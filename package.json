@@ -1,0 +1,15 @@
+{
+  "dependencies": {
+    "@emotion/react": "^11.14.0",
+    "@emotion/styled": "^11.14.0",
+    "@mui/material": "^6.4.4",
+    "@reduxjs/toolkit": "^2.5.1",
+    "react-redux": "^9.2.0",
+    "styled-components": "^6.1.15",
+    "yarn": "^1.22.22"
+  },
+  "name": "wms-run",
+  "version": "1.0.0",
+  "main": "index.js",
+  "license": "MIT"
+}

@@ -1,0 +1,65 @@
+# ---------------------------
+# Node & Yarn
+# ---------------------------
+node_modules/
+**/node_modules/
+yarn-error.log*
+npm-debug.log*
+lerna-debug.log*
+
+# ---------------------------
+# Archivos de entorno
+# No olvides agregar un .env.example para documentar las variables necesarias
+# ---------------------------
+.env
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
+
+# ---------------------------
+# Build y distribución
+# ---------------------------
+dist/
+build/
+.next/
+.expo/
+.expo-shared/
+coverage/
+android/app/build/
+ios/build/
+
+# ---------------------------
+# Prisma
+# ---------------------------
+prisma/dev.db
+prisma/migrations/
+
+# ---------------------------
+# Docker (ajusta según tu configuración)
+# ---------------------------
+Dockerfile*
+docker-compose*.yml
+.docker/
+
+# ---------------------------
+# Configuraciones de editores e IDEs
+# ---------------------------
+.vscode/
+.idea/
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+
+# ---------------------------
+# Archivos del Sistema Operativo
+# ---------------------------
+.DS_Store
+Thumbs.db
+
+# ---------------------------
+# Otros
+# ---------------------------
+*.log
+*.swp
