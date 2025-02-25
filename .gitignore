@@ -1,51 +1,38 @@
-# ---------------------------
-# Node & Yarn
-# ---------------------------
-node_modules/
-node_modules
+# Directorios y archivos de dependencias
+/node_modules/
 **/node_modules/
-yarn-error.log*
+
+# Lock files: Solo mantén el que decidas usar en la raíz.
+# Si eliges Yarn:
+package-lock.json
+pnpm-lock.yaml
+
+# Si eliges npm:
+yarn.lock
+
+# Resultados de compilación / build
+/dist/
+/build/
+/tmp/
+.nx/              # Directorio de cache de Nx (si usas Nx)
+.lerna/           # Directorio de cache de Lerna (si aplica)
+
+# Archivos generados por TypeScript
+tsconfig.tsbuildinfo
+
+# Logs y archivos de debug
 npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
 lerna-debug.log*
+debug.log*
 
-# ---------------------------
-# Archivos de entorno
-# No olvides agregar un .env.example para documentar las variables necesarias
-# ---------------------------
-.env
-.env.local
-.env.development.local
-.env.test.local
-.env.production.local
+# Variables de entorno
+*.env
+.env.*
+!.env.example    # Opcional: conservar un ejemplo de variables de entorno
 
-# ---------------------------
-# Build y distribución
-# ---------------------------
-dist/
-build/
-.next/
-.expo/
-.expo-shared/
-coverage/
-android/app/build/
-ios/build/
-
-# ---------------------------
-# Prisma
-# ---------------------------
-prisma/dev.db
-prisma/migrations/
-
-# ---------------------------
-# Docker (ajusta según tu configuración)
-# ---------------------------
-Dockerfile*
-docker-compose*.yml
-.docker/
-
-# ---------------------------
-# Configuraciones de editores e IDEs
-# ---------------------------
+# Configuraciones locales de IDEs y editores
 .vscode/
 .idea/
 *.suo
@@ -53,14 +40,6 @@ docker-compose*.yml
 *.njsproj
 *.sln
 
-# ---------------------------
-# Archivos del Sistema Operativo
-# ---------------------------
+# Archivos de sistema
 .DS_Store
 Thumbs.db
-
-# ---------------------------
-# Otros
-# ---------------------------
-*.log
-*.swp
