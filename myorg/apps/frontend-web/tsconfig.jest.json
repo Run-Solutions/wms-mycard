@@ -1,0 +1,9 @@
+{
+    "extends": "./tsconfig.json",
+    "compilerOptions": {
+      "jsx": "react-jsx",
+      "module": "commonjs"
+    },
+    "exclude": ["node_modules", ".next"]
+  }
+  

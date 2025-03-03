@@ -6,10 +6,10 @@ export const theme1 = createTheme({
     mode: "light",
     primary: { main: "#6adbef" },
     secondary: { main: "#5ce1e6" },
-    background: { default: "#f5f5f5", paper: "#ffffff" },
+    background: { default: "#ffffff", paper: "#ffffff" }, // Fondo blanco
   },
   components: {
-    MuiAppBar: { styleOverrides: { root: { backgroundColor: "#212121" } } },
+    MuiAppBar: { styleOverrides: { root: { backgroundColor: "#6adbef" } } },
   },
 });
 
@@ -18,10 +18,7 @@ export const theme2 = createTheme({
     mode: "dark",
     primary: { main: "#03A9F4" },
     secondary: { main: "#FF5722" },
-    background: { default: "#303030", paper: "#424242" },
-  },
-  components: {
-    MuiAppBar: { styleOverrides: { root: { backgroundColor: "#000000" } } },
+    background: { default: "#212121", paper: "#424242" },
   },
 });
 
@@ -30,7 +27,7 @@ export const theme3 = createTheme({
     mode: "light",
     primary: { main: "#4CAF50" },
     secondary: { main: "#FFC107" },
-    background: { default: "#e0f7fa", paper: "#ffffff" },
+    background: { default: "#f0fff0", paper: "#ffffff" }, // Ejemplo de fondo muy claro
   },
 });
 
@@ -39,7 +36,7 @@ export const theme4 = createTheme({
     mode: "dark",
     primary: { main: "#9C27B0" },
     secondary: { main: "#FF4081" },
-    background: { default: "#303030", paper: "#424242" },
+    background: { default: "#181818", paper: "#303030" },
   },
 });
 
@@ -48,7 +45,7 @@ export const theme5 = createTheme({
     mode: "light",
     primary: { main: "#FF5722" },
     secondary: { main: "#795548" },
-    background: { default: "#fff3e0", paper: "#ffffff" },
+    background: { default: "#fff8e1", paper: "#ffffff" },
   },
 });
 
@@ -66,7 +63,7 @@ export const theme7 = createTheme({
     mode: "dark",
     primary: { main: "#E91E63" },
     secondary: { main: "#03A9F4" },
-    background: { default: "#212121", paper: "#424242" },
+    background: { default: "#121212", paper: "#424242" },
   },
 });
 

@@ -1,16 +1,25 @@
 import { NestFactory } from '@nestjs/core';
 import { AppModule } from './app.module';
+import { IoAdapter } from '@nestjs/platform-socket.io';
+import { join } from 'path';
+import { NestExpressApplication } from '@nestjs/platform-express';
 
 async function bootstrap() {
-  const app = await NestFactory.create(AppModule);
+  const app = await NestFactory.create<NestExpressApplication>(AppModule);
 
-  // Habilita CORS para permitir solicitudes desde el origen deseado (por ejemplo, localhost:8081)
+  app.useStaticAssets(join(process.cwd(), 'uploads'), {
+    prefix: '/uploads/',
+  });
+
+  // eslint-disable-next-line @typescript-eslint/no-unsafe-argument
+  app.useWebSocketAdapter(new IoAdapter(app) as any);
+
   app.enableCors({
-    origin: 'http://localhost:8081', // Puedes ajustar este valor según tu entorno
+    origin: 'http://localhost:3001',
     methods: 'GET,HEAD,PUT,PATCH,POST,DELETE',
     credentials: true,
   });
 
-  await app.listen(process.env.PORT ?? 3000);
+  await app.listen(process.env.PORT || 3000);
 }
-bootstrap();
+void bootstrap();

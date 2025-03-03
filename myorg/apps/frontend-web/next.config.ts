@@ -1,6 +1,12 @@
 import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
+  experimental: {
+    appDir: true,
+  } as any, // Forzamos la propiedad experimental
+  compiler: {
+    styledComponents: true,
+  },
   webpack: (config) => {
     config.resolve.alias = {
       ...config.resolve.alias,
@@ -12,11 +18,10 @@ const nextConfig: NextConfig = {
     return [
       {
         source: '/api/:path*',
-        destination: 'http://localhost:3000/:path*', // Cambia la URL y el puerto según la configuración de tu backend
+        destination: 'http://localhost:3000/:path*',
       },
     ];
   },
 };
 
 export default nextConfig;
-

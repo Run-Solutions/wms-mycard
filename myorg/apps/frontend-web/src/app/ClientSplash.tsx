@@ -1,4 +1,3 @@
-// src/app/ClientSplash.tsx
 'use client';
 
 import React, { useState, useEffect } from "react";
@@ -14,11 +13,9 @@ export default function ClientSplash({
 
   useEffect(() => {
     setMounted(true);
-    // Ajusta el tiempo del splash según lo necesites (en milisegundos)
     const timer = setTimeout(() => {
       setShowSplash(false);
-    }, 1000); // 10 segundos
-
+    }, 1000); // Ajusta el tiempo del splash según lo necesites
     return () => clearTimeout(timer);
   }, []);
 

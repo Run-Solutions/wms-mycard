@@ -29,6 +29,7 @@ const fadeInSlide = keyframes`
 interface MainContentProps {
   open: boolean;
 }
+
 const MainContent = styled.main<MainContentProps>`
   flex-grow: 1;
   padding: 24px;
@@ -40,11 +41,13 @@ const MainContent = styled.main<MainContentProps>`
 `;
 
 const DashboardLayout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  // Inicializamos el theme en 0 para que SSR y cliente sean consistentes
+  // Controlamos que el componente ya esté montado en el cliente
+  const [mounted, setMounted] = useState(false);
   const [themeIndex, setThemeIndex] = useState<number>(0);
   const [drawerOpen, setDrawerOpen] = useState<boolean>(false);
 
   useEffect(() => {
+    setMounted(true); // Se monta en el cliente
     if (typeof window !== "undefined") {
       const stored = localStorage.getItem("selectedThemeIndex");
       if (stored) {
@@ -62,6 +65,9 @@ const DashboardLayout: React.FC<{ children: React.ReactNode }> = ({ children }) 
       localStorage.setItem("selectedThemeIndex", themeIndex.toString());
     }
   }, [themeIndex]);
+
+  // Mientras no esté montado, no renderizamos nada para evitar desajustes
+  if (!mounted) return null;
 
   const toggleDrawer = () => setDrawerOpen((prev) => !prev);
   const currentTheme = themes[themeIndex];
@@ -91,11 +97,7 @@ const DashboardLayout: React.FC<{ children: React.ReactNode }> = ({ children }) 
         />
         {/* Contenedor para Sidebar y contenido principal */}
         <Box sx={{ display: "flex", marginTop: `${headerHeight}px` }}>
-          <Sidebar
-            open={drawerOpen}
-            onNavigate={handleNavigation}
-            onLogout={handleLogout}
-          />
+          <Sidebar open={drawerOpen} onLogout={handleLogout} />
           <MainContent open={drawerOpen}>{children}</MainContent>
         </Box>
       </StyledThemeProvider>

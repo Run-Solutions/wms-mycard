@@ -1,9 +1,13 @@
+// src/app/dashboard/page.tsx
 "use client";
 import React from "react";
 import { Grid, Box } from "@mui/material";
 import FlipCard from "@/components/Card/FlipCard";
+import { useRouter } from "next/navigation";
 
 const DashboardPage: React.FC = () => {
+  const router = useRouter();
+
   const cards = [
     {
       title: "users",
@@ -61,17 +65,24 @@ const DashboardPage: React.FC = () => {
     },
   ];
 
+  const handleCardClick = (title: string) => {
+    // Navega a la ruta correspondiente utilizando el título de la tarjeta
+    router.push(`/${title.toLowerCase()}`);
+  };
+
   return (
     <Box sx={{ width: "100%", px: 2, mt: -10 }}>
       <Grid container rowSpacing={1} columnSpacing={2} justifyContent="center">
         {cards.map((card, index) => (
           <Grid item xs={12} sm={6} md={4} key={index}>
-            <FlipCard
-              title={card.title}
-              description={card.description}
-              imageName={card.imageName}
-              logoName={card.logoName}
-            />
+            <Box onClick={() => handleCardClick(card.title)} sx={{ cursor: "pointer" }}>
+              <FlipCard
+                title={card.title}
+                description={card.description}
+                imageName={card.imageName}
+                logoName={card.logoName}
+              />
+            </Box>
           </Grid>
         ))}
       </Grid>

@@ -1,3 +1,6 @@
+// src/components/Header/DashboardHeader.tsx
+'use client';
+
 import React, { useState } from "react";
 import styled from "styled-components";
 import MenuIcon from "@mui/icons-material/Menu";
@@ -7,14 +10,24 @@ import Brightness7Icon from "@mui/icons-material/Brightness7";
 import IconButton from "@mui/material/IconButton";
 import Popover from "@mui/material/Popover";
 import Grid from "@mui/material/Grid";
+import EditProfileModal from "./EditProfileModal";
+import { useAuth } from "@/context/AuthContext"; 
 import { themes } from "@/theme/themes";
+
+interface DashboardHeaderProps {
+  toggleDrawer: () => void;
+  drawerOpen: boolean;
+  onThemeChange: (index: number) => void;
+  currentTheme: number;
+  sidebarWidth: number;
+}
 
 interface HeaderContainerProps {
   $sidebarWidth: number;
 }
 
 const HeaderContainer = styled.header<HeaderContainerProps>`
-  background: ${({ theme }) => (theme as any).palette.primary.main};
+  background: ${({ theme }) => theme.palette.primary.main};
   padding: 10px 20px;
   display: flex;
   align-items: center;
@@ -49,6 +62,7 @@ const UserInfoContainer = styled.div`
   display: flex;
   align-items: center;
   margin-left: 20px;
+  cursor: pointer;
 `;
 
 const UserAvatar = styled.img`
@@ -83,14 +97,6 @@ const SecondarySwatch = styled.div`
   flex: 1;
 `;
 
-interface DashboardHeaderProps {
-  toggleDrawer: () => void;
-  drawerOpen: boolean;
-  onThemeChange: (index: number) => void;
-  currentTheme: number;
-  sidebarWidth: number;
-}
-
 const DashboardHeader: React.FC<DashboardHeaderProps> = ({
   toggleDrawer,
   drawerOpen,
@@ -98,7 +104,12 @@ const DashboardHeader: React.FC<DashboardHeaderProps> = ({
   currentTheme,
   sidebarWidth,
 }) => {
+  // Hook para el usuario real
+  const { user } = useAuth();
+  // Estado para el popover del tema
   const [anchorEl, setAnchorEl] = useState<HTMLButtonElement | null>(null);
+  // Estado para abrir el modal de editar perfil
+  const [openProfile, setOpenProfile] = useState(false);
 
   const handleThemeButtonClick = (event: React.MouseEvent<HTMLButtonElement>) => {
     setAnchorEl(event.currentTarget);
@@ -108,10 +119,19 @@ const DashboardHeader: React.FC<DashboardHeaderProps> = ({
     setAnchorEl(null);
   };
 
+  // Al hacer click en el avatar se abre el modal de edición
+  const handleUserClick = () => {
+    setOpenProfile(true);
+  };
+
+  const handleProfileClose = () => {
+    setOpenProfile(false);
+  };
+
   const openPopover = Boolean(anchorEl);
   const popoverId = openPopover ? "theme-popover" : undefined;
 
-  // Ejemplo: si el índice es par se usa Brightness4Icon, si es impar, Brightness7Icon.
+  // Selecciona el icono del tema según currentTheme
   const ThemeIcon = currentTheme % 2 === 0 ? Brightness4Icon : Brightness7Icon;
 
   return (
@@ -126,9 +146,16 @@ const DashboardHeader: React.FC<DashboardHeaderProps> = ({
           </LogoContainer>
         </div>
         <div style={{ display: "flex", alignItems: "center" }}>
-          <UserInfoContainer>
-            <UserAvatar src="/images/user.svg" alt="User" />
-            <UserName>John Doe</UserName>
+          <UserInfoContainer onClick={handleUserClick}>
+            <UserAvatar
+              src={
+                user?.profileImage
+                  ? `http://localhost:3000/uploads/${user.profileImage}`
+                  : "/logos/default-avatar.png"
+              }
+              alt="User"
+            />
+            <UserName>{user?.username || "Usuario"}</UserName>
           </UserInfoContainer>
           <IconButton
             color="inherit"
@@ -178,6 +205,9 @@ const DashboardHeader: React.FC<DashboardHeaderProps> = ({
           ))}
         </Grid>
       </Popover>
+      {openProfile && user && (
+        <EditProfileModal user={user} onClose={handleProfileClose} />
+      )}
     </>
   );
 };

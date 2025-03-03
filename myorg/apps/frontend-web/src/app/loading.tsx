@@ -1,40 +1,25 @@
-// app/layout.tsx
+// src/app/loading.tsx
 'use client';
 
 import React, { useEffect, useState } from 'react';
 import Loading from '@/components/Loading/Loading';
 
-export default function RootLayout({
-  children,
-}: {
-  children: React.ReactNode;
-}) {
+export default function LoadingFallback({ children }: { children: React.ReactNode }) {
   const [mounted, setMounted] = useState(false);
   const [showSplash, setShowSplash] = useState(true);
 
   useEffect(() => {
     setMounted(true);
-    // Aquí defines el tiempo que deseas que dure el splash.
+    // Duración del splash: 10 segundos (ajustable)
     const timer = setTimeout(() => {
       setShowSplash(false);
-    }, 10000); // 10 segundos
-
+    }, 10000);
     return () => clearTimeout(timer);
   }, []);
 
   if (!mounted || showSplash) {
-    return (
-      <html>
-        <body>
-          <Loading />
-        </body>
-      </html>
-    );
+    return <Loading />;
   }
 
-  return (
-    <html>
-      <body>{children}</body>
-    </html>
-  );
+  return <>{children}</>;
 }

@@ -67,8 +67,6 @@ const Footer = styled.footer`
   }
 `;
 
-
-
 const AuthPage: React.FC = () => {
   return (
     <>

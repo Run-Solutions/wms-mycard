@@ -1,15 +1,15 @@
-"use client";
+// src/components/Auth/AuthFlipCard.tsx
+'use client';
+
 import React, { useState } from "react";
 import styled, { createGlobalStyle } from "styled-components";
 import LoginForm from "./LoginForm";
 import RegisterForm from "./RegisterForm";
 import ToggleSwitch from "./ToggleSwitch";
-import { useDispatch } from "react-redux";
-import { AppDispatch } from "../../store";
-import { loginUser, registerUser } from "../../store/slices/authSlice";
+import { useAuth } from "../../context/AuthContext";
 import { useRouter } from "next/navigation";
+import { toast } from "react-toastify";
 
-// GlobalStyle con fondo casi blanco
 const GlobalStyle = createGlobalStyle`
   html, body, #__next {
     height: 100%;
@@ -24,17 +24,9 @@ const GlobalStyle = createGlobalStyle`
   }
 `;
 
-// Layout de dos columnas: logo a la izquierda, formulario a la derecha
 const PageContainer = styled.div`
   display: flex;
   height: 100vh;
-`;
-
-const LogoContainer = styled.div`
-  flex: 1;
-  display: flex;
-  align-items: center;
-  justify-content: center;
 `;
 
 const FormContainer = styled.div`
@@ -45,7 +37,6 @@ const FormContainer = styled.div`
   justify-content: center;
 `;
 
-// Contenedor del toggle: centrado horizontalmente para que se posicione sobre el formulario
 const ToggleContainer = styled.div`
   display: flex;
   align-items: center;
@@ -53,7 +44,6 @@ const ToggleContainer = styled.div`
   margin-bottom: 20px;
   margin-left: 140px;
 `;
-
 
 const FlipCardInner = styled.div`
   width: 300px;
@@ -100,51 +90,80 @@ const Card = styled.div.withConfig({
   ${(props) => props.transparent && `box-shadow: none;`}
 `;
 
-// Se eliminó el efecto hover para evitar el movimiento extraño
 const CardContent = styled.div`
   border-radius: 0;
   transition: all 0.2s;
 `;
 
 const AuthFlipCard: React.FC = () => {
-  const dispatch = useDispatch<AppDispatch>();
   const router = useRouter();
-
-  const [isFlipped, setIsFlipped] = useState(false);
+  const { setUser } = useAuth();
 
   // Estados para login
   const [loginEmail, setLoginEmail] = useState("");
   const [loginPassword, setLoginPassword] = useState("");
-  const [loginError, setLoginError] = useState<string | null>(null);
 
   // Estados para registro
   const [regUsername, setRegUsername] = useState("");
   const [regEmail, setRegEmail] = useState("");
   const [regPassword, setRegPassword] = useState("");
   const [regConfirmPassword, setRegConfirmPassword] = useState("");
-  const [regError, setRegError] = useState<string | null>(null);
+
+  const [isFlipped, setIsFlipped] = useState(false);
 
   const handleLoginSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     try {
-      await dispatch(loginUser({ username: loginEmail, password: loginPassword })).unwrap();
-      router.push("/dashboard");
-    } catch (err: any) {
-      setLoginError(err.message || "Error al iniciar sesión");
+      const res = await fetch("http://localhost:3000/auth/login", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ username: loginEmail, password: loginPassword }),
+      });
+      const data = await res.json();
+      if (res.ok) {
+        // Se espera que la respuesta contenga { token, user }
+        setUser(data.user);
+        localStorage.setItem("user", JSON.stringify(data.user));
+        router.push("/dashboard");
+      } else {
+        toast.error(data.message || "Error en login");
+        console.error("Error en login:", data.message || "Error en login");
+      }
+    } catch (err) {
+      toast.error("Error en login");
+      console.error("Error en login:", err);
     }
   };
 
   const handleRegisterSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     if (regPassword !== regConfirmPassword) {
-      setRegError("Las contraseñas no coinciden");
+      toast.error("Las contraseñas no coinciden");
       return;
     }
     try {
-      await dispatch(registerUser({ username: regUsername, email: regEmail, password: regPassword })).unwrap();
-      router.push("/auth/login");
-    } catch (err: any) {
-      setRegError(err.message || "Error al registrarse");
+      const res = await fetch("http://localhost:3000/auth/register", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          username: regUsername,
+          email: regEmail,
+          password: regPassword,
+        }),
+      });
+      const data = await res.json();
+      if (res.ok) {
+        setTimeout(() => {
+          router.push("/auth/login");
+          setIsFlipped(false);
+        }, 2000);
+      } else {
+        toast.error(data.message || "Error en registro");
+        console.error("Error en registro:", data.message || "Error en registro");
+      }
+    } catch (err) {
+      toast.error("Error en registro");
+      console.error("Error en registro:", err);
     }
   };
 
@@ -159,7 +178,9 @@ const AuthFlipCard: React.FC = () => {
               onChange={(e) => setIsFlipped(e.target.checked)}
             />
           </ToggleContainer>
-          <FlipCardInner style={{ transform: isFlipped ? "rotateY(180deg)" : "none" }}>
+          <FlipCardInner
+            style={{ transform: isFlipped ? "rotateY(180deg)" : "none" }}
+          >
             <FlipCardFront>
               <Card>
                 <CardContent>
@@ -169,7 +190,6 @@ const AuthFlipCard: React.FC = () => {
                     onEmailChange={(e) => setLoginEmail(e.target.value)}
                     onPasswordChange={(e) => setLoginPassword(e.target.value)}
                     onSubmit={handleLoginSubmit}
-                    error={loginError}
                     onSignUpClick={() => setIsFlipped(true)}
                   />
                 </CardContent>
@@ -186,9 +206,10 @@ const AuthFlipCard: React.FC = () => {
                     onUsernameChange={(e) => setRegUsername(e.target.value)}
                     onEmailChange={(e) => setRegEmail(e.target.value)}
                     onPasswordChange={(e) => setRegPassword(e.target.value)}
-                    onConfirmPasswordChange={(e) => setRegConfirmPassword(e.target.value)}
+                    onConfirmPasswordChange={(e) =>
+                      setRegConfirmPassword(e.target.value)
+                    }
                     onSubmit={handleRegisterSubmit}
-                    error={regError}
                     onLoginClick={() => setIsFlipped(false)}
                   />
                 </CardContent>
