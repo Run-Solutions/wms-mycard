@@ -15,193 +15,111 @@ Este repositorio contiene el código fuente de un sistema full stack modular, or
 
 - [APOLO](#apolo)
   - [Tabla de Contenidos](#tabla-de-contenidos)
-  - [Visión General](#visión-general)
-  - [Características](#características)
-  - [Tecnologías Utilizadas](#tecnologías-utilizadas)
-    - [Backend](#backend)
-    - [Frontend Web](#frontend-web)
-  - [Estructura del Proyecto](#estructura-del-proyecto)
-  - [Instalación y Configuración](#instalación-y-configuración)
+  - [Uso de Docker](#uso-de-docker)
     - [Requisitos Previos](#requisitos-previos)
-    - [Instalación](#instalación)
-    - [Configurar Variables de Entorno](#configurar-variables-de-entorno)
-  - [Scripts y Comandos Útiles](#scripts-y-comandos-útiles)
-    - [Backend](#backend-1)
-    - [Frontend Web](#frontend-web-1)
-    - [Comandos Globales](#comandos-globales)
+    - [Estructura Docker](#estructura-docker)
+    - [Cómo Iniciar el Entorno Docker](#cómo-iniciar-el-entorno-docker)
+    - [Verificar el Funcionamiento](#verificar-el-funcionamiento)
+    - [Aplicar Migraciones en la Base de Datos](#aplicar-migraciones-en-la-base-de-datos)
+    - [Detener y Eliminar Contenedores](#detener-y-eliminar-contenedores)
   - [Despliegue en Producción](#despliegue-en-producción)
-    - [Backend](#backend-2)
-    - [Frontend Web](#frontend-web-2)
-  - [Contribución](#contribución)
-  - [Licencia](#licencia)
-  - [Contacto](#contacto)
 
 ---
 
-## Visión General
+## Uso de Docker
 
-**APOLO** es un sistema modular desarrollado para gestionar procesos empresariales. La solución se compone de los siguientes módulos:
-
-- **Backend:** API REST y WebSocket con NestJS y Prisma.
-- **Frontend Web:** Aplicación web con Next.js, React y Material UI.
-- **(Frontend Mobile y Librerías Compartidas):** (Actualmente no incluidos en esta actualización)
-
-Este monorepo facilita el mantenimiento y la escalabilidad del sistema, permitiendo trabajar de forma centralizada en múltiples aplicaciones y compartir código entre ellas.
-
----
-
-## Características
-
-- **Arquitectura modular:** Separación clara entre Backend y Frontend Web.
-- **Autenticación y Autorización:** Implementación de login, registro, recuperación de contraseña y control de roles.
-- **Notificaciones en tiempo real:** Uso de WebSockets para enviar notificaciones a clientes conectados.
-- **Interfaz moderna y responsiva:** Con Next.js, Material UI y Styled Components.
-- **Optimización y rendimiento:** Uso de Next.js con TurboPack para acelerar el desarrollo y la compilación.
-- **Testing:** Configuración de pruebas unitarias y end-to-end con Jest.
-- **Integración con bases de datos:** Uso de Prisma y MySQL (u otro compatible) para el manejo de datos.
-- **Configuración robusta:** Uso de ESLint, Prettier, TypeScript y variables de entorno para garantizar calidad y seguridad.
-
----
-
-## Tecnologías Utilizadas
-
-### Backend
-
-- **NestJS:** Framework progresivo para Node.js.
-- **Prisma:** ORM moderno para interactuar con bases de datos.
-- **TypeScript:** Lenguaje de tipado estático.
-- **JWT & bcrypt:** Para autenticación y seguridad.
-- **WebSockets (Socket.io):** Comunicación en tiempo real.
-
-### Frontend Web
-
-- **Next.js:** Framework para React con renderizado del lado del servidor y generación de sitios estáticos.
-- **React:** Biblioteca para construir interfaces de usuario.
-- **Material UI:** Componentes de interfaz modernos y personalizables.
-- **Styled Components:** Estilos basados en componentes.
-- **Redux Toolkit:** Manejo de estado global.
-- **Axios & Socket.io-client:** Para consumo de APIs y comunicación en tiempo real.
-
----
-
-## Estructura del Proyecto
-
-```
-myorg/
-├── apps
-│   ├── backend              # API construida con NestJS y Prisma
-│   │   ├── src              # Código fuente
-│   │   ├── dist             # Archivos compilados (generados)
-│   │   ├── prisma           # Migraciones y esquema de la base de datos
-│   │   └── package.json     # Dependencias y scripts del backend
-│   └── frontend-web         # Aplicación web con Next.js, React y Material UI
-│       ├── src              # Código fuente (componentes, páginas, etc.)
-│       ├── public           # Recursos estáticos (imágenes, logos, etc.)
-│       └── package.json     # Dependencias y scripts del frontend web
-├── libs
-│   └── shared               # Código compartido (interfaces, utils, validaciones)
-├── nx.json                  # Configuración de Nx
-├── package.json             # Configuración global del monorepo y workspaces
-├── tsconfig.base.json       # Configuración global de TypeScript
-├── tsconfig.json            # Configuración TypeScript raíz
-└── .gitignore               # Archivos y directorios a ignorar en Git
-```
-
-Cada aplicación tiene su propio `package.json` y configuración, permitiendo el trabajo independiente y aprovechando los beneficios del monorepo.
-
----
-
-## Instalación y Configuración
+Este proyecto utiliza Docker y Docker Compose para facilitar la configuración del entorno de desarrollo y producción. Con Docker, cualquier persona que clone el repositorio podrá levantar la base de datos, el backend y el frontend de forma rápida y consistente sin preocuparse por las dependencias locales.
 
 ### Requisitos Previos
 
-- **Node.js:** Versión LTS recomendada (v16 o superior).
-- **Yarn o npm:** Gestor de paquetes.
-- **Nx CLI (opcional):** Para ejecutar comandos globales de Nx.
+Antes de iniciar, asegúrate de cumplir con los siguientes requisitos:
 
-### Instalación
+- **Docker Desktop:** Instala la última versión de Docker en tu sistema. Puedes descargarlo desde [Docker Desktop](https://www.docker.com/products/docker-desktop/).
+- **Docker Compose:** Se incluye con Docker Desktop, pero si usas una versión independiente, asegúrate de tenerlo instalado.
+- **Archivo .env:** El repositorio incluye un archivo `.env.example` que debes renombrar a `.env` y completar con las variables de entorno necesarias.
 
-```bash
-git clone https://github.com/JuliMolinaZ/wms-run.git
-cd wms-run
-npm install  # O si usas yarn:
-yarn install
-```
+### Estructura Docker
 
-### Configurar Variables de Entorno
+El entorno Docker se compone de los siguientes servicios definidos en `docker-compose.yml`:
 
-Crea un archivo `.env` en cada proyecto y define las variables necesarias. Ejemplo:
+1. **Base de Datos (MySQL)**:
+   - Utiliza MySQL 8.
+   - Crea la base de datos especificada en el `.env`.
+   - Expone el puerto 3306.
 
-```dotenv
-DATABASE_URL="mysql://usuario:contraseña@localhost:3306/mi_basedatos"
-JWT_SECRET="mi_secreto_super_seguro"
-PORT=3000
-```
+2. **Backend (NestJS + Prisma)**:
+   - Construido sobre Node.js 18 Alpine.
+   - Se conecta a MySQL a través de la variable `DATABASE_URL`.
+   - Expone el puerto 3000.
 
----
+3. **Frontend (Next.js + React)**:
+   - Construido sobre Node.js.
+   - Expone el puerto 3001.
 
-## Scripts y Comandos Útiles
+### Cómo Iniciar el Entorno Docker
 
-### Backend
+1. Clona el repositorio y accede al directorio del proyecto:
 
-```bash
-npm run start:dev    # Iniciar en modo desarrollo
-npm run build        # Compilar el proyecto
-npm run test         # Ejecutar pruebas unitarias
-npm run test:e2e     # Ejecutar pruebas end-to-end
-```
+   git clone https://github.com/JuliMolinaZ/wms-run.git
+   cd wms-run
 
-### Frontend Web
+2. Crea un archivo `.env` en la raíz del proyecto y en `apps/backend` siguiendo el ejemplo de `.env.example`.
 
-```bash
-npm run dev          # Iniciar la aplicación en modo desarrollo
-npm run build        # Construir la aplicación
-npm run start        # Iniciar la aplicación en producción
-npm run lint         # Ejecutar linter
-npm run test         # Ejecutar pruebas
-```
+3. Construye y levanta los contenedores:
 
-### Comandos Globales
+   docker-compose up --build
 
-```bash
-npx nx show projects                      # Listar proyectos
-npx nx run-many --target=build --all      # Construir todos los proyectos
-npx nx run-many --target=test --all       # Ejecutar pruebas en todos los proyectos
-```
+4. Los servicios estarán disponibles en:
+   - **Backend:** `http://localhost:3000`
+   - **Frontend:** `http://localhost:3001`
+   - **MySQL:** `localhost:3306` (se recomienda usar un cliente como MySQL Workbench para conectarse)
+
+### Verificar el Funcionamiento
+
+- **Backend:** Verifica los logs en la terminal para asegurarte de que las rutas han sido mapeadas correctamente.
+- **Frontend:** Abre en el navegador `http://localhost:3001` y verifica que la interfaz se cargue correctamente.
+
+### Aplicar Migraciones en la Base de Datos
+
+Si es la primera vez que levantas el entorno, debes aplicar las migraciones en la base de datos ejecutando:
+
+docker-compose run backend npx prisma migrate deploy
+
+
+Este comando aplicará todas las migraciones definidas en Prisma y creará las tablas necesarias.
+
+### Detener y Eliminar Contenedores
+
+Si deseas detener los contenedores sin eliminarlos:
+
+
+docker-compose stop
+
+
+Para eliminarlos junto con los volúmenes de datos:
+
+
+docker-compose down -v
+
 
 ---
 
 ## Despliegue en Producción
 
-### Backend
+Para desplegar en producción con Docker, sigue estos pasos:
 
-```bash
-npm run build
-npm run start:prod  # Usar PM2 o Docker para gestión
-```
+1. Construye las imágenes:
 
-### Frontend Web
+   
+   docker-compose -f docker-compose.prod.yml build
+   
 
-Se recomienda desplegar en **Vercel, Netlify o un servidor con Node.js**.
+2. Levanta los contenedores en modo desacoplado:
 
----
+   
+   docker-compose -f docker-compose.prod.yml up -d
+   
 
-## Contribución
+3. Verifica los logs:
 
-1. Realiza un fork.
-2. Crea una rama (`feature/nueva-funcionalidad`).
-3. Realiza cambios y pruebas.
-4. Envía un Pull Request.
-
----
-
-## Licencia
-
-Este proyecto se distribuye bajo la licencia **UNLICENSED**.
-
----
-
-## Contacto
-
-📧 **Correo:** julianmolina.ing@gmail.com  
-🔗 **GitHub:** [JuliMolinaZ](https://github.com/JuliMolinaZ)
+   docker-compose logs -f

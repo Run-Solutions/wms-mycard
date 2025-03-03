@@ -1,6 +1,5 @@
 # Node modules en la raíz y en cada workspace
 node_modules/
-node_modules
 **/node_modules/
 
 # Salidas de compilación
@@ -39,5 +38,48 @@ logs/
 # Ignorar imágenes subidas en backend (si se generan automáticamente)
 apps/backend/uploads/
 
+# Archivos extra
 extraido.sh
 codigo_componentes.txt
+
+# compiled output
+dist
+tmp
+out-tsc
+
+# dependencies
+node_modules
+
+# IDEs and editors adicionales
+/.idea
+.project
+.classpath
+.c9/
+*.launch
+.settings/
+*.sublime-workspace
+
+# IDE - VSCode
+.vscode/*
+!.vscode/settings.json
+!.vscode/tasks.json
+!.vscode/launch.json
+!.vscode/extensions.json
+
+# Misc
+/.sass-cache
+/connect.lock
+/coverage
+/libpeerconnection.log
+npm-debug.log
+yarn-error.log
+testem.log
+/typings
+
+# System Files
+.DS_Store
+Thumbs.db
+
+# Nx cache y workspace data
+.nx/cache
+.nx/workspace-data
