@@ -1,4 +1,4 @@
-# APOLO TEST
+# MYCARD
 
 APOLO es un sistema full stack modular desarrollado en un monorepo administrado con Nx. Está compuesto por múltiples aplicaciones y librerías compartidas, lo que permite escalar y mantener funcionalidades de forma independiente.
 
