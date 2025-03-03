@@ -1,15 +1,55 @@
-# See http://help.github.com/ignore-files/ for more about ignoring files.
+# Node modules en la raíz y en cada workspace
+node_modules/
+**/node_modules/
 
-# compiled output
-dist
-tmp
-out-tsc
+# Salidas de compilación
+dist/
+**/dist/
+build/
+**/build/
+.next/
+**/.next/
 
-# dependencies
-node_modules
+# Archivos de lock y caches
+yarn.lock
+package-lock.json
+.pnpm-debug.log*
+.nx/cache/
 
-# IDEs and editors
-/.idea
+# Archivos de entorno (variables sensibles)
+.env
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
+
+# Archivo de Docker Compose con credenciales sensibles (usa el de ejemplo en su lugar)
+docker-compose.yml
+
+# Archivos de compilación TypeScript
+*.tsbuildinfo
+
+# Directorios de IDE y editores
+.vscode/
+.idea/
+
+# Otros (coverage, logs, etc.)
+coverage/
+logs/
+*.log
+
+# Ignorar imágenes subidas en backend (si se generan automáticamente)
+apps/backend/uploads/
+
+# Archivos extras
+extraido.sh
+codigo_componentes.txt
+
+# compilados, tmp, etc.
+tmp/
+out-tsc/
+
+# IDEs y editores adicionales
 .project
 .classpath
 .c9/
@@ -17,17 +57,16 @@ node_modules
 .settings/
 *.sublime-workspace
 
-# IDE - VSCode
+# VSCode settings (except algunos archivos importantes)
 .vscode/*
 !.vscode/settings.json
 !.vscode/tasks.json
 !.vscode/launch.json
 !.vscode/extensions.json
 
-# misc
+# Misc
 /.sass-cache
 /connect.lock
-/coverage
 /libpeerconnection.log
 npm-debug.log
 yarn-error.log
@@ -38,5 +77,10 @@ testem.log
 .DS_Store
 Thumbs.db
 
+# Nx cache y workspace data
 .nx/cache
 .nx/workspace-data
+
+# Archivos de configuración sensibles
+# (No subir el docker-compose.yml real con credenciales; usar el de ejemplo)
+docker-compose.override.yml
