@@ -57,8 +57,6 @@ Tailwind CSS (opcional): Para estilos utilitarios (en el frontend web, si se req
 Estructura del Proyecto
 La estructura principal del monorepo es la siguiente:
 
-graphql
-Copiar
 myorg/
 ├── apps
 │   ├── backend         # API construida con NestJS y Prisma
@@ -91,16 +89,12 @@ Nx CLI (opcional): Para ejecutar comandos globales de Nx.
 Instalación
 Clonar el repositorio:
 
-bash
-Copiar
 git clone https://github.com/tu-usuario/myorg.git
 cd myorg
 Instalar dependencias en el monorepo:
 
 Si utilizas workspaces (ya configurados en el package.json raíz):
 
-bash
-Copiar
 npm install
 # o, si usas yarn:
 yarn install
@@ -111,7 +105,7 @@ Configurar Variables de Entorno:
 Crea un archivo .env en cada proyecto (por ejemplo, en apps/backend) y define las variables necesarias (por ejemplo, cadena de conexión a la base de datos, JWT_SECRET, etc.):
 
 dotenv
-Copiar
+
 DATABASE_URL="mysql://usuario:contraseña@localhost:3306/mi_basedatos"
 JWT_SECRET="mi_secreto_super_seguro"
 PORT=3000
@@ -119,67 +113,43 @@ Scripts y Comandos Útiles
 Backend (apps/backend)
 Iniciar en modo desarrollo:
 
-bash
-Copiar
 npm run start:dev
 Compilar el proyecto:
 
-bash
-Copiar
 npm run build
 Ejecutar pruebas unitarias:
 
-bash
-Copiar
 npm run test
 Ejecutar pruebas end-to-end:
 
-bash
-Copiar
 npm run test:e2e
 Frontend-Web (apps/frontend-web)
 Iniciar la aplicación en modo desarrollo:
 
-bash
-Copiar
 npm run dev
 Construir la aplicación:
 
-bash
-Copiar
 npm run build
 Iniciar la aplicación en producción:
 
-bash
-Copiar
 npm run start
 Ejecutar linter:
 
-bash
-Copiar
 npm run lint
 Ejecutar pruebas:
 
-bash
-Copiar
 npm run test
 Monorepo General
 Si utilizas Nx, puedes ejecutar comandos globales como:
 
 Listar proyectos:
 
-bash
-Copiar
 npx nx show projects
 Construir todos los proyectos:
 
-bash
-Copiar
 npx nx run-many --target=build --all
 Ejecutar pruebas de todos los proyectos:
 
-bash
-Copiar
 npx nx run-many --target=test --all
 Desarrollo y Testing
 Desarrollo:
@@ -191,21 +161,17 @@ Se utiliza Jest para pruebas unitarias y end-to-end. Asegúrate de que tus prueb
 Linting y Formateo:
 El proyecto utiliza ESLint y Prettier para mantener la calidad y consistencia del código. Ejecuta:
 
-bash
-Copiar
 npm run lint
 npm run format
 Despliegue en Producción
 Antes de desplegar, asegúrate de:
 
 Compilar los proyectos:
-bash
-Copiar
+
 npm run build
 Configurar las variables de entorno en el servidor de producción.
 Para el backend, utiliza un proceso de gestión (por ejemplo, PM2 o Docker) para ejecutar la aplicación con el comando:
-bash
-Copiar
+
 npm run start:prod
 Para el frontend web, despliega la aplicación Next.js utilizando soluciones como Vercel, Netlify o configurando un servidor Node.js para servir la aplicación.
 Contribución
@@ -221,6 +187,6 @@ Licencia
 Este proyecto se distribuye bajo la licencia UNLICENSED (o ajusta la licencia según corresponda). Consulta el archivo LICENSE para más detalles.
 
 Contacto
-Correo: tu-email@ejemplo.com
+Correo: julianmolina.ing@gmail.com
 GitHub: https://github.com/tu-usuario
 Documentación Adicional: Puedes encontrar más detalles y documentación interna en la carpeta docs (si la agregas en el futuro).
