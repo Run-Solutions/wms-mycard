@@ -7,7 +7,7 @@
   "dependencies": {
     "@nestjs/websockets": "^11.0.10",
     "@prisma/client": "^6.4.1",
-    "bcrypt": "^5.1.1",
+    "bcryptjs": "^3.0.2",
     "jsonwebtoken": "^9.0.2",
     "socket.io": "^4.8.1"
   },
