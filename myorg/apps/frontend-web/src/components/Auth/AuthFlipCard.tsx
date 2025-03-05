@@ -16,7 +16,7 @@ const GlobalStyle = createGlobalStyle`
     margin: 0;
     padding: 0;
     background: linear-gradient(rgba(255,255,255,0.95), rgba(255,255,255,0.95)),
-                url('/images/apolopaper.jpg') no-repeat center center fixed;
+                url('/images/items.jpg') no-repeat center center fixed;
     background-size: cover;
   }
   *, *::before, *::after {
@@ -26,15 +26,15 @@ const GlobalStyle = createGlobalStyle`
 
 const PageContainer = styled.div`
   display: flex;
-  height: 100vh;
 `;
 
 const FormContainer = styled.div`
   flex: 1;
   display: flex;
-  flex-direction: column;
   align-items: center;
   justify-content: center;
+  flex-direction: column;
+  height: auto;
 `;
 
 const ToggleContainer = styled.div`

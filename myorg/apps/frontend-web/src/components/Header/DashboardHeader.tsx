@@ -47,7 +47,7 @@ const LogoContainer = styled.div`
 
 const AppName = styled.h1`
   font-size: 28px;
-  font-weight: 800;
+  font-weight: 700;
   color: #fff;
   margin: 0;
   letter-spacing: 2px;
@@ -142,7 +142,7 @@ const DashboardHeader: React.FC<DashboardHeaderProps> = ({
             {drawerOpen ? <ChevronLeftIcon /> : <MenuIcon />}
           </IconButton>
           <LogoContainer>
-            <AppName>APOLOWARE</AppName>
+            <AppName>MyCard</AppName>
           </LogoContainer>
         </div>
         <div style={{ display: "flex", alignItems: "center" }}>
@@ -162,7 +162,7 @@ const DashboardHeader: React.FC<DashboardHeaderProps> = ({
             onClick={handleThemeButtonClick}
             style={{ marginLeft: 8 }}
           >
-            <ThemeIcon />
+          <ThemeIcon />
           </IconButton>
           <SupportLogo src="/images/support.svg" alt="Soporte Técnico" />
         </div>

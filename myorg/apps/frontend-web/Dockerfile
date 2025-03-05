@@ -1,3 +1,5 @@
+# myorg\apps\frontend-web\Dockerfile
+
 # Usa una imagen base de Node.js
 FROM node:18-alpine
 

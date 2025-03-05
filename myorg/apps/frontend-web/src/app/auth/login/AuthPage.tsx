@@ -33,7 +33,7 @@ const AuthPage: React.FC = () => {
   return (
     <PageContainer>
       <LogoContainer>
-        <img src="/images/rocket.svg" alt="Logo" style={{ width: "150px" }} />
+        <img src="/images/card.svg" alt="Logo" style={{ width: "150px" }} />
       </LogoContainer>
       <FormContainer>
         <AuthFlipCard />
