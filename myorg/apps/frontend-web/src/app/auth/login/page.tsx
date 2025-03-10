@@ -48,7 +48,7 @@ const LogoContainer = styled.div`
   justify-content: center;
   max-width: 400px;
   padding-right: 100px;
-  img { width: 300px; }
+  img { width: 400px; }
   @media (max-width: 768px) {
     width: 100%;
     padding-bottom: 20px;

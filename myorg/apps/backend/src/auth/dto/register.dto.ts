@@ -1,4 +1,5 @@
-import { IsEmail, IsNotEmpty, IsString } from 'class-validator';
+/*myorg\apps\backend\src\auth\dto\register.dto.ts*/
+import { IsEmail, IsInt, IsNotEmpty, IsOptional, IsString } from 'class-validator';
 
 export class RegisterDto {
   @IsNotEmpty()
@@ -14,6 +15,7 @@ export class RegisterDto {
   password: string;
 
   // Campo opcional para definir el rol (si no se define, se asigna 'operator' en el servicio)
-  @IsString()
-  role?: string;
+  @IsOptional()
+  @IsInt()
+  role_id?: number;
 }

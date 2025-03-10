@@ -43,6 +43,7 @@ const HeaderContainer = styled.header<HeaderContainerProps>`
 const LogoContainer = styled.div`
   display: flex;
   align-items: center;
+  padding: 5px;
 `;
 
 const AppName = styled.h1`
@@ -51,6 +52,7 @@ const AppName = styled.h1`
   color: #fff;
   margin: 0;
   letter-spacing: 2px;
+  font-family: Arial, sans-serif !important;
 `;
 
 const SupportLogo = styled.img`
@@ -142,15 +144,15 @@ const DashboardHeader: React.FC<DashboardHeaderProps> = ({
             {drawerOpen ? <ChevronLeftIcon /> : <MenuIcon />}
           </IconButton>
           <LogoContainer>
-            <AppName>MyCard</AppName>
+            <img src="/logos/mycard-logo.svg" alt="MyCard Logo" style={{ height: 40 }} />
           </LogoContainer>
         </div>
         <div style={{ display: "flex", alignItems: "center" }}>
           <UserInfoContainer onClick={handleUserClick}>
             <UserAvatar
               src={
-                user?.profileImage
-                  ? `http://localhost:3000/uploads/${user.profileImage}`
+                user?.profile_image
+                  ? `http://localhost:3000/uploads/${user.profile_image}`
                   : "/logos/default-avatar.png"
               }
               alt="User"
@@ -206,7 +208,7 @@ const DashboardHeader: React.FC<DashboardHeaderProps> = ({
         </Grid>
       </Popover>
       {openProfile && user && (
-        <EditProfileModal user={user} onClose={handleProfileClose} />
+        <EditProfileModal user={{...user, id: String(user.id)}} onClose={handleProfileClose} />
       )}
     </>
   );

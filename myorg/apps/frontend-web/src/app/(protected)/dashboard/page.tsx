@@ -16,30 +16,30 @@ const DashboardPage: React.FC = () => {
       logoName: "users.webp",
     },
     {
-      title: "picking",
-      description: "Optimiza la selección de productos en el almacén.",
+      title: "Ordenes de Trabajo",
+      description: "Registra nuevas ordenes de trabajo.",
       imageName: "picking.jpg",
       logoName: "picking.webp",
     },
     {
-      title: "slotting",
+      title: "Seguimiento OT's",
       description: "Organiza el almacenamiento de productos de forma óptima.",
       imageName: "slotting.jpg",
       logoName: "slotting.webp",
     },
     {
-      title: "dashboards",
-      description: "Visualiza reportes y métricas en tiempo real.",
+      title: "Dashboard",
+      description: "Visualiza reportes y métricas.",
       imageName: "dashboard.jpg",
       logoName: "dashboard.webp",
     },
     {
-      title: "packing",
-      description: "Coordina el empaque y preparación de pedidos.",
+      title: "Finalización",
+      description: "Cerrar Ots que hayan completado el flujo asignado.",
       imageName: "packing.jpg",
       logoName: "packing.webp",
-    },
-    {
+    }
+    /*{
       title: "locations",
       description: "Gestiona las ubicaciones y zonas del almacén.",
       imageName: "ubication.jpg",
@@ -62,7 +62,7 @@ const DashboardPage: React.FC = () => {
       description: "Administra el inventario y detalles de productos.",
       imageName: "items.jpg",
       logoName: "items.webp",
-    },
+    },*/
   ];
 
   const handleCardClick = (title: string) => {

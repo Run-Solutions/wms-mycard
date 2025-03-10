@@ -8,12 +8,12 @@ import React, {
   } from "react";
   
   export interface User {
-    id: string;
+    id: number;
     username: string;
     email: string;
     phone?: string;
-    role: string;
-    profileImage?: string;
+    role: {id: number, name: string, createdAt:string, updateAt: string};
+    profile_image?: string;
   }
   
   interface AuthContextType {

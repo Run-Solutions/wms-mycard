@@ -141,30 +141,14 @@ const AuthFlipCard: React.FC = () => {
       toast.error("Las contraseñas no coinciden");
       return;
     }
-    try {
-      const res = await fetch("http://localhost:3000/auth/register", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          username: regUsername,
-          email: regEmail,
-          password: regPassword,
-        }),
-      });
-      const data = await res.json();
-      if (res.ok) {
-        setTimeout(() => {
-          router.push("/auth/login");
-          setIsFlipped(false);
-        }, 2000);
-      } else {
-        toast.error(data.message || "Error en registro");
-        console.error("Error en registro:", data.message || "Error en registro");
-      }
-    } catch (err) {
-      toast.error("Error en registro");
-      console.error("Error en registro:", err);
-    }
+    // Guardar los datos en localstorage
+    const pendingUser = {
+      username: regUsername,
+      email: regEmail,
+      password: regPassword,
+    };
+      localStorage.setItem("pendingUser", JSON.stringify(pendingUser));
+      router.push("/auth/roleSelection");
   };
 
   return (

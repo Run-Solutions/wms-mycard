@@ -53,6 +53,7 @@ const FormContainer = styled.div`
 const RegisterPage: React.FC = () => {
   const dispatch = useDispatch<AppDispatch>();
   const router = useRouter();
+
   const [username, setUsername] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -66,9 +67,23 @@ const RegisterPage: React.FC = () => {
       return;
     }
     try {
-      await dispatch(registerUser({ username, email, password })).unwrap();
+      // Crear el objeto de usuario
+      const newUser = { id: Date.now().toString(), username, email, role: "pending" };
+      
+      // Guardar los datos para llevarlos a la siguiente pagina: roleSelection
+      sessionStorage.setItem('username', username);
+      sessionStorage.setItem('email', email);
+      sessionStorage.setItem('password', password);
+
+      // Guardar en localStorage para persistencia en el contexto
+      localStorage.setItem("user", JSON.stringify(newUser));
+
+      // Actualizar contexto de autenticación
+      dispatch(registerUser({ username, email, password })); // <-- Asegúrate de importar useAuth y setUser
+
+      // await dispatch(registerUser({ username, email, password })).unwrap();
       // Redirige a la ruta configurada (backend ya la tiene configurada)
-      router.push("/auth/login");
+      router.push("/auth/roleSelection"); // se cambia la ruta a elegir rol
     } catch (err: any) {
       setError(err.message || "Error al registrarse");
     }

@@ -4,9 +4,12 @@ import { createTheme } from "@mui/material/styles";
 export const theme1 = createTheme({
   palette: {
     mode: "light",
-    primary: { main: "#6adbef" },
+    primary: { main: "#0038A8" },
     secondary: { main: "#5ce1e6" },
     background: { default: "#ffffff", paper: "#ffffff" }, // Fondo blanco
+  },
+  typography: {
+    fontFamily: "Arial, sans-serif !important",
   },
   components: {
     MuiAppBar: { styleOverrides: { root: { backgroundColor: "#6adbef" } } },
@@ -16,13 +19,13 @@ export const theme1 = createTheme({
 export const theme2 = createTheme({
   palette: {
     mode: "dark",
-    primary: { main: "#03A9F4" },
-    secondary: { main: "#FF5722" },
+    primary: { main: "#0038A8" },
+    secondary: { main: "#5ce1e6" },
     background: { default: "#212121", paper: "#424242" },
   },
 });
 
-export const theme3 = createTheme({
+/*export const theme3 = createTheme({
   palette: {
     mode: "light",
     primary: { main: "#4CAF50" },
@@ -65,9 +68,9 @@ export const theme7 = createTheme({
     secondary: { main: "#03A9F4" },
     background: { default: "#121212", paper: "#424242" },
   },
-});
+});*/
 
-export const themes = [theme1, theme2, theme3, theme4, theme5, theme6, theme7];
+export const themes = [theme1, theme2/*, theme3, theme4, theme5, theme6, theme7*/];
 
 export const getDailyTheme = () => {
   const dayIndex = new Date().getDay(); // 0 (Domingo) a 6 (Sábado)

@@ -1,3 +1,4 @@
+/* myorg\apps\backend\src\modules\users\users.service.ts */
 import { Injectable } from '@nestjs/common';
 import { PrismaClient } from '@prisma/client';
 import { UpdateUserDto } from '../../auth/dto/update-user.dto';
@@ -7,7 +8,9 @@ export class UsersService {
   private prisma = new PrismaClient();
 
   async getUsers() {
-    return await this.prisma.user.findMany();
+    return await this.prisma.user.findMany({
+      include: { role: true } // Incluir la info del rol
+    });
   }
 
   async updateUser(id: string, updateUserDto: UpdateUserDto) {

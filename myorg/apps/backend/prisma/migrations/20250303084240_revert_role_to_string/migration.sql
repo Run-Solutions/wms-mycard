@@ -1,3 +1,4 @@
+-- myorg\apps\backend\prisma\migrations\20250303084240_revert_role_to_string\migration.sql
 /*
   Warnings:
 
@@ -5,16 +6,13 @@
   - You are about to drop the `Role` table. If the table is not empty, all the data it contains will be lost.
   - Added the required column `role` to the `User` table without a default value. This is not possible if the table is not empty.
 
-*/
--- DropForeignKey
-ALTER TABLE `User` DROP FOREIGN KEY `User_roleId_fkey`;
 
--- DropIndex
-DROP INDEX `User_roleId_fkey` ON `User`;
+-- DropForeignKey
+ALTER TABLE `users` DROP FOREIGN KEY `User_roleId_fkey`;
 
 -- AlterTable
-ALTER TABLE `User` DROP COLUMN `roleId`,
-    ADD COLUMN `role` VARCHAR(191) NOT NULL;
+ALTER TABLE `users` DROP COLUMN `role_id`,
+  ADD COLUMN `role` VARCHAR(191) NOT NULL;
 
 -- DropTable
-DROP TABLE `Role`;
+DROP TABLE `roles`;*/

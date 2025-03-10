@@ -1,3 +1,4 @@
+// myorg\apps\frontend-web\src\hooks\useAuth.ts
 import { useSelector, useDispatch } from 'react-redux';
 import type { RootState, AppDispatch } from '../store';
 

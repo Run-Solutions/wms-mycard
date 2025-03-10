@@ -10,8 +10,8 @@ interface User {
   username: string;
   email: string;
   phone?: string;
-  role: string;
-  profileImage?: string; // Debe contener solo el nombre del archivo
+  role: {id:number, name: string, createdAt: string, updateAt: string};
+  profile_image?: string;
 }
 
 interface EditProfileModalProps {
@@ -28,7 +28,7 @@ const EditProfileModal: React.FC<EditProfileModalProps> = ({ user, onClose }) =>
   const [phone, setPhone] = useState(user.phone || "");
   const [role, setRole] = useState(user.role);
   const [password, setPassword] = useState("");
-  const [profileImage, setProfileImage] = useState<File | null>(null);
+  const [profile_image, setProfileImage] = useState<File | null>(null);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -36,9 +36,9 @@ const EditProfileModal: React.FC<EditProfileModalProps> = ({ user, onClose }) =>
     formData.append("username", username);
     formData.append("email", email);
     formData.append("phone", phone);
-    formData.append("role", role);
+    formData.append("role", role.name);
     if (password) formData.append("password", password);
-    if (profileImage) formData.append("profileImage", profileImage);
+    if (profile_image) formData.append("profile_image", profile_image);
 
     try {
       const res = await fetch(`http://localhost:3000/users/${user.id}`, {
@@ -76,9 +76,9 @@ const EditProfileModal: React.FC<EditProfileModalProps> = ({ user, onClose }) =>
           <AvatarContainer onClick={handleAvatarClick}>
             <ProfileLogo
               src={
-                user.profileImage
-                  ? `http://localhost:3000/uploads/${user.profileImage}`
-                  : "/logos/default-avatar.png"
+                user.profile_image
+                  ? `http://localhost:3000/uploads/${user.profile_image}`
+                  : "/logos/users.webp"
               }
               alt={user.username}
             />
@@ -124,8 +124,8 @@ const EditProfileModal: React.FC<EditProfileModalProps> = ({ user, onClose }) =>
             <label>Rol</label>
             <input
               type="text"
-              value={role}
-              onChange={(e) => setRole(e.target.value)}
+              value={role.name}
+              onChange={(e) => setRole({ ...role, name: e.target.value })}
             />
           </InputGroup>
           <InputGroup>

@@ -53,7 +53,7 @@ const FloatingChatButton: React.FC = () => {
   // Puedes condicionar su renderizado según la ruta o incluirlo solo en el layout protegido.
   return (
     <>
-      <Button onClick={() => setChatOpen(!chatOpen)}>
+      {/*<Button onClick={() => setChatOpen(!chatOpen)}>
         <IconSvg stroke="none" viewBox="0 0 24 24" fill="currentColor">
           <path
             fillRule="evenodd"
@@ -62,7 +62,7 @@ const FloatingChatButton: React.FC = () => {
           />
         </IconSvg>
         <TextSpan>AI</TextSpan>
-      </Button>
+      </Button>*/}
       {chatOpen && <ChatWindow onClose={() => setChatOpen(false)} />}
     </>
   );

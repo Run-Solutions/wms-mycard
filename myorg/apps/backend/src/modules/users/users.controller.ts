@@ -1,3 +1,4 @@
+/* myorg\apps\backend\src\modules\users\users.controller.ts */
 import {
   Controller,
   Get,
@@ -24,7 +25,7 @@ export class UsersController {
 
   @Patch(':id')
   @UseInterceptors(
-    FileInterceptor('profileImage', {
+    FileInterceptor('profile_image', {
       storage: diskStorage({
         destination: './uploads', // Asegúrate de que la carpeta 'uploads' exista
         filename: (req, file, cb) => {
@@ -44,7 +45,7 @@ export class UsersController {
   ) {
     if (file) {
       // Guarda el nombre del archivo; puedes ajustar para guardar la ruta completa si lo deseas
-      updateUserDto.profileImage = file.filename;
+      updateUserDto.profile_image = file.filename;
     }
     const updatedUser = await this.usersService.updateUser(id, updateUserDto);
     return updatedUser;

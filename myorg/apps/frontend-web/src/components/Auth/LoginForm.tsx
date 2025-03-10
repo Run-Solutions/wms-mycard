@@ -6,7 +6,7 @@ const Form = styled.form`
   display: flex;
   flex-direction: column;
   gap: 10px;
-  background: linear-gradient(45deg, #6adbef, #5ce1e6);
+  background: linear-gradient(to right, #0038A8 0%, #0038A8 100%);
   padding: 30px;
   width: 450px;
   border-radius: 20px;

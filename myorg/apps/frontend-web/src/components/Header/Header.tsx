@@ -4,7 +4,7 @@ import styled from "styled-components";
 
 // Contenedor principal del header con el mismo gradiente que el formulario
 const HeaderContainer = styled.header`
-  background: linear-gradient(to right, #093a7c 0%, #093a7c 100%);
+  background: linear-gradient(to right, #0038A8 0%, #0038A8 100%);
   padding: 10px 20px;
   display: flex;
   align-items: center;
@@ -20,6 +20,7 @@ const HeaderContainer = styled.header`
 const LogoContainer = styled.div`
   display: flex;
   align-items: center;
+  padding: 5px;
 `;
 
 
@@ -43,7 +44,7 @@ const Header: React.FC = () => {
   return (
     <HeaderContainer>
       <LogoContainer>
-        <AppName>MyCard</AppName>
+        <img src="/logos/mycard-logo.svg" alt="MyCard Logo" style={{ height: 40 }} />
       </LogoContainer>
       {/* Ajusta la ruta del logo de soporte técnico */}
       <SupportLogo src="/images/support.svg" alt="Soporte Técnico" />

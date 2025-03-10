@@ -9,8 +9,8 @@ interface User {
   username: string;
   email: string;
   phone?: string;
-  role: string;
-  profileImage?: string;
+  role: {id:number, name: string, createdAt: string, updateAt: string};
+  profile_image?: string;
 }
 
 const UsersPage: React.FC = () => {
@@ -22,6 +22,9 @@ const UsersPage: React.FC = () => {
       try {
         const res = await fetch('http://localhost:3000/users');
         const data = await res.json();
+
+        console.log('Datos obtenidos: ', data)
+
         if (Array.isArray(data)) {
           setUsers(data);
         } else if (Array.isArray(data.users)) {
@@ -57,13 +60,13 @@ const UsersPage: React.FC = () => {
                 <FlipCardFront theme={theme} className="flip-card-front">
                   <ProfileImage
                     src={
-                      user.profileImage
-                        ? `http://localhost:3000/uploads/${user.profileImage}`
-                        : '/placeholder.png'
+                      user.profile_image
+                        ? `http://localhost:3000/uploads/${user.profile_image}`
+                        : '/logos/users.webp'
                     }
                     alt={user.username}
                   />
-                  <UserName theme={theme}>{user.username}</UserName>
+                  <UserName theme={theme}>{String(user.username)}</UserName>
                 </FlipCardFront>
                 <FlipCardBack theme={theme} className="flip-card-back">
                   <InfoItem>
@@ -75,7 +78,7 @@ const UsersPage: React.FC = () => {
                     </InfoItem>
                   )}
                   <InfoItem>
-                    <strong>Rol:</strong> {user.role}
+                    <strong>Rol:</strong> {user.role?.name || 'Sin rol'}
                   </InfoItem>
                 </FlipCardBack>
               </FlipCardInner>
