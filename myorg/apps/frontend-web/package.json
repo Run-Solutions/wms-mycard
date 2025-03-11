@@ -12,9 +12,10 @@
   "dependencies": {
     "@emotion/react": "^11.14.0",
     "@emotion/styled": "^11.14.0",
-    "@mui/icons-material": "^6.4.4",
-    "@mui/material": "^6.4.4",
+    "@mui/icons-material": "^6.4.7",
+    "@mui/material": "^6.4.7",
     "@mui/styled-engine-sc": "^6.4.3",
+    "@mui/system": "^6.4.7",
     "@reduxjs/toolkit": "^2.5.1",
     "axios": "^1.7.9",
     "babel-plugin-styled-components": "^2.1.4",

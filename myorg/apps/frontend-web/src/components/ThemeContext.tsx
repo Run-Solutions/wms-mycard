@@ -13,7 +13,7 @@ interface ThemeContextType {
 const ThemeContext = createContext<ThemeContextType | undefined>(undefined);
 
 export function ThemeProviderClient({ children }: { children: React.ReactNode }) {
-  const initialIndex = new Date().getDay();
+  const initialIndex = new Date().getDay() % themes.length;
   const [currentTheme, setCurrentTheme] = useState(initialIndex);
   const [theme, setTheme] = useState(themes[initialIndex]);
 

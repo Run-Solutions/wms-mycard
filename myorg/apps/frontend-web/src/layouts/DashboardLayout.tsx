@@ -50,13 +50,14 @@ const DashboardLayout: React.FC<{ children: React.ReactNode }> = ({ children }) 
     setMounted(true); // Se monta en el cliente
     if (typeof window !== "undefined") {
       const stored = localStorage.getItem("selectedThemeIndex");
-      if (stored) {
-        setThemeIndex(Number(stored));
-      } else {
-        const dailyTheme = getDailyTheme();
-        const idx = themes.findIndex((t) => t === dailyTheme);
-        setThemeIndex(idx >= 0 ? idx : 0);
+      let index = stored ? Number(stored) : -1;
+
+      if (index < 0 || index >= themes.length) {
+        const DailyTheme = getDailyTheme();
+        index = themes.findIndex((t) => t === DailyTheme);
+        index = index >= 0 ? index : 0;
       }
+      setThemeIndex(index);
     }
   }, []);
 

@@ -24,8 +24,8 @@ export const theme2 = createTheme({
     background: { default: "#212121", paper: "#424242" },
   },
 });
-
-/*export const theme3 = createTheme({
+/*
+export const theme3 = createTheme({
   palette: {
     mode: "light",
     primary: { main: "#4CAF50" },
@@ -68,11 +68,8 @@ export const theme7 = createTheme({
     secondary: { main: "#03A9F4" },
     background: { default: "#121212", paper: "#424242" },
   },
-});*/
-
+});
+*/
 export const themes = [theme1, theme2/*, theme3, theme4, theme5, theme6, theme7*/];
 
-export const getDailyTheme = () => {
-  const dayIndex = new Date().getDay(); // 0 (Domingo) a 6 (Sábado)
-  return themes[dayIndex];
-};
+export const getDailyTheme = () => themes[0] ?? theme1;
