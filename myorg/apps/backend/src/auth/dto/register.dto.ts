@@ -1,5 +1,5 @@
 /*myorg\apps\backend\src\auth\dto\register.dto.ts*/
-import { IsEmail, IsInt, IsNotEmpty, IsOptional, IsString } from 'class-validator';
+import { IsEmail, IsInt, IsNotEmpty, IsOptional, IsString, ValidateIf } from 'class-validator';
 
 export class RegisterDto {
   @IsNotEmpty()
@@ -18,4 +18,9 @@ export class RegisterDto {
   @IsOptional()
   @IsInt()
   role_id?: number;
+
+  @ValidateIf((o: RegisterDto) => o.role_id === 2)
+  @IsNotEmpty({ message: "El área de operador es obligatoria si el rol es operador." })
+  @IsInt()
+  areas_operator_id?: number;
 }

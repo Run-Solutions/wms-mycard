@@ -9,30 +9,56 @@ datasource db {
 }
 
 model User {
-  id            Int      @id @default(autoincrement())
-  username      String   @unique
-  email         String   @unique
-  password      String
-  phone         String?
-  profile_image String?
-  role_id       Int      @map("role_id") // Clave foránea
+  id                  Int                 @id @default(autoincrement())
+  username            String              @unique
+  email               String              @unique
+  password            String
+  phone               String?
+  profile_image       String?
+  role_id             Int                 @map("role_id") // Clave foránea
+  areas_operator_id   Int?                // Puede ser nulo si no es operador
 
-  role          Role     @relation(fields: [role_id], references: [id]) // Relación con Role
+  role                Role                @relation(fields: [role_id], references: [id]) // Relación con Role
+  areasOperator       AreasOperator?      @relation(fields: [areas_operator_id], references: [id]) // Relación con area si es operador
 
-  created_at    DateTime @default(now()) @map("created_at")
-  updated_at    DateTime @updatedAt @map("updated_at")
+  created_at      DateTime            @default(now()) @map("created_at")
+  updated_at      DateTime            @updatedAt @map("updated_at")
 
   @@map("users")
 }
 
 model Role {
-  id        Int      @id @default(autoincrement())
-  name      String   @unique
-  users     User[]   // Relación inversa con User
+  id              Int                 @id @default(autoincrement())
+  name            String              @unique
 
-  createdAt DateTime @default(now()) @map("created_at")
-  updatedAt DateTime @updatedAt @map("updated_at")
+  users           User[]              // Relación inversa con User
+  permissions     ModulePermission[]  // Relación inversa con ModulePermission
+
+  created_at      DateTime            @default(now()) @map("created_at")
+  updated_at      DateTime            @updatedAt @map("updated_at")
 
   @@map("roles")
 }
 
+model AreasOperator {
+  id              Int                 @id @default(autoincrement())
+  name            String              @unique
+
+  users           User[]              //Relacion con User si aplica 
+  
+  @@map("areas_operator")
+}
+
+model ModulePermission {
+  id              Int                 @id @default(autoincrement())
+  module          String              //Nombre del modulo permitido
+  role_id         Int                 @map("role_id")
+  
+  role            Role                @relation(fields: [role_id], references: [id])
+
+  created_at      DateTime            @default(now()) @map("created_at")
+  updated_at      DateTime            @updatedAt @map("updated_at")
+
+  @@unique([module, role_id])         //Para no tener un mismo rol con permisos duplicados
+  @@map("module_permissions")
+}

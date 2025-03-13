@@ -166,8 +166,12 @@ const Footer = styled.footer`
 const RoleSelection = () => {
   const router = useRouter();
   const [userData, setUserData] = useState<{ username: string; email: string; password: string } | null>(null);
+  
   const [roles, setRoles] = useState<{ id: string; name: string }[]>([]);
   const [selectedRole, setSelectedRole] = useState("");
+  
+  const [areas_operator, setAreasOperator] = useState<{ id: string; name: string }[]>([]);
+  const [selectedAreasOperator, setSelectedAreasOperator] = useState("");
 
   // Cargar datos desde localStorage
   useEffect(() => {
@@ -196,6 +200,24 @@ const RoleSelection = () => {
       });
   }, []);
 
+  // Obtener las areas desde la BD
+  useEffect(() => {
+
+    if (!selectedRole) return;
+  
+    // Verificar si el rol seleccionado es "Operador"
+    const role = roles.find(role => String(role.id) === String(selectedRole));
+
+    if (role?.name !== "Operador"){
+      fetch("http://localhost:3000/auth/areas_operator")
+        .then((res) => res.json())
+        .then((data) => setAreasOperator(data || []))
+        .catch((err) => console.error("Error obteniendo áreas de operador", err));
+    } else {
+      setAreasOperator([]);
+    }
+  }, [selectedRole, roles]);
+
   const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
 
@@ -203,26 +225,33 @@ const RoleSelection = () => {
       toast.error("Debes seleccionar un rol");
       return;
     }
-    const payload = {
+    
+    const selectedRoleObject = roles.find(role => String(role.id) === String(selectedRole));
+    if(selectedRoleObject?.name === "Operador" && !selectedAreasOperator){
+      toast.error('Debes seleccionar un área');
+      return;
+    }
+
+    const payload: any = {
       ...userData,
       role_id: parseInt(selectedRole, 10),
     };
+
+    if (selectedRole === '2'){
+      payload.areas_operator_id = Number(selectedAreasOperator);
+    }
     console.log("Enviando datos al backend:", payload); // Verificar que se envían los datos correctos
 
     try {
       const res = await fetch("http://localhost:3000/auth/register", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          username: userData?.username,
-          email: userData?.email,
-          password: userData?.password,
-          role_id: Number(selectedRole), // Se envía junto con los datos
-        }),
+        body: JSON.stringify(payload),
       });
 
       const data = await res.json();
       console.log("Respuesta del backend", data);
+
       if (res.ok) {
         localStorage.removeItem("pendingUser");
         toast.success("Registro exitoso");
@@ -290,6 +319,24 @@ const RoleSelection = () => {
                 </option>
             ))}
           </Select>
+
+          {/* Solo muestra el área si el usuario es operador */}
+          {selectedRole === '2' && areas_operator.length > 0 && (
+            <>
+              <FlexColumn>
+                <label style={{ color: "white", fontWeight: 600 }}>Área de operación</label>
+              </FlexColumn>
+              <Select value={selectedAreasOperator} onChange={(e) => {
+                console.log("Area seleccionada:", e.target.value);
+                setSelectedAreasOperator(e.target.value);
+              }}>
+              <option value="">Selecciona un área</option>
+              {areas_operator.map((area: { id: string; name: string }) => (
+                <option key={area.id} value={area.id}>{area.name}</option>
+              ))}
+            </Select>
+            </>
+          )}
           <Button type="submit">Confirmar Registro</Button>
         </FormContainer>
       </PageContainer>

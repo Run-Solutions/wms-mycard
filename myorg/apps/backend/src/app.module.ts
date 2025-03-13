@@ -13,6 +13,7 @@ import { LocationsModule } from './modules/locations/locations.module';
 import { ArrivalsModule } from './modules/arrivals/arrivals.module';
 import { PutawayModule } from './modules/putaway/putaway.module';
 import { ItemsModule } from './modules/items/items.module';
+import { PermissionsModule } from './modules/permissions/permissions.module';
 
 @Module({
   imports: [
@@ -28,6 +29,7 @@ import { ItemsModule } from './modules/items/items.module';
     ArrivalsModule,
     PutawayModule,
     ItemsModule,
+    PermissionsModule,
   ],
   controllers: [AppController],
   providers: [AppService],

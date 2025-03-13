@@ -1,6 +1,6 @@
 /* myorg\apps\backend\src\auth\auth.controller.ts */
 
-import { BadRequestException, Body, Controller, Post, Get, UsePipes, ValidationPipe } from '@nestjs/common';
+import { Body, Controller, Post, Get, UsePipes, ValidationPipe, Param } from '@nestjs/common';
 import { AuthService } from './auth.service';
 import { LoginDto } from './dto/login.dto';
 import { RegisterDto } from './dto/register.dto';
@@ -14,11 +14,19 @@ export class AuthController {
   async getRoles(){
     return this.authService.getRoles(); // Llama al servicio para obtener los roles
   }
+  @Get('areas_operator')
+  async getAreasOperator(){
+  return await this.authService.getAreasOperator(); // Llama al servicio en lugar de usar this.prisma directamente
+}
+  @Get('check-role/:role')
+  async checkRole(@Param('role') role: string): Promise<boolean> {
+    return this.authService.checkRoleExists(parseInt(role, 10)); // Llama al servicio para obtener los roles
+  }
+
   @Get('users')
   async getUsers() {
     return this.authService.getUsers();
   }
-
 
   @Post('login')
   async login(@Body() loginDto: LoginDto) {
@@ -28,24 +36,7 @@ export class AuthController {
   @Post('register')
   @UsePipes(new ValidationPipe({ whitelist: true }))
   async register(@Body() registerDto: RegisterDto) {
-    console.log("Recibiendo datos en /register:", registerDto);
-    //Validar role_id
-    if (registerDto.role_id) {
-      const role_id = parseInt(registerDto.role_id.toString(),10);
-
-      if (isNaN(role_id)) {
-        throw new BadRequestException(`El role_id ${registerDto.role_id} no existe.`)
-      }
-
-      try {
-        const roleExists = await this.authService.checkRoleExists(role_id);
-        if (!roleExists) {
-          throw new BadRequestException(`El role_id ${role_id} no existe.`)
-        }
-      } catch (error) {
-        throw new BadRequestException('Error al verificar role_id')
-      }
-    }
+    console.log('DTO recibido en el backend:', registerDto);
     return this.authService.register(registerDto);
   }
 

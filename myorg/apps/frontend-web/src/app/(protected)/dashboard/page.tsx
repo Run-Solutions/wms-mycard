@@ -10,12 +10,6 @@ const DashboardPage: React.FC = () => {
 
   const cards = [
     {
-      title: "users",
-      description: "Gestiona y administra los usuarios del sistema.",
-      imageName: "users.jpg",
-      logoName: "users.webp",
-    },
-    {
       title: "Ordenes de Trabajo",
       description: "Registra nuevas ordenes de trabajo.",
       imageName: "picking.jpg",
@@ -38,6 +32,18 @@ const DashboardPage: React.FC = () => {
       description: "Cerrar Ots que hayan completado el flujo asignado.",
       imageName: "packing.jpg",
       logoName: "packing.webp",
+    },
+    {
+      title: "permisos",
+      description: "Manejar vista de modulo de acuerdo a los roles de tus usuarios.",
+      imageName: "packing.jpg",
+      logoName: "packing.webp",
+    },
+    {
+      title: "usuarios",
+      description: "Gestiona y administra los usuarios del sistema.",
+      imageName: "users.jpg",
+      logoName: "users.webp",
     }
     /*{
       title: "locations",
