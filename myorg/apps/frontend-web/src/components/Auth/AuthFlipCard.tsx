@@ -119,11 +119,27 @@ const AuthFlipCard: React.FC = () => {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ username: loginEmail, password: loginPassword }),
       });
+
       const data = await res.json();
+      console.log('Respuesta de data desde el back:', data);
+
       if (res.ok) {
         // Se espera que la respuesta contenga { token, user }
-        setUser(data.user);
-        localStorage.setItem("user", JSON.stringify(data.user));
+
+        // Guardar el token en localStorage para modulos por rol
+        if (data.token) {
+          localStorage.setItem('token', data.token);
+          console.log('Token almacenado:', data.token)
+        } else {
+          console.error('⛔ No se ha recibido el token')
+        }
+
+        // Guardar el usuario en localStorage
+        if (data.user) {
+          setUser(data.user);
+          localStorage.setItem("user", JSON.stringify(data.user));
+        }
+
         router.push("/dashboard");
       } else {
         toast.error(data.message || "Error en login");

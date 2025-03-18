@@ -27,7 +27,7 @@ export class PermissionsService {
     
     return prisma.modulePermission.create({
       data: {
-        module: createDto.module,
+        module: { connect: { id: Number(createDto.module) } },
         role: { connect: { id: createDto.role_id } },
       },
     });
@@ -42,7 +42,7 @@ export class PermissionsService {
     return prisma.modulePermission.update({
       where: { id },
       data: {
-        module: updateDto.module,
+        module: updateDto.module ? { connect: { id: Number(updateDto.module) } } : undefined,
         role: updateDto.role_id ? { connect: { id: updateDto.role_id } } : undefined,
       },
     });

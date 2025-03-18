@@ -7,6 +7,7 @@ export const theme1 = createTheme({
     primary: { main: "#0038A8" },
     secondary: { main: "#5ce1e6" },
     background: { default: "#ffffff", paper: "#ffffff" }, // Fondo blanco
+    text: { primary: "#333333", secondary: "#555555" },
   },
   typography: {
     fontFamily: "Arial, sans-serif !important",
@@ -22,7 +23,11 @@ export const theme2 = createTheme({
     primary: { main: "#0038A8" },
     secondary: { main: "#5ce1e6" },
     background: { default: "#212121", paper: "#424242" },
+    text: { primary: "#ffffff", secondary: "#b0bec5" },
   },
+  typography: {
+    fontFamily: "Arial, sans-serif !important",
+  }
 });
 /*
 export const theme3 = createTheme({

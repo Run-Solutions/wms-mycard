@@ -20,8 +20,27 @@ export class AuthService {
     const { username, password } = loginDto;
     const user = await this.prisma.user.findUnique({
       where: { username },
-      include: { role: true },
-    });
+      include: { 
+        role: { 
+          include: { 
+            permissions: { 
+              include: { module: true }  // ✅ Asegúrate de incluir el módulo
+            } 
+          } 
+        } 
+      },
+    }) as {
+      id: number;
+      username: string;
+      password: string;
+      role?: {
+        id: number;
+        name: string;
+        permissions?: { module?: { name: string } }[];
+      };
+    } | null;;
+    
+    
 
     if (!user || !(await bcrypt.compare(password, user.password))) {
       // Emitir notificación de error en login (opcional)
@@ -33,11 +52,23 @@ export class AuthService {
       throw new UnauthorizedException('Credenciales inválidas');
     }
 
-    const token = jwt.sign(
-      { sub: user.id, username: user.username, role: user.role?.name },
-      this.jwtSecret,
-      { expiresIn: '1h' },
-    );
+    const tokenPayload: Record<string, unknown> = {
+      sub: user.id,
+      username: user.username,
+      role: user.role?.name,
+      role_id: user.role?.id,
+      modules: user.role?.permissions?.map((p) => p.module?.name) || [],
+    };
+    
+    /*if (user.role?.name === 'operador' && user.areasOperator) {
+      tokenPayload.areasOperator = {
+        id: user.areasOperator.id,
+        name: user.areasOperator.name,
+      };
+    }*/
+    
+    const token = jwt.sign(tokenPayload, this.jwtSecret, { expiresIn: '1h' });
+    
     return { token, user };
   }
 

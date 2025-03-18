@@ -1,97 +1,97 @@
 // src/app/dashboard/page.tsx
 "use client";
-import React from "react";
-import { Grid, Box } from "@mui/material";
+import React, { useEffect, useState } from "react";
+import { Grid, Box, CircularProgress } from "@mui/material";
 import FlipCard from "@/components/Card/FlipCard";
 import { useRouter } from "next/navigation";
 
+interface Module {
+  id: number;
+  name: string;
+  description: string;
+  imageName: string;
+  logoName: string;
+}
+
 const DashboardPage: React.FC = () => {
   const router = useRouter();
+  const [modules, setModules] = useState<Module[]>([]);
+  const [loading, setLoading] = useState(true);
 
-  const cards = [
-    {
-      title: "Ordenes de Trabajo",
-      description: "Registra nuevas ordenes de trabajo.",
-      imageName: "picking.jpg",
-      logoName: "picking.webp",
-    },
-    {
-      title: "Seguimiento OT's",
-      description: "Organiza el almacenamiento de productos de forma óptima.",
-      imageName: "slotting.jpg",
-      logoName: "slotting.webp",
-    },
-    {
-      title: "Dashboard",
-      description: "Visualiza reportes y métricas.",
-      imageName: "dashboard.jpg",
-      logoName: "dashboard.webp",
-    },
-    {
-      title: "Finalización",
-      description: "Cerrar Ots que hayan completado el flujo asignado.",
-      imageName: "packing.jpg",
-      logoName: "packing.webp",
-    },
-    {
-      title: "permisos",
-      description: "Manejar vista de modulo de acuerdo a los roles de tus usuarios.",
-      imageName: "packing.jpg",
-      logoName: "packing.webp",
-    },
-    {
-      title: "usuarios",
-      description: "Gestiona y administra los usuarios del sistema.",
-      imageName: "users.jpg",
-      logoName: "users.webp",
-    }
-    /*{
-      title: "locations",
-      description: "Gestiona las ubicaciones y zonas del almacén.",
-      imageName: "ubication.jpg",
-      logoName: "ubication.webp",
-    },
-    {
-      title: "arrivals",
-      description: "Controla la recepción y llegada de mercancías.",
-      imageName: "arrivals.jpg",
-      logoName: "arrivals.webp",
-    },
-    {
-      title: "putaway",
-      description: "Organiza el almacenaje de productos recibidos.",
-      imageName: "putaway.jpg",
-      logoName: "putaway.webp",
-    },
-    {
-      title: "items",
-      description: "Administra el inventario y detalles de productos.",
-      imageName: "items.jpg",
-      logoName: "items.webp",
-    },*/
-  ];
+  useEffect(() => {
+    const fetchModules = async () => {
+      try {
+        // Se recuper el token del user logeado
+        const token = localStorage.getItem('token');
+        if (!token) {
+          throw new Error('⛔ No se ha leído el token')
+        }
 
-  const handleCardClick = (title: string) => {
-    // Navega a la ruta correspondiente utilizando el título de la tarjeta
-    router.push(`/${title.toLowerCase()}`);
+        const response = await fetch("http://localhost:3000/dashboard/modules", {
+          method: 'GET',
+          headers: {
+            'Authorization': `Bearer ${token}`,
+            'Content-Type': 'application/json',
+          },
+        });
+
+        if (!response.ok) {
+          throw new Error("Error al obtener módulos");
+        }
+
+        const data = await response.json();
+        console.log('Modulos:', data.modules);
+
+        // Actualizar el estado con los modulos obtenidos 
+        setModules(data.modules)
+      } catch (error) {
+        console.error(error);
+      } finally {
+        // Cerrar la carga de los modulos cuando finalice
+        setLoading(false);
+      }
+    };
+
+    fetchModules();
+  }, []);
+
+  // Para redireccionar a la pagina correpondiente
+  const toCamelCase = (str: string) =>
+    str
+      .toLowerCase()
+      .replace(/(?:^\w|[A-Z]|\b\w)/g, (match, index) =>
+      index === 0 ? match.toLowerCase() : match.toUpperCase()
+      )
+      .replace(/\s+/g, "")
+
+  const handleCardClick = (name: string) => {
+    let redirect_page = toCamelCase(name);
+    console.log(redirect_page);
+    router.push(`/${redirect_page}`);
   };
 
   return (
-    <Box sx={{ width: "100%", px: 2, mt: -10 }}>
-      <Grid container rowSpacing={1} columnSpacing={2} justifyContent="center">
-        {cards.map((card, index) => (
-          <Grid item xs={12} sm={6} md={4} key={index}>
-            <Box onClick={() => handleCardClick(card.title)} sx={{ cursor: "pointer" }}>
-              <FlipCard
-                title={card.title}
-                description={card.description}
-                imageName={card.imageName}
-                logoName={card.logoName}
-              />
-            </Box>
-          </Grid>
-        ))}
-      </Grid>
+    <Box sx={{ width: "100%", px: 20, mt: -5 }}>
+      {loading ? (
+        <Box display="flex" justifyContent="center" mt={4}>
+          <CircularProgress />
+        </Box>
+      ) : (
+        <Grid container rowSpacing={3} columnSpacing={2} justifyContent="center">
+          {modules.map((module) => (
+            <Grid item xs={12} sm={6} md={4} key={module.id}>
+              <Box onClick={() => handleCardClick(module.name)} sx={{ cursor: "pointer" }}>
+                <FlipCard
+                  title={module.name}
+                  description={module.description}
+                  imageName={module.imageName}
+                  logoName={module.logoName}
+                />
+              </Box>
+            </Grid>
+          ))}
+        </Grid>
+      )}
     </Box>
   );
 };

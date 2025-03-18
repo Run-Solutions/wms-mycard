@@ -1,46 +1,38 @@
-//myorg\apps\backend\src\auth\roles\roles.guard.tsmyorg\apps\backend\src\auth\roles\roles.guard.ts
+//myorg\apps\backend\src\auth\roles\roles.guard.ts
 // se ejecutan antes de que una solicitud llegue a un controlador y sirven para permitir o denegar el acceso según ciertas reglas.
-import { Injectable, CanActivate, ExecutionContext } from '@nestjs/common';
-import { PrismaClient } from '@prisma/client';
+import { Injectable, CanActivate, ExecutionContext, UnauthorizedException, ForbiddenException } from '@nestjs/common';
+import { Reflector } from '@nestjs/core';
+import { PrismaService } from '../../../prisma/prisma.service'; // Importa PrismaService
 import { Request } from 'express';
 
-const prisma = new PrismaClient();
-
 interface RequestWithUser extends Request {
-  user?: {
-    id: number;
-    role_id?: number; // Verifica si esto es correcto según tu base de datos
-  };
+  user: { id: number };
 }
 
 @Injectable()
 export class RolesGuard implements CanActivate {
+  constructor(private reflector: Reflector, private prisma: PrismaService) {}
+
   async canActivate(context: ExecutionContext): Promise<boolean> {
+    const requiredModules = this.reflector.get<string[]>('modules', context.getHandler());
+    if (!requiredModules) return true;
+
     const request: RequestWithUser = context.switchToHttp().getRequest();
-    const user = request.user;
-
-    if (!user?.id) return false;
-
-    // Obtener el usuario con su rol desde la base de datos
-    const userWithRole = await prisma.user.findUnique({
-      where: { id: user.id },
-      select: { role_id: true }, // Asegúrate de que esto existe en la base de datos
-    });
-
-    if (!userWithRole?.role_id) return false;
-
-    // Obtener permisos basados en el rol
-    const path: string | undefined = (request.route as { path?: string })?.path; // Agregar '?' para evitar errores si `route` es undefined
-    if (!path) return false;
-
-    // Buscar permisos en la base de datos
-    const hasPermission = await prisma.modulePermission.findFirst({
-      where: {
-        module: path,
-        role_id: userWithRole.role_id, // Usar el role_id en lugar de un array
+    if(!request.user) throw new UnauthorizedException('Usuario no autenticado.')
+    
+      const userWithRole = await this.prisma.user.findUnique({
+      where: { id: request.user.id },
+      include: {
+        role: { include: { permissions: { include: { module: true } } } },
       },
     });
 
-    return hasPermission !== null;
+    if (!userWithRole?.role?.permissions.length) {
+      throw new ForbiddenException('No tienes permisos para acceder');
+    }
+
+    const userModules = userWithRole.role.permissions.map((perm) => perm.module?.name).filter(Boolean);
+
+    return requiredModules.some((module) => userModules.includes(module));
   }
 }

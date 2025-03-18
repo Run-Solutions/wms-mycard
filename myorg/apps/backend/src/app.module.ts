@@ -14,6 +14,7 @@ import { ArrivalsModule } from './modules/arrivals/arrivals.module';
 import { PutawayModule } from './modules/putaway/putaway.module';
 import { ItemsModule } from './modules/items/items.module';
 import { PermissionsModule } from './modules/permissions/permissions.module';
+import { PrismaService } from 'prisma/prisma.service';
 
 @Module({
   imports: [
@@ -32,6 +33,6 @@ import { PermissionsModule } from './modules/permissions/permissions.module';
     PermissionsModule,
   ],
   controllers: [AppController],
-  providers: [AppService],
+  providers: [AppService, PrismaService],
 })
 export class AppModule {}

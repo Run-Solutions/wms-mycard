@@ -1,7 +1,46 @@
 import { Injectable } from '@nestjs/common';
+import { PrismaService } from 'prisma/prisma.service';
 
 @Injectable()
 export class DashboardService {
+  constructor(private prisma: PrismaService) {}
+
+  async getModulesByUser(userId: number) {
+    const userWithRole = await this.prisma.user.findUnique({
+      where: { id: userId },
+      include: {
+        role: {
+          include: {
+            permissions: {
+              include: {
+                module: {
+                  select: {
+                    id: true,
+                    name: true,
+                    description: true,
+                    imageName: true,
+                    logoName: true,
+                  },
+                },
+              },
+            },
+          },
+        },
+      },
+    });
+  
+    if (!userWithRole?.role) {
+      return { message: 'Usuario no encontrado', modules: [] };
+    }
+  
+    const modules = userWithRole.role.permissions
+      .map((perm) => perm.module)
+      .filter(Boolean);
+    
+    console.log('Para depurar .. Modules obtenidos:', modules); // Para depuración
+    return { modules };
+  }
+  
   getKPIs() {
     return {
       stock: 150,

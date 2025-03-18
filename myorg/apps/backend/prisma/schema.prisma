@@ -49,16 +49,32 @@ model AreasOperator {
   @@map("areas_operator")
 }
 
-model ModulePermission {
+model Module {
   id              Int                 @id @default(autoincrement())
-  module          String              //Nombre del modulo permitido
-  role_id         Int                 @map("role_id")
+  name            String              @unique
+  description     String              //Nombre del modulo permitido
+  imageName       String              
+  logoName        String              
   
-  role            Role                @relation(fields: [role_id], references: [id])
+  permissions     ModulePermission[]  // Relacion con permisos 
 
   created_at      DateTime            @default(now()) @map("created_at")
   updated_at      DateTime            @updatedAt @map("updated_at")
 
-  @@unique([module, role_id])         //Para no tener un mismo rol con permisos duplicados
+  @@map("modules")
+}
+
+model ModulePermission {
+  id              Int                 @id @default(autoincrement())
+  role_id         Int                 
+  module_id       Int                 //Nombre del modulo permitido
+  
+  role            Role                @relation(fields: [role_id], references: [id], onDelete: Cascade)
+  module          Module              @relation(fields: [module_id], references: [id], onDelete: Cascade)
+
+  created_at      DateTime            @default(now()) @map("created_at")
+  updated_at      DateTime            @updatedAt @map("updated_at")
+
+  @@unique([module_id, role_id])      //Para no tener un mismo rol con permisos duplicados
   @@map("module_permissions")
 }

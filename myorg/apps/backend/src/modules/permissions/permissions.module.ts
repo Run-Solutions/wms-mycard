@@ -7,9 +7,10 @@ import { PermissionsService } from './permissions.service';
 import { RolesGuard } from '../../auth/roles/roles.guard';
 // Si ya usas NotificationsModule en otros módulos, puedes importarlo así:
 import { NotificationsModule } from '../../notifications/notifications.module';
+import { AuthModule } from 'src/auth/auth.module';
 
 @Module({
-  imports: [NotificationsModule], // Importa aquí otros módulos que necesites
+  imports: [NotificationsModule, AuthModule], // Importa aquí otros módulos que necesites
   controllers: [PermissionsController],
   providers: [PermissionsService, RolesGuard],
 })
