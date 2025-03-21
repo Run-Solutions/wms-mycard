@@ -1,9 +1,9 @@
 // myorg\apps\frontend-web\src\app\auth\login\page.tsx
-"use client";
-import React from "react";
-import styled, { createGlobalStyle } from "styled-components";
-import AuthFlipCard from "../../../components/Auth/AuthFlipCard";
-import Header from "../../../components/Header/Header";
+'use client';
+import React from 'react';
+import styled, { createGlobalStyle } from 'styled-components';
+import AuthFlipCard from '../../../components/Auth/AuthFlipCard';
+import Header from '../../../components/Header/Header';
 
 const GlobalStyle = createGlobalStyle`
   html, body, #__next {
@@ -94,15 +94,15 @@ const AuthPage: React.FC = () => {
       <Header />
       <PageContainer>
         <LogoContainer>
-          <img src="/images/card.svg" alt="Logo" />
+          <img src='/images/card.svg' alt='Logo' />
         </LogoContainer>
         <FormContainer>
           <AuthFlipCard />
         </FormContainer>
       </PageContainer>
       <Footer>
-        © 2025 Run Solutions Services |{" "}
-        <a href="#">About us</a> | <a href="#">MIT License</a>
+        © 2025 Run Solutions Services |{' '}
+        <a href='#'>About us</a> | <a href='#'>MIT License</a>
       </Footer>
     </>
   );

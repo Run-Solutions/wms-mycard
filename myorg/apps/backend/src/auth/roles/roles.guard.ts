@@ -1,5 +1,5 @@
-//myorg\apps\backend\src\auth\roles\roles.guard.ts
-// se ejecutan antes de que una solicitud llegue a un controlador y sirven para permitir o denegar el acceso según ciertas reglas.
+// myorg\apps\backend\src\auth\roles\roles.guard.ts
+// para filtrar los modulos viisbles para el usuario de acuerdo al rol
 import { Injectable, CanActivate, ExecutionContext, UnauthorizedException, ForbiddenException } from '@nestjs/common';
 import { Reflector } from '@nestjs/core';
 import { PrismaService } from '../../../prisma/prisma.service'; // Importa PrismaService

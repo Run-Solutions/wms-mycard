@@ -68,6 +68,7 @@ model ModulePermission {
   id              Int                 @id @default(autoincrement())
   role_id         Int                 
   module_id       Int                 //Nombre del modulo permitido
+  enabled         Boolean             @default(true) //para activar o desactivar el modulo por rol
   
   role            Role                @relation(fields: [role_id], references: [id], onDelete: Cascade)
   module          Module              @relation(fields: [module_id], references: [id], onDelete: Cascade)

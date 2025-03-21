@@ -1,42 +1,38 @@
 // myorg\apps\backend\src\modules\permissions\permissions.controller.ts
-// endpoints para gestionar los permisos (crear, leer, actualizar y eliminar).
-import { Controller, Get, Post, Body, Param, Put, Delete, UseGuards } from '@nestjs/common';
+import { Controller, Patch, Get, Param, Body, UseGuards } from '@nestjs/common';
+import { JwtAuthGuard } from 'src/auth/jwt-auth.guard';
+import { PermissionGuard } from 'src/auth/roles/permission.guard';
 import { PermissionsService } from './permissions.service';
-import { CreateModulePermissionDto } from './dto/create-module-permission.dto';
-import { UpdateModulePermissionDto } from './dto/update-module-permission.dto';
-import { RolesGuard } from 'src/auth/roles/roles.guard';
 
 @Controller('permissions')
-@UseGuards(RolesGuard)
 export class PermissionsController {
   constructor(private readonly permissionsService: PermissionsService){}
+  
+  // para asignar permisos a ubn rol sobre un modulo 
+  @UseGuards(JwtAuthGuard, PermissionGuard)
+  @Patch(':roleId/:moduleId')
+  async togglePermission(
+    @Param('roleId') roleId: string, 
+    @Param('moduleId') moduleId: string,
+    @Body('enabled') enabled: boolean,
+  ) {
+    return this.permissionsService.togglePermission(
+      parseInt(roleId), 
+      parseInt(moduleId), 
+      enabled);
+  }
 
+  // para obtener permisos de un rol especifico
+  @UseGuards(JwtAuthGuard)
+  @Get(':roleId')
+  async getPermissionByRole(@Param('roleId') roleId: number) {
+    return this.permissionsService.getPermissionByRole(roleId);
+  }
+
+  // para obtener todos los permisos
+  @UseGuards(JwtAuthGuard)
   @Get()
-  findAll() {
-    return this.permissionsService.findAll();
+  async getAllPermissions() {
+    return this.permissionsService.getAllPermissions();
   }
-
-  @Get(':id')
-  findOne(@Param('id')id:string){
-    return this.permissionsService.findOne(+id);
-  }
-
-  @Post()
-  create(@Body() createDto: CreateModulePermissionDto){
-    return this.permissionsService.create(createDto);
-  }
-
-  @Put(':id')
-  update(
-    @Param('id') id: string,
-    @Body() updateDto: UpdateModulePermissionDto,
-  ){
-    return this.permissionsService.update(+id, updateDto);
-  }
-
-  @Delete(':id')
-  remove (@Param('id') id: string){
-    return this.permissionsService.remove(+id);
-  }
-
 }

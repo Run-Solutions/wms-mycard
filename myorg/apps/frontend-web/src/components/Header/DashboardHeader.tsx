@@ -1,18 +1,19 @@
 // src/components/Header/DashboardHeader.tsx
 'use client';
 
-import React, { useState } from "react";
-import styled from "styled-components";
-import MenuIcon from "@mui/icons-material/Menu";
-import ChevronLeftIcon from "@mui/icons-material/ChevronLeft";
-import Brightness4Icon from "@mui/icons-material/Brightness4";
-import Brightness7Icon from "@mui/icons-material/Brightness7";
-import IconButton from "@mui/material/IconButton";
-import Popover from "@mui/material/Popover";
-import Grid from "@mui/material/Grid";
-import EditProfileModal from "./EditProfileModal";
-import { useAuth } from "@/context/AuthContext"; 
-import { themes } from "@/theme/themes";
+import React, { useState } from 'react';
+import styled from 'styled-components';
+import MenuIcon from '@mui/icons-material/Menu';
+import ChevronLeftIcon from '@mui/icons-material/ChevronLeft';
+import Brightness4Icon from '@mui/icons-material/Brightness4';
+import Brightness7Icon from '@mui/icons-material/Brightness7';
+import IconButton from '@mui/material/IconButton';
+import Popover from '@mui/material/Popover';
+import Grid from '@mui/material/Grid';
+import EditProfileModal from './EditProfileModal';
+import { useAuth } from '@/context/AuthContext'; 
+import { themes } from '@/theme/themes';
+import { useRouter } from 'next/navigation';
 
 interface DashboardHeaderProps {
   toggleDrawer: () => void;
@@ -131,42 +132,49 @@ const DashboardHeader: React.FC<DashboardHeaderProps> = ({
   };
 
   const openPopover = Boolean(anchorEl);
-  const popoverId = openPopover ? "theme-popover" : undefined;
+  const popoverId = openPopover ? 'theme-popover' : undefined;
 
   // Selecciona el icono del tema según currentTheme
   const ThemeIcon = currentTheme % 2 === 0 ? Brightness4Icon : Brightness7Icon;
 
+  const router = useRouter();
+  // Selecciona el icono de la marca
+  const handleLogoClick = (name: string) => {
+    let redirect_page = name;
+    router.push(`/${redirect_page}`)
+  };
+
   return (
     <>
       <HeaderContainer $sidebarWidth={sidebarWidth}>
-        <div style={{ display: "flex", alignItems: "center" }}>
-          <IconButton color="inherit" onClick={toggleDrawer}>
+        <div style={{ display: 'flex', alignItems: 'center' }}>
+          <IconButton color='inherit' onClick={toggleDrawer}>
             {drawerOpen ? <ChevronLeftIcon /> : <MenuIcon />}
           </IconButton>
-          <LogoContainer>
-            <img src="/logos/mycard-logo.svg" alt="MyCard Logo" style={{ height: 40 }} />
+          <LogoContainer onClick={() => handleLogoClick('dashboard')} style={{ cursor: 'pointer' }}>
+            <img src='/logos/mycard-logo.svg' alt='MyCard Logo' style={{ height: 40 }} />
           </LogoContainer>
         </div>
-        <div style={{ display: "flex", alignItems: "center" }}>
+        <div style={{ display: 'flex', alignItems: 'center' }}>
           <UserInfoContainer onClick={handleUserClick}>
             <UserAvatar
               src={
                 user?.profile_image
                   ? `http://localhost:3000/uploads/${user.profile_image}`
-                  : "/logos/default-avatar.png"
+                  : '/logos/default-avatar.png'
               }
-              alt="User"
+              alt='User'
             />
-            <UserName>{user?.username || "Usuario"}</UserName>
+            <UserName>{user?.username || 'Usuario'}</UserName>
           </UserInfoContainer>
           <IconButton
-            color="inherit"
+            color='inherit'
             onClick={handleThemeButtonClick}
             style={{ marginLeft: 8 }}
           >
           <ThemeIcon />
           </IconButton>
-          <SupportLogo src="/images/support.svg" alt="Soporte Técnico" />
+          <SupportLogo src='/images/support.svg' alt='Soporte Técnico' />
         </div>
       </HeaderContainer>
       <Popover
@@ -175,12 +183,12 @@ const DashboardHeader: React.FC<DashboardHeaderProps> = ({
         anchorEl={anchorEl}
         onClose={handlePopoverClose}
         anchorOrigin={{
-          vertical: "bottom",
-          horizontal: "center",
+          vertical: 'bottom',
+          horizontal: 'center',
         }}
         transformOrigin={{
-          vertical: "top",
-          horizontal: "center",
+          vertical: 'top',
+          horizontal: 'center',
         }}
       >
         <Grid container spacing={1} style={{ padding: 10 }}>

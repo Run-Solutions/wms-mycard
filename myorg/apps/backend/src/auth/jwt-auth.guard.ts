@@ -1,7 +1,7 @@
 // myorg\apps\backend\src\auth\jwt-auth.guard.ts
 // validar el token en cada solicitud y lo agrega a request.user
-import { Injectable, CanActivate, ExecutionContext, UnauthorizedException } from "@nestjs/common";
-import { Request } from "express";
+import { Injectable, CanActivate, ExecutionContext, UnauthorizedException } from '@nestjs/common';
+import { Request } from 'express';
 import * as jwt from 'jsonwebtoken';
 
 export interface RequestWithUser extends Request {
@@ -24,6 +24,8 @@ export class JwtAuthGuard implements CanActivate {
         const request: RequestWithUser = context.switchToHttp().getRequest();
         const authHeader = request.headers.authorization;
 
+        console.log('Encabezado Authorization:', authHeader);
+
         if (!authHeader || !authHeader.startsWith('Bearer ')) {
             throw new UnauthorizedException('Token no proporcionado');
         }
@@ -42,6 +44,7 @@ export class JwtAuthGuard implements CanActivate {
                 role_id: decoded.role_id
             };
             console.log(request.user)
+            console.log('Usuario asignado a request.user:', request.user);
             return true;
         } catch {
             throw new UnauthorizedException('Token invalido o expirado');

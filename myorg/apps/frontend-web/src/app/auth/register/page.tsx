@@ -1,13 +1,13 @@
 // myorg\apps\frontend-web\src\app\auth\register\page.tsx
-"use client";
+'use client';
 
-import React, { useState } from "react";
-import { TextField, Button, Typography, Box } from "@mui/material";
-import styled, { keyframes, createGlobalStyle } from "styled-components";
-import { useDispatch } from "react-redux";
-import { registerUser } from "../../../store/slices/authSlice";
-import { AppDispatch } from "../../../store";
-import { useRouter } from "next/navigation";
+import React, { useState } from 'react';
+import { TextField, Button, Typography, Box } from '@mui/material';
+import styled, { keyframes, createGlobalStyle } from 'styled-components';
+import { useDispatch } from 'react-redux';
+import { registerUser } from '../../../store/slices/authSlice';
+import { AppDispatch } from '../../../store';
+import { useRouter } from 'next/navigation';
 
 const fadeIn = keyframes`
   from {
@@ -54,21 +54,21 @@ const RegisterPage: React.FC = () => {
   const dispatch = useDispatch<AppDispatch>();
   const router = useRouter();
 
-  const [username, setUsername] = useState("");
-  const [email, setEmail] = useState("");
-  const [password, setPassword] = useState("");
-  const [confirmPassword, setConfirmPassword] = useState("");
+  const [username, setUsername] = useState('');
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
+  const [confirmPassword, setConfirmPassword] = useState('');
   const [error, setError] = useState<string | null>(null);
 
   const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     if (password !== confirmPassword) {
-      setError("Las contraseñas no coinciden");
+      setError('Las contraseñas no coinciden');
       return;
     }
     try {
       // Crear el objeto de usuario
-      const newUser = { id: Date.now().toString(), username, email, role: "pending" };
+      const newUser = { id: Date.now().toString(), username, email, role: 'pending' };
       
       // Guardar los datos para llevarlos a la siguiente pagina: roleSelection
       sessionStorage.setItem('username', username);
@@ -76,16 +76,16 @@ const RegisterPage: React.FC = () => {
       sessionStorage.setItem('password', password);
 
       // Guardar en localStorage para persistencia en el contexto
-      localStorage.setItem("user", JSON.stringify(newUser));
+      localStorage.setItem('user', JSON.stringify(newUser));
 
       // Actualizar contexto de autenticación
       dispatch(registerUser({ username, email, password })); // <-- Asegúrate de importar useAuth y setUser
 
       // await dispatch(registerUser({ username, email, password })).unwrap();
       // Redirige a la ruta configurada (backend ya la tiene configurada)
-      router.push("/auth/roleSelection"); // se cambia la ruta a elegir rol
+      router.push('/auth/roleSelection'); // se cambia la ruta a elegir rol
     } catch (err: any) {
-      setError(err.message || "Error al registrarse");
+      setError(err.message || 'Error al registrarse');
     }
   };
 
@@ -94,20 +94,20 @@ const RegisterPage: React.FC = () => {
       <GlobalStyle />
       <BackgroundWrapper>
         <FormContainer>
-          <Box component="form" onSubmit={handleSubmit}>
+          <Box component='form' onSubmit={handleSubmit}>
             <Typography
-              variant="h4"
-              align="center"
+              variant='h4'
+              align='center'
               gutterBottom
-              sx={{ color: "#000" }}
+              sx={{ color: '#000' }}
             >
               Registro
             </Typography>
             <TextField
-              label="Usuario"
-              variant="outlined"
+              label='Usuario'
+              variant='outlined'
               fullWidth
-              margin="normal"
+              margin='normal'
               value={username}
               onChange={(e: React.ChangeEvent<HTMLInputElement>) =>
                 setUsername(e.target.value)
@@ -115,11 +115,11 @@ const RegisterPage: React.FC = () => {
               required
             />
             <TextField
-              label="Correo electrónico"
-              variant="outlined"
+              label='Correo electrónico'
+              variant='outlined'
               fullWidth
-              margin="normal"
-              type="email"
+              margin='normal'
+              type='email'
               value={email}
               onChange={(e: React.ChangeEvent<HTMLInputElement>) =>
                 setEmail(e.target.value)
@@ -127,11 +127,11 @@ const RegisterPage: React.FC = () => {
               required
             />
             <TextField
-              label="Contraseña"
-              type="password"
-              variant="outlined"
+              label='Contraseña'
+              type='password'
+              variant='outlined'
               fullWidth
-              margin="normal"
+              margin='normal'
               value={password}
               onChange={(e: React.ChangeEvent<HTMLInputElement>) =>
                 setPassword(e.target.value)
@@ -139,11 +139,11 @@ const RegisterPage: React.FC = () => {
               required
             />
             <TextField
-              label="Confirmar Contraseña"
-              type="password"
-              variant="outlined"
+              label='Confirmar Contraseña'
+              type='password'
+              variant='outlined'
               fullWidth
-              margin="normal"
+              margin='normal'
               value={confirmPassword}
               onChange={(e: React.ChangeEvent<HTMLInputElement>) =>
                 setConfirmPassword(e.target.value)
@@ -151,25 +151,25 @@ const RegisterPage: React.FC = () => {
               required
             />
             {error && (
-              <Typography color="error" variant="body2">
+              <Typography color='error' variant='body2'>
                 {error}
               </Typography>
             )}
             <Button
-              type="submit"
-              variant="contained"
-              color="primary"
+              type='submit'
+              variant='contained'
+              color='primary'
               fullWidth
               sx={{ marginTop: 2 }}
             >
               Registrarse
             </Button>
             <Button
-              variant="outlined"
-              color="secondary"
+              variant='outlined'
+              color='secondary'
               fullWidth
               sx={{ marginTop: 1 }}
-              onClick={() => alert("Registro con Google no implementado")}
+              onClick={() => alert('Registro con Google no implementado')}
             >
               Registrarse con Google
             </Button>

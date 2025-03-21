@@ -20,7 +20,7 @@ export class RegisterDto {
   role_id?: number;
 
   @ValidateIf((o: RegisterDto) => o.role_id === 2)
-  @IsNotEmpty({ message: "El área de operador es obligatoria si el rol es operador." })
+  @IsNotEmpty({ message: 'El área de operador es obligatoria si el rol es operador.' })
   @IsInt()
   areas_operator_id?: number;
 }

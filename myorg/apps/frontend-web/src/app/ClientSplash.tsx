@@ -1,7 +1,7 @@
 'use client';
 
-import React, { useState, useEffect } from "react";
-import Loading from "@/components/Loading/Loading";
+import React, { useState, useEffect } from 'react';
+import Loading from '@/components/Loading/Loading';
 
 export default function ClientSplash({
   children,

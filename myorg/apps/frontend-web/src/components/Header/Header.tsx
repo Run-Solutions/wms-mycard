@@ -1,6 +1,6 @@
 // myorg\apps\frontend-web\src\components\Header\Header.tsx
-import React from "react";
-import styled from "styled-components";
+import React from 'react';
+import styled from 'styled-components';
 
 // Contenedor principal del header con el mismo gradiente que el formulario
 const HeaderContainer = styled.header`
@@ -44,10 +44,10 @@ const Header: React.FC = () => {
   return (
     <HeaderContainer>
       <LogoContainer>
-        <img src="/logos/mycard-logo.svg" alt="MyCard Logo" style={{ height: 40 }} />
+        <img src='/logos/mycard-logo.svg' alt='MyCard Logo' style={{ height: 40 }} />
       </LogoContainer>
       {/* Ajusta la ruta del logo de soporte técnico */}
-      <SupportLogo src="/images/support.svg" alt="Soporte Técnico" />
+      <SupportLogo src='/images/support.svg' alt='Soporte Técnico' />
     </HeaderContainer>
   );
 };

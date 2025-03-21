@@ -24,7 +24,7 @@ export class AuthService {
         role: { 
           include: { 
             permissions: { 
-              include: { module: true }  // ✅ Asegúrate de incluir el módulo
+              include: { module: true }  
             } 
           } 
         } 

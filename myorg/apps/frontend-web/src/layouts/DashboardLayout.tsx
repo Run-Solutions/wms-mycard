@@ -1,13 +1,13 @@
-"use client";
+'use client';
 
-import React, { useState, useEffect } from "react";
-import { Box, CssBaseline } from "@mui/material";
-import { ThemeProvider as MuiThemeProvider } from "@mui/material/styles";
-import { ThemeProvider as StyledThemeProvider } from "styled-components";
-import styled, { keyframes } from "styled-components";
-import DashboardHeader from "@/components/Header/DashboardHeader";
-import { themes, getDailyTheme } from "@/theme/themes";
-import { Sidebar } from "@/components/Sidebar/Sidebar";
+import React, { useState, useEffect } from 'react';
+import { Box, CssBaseline } from '@mui/material';
+import { ThemeProvider as MuiThemeProvider } from '@mui/material/styles';
+import { ThemeProvider as StyledThemeProvider } from 'styled-components';
+import styled, { keyframes } from 'styled-components';
+import DashboardHeader from '@/components/Header/DashboardHeader';
+import { themes, getDailyTheme } from '@/theme/themes';
+import { Sidebar } from '@/components/Sidebar/Sidebar';
 
 // Dimensiones
 const drawerOpenWidth = 200;
@@ -48,8 +48,8 @@ const DashboardLayout: React.FC<{ children: React.ReactNode }> = ({ children }) 
 
   useEffect(() => {
     setMounted(true); // Se monta en el cliente
-    if (typeof window !== "undefined") {
-      const stored = localStorage.getItem("selectedThemeIndex");
+    if (typeof window !== 'undefined') {
+      const stored = localStorage.getItem('selectedThemeIndex');
       let index = stored ? Number(stored) : -1;
 
       if (index < 0 || index >= themes.length) {
@@ -62,8 +62,8 @@ const DashboardLayout: React.FC<{ children: React.ReactNode }> = ({ children }) 
   }, []);
 
   useEffect(() => {
-    if (typeof window !== "undefined") {
-      localStorage.setItem("selectedThemeIndex", themeIndex.toString());
+    if (typeof window !== 'undefined') {
+      localStorage.setItem('selectedThemeIndex', themeIndex.toString());
     }
   }, [themeIndex]);
 
@@ -79,7 +79,7 @@ const DashboardLayout: React.FC<{ children: React.ReactNode }> = ({ children }) 
   };
 
   const handleLogout = () => {
-    window.location.href = "/auth/login";
+    window.location.href = '/auth/login';
   };
 
   const currentSidebarWidth = drawerOpen ? drawerOpenWidth : collapsedWidth;
@@ -97,7 +97,7 @@ const DashboardLayout: React.FC<{ children: React.ReactNode }> = ({ children }) 
           currentTheme={themeIndex}
         />
         {/* Contenedor para Sidebar y contenido principal */}
-        <Box sx={{ display: "flex", marginTop: `${headerHeight}px` }}>
+        <Box sx={{ display: 'flex', marginTop: `${headerHeight}px` }}>
           <Sidebar open={drawerOpen} onLogout={handleLogout} />
           <MainContent open={drawerOpen}>{children}</MainContent>
         </Box>

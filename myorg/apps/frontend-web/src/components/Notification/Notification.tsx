@@ -51,8 +51,8 @@ const Notification: React.FC = () => {
   useEffect(() => {
     const timer = setTimeout(() => {
       const newNotif: NotificationType = {
-        message: "Operación exitosa",
-        type: "success",
+        message: 'Operación exitosa',
+        type: 'success',
         timestamp: new Date().getTime(),
       };
       setNotifications(prev => [...prev, newNotif]);

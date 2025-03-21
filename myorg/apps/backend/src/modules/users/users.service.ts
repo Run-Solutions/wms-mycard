@@ -15,7 +15,7 @@ export class UsersService {
 
   async updateUser(id: string, updateUserDto: UpdateUserDto) {
     try {
-      // Extraemos el campo "role" para descartarlo y dejamos el resto en "data"
+      // Extraemos el campo 'role' para descartarlo y dejamos el resto en 'data'
       // eslint-disable-next-line @typescript-eslint/no-unused-vars
       const { role, ...data } = updateUserDto;
 

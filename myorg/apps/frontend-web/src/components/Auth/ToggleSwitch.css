@@ -83,7 +83,7 @@
   
   .moons::before, .moons::after {
     transition: .6s;
-    content: "";
+    content: '';
     position: absolute;
     width: 8px;
     height: 8px;
@@ -128,7 +128,7 @@
     height: 25px;
     bottom: 0px;
     left: 0;
-    content: "";
+    content: '';
     background-color: #B69C77;
     border-radius: 0 0 999px 999px;
   }
@@ -288,7 +288,7 @@
   .head .eye.one:after {
     background: white;
     border-radius: 50%;
-    content: "";
+    content: '';
     display: block;
     height: 3px;
     width: 3px;
@@ -308,7 +308,7 @@
   .head .eye.two:after {
     background: #020204;
     border-radius: 50%;
-    content: "";
+    content: '';
     display: block;
     height: 10px;
     width: 10px;
@@ -352,7 +352,7 @@
   .ring:after {
     background-color: ghostwhite;
     border-radius: 50%;
-    content: "";
+    content: '';
     display: block;
     height: 73%;
     margin-top: -36%;

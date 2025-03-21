@@ -30,7 +30,7 @@ const UsersPage: React.FC = () => {
         } else if (Array.isArray(data.users)) {
           setUsers(data.users);
         } else {
-          console.error("Formato de datos inesperado:", data);
+          console.error('Formato de datos inesperado:', data);
         }
       } catch (err) {
         console.error(err);
@@ -55,9 +55,9 @@ const UsersPage: React.FC = () => {
       <CardsContainer>
         {users.map((user) => (
           <UserCard key={user.id}>
-            <FlipCard className="flip-card">
-              <FlipCardInner className="flip-card-inner">
-                <FlipCardFront theme={theme} className="flip-card-front">
+            <FlipCard className='flip-card'>
+              <FlipCardInner className='flip-card-inner'>
+                <FlipCardFront theme={theme} className='flip-card-front'>
                   <ProfileImage
                     src={
                       user.profile_image
@@ -68,7 +68,7 @@ const UsersPage: React.FC = () => {
                   />
                   <UserName theme={theme}>{String(user.username)}</UserName>
                 </FlipCardFront>
-                <FlipCardBack theme={theme} className="flip-card-back">
+                <FlipCardBack theme={theme} className='flip-card-back'>
                   <InfoItem>
                     <strong>Email:</strong> {user.email}
                   </InfoItem>

@@ -12,6 +12,9 @@ export class DashboardService {
         role: {
           include: {
             permissions: {
+              where: {
+                enabled: true,
+              },
               include: {
                 module: {
                   select: {

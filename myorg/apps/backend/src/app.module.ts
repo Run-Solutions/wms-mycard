@@ -1,4 +1,5 @@
 import { Module } from '@nestjs/common';
+import { RolesGuard } from './auth/roles/roles.guard';
 import { AppController } from './app.controller';
 import { AppService } from './app.service';
 import { AuthModule } from './auth/auth.module';
@@ -33,6 +34,6 @@ import { PrismaService } from 'prisma/prisma.service';
     PermissionsModule,
   ],
   controllers: [AppController],
-  providers: [AppService, PrismaService],
+  providers: [AppService, PrismaService, RolesGuard],
 })
 export class AppModule {}

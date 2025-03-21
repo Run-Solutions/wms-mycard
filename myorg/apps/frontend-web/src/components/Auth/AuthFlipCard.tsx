@@ -1,14 +1,14 @@
 // src/components/Auth/AuthFlipCard.tsx
 'use client';
 
-import React, { useState } from "react";
-import styled, { createGlobalStyle } from "styled-components";
-import LoginForm from "./LoginForm";
-import RegisterForm from "./RegisterForm";
-import ToggleSwitch from "./ToggleSwitch";
-import { useAuth } from "../../context/AuthContext";
-import { useRouter } from "next/navigation";
-import { toast } from "react-toastify";
+import React, { useState } from 'react';
+import styled, { createGlobalStyle } from 'styled-components';
+import LoginForm from './LoginForm';
+import RegisterForm from './RegisterForm';
+import ToggleSwitch from './ToggleSwitch';
+import { useAuth } from '../../context/AuthContext';
+import { useRouter } from 'next/navigation';
+import { toast } from 'react-toastify';
 
 const GlobalStyle = createGlobalStyle`
   html, body, #__next {
@@ -78,15 +78,15 @@ interface CardProps {
 }
 
 const Card = styled.div.withConfig({
-  shouldForwardProp: (prop: string) => prop !== "transparent",
+  shouldForwardProp: (prop: string) => prop !== 'transparent',
 })<CardProps>`
   width: 300px;
   border-radius: 22px;
   transition: all 0.3s;
   background: ${(props) =>
     props.transparent
-      ? "transparent"
-      : "linear-gradient(163deg, #00ff75 0%, #3700ff 100%)"};
+      ? 'transparent'
+      : 'linear-gradient(163deg, #00ff75 0%, #3700ff 100%)'};
   ${(props) => props.transparent && `box-shadow: none;`}
 `;
 
@@ -100,23 +100,23 @@ const AuthFlipCard: React.FC = () => {
   const { setUser } = useAuth();
 
   // Estados para login
-  const [loginEmail, setLoginEmail] = useState("");
-  const [loginPassword, setLoginPassword] = useState("");
+  const [loginEmail, setLoginEmail] = useState('');
+  const [loginPassword, setLoginPassword] = useState('');
 
   // Estados para registro
-  const [regUsername, setRegUsername] = useState("");
-  const [regEmail, setRegEmail] = useState("");
-  const [regPassword, setRegPassword] = useState("");
-  const [regConfirmPassword, setRegConfirmPassword] = useState("");
+  const [regUsername, setRegUsername] = useState('');
+  const [regEmail, setRegEmail] = useState('');
+  const [regPassword, setRegPassword] = useState('');
+  const [regConfirmPassword, setRegConfirmPassword] = useState('');
 
   const [isFlipped, setIsFlipped] = useState(false);
 
   const handleLoginSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     try {
-      const res = await fetch("http://localhost:3000/auth/login", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
+      const res = await fetch('http://localhost:3000/auth/login', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ username: loginEmail, password: loginPassword }),
       });
 
@@ -137,24 +137,24 @@ const AuthFlipCard: React.FC = () => {
         // Guardar el usuario en localStorage
         if (data.user) {
           setUser(data.user);
-          localStorage.setItem("user", JSON.stringify(data.user));
+          localStorage.setItem('user', JSON.stringify(data.user));
         }
 
-        router.push("/dashboard");
+        router.push('/dashboard');
       } else {
-        toast.error(data.message || "Error en login");
-        console.error("Error en login:", data.message || "Error en login");
+        toast.error(data.message || 'Error en login');
+        console.error('Error en login:', data.message || 'Error en login');
       }
     } catch (err) {
-      toast.error("Error en login");
-      console.error("Error en login:", err);
+      toast.error('Error en login');
+      console.error('Error en login:', err);
     }
   };
 
   const handleRegisterSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     if (regPassword !== regConfirmPassword) {
-      toast.error("Las contraseñas no coinciden");
+      toast.error('Las contraseñas no coinciden');
       return;
     }
     // Guardar los datos en localstorage
@@ -163,8 +163,8 @@ const AuthFlipCard: React.FC = () => {
       email: regEmail,
       password: regPassword,
     };
-      localStorage.setItem("pendingUser", JSON.stringify(pendingUser));
-      router.push("/auth/roleSelection");
+      localStorage.setItem('pendingUser', JSON.stringify(pendingUser));
+      router.push('/auth/roleSelection');
   };
 
   return (
@@ -179,7 +179,7 @@ const AuthFlipCard: React.FC = () => {
             />
           </ToggleContainer>
           <FlipCardInner
-            style={{ transform: isFlipped ? "rotateY(180deg)" : "none" }}
+            style={{ transform: isFlipped ? 'rotateY(180deg)' : 'none' }}
           >
             <FlipCardFront>
               <Card>

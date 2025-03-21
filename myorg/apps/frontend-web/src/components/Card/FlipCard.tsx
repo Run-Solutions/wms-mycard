@@ -1,6 +1,6 @@
-"use client";
-import React from "react";
-import styled from "styled-components";
+'use client';
+import React from 'react';
+import styled from 'styled-components';
 
 // Contenedor de la tarjeta con perspectiva
 const CardWrapper = styled.div`

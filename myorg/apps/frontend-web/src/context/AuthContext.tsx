@@ -5,7 +5,7 @@ import React, {
     useState,
     useEffect,
     ReactNode,
-  } from "react";
+  } from 'react';
   
   export interface User {
     id: number;
@@ -30,7 +30,7 @@ import React, {
   
     useEffect(() => {
       // Intenta obtener el usuario autenticado desde localStorage o desde tu API de autenticación
-      const storedUser = localStorage.getItem("user");
+      const storedUser = localStorage.getItem('user');
       if (storedUser) {
         setUser(JSON.parse(storedUser));
       }
@@ -47,7 +47,7 @@ import React, {
   export function useAuth(): AuthContextType {
     const context = useContext(AuthContext);
     if (!context) {
-      throw new Error("useAuth must be used within an AuthProvider");
+      throw new Error('useAuth must be used within an AuthProvider');
     }
     return context;
   }

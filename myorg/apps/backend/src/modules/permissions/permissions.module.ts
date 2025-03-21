@@ -4,14 +4,15 @@
 import { Module } from '@nestjs/common';
 import { PermissionsController } from './permissions.controller';
 import { PermissionsService } from './permissions.service';
-import { RolesGuard } from '../../auth/roles/roles.guard';
-// Si ya usas NotificationsModule en otros módulos, puedes importarlo así:
+import { PrismaService } from 'prisma/prisma.service';
+import { PermissionGuard } from 'src/auth/roles/permission.guard';
 import { NotificationsModule } from '../../notifications/notifications.module';
 import { AuthModule } from 'src/auth/auth.module';
 
 @Module({
-  imports: [NotificationsModule, AuthModule], // Importa aquí otros módulos que necesites
+  imports: [NotificationsModule, AuthModule], 
   controllers: [PermissionsController],
-  providers: [PermissionsService, RolesGuard],
+  providers: [PermissionsService, PrismaService, PermissionGuard],
+  exports: [PermissionsService],
 })
 export class PermissionsModule {}

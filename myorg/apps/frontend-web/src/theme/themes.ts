@@ -1,32 +1,32 @@
 // src/theme/themes.ts
-import { createTheme } from "@mui/material/styles";
+import { createTheme } from '@mui/material/styles';
 
 export const theme1 = createTheme({
   palette: {
-    mode: "light",
-    primary: { main: "#0038A8" },
-    secondary: { main: "#5ce1e6" },
-    background: { default: "#ffffff", paper: "#ffffff" }, // Fondo blanco
-    text: { primary: "#333333", secondary: "#555555" },
+    mode: 'light',
+    primary: { main: '#0038A8' },
+    secondary: { main: '#5ce1e6' },
+    background: { default: '#ffffff', paper: '#ffffff' }, // Fondo blanco
+    text: { primary: '#333333', secondary: '#555555' },
   },
   typography: {
-    fontFamily: "Arial, sans-serif !important",
+    fontFamily: 'Arial, sans-serif !important',
   },
   components: {
-    MuiAppBar: { styleOverrides: { root: { backgroundColor: "#6adbef" } } },
+    MuiAppBar: { styleOverrides: { root: { backgroundColor: '#6adbef' } } },
   },
 });
 
 export const theme2 = createTheme({
   palette: {
-    mode: "dark",
-    primary: { main: "#0038A8" },
-    secondary: { main: "#5ce1e6" },
-    background: { default: "#212121", paper: "#424242" },
-    text: { primary: "#ffffff", secondary: "#b0bec5" },
+    mode: 'dark',
+    primary: { main: '#0038A8' },
+    secondary: { main: '#5ce1e6' },
+    background: { default: '#212121', paper: '#424242' },
+    text: { primary: '#ffffff', secondary: '#b0bec5' },
   },
   typography: {
-    fontFamily: "Arial, sans-serif !important",
+    fontFamily: 'Arial, sans-serif !important',
   }
 });
 /*

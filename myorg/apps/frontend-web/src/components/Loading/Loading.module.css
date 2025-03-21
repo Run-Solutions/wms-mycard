@@ -72,7 +72,7 @@
 }
 
 .road::before {
-  content: "";
+  content: '';
   position: absolute;
   width: 20px;
   height: 100%;
@@ -84,7 +84,7 @@
 }
 
 .road::after {
-  content: "";
+  content: '';
   position: absolute;
   width: 10px;
   height: 100%;
@@ -112,7 +112,7 @@
   }
 }
 
-/* Texto "Cargando..." debajo del camión */
+/* Texto 'Cargando...' debajo del camión */
 .loadingText {
   margin-top: 20px;
   font-size: 1.5rem;

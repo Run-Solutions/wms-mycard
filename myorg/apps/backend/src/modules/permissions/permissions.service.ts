@@ -1,56 +1,46 @@
 // myorg\apps\backend\src\modules\permissions\permissions.service.ts
 // lógica de negocio y la interacción con la base de datos mediante Prisma.
-import { Injectable, NotFoundException } from '@nestjs/common';
-import { PrismaClient } from '@prisma/client';
-import { CreateModulePermissionDto } from './dto/create-module-permission.dto';
-import { UpdateModulePermissionDto } from './dto/update-module-permission.dto';
-
-const prisma = new PrismaClient();
+import { Injectable } from '@nestjs/common';
+import { PrismaService } from 'prisma/prisma.service';
 
 @Injectable()
 export class PermissionsService {
-  // metodo para obtener todos los permisos
-  async findAll() {
-    return prisma.modulePermission.findMany();
-  }
+  constructor(private prisma: PrismaService) {}
 
-  // metodo para obtener un permiso por id
-  async findOne(id: number){
-    return prisma.modulePermission.findUnique({ where: { id }, });
-  }
-
-  // metodo para crear/actualizar/eliminar un permiso
-  async create(createDto: CreateModulePermissionDto){
-    // validar que el role_id exista
-    const roleExists = await prisma.role.findUnique({ where: { id: createDto.role_id } });
-    if (!roleExists) throw new NotFoundException('El rol especificado no existe');
-    
-    return prisma.modulePermission.create({
-      data: {
-        module: { connect: { id: Number(createDto.module) } },
-        role: { connect: { id: createDto.role_id } },
-      },
-    });
+  // metodo para cambiar permiso de modulo al rol
+  async togglePermission(roleId: number, moduleId: number, enabled: boolean) {
+    try {
+      const updated = await this.prisma.modulePermission.updateMany({
+        where: { 
+          role_id: Number(roleId), 
+          module_id: Number(moduleId) 
+        },
+        data: { enabled },
+      });
+  
+      if (updated.count === 0) {
+        throw new Error('No se encontró el permiso para actualizar');
+      }
+  
+      return { message: 'Permiso actualizado correctamente', updated };
+    } catch (error) {
+      throw new Error(`Error al actualizar el permiso: ${error}`);
+    }
   }
   
-  async update(id: number, updateDto: UpdateModulePermissionDto){
-    if (updateDto.role_id){
-      const roleExists = await prisma.role.findUnique({ where: { id: updateDto.role_id } });
-      if (!roleExists) throw new NotFoundException('El rol especificado no existe');
-    }
-    
-    return prisma.modulePermission.update({
-      where: { id },
-      data: {
-        module: updateDto.module ? { connect: { id: Number(updateDto.module) } } : undefined,
-        role: updateDto.role_id ? { connect: { id: updateDto.role_id } } : undefined,
-      },
+
+  // obtener permiso del rol especifico
+  async getPermissionByRole(roleId: number){
+    return this.prisma.modulePermission.findMany({
+      where: { role_id: roleId },
+      include: { module: true },
     });
   }
 
-  async remove(id: number){
-    return prisma.modulePermission.delete({
-      where: { id },
+  // obtener todos los permisos
+  async getAllPermissions() {
+    return this.prisma.modulePermission.findMany({
+      include: {role: true, module: true}
     });
   }
 }

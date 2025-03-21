@@ -1,9 +1,9 @@
 // src/components/Header/EditProfileModal.tsx
 'use client';
 
-import React, { useRef, useState } from "react";
-import styled, { useTheme } from "styled-components";
-import EditIcon from "@mui/icons-material/Edit";
+import React, { useRef, useState } from 'react';
+import styled, { useTheme } from 'styled-components';
+import EditIcon from '@mui/icons-material/Edit';
 
 interface User {
   id: string;
@@ -25,36 +25,36 @@ const EditProfileModal: React.FC<EditProfileModalProps> = ({ user, onClose }) =>
 
   const [username, setUsername] = useState(user.username);
   const [email, setEmail] = useState(user.email);
-  const [phone, setPhone] = useState(user.phone || "");
+  const [phone, setPhone] = useState(user.phone || '');
   const [role, setRole] = useState(user.role);
-  const [password, setPassword] = useState("");
+  const [password, setPassword] = useState('');
   const [profile_image, setProfileImage] = useState<File | null>(null);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     const formData = new FormData();
-    formData.append("username", username);
-    formData.append("email", email);
-    formData.append("phone", phone);
-    formData.append("role", role.name);
-    if (password) formData.append("password", password);
-    if (profile_image) formData.append("profile_image", profile_image);
+    formData.append('username', username);
+    formData.append('email', email);
+    formData.append('phone', phone);
+    formData.append('role', role.name);
+    if (password) formData.append('password', password);
+    if (profile_image) formData.append('profile_image', profile_image);
 
     try {
       const res = await fetch(`http://localhost:3000/users/${user.id}`, {
-        method: "PATCH",
+        method: 'PATCH',
         body: formData,
       });
       const data = await res.json();
       if (res.ok) {
-        localStorage.setItem("user", JSON.stringify(data));
+        localStorage.setItem('user', JSON.stringify(data));
         onClose();
         window.location.reload();
       } else {
-        console.error("Error actualizando perfil:", res.status, data);
+        console.error('Error actualizando perfil:', res.status, data);
       }
     } catch (error) {
-      console.error("Error en la petición:", error);
+      console.error('Error en la petición:', error);
     }
   };
 
@@ -78,19 +78,19 @@ const EditProfileModal: React.FC<EditProfileModalProps> = ({ user, onClose }) =>
               src={
                 user.profile_image
                   ? `http://localhost:3000/uploads/${user.profile_image}`
-                  : "/logos/users.webp"
+                  : '/logos/users.webp'
               }
               alt={user.username}
             />
             <EditIconContainer>
-              <EditIcon style={{ fontSize: "1.2rem", color: "#fff" }} />
+              <EditIcon style={{ fontSize: '1.2rem', color: '#fff' }} />
             </EditIconContainer>
             {/* Input oculto para subir imagen */}
             <HiddenFileInput
               ref={fileInputRef}
-              type="file"
+              type='file'
               onChange={handleImageChange}
-              accept="image/png, image/jpeg, image/jpg"
+              accept='image/png, image/jpeg, image/jpg'
             />
           </AvatarContainer>
           <HeaderTitle theme={theme}>Editar Perfil</HeaderTitle>
@@ -99,7 +99,7 @@ const EditProfileModal: React.FC<EditProfileModalProps> = ({ user, onClose }) =>
           <InputGroup>
             <label>Nombre</label>
             <input
-              type="text"
+              type='text'
               value={username}
               onChange={(e) => setUsername(e.target.value)}
             />
@@ -107,7 +107,7 @@ const EditProfileModal: React.FC<EditProfileModalProps> = ({ user, onClose }) =>
           <InputGroup>
             <label>Email</label>
             <input
-              type="email"
+              type='email'
               value={email}
               onChange={(e) => setEmail(e.target.value)}
             />
@@ -115,7 +115,7 @@ const EditProfileModal: React.FC<EditProfileModalProps> = ({ user, onClose }) =>
           <InputGroup>
             <label>Teléfono</label>
             <input
-              type="text"
+              type='text'
               value={phone}
               onChange={(e) => setPhone(e.target.value)}
             />
@@ -123,7 +123,7 @@ const EditProfileModal: React.FC<EditProfileModalProps> = ({ user, onClose }) =>
           <InputGroup>
             <label>Rol</label>
             <input
-              type="text"
+              type='text'
               value={role.name}
               onChange={(e) => setRole({ ...role, name: e.target.value })}
             />
@@ -131,16 +131,16 @@ const EditProfileModal: React.FC<EditProfileModalProps> = ({ user, onClose }) =>
           <InputGroup>
             <label>Nueva contraseña</label>
             <input
-              type="password"
+              type='password'
               value={password}
               onChange={(e) => setPassword(e.target.value)}
             />
           </InputGroup>
           <ButtonGroup>
-            <SubmitButton type="submit" theme={theme}>
+            <SubmitButton type='submit' theme={theme}>
               Guardar
             </SubmitButton>
-            <CancelButton type="button" onClick={onClose} theme={theme}>
+            <CancelButton type='button' onClick={onClose} theme={theme}>
               Cancelar
             </CancelButton>
           </ButtonGroup>
@@ -252,7 +252,7 @@ const SubmitButton = styled.button<{ theme: any }>`
   transition: background-color 0.3s;
 
   &:hover {
-    background-color: ${props => props.theme.palette.secondary.dark || "#000"};
+    background-color: ${props => props.theme.palette.secondary.dark || '#000'};
   }
 `;
 
@@ -267,7 +267,7 @@ const CancelButton = styled.button<{ theme: any }>`
   transition: background-color 0.3s;
 
   &:hover {
-    background-color: ${props => props.theme.palette.error.dark || "#000"};
+    background-color: ${props => props.theme.palette.error.dark || '#000'};
   }
 `;
 

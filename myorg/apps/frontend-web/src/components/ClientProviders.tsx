@@ -32,7 +32,7 @@ function InnerProviders({ children }: { children: React.ReactNode }) {
   return (
     <MuiThemeProvider theme={theme}>
       <StyledThemeProvider theme={theme}>
-        <ToastContainer position="top-right" autoClose={5000} />
+        <ToastContainer position='top-right' autoClose={5000} />
         <Notification />
         {children}
       </StyledThemeProvider>
