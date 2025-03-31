@@ -11,7 +11,7 @@ import { SlottingModule } from './modules/slotting/slotting.module';
 import { DashboardsModule } from './modules/dashboards/dashboards.module';
 import { PackingModule } from './modules/packing/packing.module';
 import { LocationsModule } from './modules/locations/locations.module';
-import { ArrivalsModule } from './modules/arrivals/arrivals.module';
+import { WorkOrderModule } from './modules/work-order/work-order.module';
 import { PutawayModule } from './modules/putaway/putaway.module';
 import { ItemsModule } from './modules/items/items.module';
 import { PermissionsModule } from './modules/permissions/permissions.module';
@@ -28,7 +28,7 @@ import { PrismaService } from 'prisma/prisma.service';
     DashboardsModule,
     PackingModule,
     LocationsModule,
-    ArrivalsModule,
+    WorkOrderModule,
     PutawayModule,
     ItemsModule,
     PermissionsModule,

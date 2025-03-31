@@ -331,7 +331,9 @@ const RoleSelection = () => {
                 setSelectedAreasOperator(e.target.value);
               }}>
               <option value=''>Selecciona un área</option>
-              {areas_operator.map((area: { id: string; name: string }) => (
+              {areas_operator
+              .sort((a, b) => Number(a.id) - Number(b.id))
+              .map((area: { id: string; name: string }) => (
                 <option key={area.id} value={area.id}>{area.name}</option>
               ))}
             </Select>

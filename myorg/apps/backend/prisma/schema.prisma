@@ -20,6 +20,7 @@ model User {
 
   role                Role                @relation(fields: [role_id], references: [id]) // Relación con Role
   areasOperator       AreasOperator?      @relation(fields: [areas_operator_id], references: [id]) // Relación con area si es operador
+  WorkOrders          WorkOrder[]         @relation("UserWorkOrders")
 
   created_at      DateTime            @default(now()) @map("created_at")
   updated_at      DateTime            @updatedAt @map("updated_at")
@@ -45,6 +46,7 @@ model AreasOperator {
   name            String              @unique
 
   users           User[]              //Relacion con User si aplica 
+  workOrderFlows  WorkOrderFlow[]     //Relacion con flujo de OTs
   
   @@map("areas_operator")
 }
@@ -78,4 +80,52 @@ model ModulePermission {
 
   @@unique([module_id, role_id])      //Para no tener un mismo rol con permisos duplicados
   @@map("module_permissions")
+}
+
+model WorkOrder {
+  id              Int                 @id @default(autoincrement())
+  ot_id           String              @unique
+  mycard_id       String
+  quantity        Int                 // Estado general de la OT
+  created_by      Int                 // Usuario que creó la OT
+  validated       Boolean             @default(false)
+  
+  user            User                @relation("UserWorkOrders", fields: [created_by], references: [id])
+  files           WorkOrderFiles[]    // Relacion con archivos
+  flow            WorkOrderFlow[]     // Relación con las áreas por las que ha pasado
+
+  createdAt       DateTime            @default(now()) @map("created_at")
+  updatedAt       DateTime            @updatedAt @map("updated_at")
+
+  @@map("work_orders")
+}
+
+model WorkOrderFiles {
+  id              Int                 @id @default(autoincrement())
+  work_order_id   Int                 // Clave foránea de la OT
+  type            String              // Tipo de archivo (OT, SKU, OP)
+  file_path       String              // Ruta del archivo
+
+  workOrder       WorkOrder           @relation(fields: [work_order_id], references: [id])
+
+  created_at      DateTime            @default(now()) @map("created_at")
+  updated_at      DateTime            @updatedAt @map("updated_at")
+
+  @@map("work_order_files")
+}
+
+model WorkOrderFlow {
+  id              Int                 @id @default(autoincrement())
+  work_order_id   Int                 // ID de la OT
+  area_id         Int                 // Área por la que pasa la OT
+  status          String              // Estado dentro de esa área ("Pendiente", "En Proceso", "Finalizado")
+  assigned_at     DateTime            @default(now()) @map("assigned_at") // Cuándo fue asignada a esta área
+
+  workOrder       WorkOrder           @relation(fields: [work_order_id], references: [id], onDelete: Cascade)
+  area            AreasOperator       @relation(fields: [area_id], references: [id], onDelete: Cascade)
+
+  created_at      DateTime            @default(now()) @map("created_at")
+  updated_at      DateTime            @updatedAt @map("updated_at")
+
+  @@map("work_order_flows")
 }

@@ -3,25 +3,218 @@
 
 import React, { useEffect, useState } from 'react';
 import styled, { useTheme } from 'styled-components';
+import IconButton from '@mui/material/IconButton';
+import DeleteIcon from '@mui/icons-material/Delete';
 
-const UsersPage: React.FC = () => {
+const WorkOrdersPage: React.FC = () => {
+  const theme = useTheme();
+  const [formData, setFormData] = useState({ ot_id: '', mycard_id: '', quantity: '', areasOperatorIds: [] as string[], priority: false, files: [] as File[], });
+  const [message, setMessage] = useState('');
+  const [areasOperator, setAreasOperator] = useState<{ id: number; name: string }[]>([]);
+  const [dropdownCount, setDropdownCount] = useState(5);
+  
+  // Para obtener las areas de operacion
+  useEffect(() => {
+    fetch('http://localhost:3000/auth/areas_operator')
+      .then((res) => res.json())
+      .then((data) => setAreasOperator(data || []))
+      .catch((err) => console.log('Error al obtener las areas de operacion', err));
+  }, []);
+  console.log("areasOperator:", areasOperator);
+
+
+  const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>, areaIndex?: number) => {
+    const { name, value } = e.target;
+  
+    if (areaIndex !== undefined) {
+      setFormData((prev) => {
+        const updatedFlows = [...prev.areasOperatorIds];
+  
+        // Evita valores duplicados 
+        if (updatedFlows.includes(value)) {
+          const duplicateIndex = updatedFlows.indexOf(value);
+          updatedFlows[duplicateIndex] = ""; // Si hay duplicado
+        }
+  
+        updatedFlows[areaIndex] = value || "";  // Asignamos el valor al índice correspondiente
+        const filteredFlows = updatedFlows.filter(area => area !== "");
+        return { ...prev, areasOperatorIds: filteredFlows };
+      });
+    } else {
+      setFormData((prev) => ({ ...prev, [name]: value }));
+    }
+  };
+
+  // Para obtener solo las areas disponibles
+  const getAvailableAreas = (index: number) => {
+    const selectedIds = formData.areasOperatorIds.slice(0, index).filter(Boolean).map((id) => Number(id));
+    const lastSelectedId = selectedIds.length > 0 ? Math.max(...selectedIds) : null;
+
+    return areasOperator
+      .sort((a, b) => Number(a.id) - Number(b.id)) // Asegura el orden
+      .filter((area) => {
+        const areaId = Number(area.id);
+        const isAlreadySelected = selectedIds.includes(areaId);  // Filtra las ya seleccionadas
+        const isLowerThanLastSelected = lastSelectedId !== null && Number(area.id) <= lastSelectedId;
+        return !isAlreadySelected && !isLowerThanLastSelected;  // Solo áreas disponibles
+      });
+  };
+  
+  const addDropdown = () => {
+    setDropdownCount((prev) => prev + 1);
+  };
+
+  const removeDropdown = (index: number) => {
+    if (dropdownCount > 1) {
+      setDropdownCount(dropdownCount - 1);
+      setFormData((prev) => {
+        const updatedAreas = [...prev.areasOperatorIds];
+        updatedAreas.splice(index, 1);  // Eliminar el valor correspondiente al índice
+        return { ...prev, areasOperatorIds: updatedAreas };
+      });
+    }
+  }
+
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = e.target.files;
+    if (!files) return; // Si no hay archivos, salimos de la función
+  
+    setFormData((prevData) => ({
+      ...prevData,
+      files: Array.from(new Set([...prevData.files, ...Array.from(files)])), 
+    }));
+  };
+
+  const removeFile = (index: number) => {
+    setFormData((prevData) => ({
+      ...prevData,
+      files: prevData.files.filter((_, i) => i !== index), // Elimina el archivo en la posición index
+    }));
+  };
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+
+    const formDataToSend = new FormData();
+    Object.entries(formData).forEach(([key, value]) => {
+      if (key === 'files') {
+        formData.files.forEach((file) => formDataToSend.append('files', file));
+      } else if (Array.isArray(value)) {
+        value.forEach((v) => formDataToSend.append(key, v));
+      } else {
+        formDataToSend.append(key, value.toString());
+      }
+    });
+    
+    console.log("Datos enviados:", formData.areasOperatorIds);
+    try {
+      // se verifica token
+      const token = localStorage.getItem('token');
+      if(!token) {
+        console.error('No se encontro el token en localStorage');
+        return;
+      }
+      const response = await fetch('http://localhost:3000/work-orders', {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${token}`
+        },
+        body: formDataToSend,
+      });
+      if (!response.ok) {
+        throw new Error(`Error del servidor: ${response.status}`);
+      }
+      const result = await response.json();
+      setMessage(result.message);
+    } catch (error) {
+      setMessage('Error al crear la orden de trabajo');
+    }
+  };
+
   return (
     <PageContainer>
       <TitleWrapper>
-        <Title>Ordenes de Trabajo</Title>
+        <Title theme={theme}>Crear nueva orden de trabajo</Title>
       </TitleWrapper>
-      
+
+      <FormWrapper onSubmit={handleSubmit}>
+        <DataWrapper>
+          <Auxiliar>
+            <Label>Número de Orden:</Label>
+            <Input type="text" name="ot_id" value={formData.ot_id} onChange={handleChange} required />
+          </Auxiliar>
+          <Auxiliar>
+            <Label>ID del Presupuesto:</Label>
+            <Input type="text" name="mycard_id" value={formData.mycard_id} onChange={handleChange} required />
+          </Auxiliar>
+          <Auxiliar>
+            <Label>Cantidad:</Label>
+            <Input type="number" name="quantity" value={formData.quantity} onChange={handleChange} required />
+          </Auxiliar>
+        </DataWrapper>
+        <OperationWrapper>
+          <Auxiliar>
+            <Label>Flujo Asignado:</Label>
+            <Selects style={{ marginRight: '40px' }}>
+              {Array.from({ length: Math.ceil(dropdownCount / 5) }).map((_, rowIndex) => (
+                <SelectRow key={rowIndex} style={{ display: "flex", alignItems: "center", height: '50px' }}>
+                  {Array.from({ length: 5 }).map((_, colIndex) => {
+                    const index = rowIndex * 5 + colIndex;
+                    return index < dropdownCount ? (
+                      <SelectWrapper key={index} style={{ display: "flex", alignItems: "center" }}>
+                        {colIndex > 0 && <Arrow>➡</Arrow>}
+                        <Select name={`area-${index}`} onChange={(e) => handleChange(e, index)} value={formData.areasOperatorIds[index] || ''} style={{ height: '100%' }}>
+                          <option value=''>Selecciona un área</option>
+                          {getAvailableAreas(index).map((area) => (
+                              <option key={area.id} value={area.id}>{area.name}</option>
+                            ))
+                          }
+                        </Select>
+                      </SelectWrapper>
+                    ) : null;
+                  })}
+                  {dropdownCount > rowIndex * 5 && dropdownCount <= (rowIndex + 1) * 5 && (
+                    <div style={{ display: "flex", flexDirection: "column", justifyContent: "center", height: '0px', padding: '0', minWidth: '40px' }}>
+                      <IconButton type="button" onClick={addDropdown} style={{ height: "20px", borderRadius: "40em", padding: '0' }}>+</IconButton>
+                      <IconButton aria-label="delete" type="button" onClick={() => removeDropdown(rowIndex)} style={{ height: "20px", borderRadius: "40em", marginTop: "5px", padding: '0' }}>
+                        <DeleteIcon />
+                      </IconButton>
+                    </div>
+                  )}
+                </SelectRow>
+              ))}
+            </Selects>
+          </Auxiliar>
+          <Auxiliar>
+            <Label>Subir OT (PDF):</Label>
+            <Input type="file" accept="application/pdf" onChange={handleFileChange} />
+            <Label>Subir SKU (PDF):</Label>
+            <Input type="file" accept="application/pdf" onChange={handleFileChange} />
+            <Label>Subir OP (PDF):</Label>
+            <Input type="file" accept="application/pdf" onChange={handleFileChange} />
+            <CheckboxWrapper>
+              <Label>Prioridad:</Label>
+              <input type="checkbox" name="priority" checked={formData.priority} onChange={handleChange} />
+            </CheckboxWrapper>
+          </Auxiliar>
+        </OperationWrapper>
+        <Button type="submit">Crear Orden</Button>
+      </FormWrapper>
+
+      {message && <Message>{message}</Message>}
     </PageContainer>
   );
 };
 
-export default UsersPage;
+export default WorkOrdersPage;
 
 // =================== Styled Components ===================
-
 const PageContainer = styled.div`
   padding: 1rem 2rem;
   margin-top: -70px;
+  width: 100%;
+  align-content: flex-start;
+  justify-content: center;
 `;
 
 const TitleWrapper = styled.div`
@@ -31,118 +224,129 @@ const TitleWrapper = styled.div`
 `;
 
 const Title = styled.h1<{ theme: any }>`
-  font-size: 4rem;
+  font-size: 2rem;
   font-weight: 500;
-  color: ${({ theme }) => theme.palette.text.primary}
+  color: ${({ theme }) => theme.palette.text.primary};
 `;
 
-const CardsContainer = styled.div`
-  display: flex;
-  flex-wrap: wrap;
-  gap: 2rem;
-`;
-
-const UserCard = styled.div`
+const FormWrapper = styled.form`
   display: flex;
   flex-direction: column;
+  gap: 1.5rem;
+  margin: 0 auto;
+  padding: 2rem;
+  border-radius: 10px;
+  background: #f8f9fa; // Color de fondo suave
+  box-shadow: 0px 4px 10px rgba(0, 0, 0, 0.1); // Sombra ligera
+`;
+
+const DataWrapper = styled.div`
+  display: flex;
+  flex-direction: row;
+  gap: 3rem;
+  margin: 0 auto;
+`;
+
+const OperationWrapper = styled.div`
+  display: flex;
+  flex-wrap: wrap;
+  gap: 1rem;
+  width: 100%;
+`;
+
+const Selects = styled.div`
+  flex-wrap: wrap;
+  justify-content: flex-start;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+`;
+
+const SelectWrapper = styled.div`
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 5px;
+`;
+
+const SelectRow  = styled.div`
+  display: flex;
+  gap: 10px;
   align-items: center;
 `;
 
-const FlipCard = styled.div`
-  background-color: transparent;
-  width: 245px;
-  height: 270px;
-  perspective: 1000px;
-  font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-  cursor: pointer;
+const Arrow = styled.div`
+  font-size: 1.2rem;
+  color: #333; /* Ajusta el color según tu diseño */
+`;
 
-  &:hover .flip-card-inner {
-    transform: rotateY(180deg);
+const Auxiliar = styled.div`
+  display: flex;
+  flex-direction: column; // Pone el Label arriba del Input
+  flex: 1; // Permite que todos los campos ocupen el mismo espacio
+`;
+
+const Label = styled.label`
+  display: flex;
+  flex-direction: column;
+  font-weight: 600;
+  margin-bottom: 5px;
+  color: #000000;
+`;
+
+const Input = styled.input`
+  padding: 10px;
+  border-radius: 10rem;
+  border: 1px solid #ccc;
+  width: 100%;
+  height: 40px;
+  outline: none;
+  color: black;
+  &::placeholder {
+    color: #aaa;
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen,
+      Ubuntu, Cantarell, 'Open Sans', 'Helvetica Neue', sans-serif;
   }
 `;
 
-const FlipCardInner = styled.div`
-  position: relative;
-  width: 100%;
-  height: 100%;
-  text-align: center;
-  transition: transform 0.6s;
-  transform-style: preserve-3d;
+const Select = styled.select`
+  padding: 0.5rem;
+  border: 1px solid #ccc;
+  border-radius: 10rem;
+  min-width: 150px;
+  flex-grow: 1;
+  color: #000000;
 `;
 
-interface FlipCardSideProps {
-  theme: any;
-}
-
-const FlipCardFront = styled.div<FlipCardSideProps>`
-  position: absolute;
-  width: 100%;
-  height: 100%;
-  padding: 5px;
-  border-radius: 2em;
-  backface-visibility: hidden;
-  background-color: ${props => props.theme.palette.primary.main};
-  border: 4px solid ${props => props.theme.palette.secondary.main};
+const CheckboxWrapper = styled.div`
   display: flex;
-  flex-direction: column;
   align-items: center;
-  justify-content: center;
-`;
-
-const ProfileImage = styled.img`
-  border-radius: 50%;
-  width: 120px;
-  height: 120px;
-  object-fit: cover;
-  margin-bottom: 1rem;
-`;
-
-const UserName = styled.div<{ theme: any }>`
-  font-size: 22px;
-  color: ${props => props.theme.palette.secondary.main};
-  font-weight: bold;
-  text-transform: uppercase;
-`;
-
-const FlipCardBack = styled.div<FlipCardSideProps>`
-  position: absolute;
-  width: 100%;
-  height: 100%;
-  padding: 5px;
-  border-radius: 2em;
-  backface-visibility: hidden;
-  background-color: ${props => props.theme.palette.primary.main};
-  border: 4px solid ${props => props.theme.palette.secondary.main};
-  transform: rotateY(180deg);
-  display: flex;
-  flex-direction: column;
-  justify-content: center;
-  align-items: center;
-`;
-
-const InfoItem = styled.div`
-  font-size: 14px;
-  color: white;
-  margin: 0.2rem 0;
-`;
-
-const CardActions = styled.div`
-  margin-top: 0.5rem;
-  display: flex;
   gap: 0.5rem;
 `;
 
-const ActionButton = styled.button`
-  padding: 0.5rem 1rem;
-  border: none;
-  border-radius: 1em;
-  cursor: pointer;
-  background-color: ${props => props.theme.palette.secondary.main};
+const Button = styled.button`
+  padding: 15px 30px;
+  text-align: center;
+  background-color: ${({ theme }) => theme.palette.primary.main};
+  border: 2px solid ${({ theme }) => theme.palette.primary.main};
+  border-radius: 10em;
   color: white;
-  font-weight: bold;
-  transition: background-color 0.3s;
+  font-size: 15px;
+  font-weight: 600;
+  height: 50px;
+  cursor: pointer;
+  transition: all 0.3s ease;
 
   &:hover {
-    background-color: ${props => props.theme.palette.secondary.dark || '#000'};
+    background-color: ${({ theme }) => theme.palette.primary.dark};
+    transform: scale(1.05); // Pequeño efecto de crecimiento
   }
 `;
+
+const Message = styled.p`
+  text-align: center;
+  margin-top: 1rem;
+  color: green;
+  font-weight: bold;
+`;
+
