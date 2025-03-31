@@ -1,14 +1,31 @@
 import { Body, Controller, Post, UploadedFiles, UseGuards, UseInterceptors, Req } from "@nestjs/common";
 import { WorkOrderService } from "./work-order.service";
-import { FilesInterceptor } from "@nestjs/platform-express";
 import { CreateWorkOrderDto } from "./dto/create-work-order.dto";
+import { FileFieldsInterceptor } from "@nestjs/platform-express";
 import { JwtAuthGuard } from "src/auth/jwt-auth.guard";
 import { Request } from 'express';
+import { diskStorage } from "multer";
+import { extname } from "path";
 
 // Definir una interfaz extendida para incluir `user`
 interface AuthenticatedRequest extends Request {
     user?: { id: number }; // Ajusta según lo que tu JWT contenga
 }
+
+// Configuracion para almacenamiento para Multer
+const multerOptions = {
+    storage: diskStorage({
+        destination: './uploads', // Carpeta donde se guardan los files
+        filename: (req, file, callback) => {
+            // Generar un nombre único manteniendo la extension original
+            const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1e9);
+            const ext = extname(file.originalname);
+            const newFilename = `${file.fieldname}-${uniqueSuffix}${ext}`;
+            callback(null, newFilename)
+        }
+    }),
+    limits: { fileSize: 5 * 1024 * 1024 }, // Para poner uhn limite de 5MB por archivo
+};
 
 @Controller('work-orders')
 export class WorkOrderController {
@@ -16,23 +33,30 @@ export class WorkOrderController {
 
     @UseGuards(JwtAuthGuard)
     @Post()
-    @UseInterceptors(FilesInterceptor('files', 3)) // Para recibir hasta 3 archivos
+    @UseInterceptors(FileFieldsInterceptor([ { name: 'ot', maxCount: 1 }, { name: 'sku', maxCount: 1 }, { name: 'op', maxCount: 1 }, ], multerOptions)) // Para recibir hasta 3 archivos
     async create(
         @Req() req: AuthenticatedRequest,  // Ahora reconoce `user`
         @Body() createWorkOrderDto: CreateWorkOrderDto, 
-        @UploadedFiles() files: Express.Multer.File[]
+        @UploadedFiles() files: { ot?: Express.Multer.File[]; sku?: Express.Multer.File[]; op?: Express.Multer.File[] }
     ) {
         console.log('Request Body:', createWorkOrderDto);
         console.log('Usuario autenticado:', req.user?.id);
 
         const userId = req.user?.id; // Obtener el ID del usuario autenticado
-
         if (!userId) {
             throw new Error('No se pudo obtener el usuario autenticado.');
         }
-        
-        // Pasar userId al servicio en lugar de usar createWorkOrderDto.created_by
-        const workOrder = await this.workOrderService.createWorkOrder(createWorkOrderDto, files, userId);
+
+        // Paso de los archivos al servicio
+        const workOrder = await this.workOrderService.createWorkOrder(
+            createWorkOrderDto, 
+            {
+                ot: files.ot ? files.ot[0] : null,
+                sku: files.sku ? files.sku[0] : null,
+                op: files.op ? files.op[0] : null,
+            }, 
+            userId
+        );
 
         return { message: 'Orden de trabajo creada correctamente', workOrder };
     }

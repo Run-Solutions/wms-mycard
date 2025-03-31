@@ -12,6 +12,7 @@ const WorkOrdersPage: React.FC = () => {
   const [message, setMessage] = useState('');
   const [areasOperator, setAreasOperator] = useState<{ id: number; name: string }[]>([]);
   const [dropdownCount, setDropdownCount] = useState(5);
+  const [files, setFiles] = useState<{ ot: File | null; sku: File | null; op: File | null }>({ ot: null, sku: null, op: null, });
   
   // Para obtener las areas de operacion
   useEffect(() => {
@@ -65,7 +66,7 @@ const WorkOrdersPage: React.FC = () => {
   };
 
   const removeDropdown = (index: number) => {
-    if (dropdownCount > 1) {
+    if (dropdownCount > 0) {
       setDropdownCount(dropdownCount - 1);
       setFormData((prev) => {
         const updatedAreas = [...prev.areasOperatorIds];
@@ -75,13 +76,13 @@ const WorkOrdersPage: React.FC = () => {
     }
   }
 
-  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const files = e.target.files;
-    if (!files) return; // Si no hay archivos, salimos de la función
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>, type: 'ot' | 'sku' | 'op') => {
+    const file = e.target.files?.[0]; // Obtener solo el primer file
+    if (!file) return; // Si no hay archivos, salimos de la función
   
-    setFormData((prevData) => ({
-      ...prevData,
-      files: Array.from(new Set([...prevData.files, ...Array.from(files)])), 
+    setFiles((prevFiles) => ({
+      ...prevFiles,
+      [type]: file, // Asignar el archivo al tipo correspondiente
     }));
   };
 
@@ -95,18 +96,28 @@ const WorkOrdersPage: React.FC = () => {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
+    if (!files.ot || !files.sku || !files.op) {
+      alert('Todos los archivos (OT, SKU, OP) son obligatorios.');
+      return;
+    }
+
     const formDataToSend = new FormData();
+
+    formDataToSend.append('ot', files.ot);  // Envia el archivo 'ot'
+    formDataToSend.append('sku', files.sku); // Envia el archivo 'sku'
+    formDataToSend.append('op', files.op);  // Envia el archivo 'op'
+
+    // Agregar otros datos del formulario
     Object.entries(formData).forEach(([key, value]) => {
-      if (key === 'files') {
-        formData.files.forEach((file) => formDataToSend.append('files', file));
-      } else if (Array.isArray(value)) {
+      if (Array.isArray(value)) {
         value.forEach((v) => formDataToSend.append(key, v));
       } else {
         formDataToSend.append(key, value.toString());
       }
     });
-    
+    console.log('Enviando archivos: ', { ot: files.ot.name, sku: files.sku.name, op: files.op.name });
     console.log("Datos enviados:", formData.areasOperatorIds);
+
     try {
       // se verifica token
       const token = localStorage.getItem('token');
@@ -122,7 +133,9 @@ const WorkOrdersPage: React.FC = () => {
         body: formDataToSend,
       });
       if (!response.ok) {
-        throw new Error(`Error del servidor: ${response.status}`);
+        const errorText = await response.text();
+        console.error(`Error del servidor: ${response.status}`, errorText);
+        return;
       }
       const result = await response.json();
       setMessage(result.message);
@@ -176,7 +189,7 @@ const WorkOrdersPage: React.FC = () => {
                   {dropdownCount > rowIndex * 5 && dropdownCount <= (rowIndex + 1) * 5 && (
                     <div style={{ display: "flex", flexDirection: "column", justifyContent: "center", height: '0px', padding: '0', minWidth: '40px' }}>
                       <IconButton type="button" onClick={addDropdown} style={{ height: "20px", borderRadius: "40em", padding: '0' }}>+</IconButton>
-                      <IconButton aria-label="delete" type="button" onClick={() => removeDropdown(rowIndex)} style={{ height: "20px", borderRadius: "40em", marginTop: "5px", padding: '0' }}>
+                      <IconButton aria-label="delete" type="button" onClick={() => removeDropdown(rowIndex * 5 + 4)} style={{ height: "20px", borderRadius: "40em", marginTop: "5px", padding: '0' }}>
                         <DeleteIcon />
                       </IconButton>
                     </div>
@@ -187,11 +200,11 @@ const WorkOrdersPage: React.FC = () => {
           </Auxiliar>
           <Auxiliar>
             <Label>Subir OT (PDF):</Label>
-            <Input type="file" accept="application/pdf" onChange={handleFileChange} />
+            <Input type="file" accept="application/pdf" onChange={(e) => handleFileChange(e, 'ot')} />
             <Label>Subir SKU (PDF):</Label>
-            <Input type="file" accept="application/pdf" onChange={handleFileChange} />
+            <Input type="file" accept="application/pdf" onChange={(e) => handleFileChange(e, 'sku')} />
             <Label>Subir OP (PDF):</Label>
-            <Input type="file" accept="application/pdf" onChange={handleFileChange} />
+            <Input type="file" accept="application/pdf" onChange={(e) => handleFileChange(e, 'op')} />
             <CheckboxWrapper>
               <Label>Prioridad:</Label>
               <input type="checkbox" name="priority" checked={formData.priority} onChange={handleChange} />

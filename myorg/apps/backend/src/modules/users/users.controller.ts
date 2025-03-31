@@ -1,13 +1,5 @@
 /* myorg\apps\backend\src\modules\users\users.controller.ts */
-import {
-  Controller,
-  Get,
-  Patch,
-  Param,
-  Body,
-  UseInterceptors,
-  UploadedFile,
-} from '@nestjs/common';
+import { Controller, Get, Patch, Param, Body, UseInterceptors, UploadedFile } from '@nestjs/common';
 import { UsersService } from './users.service';
 import { UpdateUserDto } from '../../auth/dto/update-user.dto';
 import { FileInterceptor } from '@nestjs/platform-express';

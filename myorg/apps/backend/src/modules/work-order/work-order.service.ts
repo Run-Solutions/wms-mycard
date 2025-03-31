@@ -8,39 +8,42 @@ import { CreateWorkOrderDto } from './dto/create-work-order.dto';
 export class WorkOrderService {
   constructor(private prisma: PrismaService) {}
 
-  async createWorkOrder(dto: CreateWorkOrderDto, files: Express.Multer.File[], userId: number) {
+  async createWorkOrder(dto: CreateWorkOrderDto, files: { ot: Express.Multer.File | null; sku: Express.Multer.File | null; op: Express.Multer.File | null }, userId: number) {
     const { ot_id, mycard_id, areasOperatorIds } = dto;
     const quantity = Number(dto.quantity); // Se debe asegurar de que llegue como numero
     
-    console.log('created_by:', userId);
+    console.log('Orden de trabajo created by:', userId);
 
     // Para guardar la OT en la BD
     const workOrder = await this.prisma.workOrder.create({
         data: { ot_id, mycard_id, quantity, created_by: userId }
     });
 
+    // Subir los archivos
+    const fileMappings = [
+        { key: 'ot', file: files.ot, type: 'OT' },
+        { key: 'sku', file: files.sku, type: 'SKU' },
+        { key: 'op', file: files.op, type: 'OP' }
+    ];
+
     // Para subir los archivos
-    if (files && files.length > 0) {
-        try {
-          await Promise.all(
-            files.map(async (file) => {
-              console.log(`Guardando archivo: ${file.filename}`);
-              await this.prisma.workOrderFiles.create({
-                data: {
-                  work_order_id: workOrder.id,
-                  type: "OT",
-                  file_path: `uploads/${file.filename}`,
-                },
-              });
-            })
-          );
-        } catch (error) {
-          console.error('Error al guardar los archivos:', error);
+    try {
+        for (const { file, type } of fileMappings) {
+            if (file) {
+                console.log(`Guardando archivo (${type}): ${file.filename}`);
+                await this.prisma.workOrderFiles.create({
+                    data: {
+                        work_order_id: workOrder.id,
+                        type,
+                        file_path: `uploads/${file.filename}`,
+                    },
+                });
+            }
         }
-      } else {
-        console.log('No se recibieron archivos para la OT.');
-      }
-      
+    } catch (error) {
+        console.error('Error al guardar los archivos:', error);
+    }
+
     // Para asignar las areas, debe ser un array de numeros
     let areasArray: number[] = [];
     if (areasOperatorIds) {
