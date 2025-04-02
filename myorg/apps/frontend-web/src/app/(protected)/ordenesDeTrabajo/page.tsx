@@ -8,10 +8,12 @@ import DeleteIcon from '@mui/icons-material/Delete';
 
 const WorkOrdersPage: React.FC = () => {
   const theme = useTheme();
+
+  // Formulacion de los estados
   const [formData, setFormData] = useState({ ot_id: '', mycard_id: '', quantity: '', areasOperatorIds: [] as string[], priority: false, files: [] as File[], });
   const [message, setMessage] = useState('');
   const [areasOperator, setAreasOperator] = useState<{ id: number; name: string }[]>([]);
-  const [dropdownCount, setDropdownCount] = useState(5);
+  const [dropdownCount, setDropdownCount] = useState(4);
   const [files, setFiles] = useState<{ ot: File | null; sku: File | null; op: File | null }>({ ot: null, sku: null, op: null, });
   
   // Para obtener las areas de operacion
@@ -23,7 +25,7 @@ const WorkOrdersPage: React.FC = () => {
   }, []);
   console.log("areasOperator:", areasOperator);
 
-
+  // Para manejar los cambios de los campos del formulario
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>, areaIndex?: number) => {
     const { name, value } = e.target;
   
@@ -61,10 +63,12 @@ const WorkOrdersPage: React.FC = () => {
       });
   };
   
+  // Agregar un nuevo dropdown para las areas en el flujo asignado
   const addDropdown = () => {
     setDropdownCount((prev) => prev + 1);
   };
 
+  // Elimina el ultimo dropdown de areas en el flujo asignado
   const removeDropdown = (index: number) => {
     if (dropdownCount > 0) {
       setDropdownCount(dropdownCount - 1);
@@ -76,6 +80,7 @@ const WorkOrdersPage: React.FC = () => {
     }
   }
 
+  // Para la carga de archivos
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>, type: 'ot' | 'sku' | 'op') => {
     const file = e.target.files?.[0]; // Obtener solo el primer file
     if (!file) return; // Si no hay archivos, salimos de la función
@@ -86,13 +91,15 @@ const WorkOrdersPage: React.FC = () => {
     }));
   };
 
-  const removeFile = (index: number) => {
-    setFormData((prevData) => ({
-      ...prevData,
-      files: prevData.files.filter((_, i) => i !== index), // Elimina el archivo en la posición index
+  // Para eliminar un archivo adjunto
+  const removeFile = (type: 'ot' | 'sku' | 'op') => {
+    setFiles((prevFiles) => ({
+      ...prevFiles,
+      [type]: null, // Elimina el archivo específico
     }));
   };
 
+  // Para el envío de la informacion
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
@@ -169,10 +176,10 @@ const WorkOrdersPage: React.FC = () => {
           <Auxiliar>
             <Label>Flujo Asignado:</Label>
             <Selects style={{ marginRight: '40px' }}>
-              {Array.from({ length: Math.ceil(dropdownCount / 5) }).map((_, rowIndex) => (
+              {Array.from({ length: Math.ceil(dropdownCount / 4) }).map((_, rowIndex) => (
                 <SelectRow key={rowIndex} style={{ display: "flex", alignItems: "center", height: '50px' }}>
-                  {Array.from({ length: 5 }).map((_, colIndex) => {
-                    const index = rowIndex * 5 + colIndex;
+                  {Array.from({ length: 4 }).map((_, colIndex) => {
+                    const index = rowIndex * 4 + colIndex;
                     return index < dropdownCount ? (
                       <SelectWrapper key={index} style={{ display: "flex", alignItems: "center" }}>
                         {colIndex > 0 && <Arrow>➡</Arrow>}
@@ -186,10 +193,12 @@ const WorkOrdersPage: React.FC = () => {
                       </SelectWrapper>
                     ) : null;
                   })}
-                  {dropdownCount > rowIndex * 5 && dropdownCount <= (rowIndex + 1) * 5 && (
+                  {dropdownCount > rowIndex * 4 && dropdownCount <= (rowIndex + 1) * 4 && (
                     <div style={{ display: "flex", flexDirection: "column", justifyContent: "center", height: '0px', padding: '0', minWidth: '40px' }}>
+                      {dropdownCount < 10 && dropdownCount > rowIndex * 4 && dropdownCount <= (rowIndex + 1) * 4 && (
                       <IconButton type="button" onClick={addDropdown} style={{ height: "20px", borderRadius: "40em", padding: '0' }}>+</IconButton>
-                      <IconButton aria-label="delete" type="button" onClick={() => removeDropdown(rowIndex * 5 + 4)} style={{ height: "20px", borderRadius: "40em", marginTop: "5px", padding: '0' }}>
+                      )}
+                      <IconButton aria-label="delete" type="button" onClick={() => removeDropdown(rowIndex * 4 + 4)} style={{ height: "20px", borderRadius: "40em", marginTop: "5px", padding: '0' }}>
                         <DeleteIcon />
                       </IconButton>
                     </div>
@@ -201,10 +210,34 @@ const WorkOrdersPage: React.FC = () => {
           <Auxiliar>
             <Label>Subir OT (PDF):</Label>
             <Input type="file" accept="application/pdf" onChange={(e) => handleFileChange(e, 'ot')} />
+            {files.ot && ( 
+              <div>
+                <span>{files.ot.name}</span> 
+                <IconButton onClick={() => removeFile('ot')}>
+                  <DeleteIcon />
+                </IconButton>
+              </div>
+            )}
             <Label>Subir SKU (PDF):</Label>
             <Input type="file" accept="application/pdf" onChange={(e) => handleFileChange(e, 'sku')} />
+            {files.sku && ( 
+              <div>
+                <span>{files.sku.name}</span> 
+                <IconButton onClick={() => removeFile('sku')}>
+                  <DeleteIcon />
+                </IconButton>
+              </div>
+            )}
             <Label>Subir OP (PDF):</Label>
             <Input type="file" accept="application/pdf" onChange={(e) => handleFileChange(e, 'op')} />
+            {files.op && ( 
+              <div>
+                <span>{files.op.name}</span> 
+                <IconButton onClick={() => removeFile('op')}>
+                  <DeleteIcon />
+                </IconButton>
+              </div>
+            )}
             <CheckboxWrapper>
               <Label>Prioridad:</Label>
               <input type="checkbox" name="priority" checked={formData.priority} onChange={handleChange} />
@@ -300,33 +333,45 @@ const Auxiliar = styled.div`
 `;
 
 const Label = styled.label`
-  display: flex;
+  display: block;
   flex-direction: column;
   font-weight: 600;
   margin-bottom: 5px;
-  color: #000000;
+  color: #05060f99;
+  transition: color 0.3s cubic-bezier(0.25, 0.01, 0.25, 1);
 `;
 
 const Input = styled.input`
   padding: 10px;
   border-radius: 10rem;
-  border: 1px solid #ccc;
+  border: 2px solid #aeadab;
   width: 100%;
-  height: 40px;
+  height: 44px;
   outline: none;
   color: black;
+  transition: border-color 0.3s cubic-bezier(0.25, 0.01, 0.25, 1), 
+              color 0.3s cubic-bezier(0.25, 0.01, 0.25, 1), 
+              background 0.2s cubic-bezier(0.25, 0.01, 0.25, 1);
+
   &::placeholder {
     color: #aaa;
     font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen,
       Ubuntu, Cantarell, 'Open Sans', 'Helvetica Neue', sans-serif;
   }
+
+  &:hover,
+  &:focus {
+    border-color: #05060f;
+  }
 `;
 
+
 const Select = styled.select`
-  padding: 0.5rem;
-  border: 1px solid #ccc;
+  padding: 10px;
   border-radius: 10rem;
+  border: 2px solid #aeadab;
   min-width: 150px;
+  max-height: 44px;
   flex-grow: 1;
   color: #000000;
 `;

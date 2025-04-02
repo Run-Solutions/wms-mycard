@@ -5,9 +5,9 @@ export const theme1 = createTheme({
   palette: {
     mode: 'light',
     primary: { main: '#0038A8' },
-    secondary: { main: '#5ce1e6' },
-    background: { default: '#ffffff', paper: '#ffffff' }, // Fondo blanco
-    text: { primary: '#333333', secondary: '#555555' },
+    secondary: { main: '#0057D9' },
+    background: { default: '#F5F7FA', paper: '#F5F7FA' }, // Fondo blanco
+    text: { primary: '#1E1E1E', secondary: '#4A4A4A' },
   },
   typography: {
     fontFamily: 'Arial, sans-serif !important',
@@ -20,10 +20,10 @@ export const theme1 = createTheme({
 export const theme2 = createTheme({
   palette: {
     mode: 'dark',
-    primary: { main: '#0038A8' },
-    secondary: { main: '#5ce1e6' },
-    background: { default: '#212121', paper: '#424242' },
-    text: { primary: '#ffffff', secondary: '#b0bec5' },
+    primary: { main: '#1A4DB7' },
+    secondary: { main: '#297CDA' },
+    background: { default: '#121212', paper: '#424242' },
+    text: { primary: '#B0B0B0', secondary: '#b0bec5' },
   },
   typography: {
     fontFamily: 'Arial, sans-serif !important',
