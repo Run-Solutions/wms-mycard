@@ -2,7 +2,10 @@
   "name": "@myorg/source",
   "version": "0.0.0",
   "license": "MIT",
-  "scripts": {},
+  "scripts": {
+    "seed": "ts-node ./prisma/seed.ts",
+    "migrate": "npx prisma migrate dev && npm run seed"
+  },
   "private": true,
   "dependencies": {
     "@nestjs/websockets": "^11.0.10",

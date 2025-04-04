@@ -27,7 +27,8 @@ export class AuthService {
               include: { module: true }  
             } 
           } 
-        } 
+        },
+        areasOperator: true,
       },
     }) as {
       id: number;
@@ -38,6 +39,7 @@ export class AuthService {
         name: string;
         permissions?: { module?: { name: string } }[];
       };
+      areasOperator?: { id: number };
     } | null;;
     
     
@@ -57,6 +59,7 @@ export class AuthService {
       username: user.username,
       role: user.role?.name,
       role_id: user.role?.id,
+      areas_operator_id: user.areasOperator?.id,
       modules: user.role?.permissions?.map((p) => p.module?.name) || [],
     };
     

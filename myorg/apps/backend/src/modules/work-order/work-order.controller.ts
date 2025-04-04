@@ -1,4 +1,5 @@
-import { Body, Controller, Post, UploadedFiles, UseGuards, UseInterceptors, Req } from "@nestjs/common";
+// myorg/apps/backend/src/modules/work-order/controllers/work-order.controller.ts
+import { Body, Controller, Post, UploadedFiles, UseGuards, UseInterceptors, Req, Get, ForbiddenException } from "@nestjs/common";
 import { WorkOrderService } from "./work-order.service";
 import { CreateWorkOrderDto } from "./dto/create-work-order.dto";
 import { FileFieldsInterceptor } from "@nestjs/platform-express";
@@ -7,9 +8,14 @@ import { Request } from 'express';
 import { diskStorage } from "multer";
 import { extname } from "path";
 
+interface AuthenticatedUser {
+    id: number;
+    role_id: number;
+    areas_operator_id: number;
+}
 // Definir una interfaz extendida para incluir `user`
 interface AuthenticatedRequest extends Request {
-    user?: { id: number }; // Ajusta según lo que tu JWT contenga
+    user?:  AuthenticatedUser; // Ajusta según lo que tu JWT contenga
 }
 
 // Configuracion para almacenamiento para Multer
@@ -59,5 +65,24 @@ export class WorkOrderController {
         );
 
         return { message: 'Orden de trabajo creada correctamente', workOrder };
+    }
+
+    // Para obtener los WorkOrderFlowPendientes
+    @UseGuards(JwtAuthGuard)
+    @Get('pending')
+    async getPendingWorkOrders(@Req() req: AuthenticatedRequest) {
+        console.log("🔹 Usuario autenticado:", req.user);
+        if (!req.user) {
+            console.log('❌ Usuario no autenticado.')
+            throw new ForbiddenException('❌ Usuario no autenticado.')
+        }
+        const { user } = req;
+        console.log("📌 ID del usuario:", user.id);
+        console.log("📌 Rol del usuario:", user.role_id);
+        console.log("📌 Áreas asignadas:", user.areas_operator_id);
+        if (user.role_id !== 2){
+            throw new ForbiddenException('No tienes permiso para acceder a las ordenes.');
+        }
+        return await this.workOrderService.getPendingWorkOrders(user.areas_operator_id);
     }
 }

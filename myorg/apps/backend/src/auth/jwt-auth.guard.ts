@@ -8,12 +8,14 @@ export interface RequestWithUser extends Request {
     user?: {
       id: number;
       role_id?: number; 
+      areas_operator_id?: number;
     };
 }
 
 interface TokenPayload extends jwt.JwtPayload {
     sub: string;
     role_id?: number;
+    areas_operator_id?: number;
 }
 
 @Injectable()
@@ -34,6 +36,7 @@ export class JwtAuthGuard implements CanActivate {
 
         try {
             const decoded = jwt.verify(token, this.jwtSecret) as TokenPayload;
+            console.log('Payload decodificado:', decoded);
 
             if (typeof decoded !== 'object' || !decoded.sub){
                 throw new UnauthorizedException('Token Invalido')
@@ -41,7 +44,8 @@ export class JwtAuthGuard implements CanActivate {
 
             request.user = {
                 id: Number(decoded.sub),
-                role_id: decoded.role_id
+                role_id: decoded.role_id,
+                areas_operator_id: decoded.areas_operator_id,
             };
             console.log(request.user)
             console.log('Usuario asignado a request.user:', request.user);
