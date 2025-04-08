@@ -34,7 +34,7 @@ export class WorkOrderService {
                     data: {
                         work_order_id: workOrder.id,
                         type,
-                        file_path: `uploads/${file.filename}`,
+                        file_path: file.filename,
                     },
                 });
             }
@@ -72,38 +72,4 @@ export class WorkOrderService {
 
     return workOrder;
   }
-
-  // Para obtener los WorkOrderFlowPendientes
-  async getPendingWorkOrders(areasOperatorIds: number) {
-    console.log('Buscando órdenes pendientes...');
-    if (!areasOperatorIds) {
-        throw new Error('No se proporcionaron areas validas');
-    }
-    const pendingOrders = await this.prisma.workOrderFlow.findMany({
-        where: {
-            status: 'Pendiente',
-            area_id: areasOperatorIds, 
-        },
-        include: {
-            workOrder: {
-                include: {
-                    user: true,
-                    files: true,
-                    flow: {
-                        include: {
-                            area: true,
-                        },
-                    },
-                },
-            },
-        },
-    });
-
-    if (pendingOrders.length === 0) {
-        return { message: 'No hay ordenes de trabajo pendientes para esta area.'}
-    }
-    console.log('Ordenes pendientes desde work-orders services', pendingOrders);
-    return pendingOrders;
-  }
-
 }

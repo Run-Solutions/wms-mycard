@@ -7,12 +7,12 @@ import { DashboardModule } from './dashboard/dashboard.module';
 import { NotificationsModule } from './notifications/notifications.module';
 import { UsersModule } from './modules/users/users.module';
 import { PickingModule } from './modules/picking/picking.module';
-import { SlottingModule } from './modules/slotting/slotting.module';
+import { AcceptWorkOrderModule } from './modules/accept-work-order/accept-work-order.module';
 import { DashboardsModule } from './modules/dashboards/dashboards.module';
 import { PackingModule } from './modules/packing/packing.module';
 import { LocationsModule } from './modules/locations/locations.module';
 import { WorkOrderModule } from './modules/work-order/work-order.module';
-import { PutawayModule } from './modules/putaway/putaway.module';
+import { FreeWorkOrderModule } from './modules/free-work-order/free-work-order.module';
 import { ItemsModule } from './modules/items/items.module';
 import { PermissionsModule } from './modules/permissions/permissions.module';
 import { PrismaService } from 'prisma/prisma.service';
@@ -24,12 +24,12 @@ import { PrismaService } from 'prisma/prisma.service';
     NotificationsModule,
     UsersModule,
     PickingModule,
-    SlottingModule,
+    AcceptWorkOrderModule,
     DashboardsModule,
     PackingModule,
     LocationsModule,
     WorkOrderModule,
-    PutawayModule,
+    FreeWorkOrderModule,
     ItemsModule,
     PermissionsModule,
   ],

@@ -1,4 +1,4 @@
-// src/app/(protected)/ordenesDeTrabajo/page.tsx
+// myorg/apps/frontend-web/src/app/(protected)/aceptarProducto/page.tsx
 'use client';
 
 import React, { useEffect, useState } from 'react';
@@ -32,6 +32,7 @@ interface WorkOrder {
       file_path: string;
     }[];
     flow: {
+      id: number;
       area: {
         name: string;
       }
@@ -40,7 +41,7 @@ interface WorkOrder {
 }
 
 
-const UsersPage: React.FC = () => {
+const AcceptProductPage: React.FC = () => {
   const theme = useTheme();
 
   // Para obtener Ordenes Pendientes
@@ -61,6 +62,48 @@ const UsersPage: React.FC = () => {
     setSelectedOrder(null);
   }
 
+  const aceptarOT = async () => {
+    console.log("Se hizo clic en Aceptar OT");
+    const token = localStorage.getItem('token');
+    const flowId = selectedOrder?.workOrder.flow[0].id;
+    try {
+      const res = await fetch(`http://localhost:3000/work-order-flow/${flowId}/accept`, {
+        method: 'PATCH',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`,
+        },
+      });
+      const data = await res.json();
+      if (res.ok) {
+        closeModal();
+      }
+    } catch (error) {
+      console.error(error);
+      alert('Error al conectar con el servidor');
+    }
+  }
+
+  const downloadFile = async (filename: string) => {
+    const token = localStorage.getItem('token');  
+    const res = await fetch(`http://localhost:3000/work-order-flow/file/${filename}`, {
+      headers: {
+        'Authorization': `Bearer ${token}`
+      }
+    });
+    if (!res.ok) {
+      const errorText = await res.text();
+      console.error("❌ Error desde el backend:", errorText);
+      throw new Error('Error al cargar el file');
+    }
+    const blob = await res.blob();
+    const url = window.URL.createObjectURL(blob);
+    window.open(url, '_blank');
+
+    // Limpieza opcional después de unos segundos
+    setTimeout(() => window.URL.revokeObjectURL(url), 5000);
+  }
+
   useEffect(() => {
     async function fetchWorkOrders() {
       try {
@@ -72,7 +115,7 @@ const UsersPage: React.FC = () => {
         }
         console.log('Token enviado a headers: ', token)
   
-        const res = await fetch('http://localhost:3000/work-orders/pending', {
+        const res = await fetch('http://localhost:3000/work-order-flow/pending', {
           method: 'GET',
           headers: {
             'Content-Type': 'application/json',
@@ -102,13 +145,41 @@ const UsersPage: React.FC = () => {
       <ModalOverlay onClick={closeModal}>
         <ModalContent onClick={(e) => e.stopPropagation()}>
           <h2>Orden: {selectedOrder.workOrder.ot_id}</h2>
-          <p><strong>MyCard:</strong> {selectedOrder.workOrder.mycard_id}</p>
-          <p><strong>Cantidad:</strong> {selectedOrder.workOrder.quantity}</p>
-          <p><strong>Creado por:</strong> {selectedOrder.workOrder.user?.username}</p>
-          <p><strong>Validado:</strong> {selectedOrder.workOrder.validated ? 'Sí' : 'No'}</p>
-          <p><strong>Flujos:</strong> {selectedOrder.workOrder.flow.map(f => f.area?.name ?? 'Area Desconocida').join(', ')}</p>
-          <p><strong>Archivos:</strong> {selectedOrder.workOrder.files.length}</p>
-          <button onClick={closeModal}>Cerrar</button>
+          <ModalBody>
+            <ModalInfo>
+              <p><strong>Id del Presupuesto:</strong> {selectedOrder.workOrder.mycard_id}</p>
+              <p><strong>Cantidad:</strong> {selectedOrder.workOrder.quantity}</p>
+              <p><strong>Creado por:</strong> {selectedOrder.workOrder.user?.username}</p>
+              <p><strong>Validado:</strong> {selectedOrder.workOrder.validated ? 'Sí' : 'No'}</p>
+              <p><strong>Archivos:</strong></p>
+              <div style={{ display: 'flex', flexDirection: 'row',}}>
+                {selectedOrder.workOrder.files.map((file) => (
+                  <div key={file.file_path}>
+                    <button onClick={() => downloadFile(file.file_path)}>
+                      {file.file_path.toLowerCase().includes('ot') ? 'Ver OT' : 
+                      file.file_path.toLowerCase().includes('sku') ? 'Ver SKU' : 
+                      file.file_path.toLowerCase().includes('op') ? 'Ver OP' : 
+                      'Ver Archivo'}
+                    </button>
+                  </div>
+                ))}
+              </div>
+            </ModalInfo>
+            <ModalFlow>
+                <strong>Flujos:</strong>
+                <Timeline>
+                  {selectedOrder.workOrder.flow.map((f, index) => (
+                    <TimelineItem key={index}>
+                      <Circle>{index + 1}</Circle>
+                      <AreaName>{f.area.name ?? 'Area Desconocida'}</AreaName>
+                      {index < selectedOrder.workOrder.flow.length -1 && <Line/>}
+                    </TimelineItem>
+                  ))}
+                </Timeline>
+            </ModalFlow>
+          </ModalBody>
+          <button style={{ marginTop: '20px'}} onClick={closeModal}>Cerrar</button>
+          <button style={{ marginTop: '20px'}} onClick={aceptarOT}>Aceptar OT</button>
         </ModalContent>
       </ModalOverlay>
     )}
@@ -118,33 +189,37 @@ const UsersPage: React.FC = () => {
         <Title theme={theme}>Órdenes de Trabajo Pendientes</Title>
       </TitleWrapper>
       <CardsContainer>
-        {WorkOrders.map((order, index) => {
-          console.log(`Orden ${index + 1}:`, order);
-          const workOrder = order.workOrder;
-          if(!workOrder) return null;
-          console.log('workOrder encontrado:', order.workOrder);
-          return (
-            <WorkOrderCard key={order.id} onClick={() => {
-              console.log('Ha clickeado');
-              handleCardClick(order);
-              }}>
-              <CardTitle>{workOrder.ot_id}</CardTitle>
-              <InfoItem>
-                <p>{workOrder.mycard_id}</p>
-                <p>Cantidad: {workOrder.quantity}</p>
-              </InfoItem>
-              <Info style={{ paddingTop: '10px' }}>Creado por: {workOrder.user.username}</Info>
-              <Info>Fecha de creación: {new Date(workOrder.createdAt).toLocaleDateString()}</Info>
-            </WorkOrderCard>
-          );
-        })}
+        {Array.isArray(WorkOrders) && WorkOrders.length > 0 ? (
+          WorkOrders.map((order, index) => {
+            console.log(`Orden ${index + 1}:`, order);
+            const workOrder = order.workOrder;
+            if(!workOrder) return null;
+            console.log('workOrder encontrado:', order.workOrder);
+            return (
+              <WorkOrderCard key={order.id} onClick={() => {
+                console.log('Ha clickeado');
+                handleCardClick(order);
+                }}>
+                <CardTitle>{workOrder.ot_id}</CardTitle>
+                <InfoItem>
+                  <p>{workOrder.mycard_id}</p>
+                  <p>Cantidad: {workOrder.quantity}</p>
+                </InfoItem>
+                <Info style={{ paddingTop: '10px' }}>Creado por: {workOrder.user.username}</Info>
+                <Info>Fecha de creación: {new Date(workOrder.createdAt).toLocaleDateString()}</Info>
+              </WorkOrderCard>
+            );
+          })
+        ) : (
+          <p>No hay ordenes pendientes por asignar.</p>
+        )}
       </CardsContainer>
     </PageContainer>
     </>
   );
 };
 
-export default UsersPage;
+export default AcceptProductPage;
 
 // =================== Styled Components ===================
 
@@ -251,22 +326,93 @@ const ModalContent = styled.div`
   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.25);
 
   h2 {
-    font-size: 1.8rem;
-    margin-bottom: 1rem;
+      font-size: 1.8rem;
+      margin-bottom: 1rem;
   }
-
-  p {
-    margin: 0.5rem 0;
-  }
-
   button {
-    margin-top: 1.5rem;
     padding: 0.5rem 1rem;
     border: none;
     border-radius: 0.5rem;
-    background-color: #4a90e2;
-    color: white;
+    background-color: ${(props) => props.theme.palette.background.default};
+    color: black;
     cursor: pointer;
+    margin: 5px;
+    transition: border-color 0.3s cubic-bezier(0.25, 0.01, 0.25, 1), 
+              color 0.3s cubic-bezier(0.25, 0.01, 0.25, 1), 
+              background 0.2s cubic-bezier(0.25, 0.01, 0.25, 1);
+
+  &::placeholder {
+    color: #aaa;
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen,
+      Ubuntu, Cantarell, 'Open Sans', 'Helvetica Neue', sans-serif;
   }
+
+  &:hover,
+  &:focus {
+    border-color: #05060f;
+  }
+  }
+`;
+
+const ModalBody = styled.div`
+  display: flex;
+  gap: 40px;
+  align-items: flex-start;
+`;
+
+const ModalFlow = styled.div`
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+`;
+
+const ModalInfo = styled.div`
+  p {
+    margin: 0.5rem 0;
+  }
+  width: 70%;
+`;
+
+const Timeline = styled.div`
+  display: flex;
+  flex-direction: column;
+  position: relative;
+  margin: 0.5rem 0;
+`;
+
+const TimelineItem = styled.div`
+  display: flex;
+  align-items: center;
+  position: relative;
+  padding-left: 2rem;
+  margin-bottom: 1rem;
+`;
+
+const Circle = styled.div`
+  position: absolute;
+  left: 0;
+  width: 20px;
+  height: 20px;
+  background-color: #4a90e2;
+  border-radius: 50%;
+  color: white;
+  font-size: 0.8rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+`;
+
+const Line = styled.div`
+  position: absolute;
+  left: 9px;
+  top: 20px;
+  height: 30px;
+  width: 2px;
+  background-color: #4a90e2;
+`;
+
+const AreaName = styled.span`
+  font-size: 1rem;
+  font-weight: 500;
 `;
 

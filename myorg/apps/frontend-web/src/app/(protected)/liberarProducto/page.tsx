@@ -1,27 +1,192 @@
-// src/app/(protected)/ordenesDeTrabajo/page.tsx
+// myorg/apps/frontend-web/src/app/(protected)/liberarProducto/page.tsx
 'use client';
 
 import React, { useEffect, useState } from 'react';
 import styled, { useTheme } from 'styled-components';
+import { useRouter } from 'next/navigation';
+import { Table, TableBody, TableCell, TableContainer, TableHead, TableRow, Paper, Typography} from '@mui/material';
 
-const UsersPage: React.FC = () => {
+// Se define el tipo de datos
+interface WorkOrder {
+  id: number;
+  work_order_id: number;
+  area_id: number;
+  status: string;
+  assigned_at: string;
+  created_at: string;
+  updated_at: string;
+  workOrder: {   
+    id: number;
+    ot_id: string;
+    mycard_id: string;
+    quantity: number;
+    created_by: number;  
+    validated: boolean;
+    createdAt: string;
+    updatedAt: string;
+    user: {
+      id: number;
+      username: string;
+    };
+    files: {
+      id: number;
+      type: string;
+      file_path: string;
+    }[];
+    flow: {
+      id: number;
+      area: {
+        name: string;
+      }
+      status: 'Pendiente' | 'En Proceso';
+    }[];
+  };
+}
+
+const FreeProductPage: React.FC = () => {
+  const router = useRouter();
+  const theme = useTheme();
+
+  // Para obtener Ordenes Pendientes
+  const [WorkOrders, setWorkOrders] = useState<WorkOrder[]>([]);
+  const [message, setMessage] = useState('');
+
+  const downloadFile = async (filename: string) => {
+    const token = localStorage.getItem('token');  
+    const res = await fetch(`http://localhost:3000/free-order-flow/file/${filename}`, {
+      headers: {
+        'Authorization': `Bearer ${token}`
+      }
+    });
+    if (!res.ok) {
+      const errorText = await res.text();
+      console.error("❌ Error desde el backend:", errorText);
+      throw new Error('Error al cargar el file');
+    }
+    const blob = await res.blob();
+    const url = window.URL.createObjectURL(blob);
+    window.open(url, '_blank');
+
+    // Limpieza opcional después de unos segundos
+    setTimeout(() => window.URL.revokeObjectURL(url), 5000);
+  }
+
+  useEffect (() => {
+    async function fetchWorkOrdersInProgress() {
+      try {
+        // Se verifica token
+        const token = localStorage.getItem('token');
+        if(!token) {
+          console.error('No se encontró el token en localStorage');
+          return;
+        }
+        console.log('Token enviado a headers: ', token)
+
+        const res = await fetch('http://localhost:3000/free-order-flow/in-progress', {
+          method: 'GET',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${token}`
+          },
+        });
+        if(!res.ok){
+          throw new Error(`Error al obtener las ordenes: ${res.status} ${res.statusText}`);
+        }
+        const data = await res.json();
+        console.log('Datos obtenidos de las Ordenes en Proceso: ', data);
+        setWorkOrders(data);
+
+      } catch (err) {
+        console.error(err);
+        console.error('Error en fetchWorkOrdersInProgress', err);
+      }
+    }
+    fetchWorkOrdersInProgress();
+  },[]);
   return (
     <PageContainer>
       <TitleWrapper>
         <Title>Liberar Producto</Title>
       </TitleWrapper>
-      
+      <TableContainer component={Paper} sx={{ mt: 4 }}>
+        <Typography variant='h6' component='div' sx={{ p: 2 }}>
+          Ordenes en Proceso
+        </Typography>
+        {message ? (
+          <Typography sx={{ p: 2, color: 'red'}}> {message}</Typography>
+        ) : (
+          <Table>
+            <TableHead>
+              <TableRow>
+                <TableCell>Id OT</TableCell>
+                <TableCell>Id del presupuesto</TableCell>
+                <TableCell>Usuario</TableCell>
+                <TableCell>Area</TableCell>
+                <TableCell>Fecha</TableCell>
+                <TableCell>Archivos</TableCell>
+              </TableRow>
+            </TableHead>
+            <TableBody>
+              {WorkOrders.map((orderFlow) => (
+                <TableRow key={orderFlow.id}>
+                  <TableCell sx={{ width: '90px', overflowX: 'auto', cursor: 'pointer' }} onClick={() => router.push(`/liberarProducto/${orderFlow.workOrder.ot_id}`)}>{orderFlow.workOrder.ot_id}</TableCell>
+                  <TableCell sx={{ width: '50px', overflowX: 'auto' }}>{orderFlow.workOrder.mycard_id}</TableCell>
+                  <TableCell sx={{ width: '110px', overflowX: 'auto' }}>{orderFlow.workOrder.user?.username || 'Sin usuario'}</TableCell>
+                  <TableCell sx={{ maxWidth: '500px', overflowX: 'auto' }}>
+                    <Timeline>
+                      {orderFlow.workOrder.flow?.map((flowStep, index) => {
+                        const isActive = flowStep.status?.toLowerCase().includes('proceso');
+                        const isLast = index === orderFlow.workOrder.flow.length - 1;
+                        return (
+                          <TimelineItem key={index}>
+                            <Circle $isActive={isActive}>{index + 1}</Circle>
+                            {index < orderFlow.workOrder.flow.length -1 && <Line $isLast={isLast}/>}
+                            <AreaName $isActive={isActive}>{flowStep.area.name ?? 'Area Desconocida'}</AreaName>
+                          </TimelineItem>
+                        );
+                      })}
+                    </Timeline>
+                  </TableCell>
+                  <TableCell sx={{ width: '100px', overflowX: 'auto' }}>{new Date(orderFlow.workOrder.createdAt).toLocaleDateString()}</TableCell>
+                  <TableCell sx={{ width: '100px', overflowX: 'auto' }}>{orderFlow.workOrder.files.length > 0 ? (
+                    orderFlow.workOrder.files.map((file) => (
+                    <div key={file.file_path}>
+                      <button onClick={() => downloadFile(file.file_path)}>
+                        {file.file_path.toLowerCase().includes('ot') ? 'Ver OT' : 
+                        file.file_path.toLowerCase().includes('sku') ? 'Ver SKU' : 
+                        file.file_path.toLowerCase().includes('op') ? 'Ver OP' : 
+                        'Ver Archivo'}
+                      </button>
+                    </div>
+                    ))
+                  ) : (
+                    'No hay archivos'
+                  )}
+                  </TableCell>
+                </TableRow>
+              ))}
+            </TableBody>
+          </Table>
+        )}
+      </TableContainer>
     </PageContainer>
   );
 };
 
-export default UsersPage;
+export default FreeProductPage;
 
 // =================== Styled Components ===================
+
+interface StyledProps {
+  $isActive: boolean;
+}
 
 const PageContainer = styled.div`
   padding: 1rem 2rem;
   margin-top: -70px;
+  width: 100%;
+  align-content: flex-start;
+  justify-content: center;
 `;
 
 const TitleWrapper = styled.div`
@@ -31,118 +196,72 @@ const TitleWrapper = styled.div`
 `;
 
 const Title = styled.h1<{ theme: any }>`
-  font-size: 4rem;
+  font-size: 2rem;
   font-weight: 500;
   color: ${({ theme }) => theme.palette.text.primary}
 `;
 
-const CardsContainer = styled.div`
+const Timeline = styled.div`
   display: flex;
-  flex-wrap: wrap;
-  gap: 2rem;
+  flex-direction: row;
+  overflow-x: auto;
+  width: 100%;
 `;
 
-const UserCard = styled.div`
+const TimelineItem = styled.div`
   display: flex;
   flex-direction: column;
   align-items: center;
-`;
-
-const FlipCard = styled.div`
-  background-color: transparent;
-  width: 245px;
-  height: 270px;
-  perspective: 1000px;
-  font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-  cursor: pointer;
-
-  &:hover .flip-card-inner {
-    transform: rotateY(180deg);
-  }
-`;
-
-const FlipCardInner = styled.div`
   position: relative;
-  width: 100%;
-  height: 100%;
-  text-align: center;
-  transition: transform 0.6s;
-  transform-style: preserve-3d;
-`;
+  min-width: 65px;
 
-interface FlipCardSideProps {
-  theme: any;
-}
-
-const FlipCardFront = styled.div<FlipCardSideProps>`
-  position: absolute;
-  width: 100%;
-  height: 100%;
-  padding: 5px;
-  border-radius: 2em;
-  backface-visibility: hidden;
-  background-color: ${props => props.theme.palette.primary.main};
-  border: 4px solid ${props => props.theme.palette.secondary.main};
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-`;
-
-const ProfileImage = styled.img`
-  border-radius: 50%;
-  width: 120px;
-  height: 120px;
-  object-fit: cover;
-  margin-bottom: 1rem;
-`;
-
-const UserName = styled.div<{ theme: any }>`
-  font-size: 22px;
-  color: ${props => props.theme.palette.secondary.main};
-  font-weight: bold;
-  text-transform: uppercase;
-`;
-
-const FlipCardBack = styled.div<FlipCardSideProps>`
-  position: absolute;
-  width: 100%;
-  height: 100%;
-  padding: 5px;
-  border-radius: 2em;
-  backface-visibility: hidden;
-  background-color: ${props => props.theme.palette.primary.main};
-  border: 4px solid ${props => props.theme.palette.secondary.main};
-  transform: rotateY(180deg);
-  display: flex;
-  flex-direction: column;
-  justify-content: center;
-  align-items: center;
-`;
-
-const InfoItem = styled.div`
-  font-size: 14px;
-  color: white;
-  margin: 0.2rem 0;
-`;
-
-const CardActions = styled.div`
-  margin-top: 0.5rem;
-  display: flex;
-  gap: 0.5rem;
-`;
-
-const ActionButton = styled.button`
-  padding: 0.5rem 1rem;
-  border: none;
-  border-radius: 1em;
-  cursor: pointer;
-  background-color: ${props => props.theme.palette.secondary.main};
-  color: white;
-  font-weight: bold;
-  transition: background-color 0.3s;
-
-  &:hover {
-    background-color: ${props => props.theme.palette.secondary.dark || '#000'};
+  &:last-child {
+    margin-right: 0;
   }
 `;
+
+const Circle = styled.div.withConfig({
+  shouldForwardProp: (prop) => prop !== '$isActive',
+})<StyledProps>`
+  width: 30px;
+  height: 30px;
+  background-color: ${({ $isActive }) => ($isActive ? '#4a90e2' : '#d1d5db')};
+  border-radius: 50%;
+  color: white;
+  font-size: 12px;
+  font-weight: bold;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 2;
+  box-shadow: ${({ $isActive }) => ($isActive ? '0 0 5px #4a90e2' : 'none')};
+  transition: background-color 0.3s, box-shadow 0.3s;
+`;
+
+const Line = styled.div.withConfig({
+  shouldForwardProp: (prop) => prop !== '$isLast',
+})<{ $isLast: boolean }>`
+  position: absolute;
+  top: 14px;
+  left: 50%;
+  height: 2px;
+  width: 70px;
+  background-color: #d1d5db;
+  z-index: 0;
+  display: ${({ $isLast }) => ($isLast ? 'none' : 'block')};
+`;
+
+
+const AreaName = styled.span.withConfig({
+  shouldForwardProp: (prop) => prop !== '$isActive',
+})<StyledProps>`
+  margin-top: 0.5rem;
+  font-size: 0.75rem;
+  font-weight: ${({ $isActive }) => ($isActive ? 'bold' : 'normal')};
+  color: ${({ $isActive }) => ($isActive ? '#4a90e2' : '#6b7280')};
+  text-align: center;
+  max-width: 80px;
+  text-transform: capitalize;
+  transition: color 0.3s, font-weight 0.3s;
+`;
+

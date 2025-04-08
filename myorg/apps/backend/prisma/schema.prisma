@@ -21,6 +21,7 @@ model User {
   role                Role                @relation(fields: [role_id], references: [id]) // Relación con Role
   areasOperator       AreasOperator?      @relation(fields: [areas_operator_id], references: [id]) // Relación con area si es operador
   WorkOrders          WorkOrder[]         @relation("UserWorkOrders")
+  WorkOrderFlow       WorkOrderFlow[]     @relation("UserWorkOrderFlow")
 
   created_at      DateTime            @default(now()) @map("created_at")
   updated_at      DateTime            @updatedAt @map("updated_at")
@@ -118,9 +119,11 @@ model WorkOrderFlow {
   id              Int                 @id @default(autoincrement())
   work_order_id   Int                 // ID de la OT
   area_id         Int                 // Área por la que pasa la OT
-  status          String              // Estado dentro de esa área ("Pendiente", "En Proceso", "Finalizado")
-  assigned_at     DateTime            @default(now()) @map("assigned_at") // Cuándo fue asignada a esta área
+  status          String              // Estado dentro de esa área ("En espera", "Pendiente", "En Proceso", "Finalizado")
+  assigned_user   Int?                // Usuario asignado
+  assigned_at     DateTime?           @map("assigned_at") // Cuándo fue asignada a esta área
 
+  user            User?               @relation("UserWorkOrderFlow", fields: [assigned_user], references: [id])
   workOrder       WorkOrder           @relation(fields: [work_order_id], references: [id], onDelete: Cascade)
   area            AreasOperator       @relation(fields: [area_id], references: [id], onDelete: Cascade)
 

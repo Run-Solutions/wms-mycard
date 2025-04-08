@@ -2,7 +2,7 @@
 'use client';
 import React, { useEffect, useState } from 'react';
 import { Box, CircularProgress } from '@mui/material';
-import Grid from '@mui/material/Grid';
+import  MuiGrid  from '@mui/material/Grid';
 import FlipCard from '@/components/Card/FlipCard';
 import { useRouter } from 'next/navigation';
 
@@ -78,9 +78,9 @@ const DashboardPage: React.FC = () => {
           <CircularProgress />
         </Box>
       ) : (
-        <Grid container rowSpacing={3} columnSpacing={2} justifyContent='center'>
+        <MuiGrid container rowSpacing={3} columnSpacing={2} justifyContent='center'>
           {modules.map((module) => (
-            <Grid item xs={12} sm={6} md={4} key={module.id}>
+            <MuiGrid item xs={12} sm={6} md={4} key={module.id}>
               <Box onClick={() => handleCardClick(module.name)} sx={{ cursor: 'pointer' }}>
                 <FlipCard
                   title={module.name}
@@ -89,9 +89,9 @@ const DashboardPage: React.FC = () => {
                   logoName={module.logoName}
                 />
               </Box>
-            </Grid>
+            </MuiGrid>
           ))}
-        </Grid>
+        </MuiGrid>
       )}
     </Box>
   );

@@ -1,5 +1,5 @@
 // myorg/apps/backend/src/modules/work-order/controllers/work-order.controller.ts
-import { Body, Controller, Post, UploadedFiles, UseGuards, UseInterceptors, Req, Get, ForbiddenException } from "@nestjs/common";
+import { Body, Controller, Post, UploadedFiles, UseGuards, UseInterceptors, Req } from "@nestjs/common";
 import { WorkOrderService } from "./work-order.service";
 import { CreateWorkOrderDto } from "./dto/create-work-order.dto";
 import { FileFieldsInterceptor } from "@nestjs/platform-express";
@@ -65,24 +65,5 @@ export class WorkOrderController {
         );
 
         return { message: 'Orden de trabajo creada correctamente', workOrder };
-    }
-
-    // Para obtener los WorkOrderFlowPendientes
-    @UseGuards(JwtAuthGuard)
-    @Get('pending')
-    async getPendingWorkOrders(@Req() req: AuthenticatedRequest) {
-        console.log("🔹 Usuario autenticado:", req.user);
-        if (!req.user) {
-            console.log('❌ Usuario no autenticado.')
-            throw new ForbiddenException('❌ Usuario no autenticado.')
-        }
-        const { user } = req;
-        console.log("📌 ID del usuario:", user.id);
-        console.log("📌 Rol del usuario:", user.role_id);
-        console.log("📌 Áreas asignadas:", user.areas_operator_id);
-        if (user.role_id !== 2){
-            throw new ForbiddenException('No tienes permiso para acceder a las ordenes.');
-        }
-        return await this.workOrderService.getPendingWorkOrders(user.areas_operator_id);
     }
 }
