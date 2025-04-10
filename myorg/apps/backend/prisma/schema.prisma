@@ -9,126 +9,167 @@ datasource db {
 }
 
 model User {
-  id                  Int                 @id @default(autoincrement())
-  username            String              @unique
-  email               String              @unique
-  password            String
-  phone               String?
-  profile_image       String?
-  role_id             Int                 @map("role_id") // Clave foránea
-  areas_operator_id   Int?                // Puede ser nulo si no es operador
+  id                    Int                 @id @default(autoincrement())
+  username              String              @unique
+  email                 String              
+  password              String
+  phone                 String?
+  profile_image         String?
+  role_id               Int                 @map("role_id") // Clave foránea
+  areas_operator_id     Int?                // Puede ser nulo si no es operador
 
-  role                Role                @relation(fields: [role_id], references: [id]) // Relación con Role
-  areasOperator       AreasOperator?      @relation(fields: [areas_operator_id], references: [id]) // Relación con area si es operador
-  WorkOrders          WorkOrder[]         @relation("UserWorkOrders")
-  WorkOrderFlow       WorkOrderFlow[]     @relation("UserWorkOrderFlow")
+  role                  Role                @relation(fields: [role_id], references: [id]) // Relación con Role
+  areasOperator         AreasOperator?      @relation(fields: [areas_operator_id], references: [id]) // Relación con area si es operador
+  WorkOrders            WorkOrder[]         @relation("UserWorkOrders")
+  WorkOrderFlow         WorkOrderFlow[]     @relation("UserWorkOrderFlow")
+  areasResponses        AreasResponse[]     @relation("UserAssignedToResponse")
 
-  created_at      DateTime            @default(now()) @map("created_at")
-  updated_at      DateTime            @updatedAt @map("updated_at")
+  created_at            DateTime            @default(now()) @map("created_at")
+  updated_at            DateTime            @updatedAt @map("updated_at")
 
   @@map("users")
 }
 
 model Role {
-  id              Int                 @id @default(autoincrement())
-  name            String              @unique
+  id                    Int                 @id @default(autoincrement())
+  name                  String              @unique
 
-  users           User[]              // Relación inversa con User
-  permissions     ModulePermission[]  // Relación inversa con ModulePermission
+  users                 User[]              // Relación inversa con User
+  permissions           ModulePermission[]  // Relación inversa con ModulePermission
 
-  created_at      DateTime            @default(now()) @map("created_at")
-  updated_at      DateTime            @updatedAt @map("updated_at")
+  created_at            DateTime            @default(now()) @map("created_at")
+  updated_at            DateTime            @updatedAt @map("updated_at")
 
   @@map("roles")
 }
 
 model AreasOperator {
-  id              Int                 @id @default(autoincrement())
-  name            String              @unique
+  id                    Int                 @id @default(autoincrement())
+  name                  String              @unique
 
-  users           User[]              //Relacion con User si aplica 
-  workOrderFlows  WorkOrderFlow[]     //Relacion con flujo de OTs
-  
+  users                 User[]              //Relacion con User si aplica 
+  workOrderFlows        WorkOrderFlow[]     //Relacion con flujo de OTs
+  areasResponses        AreasResponse[]     @relation("AreaOnResponse")
+
   @@map("areas_operator")
 }
 
 model Module {
-  id              Int                 @id @default(autoincrement())
-  name            String              @unique
-  description     String              //Nombre del modulo permitido
-  imageName       String              
-  logoName        String              
+  id                    Int                 @id @default(autoincrement())
+  name                  String              @unique
+  description           String              //Nombre del modulo permitido
+  imageName             String              
+  logoName              String              
   
-  permissions     ModulePermission[]  // Relacion con permisos 
+  permissions           ModulePermission[]  // Relacion con permisos 
 
-  created_at      DateTime            @default(now()) @map("created_at")
-  updated_at      DateTime            @updatedAt @map("updated_at")
+  created_at            DateTime            @default(now()) @map("created_at")
+  updated_at            DateTime            @updatedAt @map("updated_at")
 
   @@map("modules")
 }
 
 model ModulePermission {
-  id              Int                 @id @default(autoincrement())
-  role_id         Int                 
-  module_id       Int                 //Nombre del modulo permitido
-  enabled         Boolean             @default(true) //para activar o desactivar el modulo por rol
+  id                    Int                 @id @default(autoincrement())
+  role_id               Int                 
+  module_id             Int                 //Nombre del modulo permitido
+  enabled               Boolean             @default(true) //para activar o desactivar el modulo por rol
   
-  role            Role                @relation(fields: [role_id], references: [id], onDelete: Cascade)
-  module          Module              @relation(fields: [module_id], references: [id], onDelete: Cascade)
+  role                  Role                @relation(fields: [role_id], references: [id], onDelete: Cascade)
+  module                Module              @relation(fields: [module_id], references: [id], onDelete: Cascade)
 
-  created_at      DateTime            @default(now()) @map("created_at")
-  updated_at      DateTime            @updatedAt @map("updated_at")
+  created_at            DateTime            @default(now()) @map("created_at")
+  updated_at            DateTime            @updatedAt @map("updated_at")
 
   @@unique([module_id, role_id])      //Para no tener un mismo rol con permisos duplicados
   @@map("module_permissions")
 }
 
 model WorkOrder {
-  id              Int                 @id @default(autoincrement())
-  ot_id           String              @unique
-  mycard_id       String
-  quantity        Int                 // Estado general de la OT
-  created_by      Int                 // Usuario que creó la OT
-  validated       Boolean             @default(false)
+  id                    Int                 @id @default(autoincrement())
+  ot_id                 String              @unique
+  mycard_id             String
+  quantity              Int                 // Estado general de la OT
+  created_by            Int                 // Usuario que creó la OT
+  validated             Boolean             @default(false)
   
-  user            User                @relation("UserWorkOrders", fields: [created_by], references: [id])
-  files           WorkOrderFiles[]    // Relacion con archivos
-  flow            WorkOrderFlow[]     // Relación con las áreas por las que ha pasado
+  user                  User                @relation("UserWorkOrders", fields: [created_by], references: [id])
+  files                 WorkOrderFiles[]    // Relacion con archivos
+  flow                  WorkOrderFlow[]     // Relación con las áreas por las que ha pasado
+  areasResponses        AreasResponse[]     @relation("WorkOrderOnResponse")
 
-  createdAt       DateTime            @default(now()) @map("created_at")
-  updatedAt       DateTime            @updatedAt @map("updated_at")
+  createdAt             DateTime            @default(now()) @map("created_at")
+  updatedAt             DateTime            @updatedAt @map("updated_at")
 
   @@map("work_orders")
 }
 
 model WorkOrderFiles {
-  id              Int                 @id @default(autoincrement())
-  work_order_id   Int                 // Clave foránea de la OT
-  type            String              // Tipo de archivo (OT, SKU, OP)
-  file_path       String              // Ruta del archivo
+  id                    Int                 @id @default(autoincrement())
+  work_order_id         Int                 // Clave foránea de la OT
+  type                  String              // Tipo de archivo (OT, SKU, OP)
+  file_path             String              // Ruta del archivo
 
-  workOrder       WorkOrder           @relation(fields: [work_order_id], references: [id])
+  workOrder             WorkOrder           @relation(fields: [work_order_id], references: [id])
 
-  created_at      DateTime            @default(now()) @map("created_at")
-  updated_at      DateTime            @updatedAt @map("updated_at")
+  created_at            DateTime            @default(now()) @map("created_at")
+  updated_at            DateTime            @updatedAt @map("updated_at")
 
   @@map("work_order_files")
 }
 
 model WorkOrderFlow {
-  id              Int                 @id @default(autoincrement())
-  work_order_id   Int                 // ID de la OT
-  area_id         Int                 // Área por la que pasa la OT
-  status          String              // Estado dentro de esa área ("En espera", "Pendiente", "En Proceso", "Finalizado")
-  assigned_user   Int?                // Usuario asignado
-  assigned_at     DateTime?           @map("assigned_at") // Cuándo fue asignada a esta área
+  id                     Int                 @id @default(autoincrement())
+  work_order_id          Int                 // ID de la OT
+  area_id                Int                 // Área por la que pasa la OT
+  status                 String              // Estado dentro de esa área ("En espera", "Pendiente", "En Proceso", "Finalizado")
+  assigned_user          Int?                // Usuario asignado
+  assigned_at            DateTime?           @map("assigned_at") // Cuándo fue asignada a esta área
+  area_response_id       Int?                // Clave foránea
 
-  user            User?               @relation("UserWorkOrderFlow", fields: [assigned_user], references: [id])
-  workOrder       WorkOrder           @relation(fields: [work_order_id], references: [id], onDelete: Cascade)
-  area            AreasOperator       @relation(fields: [area_id], references: [id], onDelete: Cascade)
+  user                   User?               @relation("UserWorkOrderFlow", fields: [assigned_user], references: [id])
+  workOrder              WorkOrder           @relation(fields: [work_order_id], references: [id], onDelete: Cascade)
+  area                   AreasOperator       @relation(fields: [area_id], references: [id], onDelete: Cascade)
+  areaResponse           AreasResponse?      @relation("ResponseOnWorkOrderFlow")
 
-  created_at      DateTime            @default(now()) @map("created_at")
-  updated_at      DateTime            @updatedAt @map("updated_at")
+  created_at             DateTime            @default(now()) @map("created_at")
+  updated_at             DateTime            @updatedAt @map("updated_at")
 
   @@map("work_order_flows")
+}
+
+model AreasResponse {
+  id                     Int                 @id @default(autoincrement())
+  area_id                Int                 // Area del usuario que pasa la respuesta
+  assigned_user          Int?                // Usuario asignado
+  work_order_id          Int                 // Id de la OT 
+  work_order_flow_id     Int                 @unique                
+
+  user                   User?               @relation("UserAssignedToResponse", fields: [assigned_user], references: [id])
+  area                   AreasOperator       @relation("AreaOnResponse", fields: [area_id], references: [id], onDelete: Cascade)
+  workOrder              WorkOrder           @relation("WorkOrderOnResponse", fields: [work_order_id], references: [id], onDelete: Cascade)
+  WorkOrderFlow          WorkOrderFlow       @relation("ResponseOnWorkOrderFlow", fields: [work_order_flow_id], references: [id])
+
+  prepress               PrepressResponse?   @relation("PrepressOnResponse")
+
+  createdAt              DateTime            @default(now()) @map("created_at")
+  updatedAt              DateTime            @updatedAt @map("updated_at")
+
+  @@map("areas_response")
+}
+
+model PrepressResponse {
+  id                     Int      @id @default(autoincrement())
+  plates                 Int      // Placas
+  positives              Int      // Positivos
+  testType               String   // Tipo de prueba: "color" | "fisica" | "digital"
+  comments               String?  // Comentarios opcionales
+
+  created_at             DateTime        @default(now()) @map("created_at")
+  updated_at             DateTime        @updatedAt @map("updated_at")
+
+  areas_response_id      Int             @unique
+  areas_response         AreasResponse   @relation("PrepressOnResponse", fields: [areas_response_id], references: [id], onDelete: Cascade)
+
+  @@map("prepress_response")
 }

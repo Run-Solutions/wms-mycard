@@ -1,9 +1,10 @@
-import { Controller, Param, ForbiddenException, Get, Req, Res, UseGuards } from '@nestjs/common';
+import { Controller, Param, Post, ForbiddenException, Get, Req, Res, UseGuards, Body } from '@nestjs/common';
 import { FreeWorkOrderService } from './free-work-order.service';
 import { Request, Response } from 'express';
 import { JwtAuthGuard } from 'src/auth/jwt-auth.guard';
 import { join } from 'path';
 import * as fs from 'fs';
+import { CreatePrepressResponseDto } from './dto/response.dto';
 
 interface AuthenticatedUser {
     id: number;
@@ -60,5 +61,11 @@ export class FreeWorkOrderController {
       }
             
       return await this.FreeWorkOrderService.getWorkOrderFlowById(id, user.areas_operator_id);
+    }
+    
+    // Para guardar respuesta de liberacion de Preprensa
+    @Post('prepress')
+    createPrepressResponse(@Body() dto: CreatePrepressResponseDto) {
+      return this.FreeWorkOrderService.createPrepressResponse(dto);
     }
 }

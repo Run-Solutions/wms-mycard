@@ -1,5 +1,8 @@
-'use client'
+'use client';
 
+import axios from "axios";
+import { useRouter } from "next/navigation";
+import { useState } from "react";
 import styled from "styled-components";
 
 interface Props {
@@ -7,6 +10,72 @@ interface Props {
 }
 
 export default function PrePrensaComponent({ workOrder }: Props) {
+  const [plates, setPlates] = useState('');
+  const [positives, SetPositives] = useState('');
+  const [testTypes, SetTestTypes] = useState('');
+  const [comments, SetComments] = useState('');
+  const [message, setMessage] = useState('');
+  const [showConfirm, setShowConfirm] = useState(false); 
+  const router = useRouter();
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!plates || !positives || !testTypes) {
+      alert('Por favor. completa los campos obligatorios');
+      return;
+    }
+
+    console.log("workOrderId:", workOrder.work_order_id);
+    console.log("workOrderFlowId", workOrder.id);
+    console.log("areaId", workOrder.area_id);
+    console.log("assignedUser", workOrder.assigned_user);
+
+
+    const payload = {
+      workOrderId: workOrder.work_order_id,
+      workOrderFlowId: workOrder.id,
+      areaId: workOrder.area_id,
+      assignedUser: workOrder.assigned_user || null,
+
+      plates: parseInt(plates),
+      positives: parseInt(positives),
+      testType: testTypes,
+      comments,
+    };
+
+    try {
+      const token = localStorage.getItem('token');
+      if(!token) {
+        alert('No hay token de autenticacion');
+        return;
+      }
+      console.log('payload antes de enviar: ', payload);
+      const res = await fetch('http://localhost:3000/free-order-flow/prepress', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`,
+        },
+        body: JSON.stringify(payload),
+      });
+      const data = await res.json();
+
+      if (!res.ok) {
+        console.error("Error en el servidor:", data);
+        setMessage("Error al guardar la respuesta.");
+        return;
+      }
+
+      setMessage(data.message || "Respuesta guardada con éxito.");
+      router.push('/liberarProducto');
+    } catch (error) {
+      console.error('Error al enviar respuesta', error);
+      alert('Ocurrió un error al enviar la respuesta.');
+    } finally {
+      setShowConfirm(false);
+    }
+  }
+
   return (
     <Container>
       <Title>Área: Preprensa</Title>
@@ -25,39 +94,52 @@ export default function PrePrensaComponent({ workOrder }: Props) {
           <Value>{workOrder.workOrder.quantity}</Value>
         </InfoItem>
       </DataWrapper>
+      <form onSubmit={handleSubmit}>
+        <SectionTitle>Datos de Producción</SectionTitle>
+        <NewDataWrapper>
+          <InputGroup>
+            <Label>Placas:</Label>
+            <Input type="number" placeholder="Ej: 2" value={plates} onChange={(e) => setPlates(e.target.value)} />
+          </InputGroup>
+          <InputGroup>
+            <Label>Positivos:</Label>
+            <Input type="number" placeholder="Ej: 3" value={positives} onChange={(e) => SetPositives(e.target.value)} />
+          </InputGroup>
+        </NewDataWrapper>
 
-      <SectionTitle>Datos de Producción</SectionTitle>
-      <NewDataWrapper>
-        <InputGroup>
-          <Label>Placas:</Label>
-          <Input type="text" placeholder="Ej: 2" />
-        </InputGroup>
-        <InputGroup>
-          <Label>Positivos:</Label>
-          <Input type="text" placeholder="Ej: 3" />
-        </InputGroup>
-      </NewDataWrapper>
+        <SectionTitle>Tipo de Prueba</SectionTitle>
+        <RadioGroup>
+          <RadioLabel>
+            <Radio type="radio" name="prueba" value="color" onChange={(e) => SetTestTypes(e.target.value)} />
+            Prueba de color
+          </RadioLabel>
+          <RadioLabel>
+            <Radio type="radio" name="prueba" value="fisica" onChange={(e) => SetTestTypes(e.target.value)} />
+            Muestra física
+          </RadioLabel>
+          <RadioLabel>
+            <Radio type="radio" name="prueba" value="digital" onChange={(e) => SetTestTypes(e.target.value)} />
+            Prueba digital
+          </RadioLabel>
+        </RadioGroup>
 
-      <SectionTitle>Tipo de Prueba</SectionTitle>
-      <RadioGroup>
-        <RadioLabel>
-          <Radio type="radio" name="prueba" value="color" />
-          Prueba de color
-        </RadioLabel>
-        <RadioLabel>
-          <Radio type="radio" name="prueba" value="fisica" />
-          Muestra física
-        </RadioLabel>
-        <RadioLabel>
-          <Radio type="radio" name="prueba" value="digital" />
-          Prueba digital
-        </RadioLabel>
-      </RadioGroup>
+        <SectionTitle>Comentarios</SectionTitle>
+        <Textarea placeholder="Agrega un comentario adicional..."  onChange={(e) => SetComments(e.target.value)}/>
 
-      <SectionTitle>Comentarios</SectionTitle>
-      <Textarea placeholder="Agrega un comentario adicional..." />
-
-      <LiberarButton>Liberar producto</LiberarButton>
+        <LiberarButton type="button" onClick={() => setShowConfirm(true)}>Liberar producto</LiberarButton>
+      </form>
+      {message && <p>{message}</p>}
+      {showConfirm && (
+        <ModalOverlay>
+          <ModalBox>
+            <h4>¿Estás segura/o que deseas liberar este prducto?</h4>
+            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '1rem', marginTop: '1rem' }}>
+              <CancelButton onClick={() => setShowConfirm(false)}>Cancelar</CancelButton>
+              <ConfirmButton onClick={handleSubmit}>Confirmar</ConfirmButton>
+            </div>
+          </ModalBox>
+        </ModalOverlay>
+      )}
     </Container>
   );
 }
@@ -182,5 +264,64 @@ const LiberarButton = styled.button`
 
   &:hover {
     background-color: #1d4ed8;
+  }
+`;
+
+const ModalOverlay = styled.div`
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background: rgba(0,0,0,0.3);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+`;
+
+const ModalBox = styled.div`
+  background: white;
+  padding: 2rem;
+  border-radius: 1rem;
+  box-shadow: 0 8px 24px rgba(0,0,0,0.2);
+  max-width: 400px;
+  width: 90%;
+`;
+
+const ConfirmButton = styled.button`
+  background-color: #2563eb;
+  color: white;
+  padding: 0.5rem 1.5rem;
+  border-radius: 0.5rem;
+  font-weight: 600;
+
+  border: none;
+  cursor: pointer;
+
+  transition: background-color 0.3s ease, color 0.3s ease;
+
+  &:hover,
+  &:focus {
+    background-color: #1e40af;
+    outline: none;
+  }
+`;
+
+const CancelButton = styled.button`
+  background-color: #BBBBBB;
+  color: white;
+  padding: 0.5rem 1.5rem;
+  border-radius: 0.5rem;
+  font-weight: 600;
+
+  border: none;
+  cursor: pointer;
+
+  transition: background-color 0.3s ease, color 0.3s ease;
+
+  &:hover,
+  &:focus {
+    background-color: #a0a0a0;
+    outline: none;
   }
 `;

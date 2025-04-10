@@ -136,17 +136,17 @@ export class AuthService {
         if (target.includes('User_username_key')) {
           throw new BadRequestException('El nombre de usuario ya existe');
         }
-        if (target.includes('User_email_key')) {
-          throw new BadRequestException('El correo ya existe');
-        }
+        //if (target.includes('User_email_key')) {
+        //  throw new BadRequestException('El correo ya existe');
+        //}
       }
       throw new BadRequestException('Error al registrar el usuario');
     }
   }
 
   async forgotPassword(forgotPasswordDto: ForgotPasswordDto): Promise<{ message: string }> {
-    const { email } = forgotPasswordDto;
-    const user = await this.prisma.user.findUnique({ where: { email } });
+    const { username } = forgotPasswordDto;
+    const user = await this.prisma.user.findUnique({ where: { username } });
     if (!user) {
       throw new UnauthorizedException('Email no encontrado');
     }

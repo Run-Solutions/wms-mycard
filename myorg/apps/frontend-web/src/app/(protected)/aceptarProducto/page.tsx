@@ -77,6 +77,7 @@ const AcceptProductPage: React.FC = () => {
       const data = await res.json();
       if (res.ok) {
         closeModal();
+        window.location.reload();
       }
     } catch (error) {
       console.error(error);

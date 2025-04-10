@@ -106,9 +106,9 @@ const FreeProductPage: React.FC = () => {
   return (
     <PageContainer>
       <TitleWrapper>
-        <Title>Liberar Producto</Title>
+        <Title>Mis Ordenes</Title>
       </TitleWrapper>
-      <TableContainer component={Paper} sx={{ mt: 4 }}>
+      <TableContainer component={Paper} sx={{ backgroundColor: 'white', padding: '2rem', mt: 4, borderRadius: '1rem', boxShadow: '0 4px 12px rgba(0,0,0,0.1)', maxWidth: '90%', marginX: 'auto', }}>
         <Typography variant='h6' component='div' sx={{ p: 2 }}>
           Ordenes en Proceso
         </Typography>
@@ -129,10 +129,10 @@ const FreeProductPage: React.FC = () => {
             <TableBody>
               {WorkOrders.map((orderFlow) => (
                 <TableRow key={orderFlow.id}>
-                  <TableCell sx={{ width: '90px', overflowX: 'auto', cursor: 'pointer' }} onClick={() => router.push(`/liberarProducto/${orderFlow.workOrder.ot_id}`)}>{orderFlow.workOrder.ot_id}</TableCell>
-                  <TableCell sx={{ width: '50px', overflowX: 'auto' }}>{orderFlow.workOrder.mycard_id}</TableCell>
-                  <TableCell sx={{ width: '110px', overflowX: 'auto' }}>{orderFlow.workOrder.user?.username || 'Sin usuario'}</TableCell>
-                  <TableCell sx={{ maxWidth: '500px', overflowX: 'auto' }}>
+                  <TableCell sx={{ width: '100px', overflowX: 'auto', cursor: 'pointer', '&:hover': {textDecoration: 'underline',}, }} onClick={() => router.push(`/liberarProducto/${orderFlow.workOrder.ot_id}`)}>{orderFlow.workOrder.ot_id}</TableCell>
+                  <TableCell sx={{ width: '70px', overflowX: 'auto' }}>{orderFlow.workOrder.mycard_id}</TableCell>
+                  <TableCell sx={{ width: '150px', overflowX: 'auto' }}>{orderFlow.workOrder.user?.username || 'Sin usuario'}</TableCell>
+                  <TableCell sx={{ maxWidth: '250px', overflowX: 'auto', p: 0 }}>
                     <Timeline>
                       {orderFlow.workOrder.flow?.map((flowStep, index) => {
                         const isActive = flowStep.status?.toLowerCase().includes('proceso');
@@ -147,8 +147,8 @@ const FreeProductPage: React.FC = () => {
                       })}
                     </Timeline>
                   </TableCell>
-                  <TableCell sx={{ width: '100px', overflowX: 'auto' }}>{new Date(orderFlow.workOrder.createdAt).toLocaleDateString()}</TableCell>
-                  <TableCell sx={{ width: '100px', overflowX: 'auto' }}>{orderFlow.workOrder.files.length > 0 ? (
+                  <TableCell sx={{ width: '150px', overflowX: 'auto' }}>{new Date(orderFlow.workOrder.createdAt).toLocaleDateString()}</TableCell>
+                  <TableCell sx={{ width: '200px', overflowX: 'auto' }}>{orderFlow.workOrder.files.length > 0 ? (
                     orderFlow.workOrder.files.map((file) => (
                     <div key={file.file_path}>
                       <button onClick={() => downloadFile(file.file_path)}>
@@ -206,6 +206,9 @@ const Timeline = styled.div`
   flex-direction: row;
   overflow-x: auto;
   width: 100%;
+  gap: 18px;
+  box-sizing: border-box;
+  margin-right:0;
 `;
 
 const TimelineItem = styled.div`
@@ -245,7 +248,7 @@ const Line = styled.div.withConfig({
   top: 14px;
   left: 50%;
   height: 2px;
-  width: 70px;
+  width: 80px;
   background-color: #d1d5db;
   z-index: 0;
   display: ${({ $isLast }) => ($isLast ? 'none' : 'block')};

@@ -1,5 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import { PrismaService } from 'prisma/prisma.service';
+import { CreatePrepressResponseDto } from './dto/response.dto';
 
 @Injectable()
 export class FreeWorkOrderService {
@@ -66,5 +67,42 @@ export class FreeWorkOrderService {
       return { message: 'No se encontró una orden para esta área.'}
     }
     return workOrderFlow;
+  } 
+  
+  // Para guardar respuesta de liberacion de Preprensa
+  async createPrepressResponse(dto: CreatePrepressResponseDto) {
+    return this.prisma.$transaction(async (tx) => {
+      // Crear AreasResponse
+      const response = await tx.areasResponse.create({
+        data: {
+          work_order_id: dto.workOrderId,
+          work_order_flow_id: dto.workOrderFlowId,
+          area_id: dto.areaId,
+          assigned_user: dto.assignedUser,
+        },
+      });
+
+      // Crear PrepressResponse
+      await tx.prepressResponse.create({
+        data: {
+          plates: dto.plates,
+          positives: dto.positives,
+          testType: dto.testType,
+          comments: dto.comments,
+          areas_response_id: response.id,
+        },
+      });
+      
+      // Actualizar el estado del WorkOrderFlow a Completado
+      await tx.workOrderFlow.update({
+        where: {
+          id: dto.workOrderFlowId,
+        },
+        data: {
+          status: 'Completado',
+        },
+      });
+      return { message: 'Respuesta guardada con exito'};
+    })
   } 
 }

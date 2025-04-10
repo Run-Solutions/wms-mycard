@@ -4,6 +4,7 @@
 import { use, useEffect, useState } from "react";
 import styled from "styled-components";
 import PrePrensaComponent from "@/components/LiberarProducto/PrePrensaComponent";
+import ImpresionComponent from "@/components/LiberarProducto/ImpresionComponent";
 
 interface Props {
     params: Promise<{ id: string }>;
@@ -35,6 +36,8 @@ export default function LiberarProductoPage({ params }: Props) {
       switch (workOrder.area_id) {
         case 1:
           return <PrePrensaComponent workOrder={workOrder}/>
+        case 2:
+          return <ImpresionComponent workOrder={workOrder}/>
         default: 
           return <div>Area no reconocida.</div>
       }
