@@ -3,6 +3,8 @@
 
 import React, { useEffect, useState } from 'react';
 import styled, { useTheme } from 'styled-components';
+import { useRouter } from "next/navigation";
+
 
 // Se define el tipo de datos
 interface WorkOrder {
@@ -10,12 +12,14 @@ interface WorkOrder {
   work_order_id: number;
   area_id: number;
   status: string;
+  priority: boolean;
   assigned_at: string;
   created_at: string;
   updated_at: string;
   workOrder: {   
     id: number;
     ot_id: string;
+    priority: boolean;
     mycard_id: string;
     quantity: number;
     created_by: number;  
@@ -34,15 +38,27 @@ interface WorkOrder {
     flow: {
       id: number;
       area: {
+        id: number;
         name: string;
       }
     }[];
+  };
+  areaResponse: {
+    id: number;
+    prepress: {
+      id: number;
+      plates: number;
+      positives: number;
+      testType: string;
+      comments: string;
+    }
   };
 }
 
 
 const AcceptProductPage: React.FC = () => {
   const theme = useTheme();
+  const router = useRouter();
 
   // Para obtener Ordenes Pendientes
   const [WorkOrders, setWorkOrders] = useState<WorkOrder[]>([]);
@@ -65,7 +81,20 @@ const AcceptProductPage: React.FC = () => {
   const aceptarOT = async () => {
     console.log("Se hizo clic en Aceptar OT");
     const token = localStorage.getItem('token');
-    const flowId = selectedOrder?.workOrder.flow[0].id;
+    //const flowId = selectedOrder?.workOrder.flow[0].id;
+    const flowItem = selectedOrder?.workOrder.flow.find(
+      (f) => f.area.id === selectedOrder.area_id
+    );
+    const flowId = flowItem?.id;
+    console.log(flowId);
+    if (!selectedOrder) return;
+
+    // 👉 Si el área no es 1, redirigir inmediatamente
+    if (selectedOrder?.area_id >= 2 && selectedOrder?.area_id <= 6) {
+      router.push(`/aceptarProducto/${flowId}`); 
+      return;
+    }
+
     try {
       const res = await fetch(`http://localhost:3000/work-order-flow/${flowId}/accept`, {
         method: 'PATCH',
@@ -114,7 +143,6 @@ const AcceptProductPage: React.FC = () => {
           console.error('No se encontró el token en localStorage');
           return;
         }
-        console.log('Token enviado a headers: ', token)
   
         const res = await fetch('http://localhost:3000/work-order-flow/pending', {
           method: 'GET',
@@ -130,9 +158,17 @@ const AcceptProductPage: React.FC = () => {
         
         const data = await res.json();
         console.log('Datos obtenidos: ', data);
-        setWorkOrders(data);
 
-        
+        // Ordenar las OTs: primero las marcadas como prioridad, luego por fecha
+        const sortedOrders = data.sort((a: WorkOrder, b: WorkOrder) => {
+          // Si a es prioritario y b no, a va primero
+          if (a.workOrder.priority && !b.workOrder.priority) return -1;
+          // Si b es prioritario y a no, b va primero
+          if (!a.workOrder.priority && b.workOrder.priority) return 1;
+          // Si ambos tienen la misma prioridad, ordenar por fecha (más reciente primero)
+          return new Date(a.workOrder.createdAt).getTime() - new Date(b.workOrder.createdAt).getTime();
+        });
+        setWorkOrders(sortedOrders);
       } catch (err) {
         console.error(err);
         console.error('Error en fetchWorkOrders:', err);
@@ -195,13 +231,12 @@ const AcceptProductPage: React.FC = () => {
             console.log(`Orden ${index + 1}:`, order);
             const workOrder = order.workOrder;
             if(!workOrder) return null;
-            console.log('workOrder encontrado:', order.workOrder);
             return (
               <WorkOrderCard key={order.id} onClick={() => {
                 console.log('Ha clickeado');
                 handleCardClick(order);
                 }}>
-                <CardTitle>{workOrder.ot_id}</CardTitle>
+                <CardTitle>{workOrder.priority && <PriorityBadge />}{workOrder.ot_id}</CardTitle>
                 <InfoItem>
                   <p>{workOrder.mycard_id}</p>
                   <p>Cantidad: {workOrder.quantity}</p>
@@ -417,3 +452,28 @@ const AreaName = styled.span`
   font-weight: 500;
 `;
 
+const PriorityBadge = styled.span`
+  display: inline-block;
+  width: 14px;
+  height: 14px;
+  background-color: #FFD700;
+  border-radius: 50%;
+  margin-left: 8px;
+  box-shadow: 0 0 4px rgba(255, 215, 0, 0.7);
+  position: relative;
+  top: -4px;
+  margin-right: 5px;
+  
+  /* Efecto de brillo opcional */
+  &:after {
+    content: '';
+    position: absolute;
+    top: 2px;
+    left: 2px;
+    width: 4px;
+    height: 4px;
+    background-color: white;
+    border-radius: 50%;
+    opacity: 0.8;
+  }
+`;

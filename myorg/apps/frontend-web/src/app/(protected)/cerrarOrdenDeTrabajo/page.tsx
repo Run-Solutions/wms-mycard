@@ -1,27 +1,97 @@
-// src/app/(protected)/ordenesDeTrabajo/page.tsx
+// myorg/apps/frontend-web/src/app/(protected)/cerrarOrdenDeTrabajo/page.tsx
 'use client';
 
 import React, { useEffect, useState } from 'react';
 import styled, { useTheme } from 'styled-components';
+import WorkOrderTable from '@/components/CerrarOrdenDeTrabajo/WorkOrderTable';
 
-const UsersPage: React.FC = () => {
+// Se define el tipo de datos
+interface WorkOrder {
+  id: number;
+  ot_id: string;
+  mycard_id: string;
+  quantity: number;
+  created_by: number;
+  validated: boolean;
+  createdAt: string;
+  updatedAt: string;
+  flow: {
+    area: {
+      name: string,
+    }
+    id: number;
+    work_order_id: number;
+    area_id: number;
+    status: string;
+    assigned_user: number | null;
+    assigned_at: string | null;
+    area_response_id: number | null;
+    created_at: string;
+    updated_at: string;
+  }[];
+  files: {
+    file_path: string,
+  }[],
+}
+
+const CloseWorkOrderPage: React.FC = () => {
+  const [WorkOrders, setWorkOrders] = useState<WorkOrder[]>([]);
+  // Para obtener las ordenes que estan En auditoria
+  useEffect (() => {
+    async function fetchWorkOrdersInAuditory() {
+      try {
+        const token = localStorage.getItem('token');
+        if(!token){
+          console.error('No hay token');
+          return;
+        }
+        const estados = ['En auditoria']
+        const query = estados.map(estado => encodeURIComponent(estado)).join(',');
+
+        const res = await fetch(`http://localhost:3000/free-work-order-auditory/in-auditory?statuses=${query}`, {
+          method: 'GET',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${token}`
+          },
+        });
+        if(!res.ok){
+          throw new Error(`Error al obtener las ordenes: ${res.status} ${res.statusText}`);
+        }
+        const data = await res.json();
+        console.log('Datos obtenidos de las Ordenes en Proceso: ', data);
+        const orders = data.map((item: any) => item.workOrder); 
+        console.log('Datos obtenidos de las Ordenes en Proceso: ', data);
+        setWorkOrders(data);
+      } catch (error) {
+        console.error(error);
+        console.error('Error en fetchWorkOrdersInAuditory', error);
+      }
+    }
+    fetchWorkOrdersInAuditory();
+  }, []);
+
   return (
     <PageContainer>
       <TitleWrapper>
-        <Title>Cerrar Orden de Trabajo</Title>
+        <Title>Cerrar Ordenes de Trabajo</Title>
+        <WorkOrderTable orders={WorkOrders} title="Órdenes en Auditoria" statusFilter="En auditoria" />
       </TitleWrapper>
       
     </PageContainer>
   );
 };
 
-export default UsersPage;
+export default CloseWorkOrderPage;
 
 // =================== Styled Components ===================
 
 const PageContainer = styled.div`
   padding: 1rem 2rem;
   margin-top: -70px;
+  width: 100%;
+  align-content: flex-start;
+  justify-content: center;
 `;
 
 const TitleWrapper = styled.div`
@@ -31,7 +101,7 @@ const TitleWrapper = styled.div`
 `;
 
 const Title = styled.h1<{ theme: any }>`
-  font-size: 4rem;
+  font-size: 2rem;
   font-weight: 500;
   color: ${({ theme }) => theme.palette.text.primary}
 `;

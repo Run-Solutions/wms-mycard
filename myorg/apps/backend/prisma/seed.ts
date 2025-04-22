@@ -33,9 +33,10 @@ async function main() {
       { id: 7, name: "Recepcion CQM", description: "Recibe las OTs enviadas por produccion.", imageName: "putaway.jpg", logoName: "putaway.webp" },
       { id: 8, name: "Configuracion Vistos Buenos", description: "Edita los puntos de evaluación de tu área.", imageName: "slotting.jpg", logoName: "settings.svg" },
       { id: 9, name: "Aceptar Producto", description: "Maneja las OTs enviadas por áreas previas.", imageName: "putaway.jpg", logoName: "items.webp" },
-      { id: 10, name: "Cerrar Orden de Trabajo", description: "Finaliza las OTs que han completado todos sus procesos junto con su cantidad.", imageName: "putaway.jpg", logoName: "putaway.webp" },
-      { id: 11, name: "Liberar Producto", description: "Maneja las OTs que tienes en tu área para liberar.", imageName: "putaway.jpg", logoName: "putaway.webp" },
-      { id: 12, name: "Inconformidades", description: "Maneja las OTs que han sido rechazadas por parte de la operacion siguiente.", imageName: "nebulas.gif", logoName: "extra.webp" },
+      { id: 10, name: "Aceptar Auditoria", description: "Maneja las OTs enviadas por áreas previas.", imageName: "putaway.jpg", logoName: "items.webp" },
+      { id: 11, name: "Cerrar Orden de Trabajo", description: "Finaliza las OTs que han completado todos sus procesos junto con su cantidad.", imageName: "putaway.jpg", logoName: "putaway.webp" },
+      { id: 12, name: "Liberar Producto", description: "Maneja las OTs que tienes en tu área para liberar.", imageName: "putaway.jpg", logoName: "putaway.webp" },
+      { id: 13, name: "Inconformidades", description: "Maneja las OTs que han sido rechazadas por parte de la operacion siguiente.", imageName: "nebulas.gif", logoName: "extra.webp" },
     ],
   });
 
@@ -60,13 +61,37 @@ async function main() {
       { id: 6, role_id: 3, module_id: 6, enabled: true }, 
       { id: 7, role_id: 3, module_id: 7, enabled: true },
       { id: 8, role_id: 3, module_id: 8, enabled: true },
-      { id: 9, role_id: 4, module_id: 9, enabled: true }, 
-      { id: 10, role_id: 4, module_id: 10, enabled: true }, 
+      { id: 9, role_id: 4, module_id: 10, enabled: true }, 
+      { id: 10, role_id: 4, module_id: 11, enabled: true }, 
       { id: 11, role_id: 2, module_id: 9, enabled: true }, 
-      { id: 12, role_id: 2, module_id: 11, enabled: true },
-      { id: 13, role_id: 2, module_id: 12, enabled: true },
+      { id: 12, role_id: 2, module_id: 12, enabled: true },
+      { id: 13, role_id: 2, module_id: 13, enabled: true },
     ],
   });
+  
+  // 🔹 Seed para FormQuestions asociadas a "impresion"
+  const impressionArea = await prisma.areasOperator.findFirst({
+    where: { name: 'impresion'},
+  });
+  if (!impressionArea) { throw new Error ('No se encontró el área de "impresion"')}
+  const questions: { title: string; key: string }[] = [
+    { title: 'Impresión De Guías, Sensores, Área Para Cinta Mágnetica, Pinzas Y Escuadra', key: 'impresion_guias', }, 
+    { title: 'Revisión Espesor De Material Para Armado Sandwich', key: 'revision_espesor', },
+    { title: 'Revisar Piojos Y Velo En La Impresión', key: 'revisar_piojos', },
+    { title: 'Verificar Coincidencia Frente Y Vuelta', key: 'verificar_coincidencia', },
+  ];
+  for (const question of questions) {
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-member-access
+    await (prisma.formQuestion as any).upsert({
+      where: { key: question.key },
+      update: {},
+      create: {
+        title: question.title,
+        key: question.key,
+        areas: {connect: { id: impressionArea.id},},
+      },
+    });
+  }
 
   console.log("✅ Seed completado!");
 }

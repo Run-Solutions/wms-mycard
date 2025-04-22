@@ -5,6 +5,7 @@ import React, { useEffect, useState } from 'react';
 import styled, { useTheme } from 'styled-components';
 import { useRouter } from 'next/navigation';
 import { Table, TableBody, TableCell, TableContainer, TableHead, TableRow, Paper, Typography} from '@mui/material';
+import WorkOrderTable from '@/components/LiberarProducto/WorkOrderTable';
 
 // Se define el tipo de datos
 interface WorkOrder {
@@ -38,7 +39,7 @@ interface WorkOrder {
       area: {
         name: string;
       }
-      status: 'Pendiente' | 'En Proceso';
+      status: 'Pendiente' | 'En Proceso' ;
     }[];
   };
 }
@@ -47,29 +48,9 @@ const FreeProductPage: React.FC = () => {
   const router = useRouter();
   const theme = useTheme();
 
-  // Para obtener Ordenes Pendientes
+  // Para obtener Ordenes En Proceso
   const [WorkOrders, setWorkOrders] = useState<WorkOrder[]>([]);
   const [message, setMessage] = useState('');
-
-  const downloadFile = async (filename: string) => {
-    const token = localStorage.getItem('token');  
-    const res = await fetch(`http://localhost:3000/free-order-flow/file/${filename}`, {
-      headers: {
-        'Authorization': `Bearer ${token}`
-      }
-    });
-    if (!res.ok) {
-      const errorText = await res.text();
-      console.error("❌ Error desde el backend:", errorText);
-      throw new Error('Error al cargar el file');
-    }
-    const blob = await res.blob();
-    const url = window.URL.createObjectURL(blob);
-    window.open(url, '_blank');
-
-    // Limpieza opcional después de unos segundos
-    setTimeout(() => window.URL.revokeObjectURL(url), 5000);
-  }
 
   useEffect (() => {
     async function fetchWorkOrdersInProgress() {
@@ -80,9 +61,10 @@ const FreeProductPage: React.FC = () => {
           console.error('No se encontró el token en localStorage');
           return;
         }
-        console.log('Token enviado a headers: ', token)
+        const estados = ['En proceso', 'Enviado a CQM', 'Listo'];
+        const query = estados.map(estado => encodeURIComponent(estado)).join(',');
 
-        const res = await fetch('http://localhost:3000/free-order-flow/in-progress', {
+        const res = await fetch(`http://localhost:3000/free-order-flow/in-progress?statuses=${query}`, {
           method: 'GET',
           headers: {
             'Content-Type': 'application/json',
@@ -108,67 +90,9 @@ const FreeProductPage: React.FC = () => {
       <TitleWrapper>
         <Title>Mis Ordenes</Title>
       </TitleWrapper>
-      <TableContainer component={Paper} sx={{ backgroundColor: 'white', padding: '2rem', mt: 4, borderRadius: '1rem', boxShadow: '0 4px 12px rgba(0,0,0,0.1)', maxWidth: '90%', marginX: 'auto', }}>
-        <Typography variant='h6' component='div' sx={{ p: 2 }}>
-          Ordenes en Proceso
-        </Typography>
-        {message ? (
-          <Typography sx={{ p: 2, color: 'red'}}> {message}</Typography>
-        ) : (
-          <Table>
-            <TableHead>
-              <TableRow>
-                <TableCell>Id OT</TableCell>
-                <TableCell>Id del presupuesto</TableCell>
-                <TableCell>Usuario</TableCell>
-                <TableCell>Area</TableCell>
-                <TableCell>Fecha</TableCell>
-                <TableCell>Archivos</TableCell>
-              </TableRow>
-            </TableHead>
-            <TableBody>
-              {WorkOrders.map((orderFlow) => (
-                <TableRow key={orderFlow.id}>
-                  <TableCell sx={{ width: '100px', overflowX: 'auto', cursor: 'pointer', '&:hover': {textDecoration: 'underline',}, }} onClick={() => router.push(`/liberarProducto/${orderFlow.workOrder.ot_id}`)}>{orderFlow.workOrder.ot_id}</TableCell>
-                  <TableCell sx={{ width: '70px', overflowX: 'auto' }}>{orderFlow.workOrder.mycard_id}</TableCell>
-                  <TableCell sx={{ width: '150px', overflowX: 'auto' }}>{orderFlow.workOrder.user?.username || 'Sin usuario'}</TableCell>
-                  <TableCell sx={{ maxWidth: '250px', overflowX: 'auto', p: 0 }}>
-                    <Timeline>
-                      {orderFlow.workOrder.flow?.map((flowStep, index) => {
-                        const isActive = flowStep.status?.toLowerCase().includes('proceso');
-                        const isLast = index === orderFlow.workOrder.flow.length - 1;
-                        return (
-                          <TimelineItem key={index}>
-                            <Circle $isActive={isActive}>{index + 1}</Circle>
-                            {index < orderFlow.workOrder.flow.length -1 && <Line $isLast={isLast}/>}
-                            <AreaName $isActive={isActive}>{flowStep.area.name ?? 'Area Desconocida'}</AreaName>
-                          </TimelineItem>
-                        );
-                      })}
-                    </Timeline>
-                  </TableCell>
-                  <TableCell sx={{ width: '150px', overflowX: 'auto' }}>{new Date(orderFlow.workOrder.createdAt).toLocaleDateString()}</TableCell>
-                  <TableCell sx={{ width: '200px', overflowX: 'auto' }}>{orderFlow.workOrder.files.length > 0 ? (
-                    orderFlow.workOrder.files.map((file) => (
-                    <div key={file.file_path}>
-                      <button onClick={() => downloadFile(file.file_path)}>
-                        {file.file_path.toLowerCase().includes('ot') ? 'Ver OT' : 
-                        file.file_path.toLowerCase().includes('sku') ? 'Ver SKU' : 
-                        file.file_path.toLowerCase().includes('op') ? 'Ver OP' : 
-                        'Ver Archivo'}
-                      </button>
-                    </div>
-                    ))
-                  ) : (
-                    'No hay archivos'
-                  )}
-                  </TableCell>
-                </TableRow>
-              ))}
-            </TableBody>
-          </Table>
-        )}
-      </TableContainer>
+      <WorkOrderTable orders={WorkOrders} title="Órdenes en Proceso" statusFilter="En proceso" />
+      <WorkOrderTable orders={WorkOrders} title="Órdenes enviadas a Calidad" statusFilter="Enviado a CQM" />
+      <WorkOrderTable orders={WorkOrders} title="Órdenes pendientes por Liberar" statusFilter="Listo" />
     </PageContainer>
   );
 };

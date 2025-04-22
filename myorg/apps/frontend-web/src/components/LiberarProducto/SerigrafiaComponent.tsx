@@ -1,5 +1,8 @@
 'use client'
 
+
+import { useRouter } from "next/navigation";
+import { useState } from "react";
 import styled from "styled-components";
 
 interface Props {
@@ -7,7 +10,134 @@ interface Props {
 }
 
 export default function SerigrafiaComponent({ workOrder }: Props) {
+  const router = useRouter();
+
+  // Para bloquear liberacion hasta que sea aprobado por CQM
+  const isDisabled = workOrder.status === 'En proceso';
+
+  // Para mostrar formulario de CQM y enviarlo
+  const [showModal, setShowModal] = useState(false);
+
+  const openModal = () => {
+    setShowModal(true);
+  };
+
+  const closeModal = () => {
+    setShowModal(false);
+  };
+
+  //Para guardar las respuestas 
+  const [responses, setResponses] = useState<{ questionId: number, answer: boolean }[]>([]);
+  const [sampleQuantity, setSampleQuantity] = useState<number | string>('');
+
+  // Para controlar qué preguntas están marcadas
+  const [checkedQuestions, setCheckedQuestions] = useState<number[]>([]);
+
+  // Función para manejar el cambio en el campo de muestras
+  const handleSampleQuantityChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    setSampleQuantity(e.target.value);
+  };
+
+  const handleCheckboxChange = (questionId: number, isChecked: boolean) => {
+    setResponses((prevResponses) => {
+      const updateResponses = prevResponses.filter(response => response.questionId !== questionId);
+      if(isChecked) { 
+        updateResponses.push({ questionId, answer: isChecked}); 
+      }
+      return updateResponses;
+    });
+
+    // Actualizar visualmente el checkbox
+    setCheckedQuestions((prev) =>
+      isChecked ? [...prev, questionId] : prev.filter((id) => id !== questionId)
+    );
+  };
+
+  // Para mandar la OT a evaluacion por CQM
+  const handleSubmit = async () => {
+    const payload = {
+      question_id: responses.map(response => response.questionId),
+      work_order_flow_id: workOrder.id,
+      work_order_id: workOrder.workOrder.id,
+      area_id: workOrder.area.id,
+      response: responses.map(response => response.answer),
+      reviewed: false,
+      user_id: workOrder.assigned_user,
+      sample_quantity: Number(sampleQuantity),
+    };
+    try {
+      const token = localStorage.getItem('token');
+      if(!token) {
+        alert('No hay token de autenticación');
+        return;
+      }
+      console.log('Datos a enviar', payload);
+      const res = await fetch('http://localhost:3000/free-order-flow/cqm-impression', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`,
+        },
+        body: JSON.stringify(payload),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        console.error("Error en el servidor:", data);
+        return;
+      }
+      router.push('/liberarProducto');
+  } catch (error) {
+    console.log('Error al guardar la respuesta: ', error);
+  }
+  }
+  
+  // Para Liberar el producto cuando ya ha pasado por CQM
+  const [showConfirm, setShowConfirm] = useState(false); 
+  const handleImpressSubmit = async () => {
+    const payload = {
+      workOrderId: workOrder.workOrder.id,
+      workOrderFlowId: workOrder.id,
+      areaId: workOrder.area.id,
+      assignedUser: workOrder.assigned_user,
+      releaseQuantity: Number(sampleQuantity),
+      comments: document.querySelector('textarea')?.value || '',
+      formAnswerId: workOrder.answers[0].id,
+    };
+
+    console.log('datos a enviar',payload);
+  
+    try {
+      const token = localStorage.getItem('token');
+      if (!token) {
+        alert('No hay token de autenticación');
+        return;
+      }
+  
+      const res = await fetch('http://localhost:3000/free-order-flow/impress', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`,
+        },
+        body: JSON.stringify(payload),
+      });
+  
+      const data = await res.json();
+      if (!res.ok) {
+        console.error('Error en el servidor:', data);
+        return;
+      }
+  
+      router.push('/liberarProducto');
+    } catch (error) {
+      console.log('Error al enviar datos:', error);
+    }
+  };
+  
+  ;
+
   return (
+    <>
     <Container>
       <Title>Área: Serigrafia</Title>
 
@@ -25,40 +155,69 @@ export default function SerigrafiaComponent({ workOrder }: Props) {
           <Value>{workOrder.workOrder.quantity}</Value>
         </InfoItem>
       </DataWrapper>
-
-      <SectionTitle>Datos de Producción</SectionTitle>
-      <NewDataWrapper>
+      <NewData>
+        <SectionTitle>Datos de Producción</SectionTitle>
+        <NewDataWrapper>
+          <InputGroup>
+            <Label>Cantidad a Liberar:</Label>
+            <Input type="number" placeholder="Ej: 2" value={sampleQuantity} onChange={handleSampleQuantityChange} disabled={isDisabled} />
+          </InputGroup>
+          <CqmButton onClick={openModal} disabled={workOrder.status === 'Listo'}>Enviar a CQM</CqmButton>
+        </NewDataWrapper>
         <InputGroup>
-          <Label>Placas:</Label>
-          <Input type="text" placeholder="Ej: 2" />
+          <SectionTitle>Comentarios</SectionTitle>
+          <Textarea placeholder="Agrega un comentario adicional..." disabled={isDisabled}/>
         </InputGroup>
-        <InputGroup>
-          <Label>Positivos:</Label>
-          <Input type="text" placeholder="Ej: 3" />
-        </InputGroup>
-      </NewDataWrapper>
-
-      <SectionTitle>Tipo de Prueba</SectionTitle>
-      <RadioGroup>
-        <RadioLabel>
-          <Radio type="radio" name="prueba" value="color" />
-          Prueba de color
-        </RadioLabel>
-        <RadioLabel>
-          <Radio type="radio" name="prueba" value="fisica" />
-          Muestra física
-        </RadioLabel>
-        <RadioLabel>
-          <Radio type="radio" name="prueba" value="digital" />
-          Prueba digital
-        </RadioLabel>
-      </RadioGroup>
-
-      <SectionTitle>Comentarios</SectionTitle>
-      <Textarea placeholder="Agrega un comentario adicional..." />
-
-      <LiberarButton>Liberar producto</LiberarButton>
+      </NewData>
+      <LiberarButton disabled={isDisabled} onClick={() => setShowConfirm(true)}>Liberar Producto</LiberarButton>
     </Container>
+
+    {/* Modal para enviar a liberacion */}
+    {showConfirm && (
+        <ModalOverlay>
+          <ModalBox>
+            <h4>¿Estás segura/o que deseas liberar este prducto?</h4>
+            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '1rem', marginTop: '1rem' }}>
+              <CancelButton onClick={() => setShowConfirm(false)}>Cancelar</CancelButton>
+              <ConfirmButton onClick={handleImpressSubmit}>Confirmar</ConfirmButton>
+            </div>
+          </ModalBox>
+        </ModalOverlay>
+      )}
+
+    {/* Modal para enviar a CQM */}
+    {showModal && (
+      <ModalOverlay>
+        <ModalContent>
+          <ModalTitle>Preguntas del Área: {workOrder.area.name}</ModalTitle>
+          <Table>
+            <thead>
+              <tr>
+                <th>Pregunta</th>
+                <th>Respuesta</th>
+              </tr>
+            </thead>
+            <tbody>
+              {workOrder.area.formQuestions
+              .filter((question: { role_id: number | null }) => question.role_id === null)
+              .map((question: { id: number; title: string }) => (
+                <tr key={question.id}>
+                  <td>{question.title}</td>
+                  <td><input type="checkbox" checked={checkedQuestions.includes(question.id)} onChange={(e) => handleCheckboxChange(question.id, e.target.checked)}/></td>
+                </tr>
+              ))}
+            </tbody>
+          </Table>
+          <InputGroup style={{ paddingTop: '30px'}}>
+            <Label>Muestras:</Label>
+            <Input type="number" placeholder="Ej: 2" value={sampleQuantity} onChange={handleSampleQuantityChange}/>
+          </InputGroup>
+          <CloseButton onClick={closeModal}>Cerrar</CloseButton>
+          <SubmitButton onClick={handleSubmit}>Enviar Respuestas</SubmitButton>
+        </ModalContent>
+      </ModalOverlay>
+    )}
+  </>
   );
 }
 
@@ -80,6 +239,10 @@ const Title = styled.h2`
   font-weight: 700;
   margin-bottom: 1.5rem;
   color: #1f2937;
+`;
+
+const NewData = styled.div`
+  
 `;
 
 const SectionTitle = styled.h3`
@@ -113,17 +276,17 @@ const Value = styled.div`
 
 const NewDataWrapper = styled.div`
   display: flex;
-  gap: 1.5rem;
+  gap: 8rem;
   flex-wrap: wrap;
 `;
 
 const InputGroup = styled.div`
-  flex: 1;
-  min-width: 200px;
+  width: 50%;
 `;
 
 const Input = styled.input`
   width: 100%;
+  color: black;
   padding: 0.75rem 1rem;
   border: 2px solid #d1d5db;
   border-radius: 0.5rem;
@@ -157,6 +320,7 @@ const Radio = styled.input`
 
 const Textarea = styled.textarea`
   width: 100%;
+  color: black;
   height: 120px;
   padding: 1rem;
   border: 2px solid #d1d5db;
@@ -171,9 +335,30 @@ const Textarea = styled.textarea`
   }
 `;
 
-const LiberarButton = styled.button`
+const LiberarButton = styled.button<{ disabled?: boolean }>`
   margin-top: 2rem;
-  background-color: #2563eb;
+  background-color: ${({ disabled }) => disabled ? '#9CA3AF' : '#2563EB'};
+  color: white;
+  padding: 0.75rem 2rem;
+  border-radius: 0.5rem;
+  font-weight: 600;
+  transition: background 0.3s;
+  cursor: ${({ disabled }) => disabled ? 'not-allowed' : 'pointer'};
+  opacity: ${({ disabled }) => disabled ? 0.7 : 1};
+
+  &:hover {
+    background-color: ${({ disabled }) => disabled ? '#9CA3AF' : '#1D4ED8'};
+  }
+
+  &:disabled {
+    background-color: #9CA3AF;
+    cursor: not-allowed;
+  }
+`;
+
+const CqmButton = styled.button`
+  margin-top: 2rem;
+  background-color: ${({ disabled }) => (disabled ? 'green' : '#2563eb')};
   color: white;
   padding: 0.75rem 2rem;
   border-radius: 0.5rem;
@@ -182,5 +367,134 @@ const LiberarButton = styled.button`
 
   &:hover {
     background-color: #1d4ed8;
+  }
+`;
+
+const ModalOverlay = styled.div`
+  position: fixed;
+  top: 0;
+  left: 0;
+  color: black;
+  width: 100%;
+  height: 100%;
+  background: rgba(0,0,0,0.4);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 999;
+`;
+
+const ModalContent = styled.div`
+  background: white;
+  padding: 2rem;
+  border-radius: 1rem;
+  max-width: 600px;
+  width: 90%;
+  box-shadow: 0 10px 25px rgba(0,0,0,0.2);
+`;
+
+const ModalTitle = styled.h2`
+  font-size: 1.5rem;
+  font-weight: 700;
+  margin-bottom: 1.5rem;
+  color: #1f2937;
+  text-align: center;
+`;
+
+const Table = styled.table`
+  width: 100%;
+  border-collapse: collapse;
+
+  th, td {
+    padding: 0.75rem;
+    text-align: left;
+    border-bottom: 1px solid #e5e7eb;
+  }
+
+  th {
+    background-color: #f3f4f6;
+    color: #374151;
+  }
+`;
+
+const CloseButton = styled.button`
+  margin-top: 1.5rem;
+  background-color: #BBBBBB;
+  color: white;
+  padding: 0.5rem 1.25rem;
+  border-radius: 0.5rem;
+  font-weight: 600;
+  display: block;
+  margin-left: auto;
+
+  border: none;
+  cursor: pointer;
+
+  transition: background-color 0.3s ease, color 0.3s ease;
+
+  &:hover {
+    background-color: #a0a0a0;
+    outline: none
+  }
+`;
+
+const SubmitButton = styled.button`
+  margin-top: 1.5rem;
+  background-color: #4CAF50;
+  color: white;
+  padding: 0.75rem 2rem;
+  border-radius: 0.5rem;
+  font-weight: 600;
+  transition: background 0.3s;
+  
+  &:hover {
+    background-color: #45a049;
+  }
+`;
+
+const ModalBox = styled.div`
+  background: white;
+  padding: 2rem;
+  border-radius: 1rem;
+  box-shadow: 0 8px 24px rgba(0,0,0,0.2);
+  max-width: 400px;
+  width: 90%;
+`;
+
+const ConfirmButton = styled.button`
+  background-color: #2563eb;
+  color: white;
+  padding: 0.5rem 1.5rem;
+  border-radius: 0.5rem;
+  font-weight: 600;
+
+  border: none;
+  cursor: pointer;
+
+  transition: background-color 0.3s ease, color 0.3s ease;
+
+  &:hover,
+  &:focus {
+    background-color: #1e40af;
+    outline: none;
+  }
+`;
+
+const CancelButton = styled.button`
+  background-color: #BBBBBB;
+  color: white;
+  padding: 0.5rem 1.5rem;
+  border-radius: 0.5rem;
+  font-weight: 600;
+
+  border: none;
+  cursor: pointer;
+
+  transition: background-color 0.3s ease, color 0.3s ease;
+
+  &:hover,
+  &:focus {
+    background-color: #a0a0a0;
+    outline: none;
   }
 `;

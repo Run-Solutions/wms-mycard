@@ -1,4 +1,5 @@
-// src/app/(protected)/ordenesDeTrabajo/page.tsx
+// myorg/apps/frontend-web/src/app/(protected)/ordenesDeTrabajo/page.tsx
+// permite crear nuevas ordenes de trabajo con form que incluye datos
 'use client';
 
 import React, { useEffect, useState } from 'react';
@@ -27,19 +28,21 @@ const WorkOrdersPage: React.FC = () => {
 
   // Para manejar los cambios de los campos del formulario
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>, areaIndex?: number) => {
-    const { name, value } = e.target;
+    const target = e.target;
+    const name = target.name;
+    const value = target.type === 'checkbox' ? (target as HTMLInputElement).checked : target.value;
   
     if (areaIndex !== undefined) {
       setFormData((prev) => {
         const updatedFlows = [...prev.areasOperatorIds];
   
         // Evita valores duplicados 
-        if (updatedFlows.includes(value)) {
-          const duplicateIndex = updatedFlows.indexOf(value);
+        if (updatedFlows.includes(value as string)) {
+          const duplicateIndex = updatedFlows.indexOf(value as string);
           updatedFlows[duplicateIndex] = ""; // Si hay duplicado
         }
   
-        updatedFlows[areaIndex] = value || "";  // Asignamos el valor al índice correspondiente
+        updatedFlows[areaIndex] = value as string || "";  // Asignamos el valor al índice correspondiente
         const filteredFlows = updatedFlows.filter(area => area !== "");
         return { ...prev, areasOperatorIds: filteredFlows };
       });
@@ -50,17 +53,9 @@ const WorkOrdersPage: React.FC = () => {
 
   // Para obtener solo las areas disponibles
   const getAvailableAreas = (index: number) => {
-    const selectedIds = formData.areasOperatorIds.slice(0, index).filter(Boolean).map((id) => Number(id));
-    const lastSelectedId = selectedIds.length > 0 ? Math.max(...selectedIds) : null;
-
     return areasOperator
-      .sort((a, b) => Number(a.id) - Number(b.id)) // Asegura el orden
-      .filter((area) => {
-        const areaId = Number(area.id);
-        const isAlreadySelected = selectedIds.includes(areaId);  // Filtra las ya seleccionadas
-        const isLowerThanLastSelected = lastSelectedId !== null && Number(area.id) <= lastSelectedId;
-        return !isAlreadySelected && !isLowerThanLastSelected;  // Solo áreas disponibles
-      });
+    .sort((a, b) => Number(a.id) - Number(b.id)) // Ordena por ID
+    .slice(0, 10); // Toma las primeras 10
   };
   
   // Agregar un nuevo dropdown para las areas en el flujo asignado
@@ -124,6 +119,7 @@ const WorkOrdersPage: React.FC = () => {
     });
     console.log('Enviando archivos: ', { ot: files.ot.name, sku: files.sku.name, op: files.op.name });
     console.log("Datos enviados:", formData.areasOperatorIds);
+    console.log('formDataToSend', formDataToSend);
 
     try {
       // se verifica token
@@ -240,7 +236,7 @@ const WorkOrdersPage: React.FC = () => {
             )}
             <CheckboxWrapper>
               <Label>Prioridad:</Label>
-              <input type="checkbox" name="priority" checked={formData.priority} onChange={handleChange} />
+              <input type="checkbox" name="priority" checked={formData.priority} onChange={(e) => { handleChange(e)}} />
             </CheckboxWrapper>
           </Auxiliar>
         </OperationWrapper>

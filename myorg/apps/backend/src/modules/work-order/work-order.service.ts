@@ -9,13 +9,19 @@ export class WorkOrderService {
 
   async createWorkOrder(dto: CreateWorkOrderDto, files: { ot: Express.Multer.File | null; sku: Express.Multer.File | null; op: Express.Multer.File | null }, userId: number) {
     const { ot_id, mycard_id, areasOperatorIds } = dto;
+    const priority = Boolean(dto.priority);
     const quantity = Number(dto.quantity); // Se debe asegurar de que llegue como numero
     
-    console.log('Orden de trabajo created by:', userId);
-
     // Para guardar la OT en la BD
     const workOrder = await this.prisma.workOrder.create({
-        data: { ot_id, mycard_id, quantity, created_by: userId }
+        data: { 
+          ot_id, 
+          mycard_id, 
+          quantity, 
+          status: 'En proceso', 
+          priority,
+          created_by: userId 
+        }
     });
 
     // Subir los archivos
@@ -70,6 +76,103 @@ export class WorkOrderService {
         }
     }
 
+    return workOrder;
+  }
+
+  // Para obtener los WorkOrders en proceso
+  async getInProgressWorkOrders(userId: number, statuses: string[]){
+    console.log('Buscando ordenes');
+    if(!userId){
+      throw new Error('No se proporcionan areas validas');
+    }
+    const inProgressWorkOrders = await this.prisma.workOrder.findMany({
+      where: {
+        status: {
+          in: statuses,
+        },
+      },
+      include: {
+        user: true,
+        flow: {
+            include: {
+                area: true,
+            }
+        },
+        files: true,
+        formAnswers: true,
+      },
+    });
+    if(inProgressWorkOrders.length === 0) {
+      return { message: 'No hay ordenes pendientes para esta area.'}
+    }
+    console.log('Ordenes pendientes desde work-orders services', inProgressWorkOrders);
+    return inProgressWorkOrders;
+  }
+
+  // Para obtener una Orden de Trabajo En Proceso por ID
+  async getInProgressWorkOrdersById(id: string) {
+    const workOrder = await this.prisma.workOrder.findFirst({
+      where: {
+        ot_id: id,
+      },
+      include: {
+        user: true,
+        flow: {
+          include: {
+            area: true,
+            areaResponse: {
+              include: {
+                prepress: true,
+                impression: {
+                  include: {
+                    form_answer: true,
+                  },
+                },
+                empalme: {
+                  include: {
+                    form_answer: true,
+                  },
+                },
+                laminacion: {
+                  include: {
+                    form_answer: true,
+                  },
+                }, 
+                corte: {
+                  include: {
+                    form_answer: true,
+                  },
+                },
+                colorEdge: {
+                  include: {
+                    form_answer: true,
+                  },
+                },
+                hotStamping: {
+                  include: {
+                    form_answer: true,
+                  },
+                }, 
+                millingChip: {
+                  include: {
+                    form_answer: true,
+                  },
+                },
+                personalizacion: {
+                  include: {
+                    form_answer: true,
+                  },
+                },
+              }
+            },
+            answers: true,
+          },
+        }
+      },
+    });
+    if(!workOrder) {
+      return { message: 'No se encontró una orden para esta área.'}
+    }
     return workOrder;
   }
 }

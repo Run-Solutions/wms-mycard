@@ -23,7 +23,9 @@ model User {
   WorkOrders            WorkOrder[]         @relation("UserWorkOrders")
   WorkOrderFlow         WorkOrderFlow[]     @relation("UserWorkOrderFlow")
   areasResponses        AreasResponse[]     @relation("UserAssignedToResponse")
-
+  answers               FormAnswer[]        @relation("AnsweredBy")  // inverso de `user`
+  reviewedAnswers       FormAnswer[]        @relation("ReviewedBy")  // inverso de `reviewer`
+  formAuditory          FormAuditory[]      @relation("UserAssignedToFormAuditory")
   created_at            DateTime            @default(now()) @map("created_at")
   updated_at            DateTime            @updatedAt @map("updated_at")
 
@@ -36,6 +38,7 @@ model Role {
 
   users                 User[]              // Relación inversa con User
   permissions           ModulePermission[]  // Relación inversa con ModulePermission
+  questions             FormQuestion[]
 
   created_at            DateTime            @default(now()) @map("created_at")
   updated_at            DateTime            @updatedAt @map("updated_at")
@@ -50,6 +53,8 @@ model AreasOperator {
   users                 User[]              //Relacion con User si aplica 
   workOrderFlows        WorkOrderFlow[]     //Relacion con flujo de OTs
   areasResponses        AreasResponse[]     @relation("AreaOnResponse")
+  formQuestions         FormQuestion[]      @relation("QuestionsOnAreas")
+  answers               FormAnswer[]
 
   @@map("areas_operator")
 }
@@ -91,12 +96,14 @@ model WorkOrder {
   mycard_id             String
   quantity              Int                 // Estado general de la OT
   created_by            Int                 // Usuario que creó la OT
-  validated             Boolean             @default(false)
+  status                String?
+  priority              Boolean             @default(false)
   
   user                  User                @relation("UserWorkOrders", fields: [created_by], references: [id])
   files                 WorkOrderFiles[]    // Relacion con archivos
   flow                  WorkOrderFlow[]     // Relación con las áreas por las que ha pasado
   areasResponses        AreasResponse[]     @relation("WorkOrderOnResponse")
+  formAnswers           FormAnswer[]        @relation("WorkOrderToFormAnswers")
 
   createdAt             DateTime            @default(now()) @map("created_at")
   updatedAt             DateTime            @updatedAt @map("updated_at")
@@ -131,6 +138,7 @@ model WorkOrderFlow {
   workOrder              WorkOrder           @relation(fields: [work_order_id], references: [id], onDelete: Cascade)
   area                   AreasOperator       @relation(fields: [area_id], references: [id], onDelete: Cascade)
   areaResponse           AreasResponse?      @relation("ResponseOnWorkOrderFlow")
+  answers                FormAnswer[]
 
   created_at             DateTime            @default(now()) @map("created_at")
   updated_at             DateTime            @updatedAt @map("updated_at")
@@ -139,37 +147,303 @@ model WorkOrderFlow {
 }
 
 model AreasResponse {
-  id                     Int                 @id @default(autoincrement())
-  area_id                Int                 // Area del usuario que pasa la respuesta
-  assigned_user          Int?                // Usuario asignado
-  work_order_id          Int                 // Id de la OT 
-  work_order_flow_id     Int                 @unique                
+  id                     Int                      @id @default(autoincrement())
+  area_id                Int                      // Area del usuario que pasa la respuesta
+  assigned_user          Int?                     // Usuario asignado
+  work_order_id          Int                      // Id de la OT 
+  work_order_flow_id     Int                      @unique                
 
-  user                   User?               @relation("UserAssignedToResponse", fields: [assigned_user], references: [id])
-  area                   AreasOperator       @relation("AreaOnResponse", fields: [area_id], references: [id], onDelete: Cascade)
-  workOrder              WorkOrder           @relation("WorkOrderOnResponse", fields: [work_order_id], references: [id], onDelete: Cascade)
-  WorkOrderFlow          WorkOrderFlow       @relation("ResponseOnWorkOrderFlow", fields: [work_order_flow_id], references: [id])
+  user                   User?                    @relation("UserAssignedToResponse", fields: [assigned_user], references: [id])
+  area                   AreasOperator            @relation("AreaOnResponse", fields: [area_id], references: [id], onDelete: Cascade)
+  workOrder              WorkOrder                @relation("WorkOrderOnResponse", fields: [work_order_id], references: [id], onDelete: Cascade)
+  WorkOrderFlow          WorkOrderFlow            @relation("ResponseOnWorkOrderFlow", fields: [work_order_flow_id], references: [id])
 
-  prepress               PrepressResponse?   @relation("PrepressOnResponse")
+  prepress               PrepressResponse?        @relation("PrepressOnResponse")
+  impression             ImpressionResponse?      @relation("ImpressionOnResponse")
+  empalme                EmpalmeResponse?         @relation("EmpalmeOnResponse")
+  laminacion             LaminacionResponse?      @relation("LaminacionOnResponse")
+  corte                  CorteResponse?           @relation("CorteOnResponse")
+  colorEdge              ColorEdgeResponse?       @relation("ColorEdgeOnResponse")
+  hotStamping            HotStampingResponse?     @relation("HotStampingOnResponse")
+  millingChip            MillingChipResponse?     @relation("MillingChipOnResponse")
+  personalizacion        PersonalizacionResponse? @relation("PersonalizacionOnResponse")
 
-  createdAt              DateTime            @default(now()) @map("created_at")
-  updatedAt              DateTime            @updatedAt @map("updated_at")
+  createdAt              DateTime                 @default(now()) @map("created_at")
+  updatedAt              DateTime                 @updatedAt @map("updated_at")
 
   @@map("areas_response")
 }
 
 model PrepressResponse {
-  id                     Int      @id @default(autoincrement())
-  plates                 Int      // Placas
-  positives              Int      // Positivos
-  testType               String   // Tipo de prueba: "color" | "fisica" | "digital"
-  comments               String?  // Comentarios opcionales
+  id                     Int                      @id @default(autoincrement())
+  plates                 Int                      // Placas
+  positives              Int                      // Positivos
+  testType               String                   // Tipo de prueba: "color" | "fisica" | "digital"
+  comments               String?                  // Comentarios opcionales
 
-  created_at             DateTime        @default(now()) @map("created_at")
-  updated_at             DateTime        @updatedAt @map("updated_at")
+  created_at             DateTime                 @default(now()) @map("created_at")
+  updated_at             DateTime                 @updatedAt @map("updated_at")
 
-  areas_response_id      Int             @unique
-  areas_response         AreasResponse   @relation("PrepressOnResponse", fields: [areas_response_id], references: [id], onDelete: Cascade)
+  areas_response_id      Int                      @unique
+  areas_response         AreasResponse            @relation("PrepressOnResponse", fields: [areas_response_id], references: [id], onDelete: Cascade)
 
   @@map("prepress_response")
+}
+
+model ImpressionResponse {
+  id                     Int                      @id @default(autoincrement())
+  release_quantity       Int                      // Cantidad a liberar
+  comments               String?                  // Comentarios opcionales
+
+  created_at             DateTime                 @default(now()) @map("created_at")
+  updated_at             DateTime                 @updatedAt @map("updated_at")
+
+  form_answer_id         Int                      @unique // Respuesta de CQM aprobada
+  form_answer            FormAnswer               @relation("AnswerOnImpression", fields: [form_answer_id], references: [id])
+  areas_response_id      Int                      @unique
+  areas_response         AreasResponse            @relation("ImpressionOnResponse", fields: [areas_response_id], references: [id], onDelete: Cascade)
+
+  @@map("impression_response")
+}
+
+model EmpalmeResponse {
+  id                     Int                      @id @default(autoincrement())
+  release_quantity       Int                      // Cantidad a liberar
+  comments               String?                  // Comentarios opcionales
+
+  created_at             DateTime                 @default(now()) @map("created_at")
+  updated_at             DateTime                 @updatedAt @map("updated_at")
+
+  form_answer_id         Int                      @unique // Respuesta de CQM aprobada
+  form_answer            FormAnswer               @relation("AnswerOnEmpalme", fields: [form_answer_id], references: [id])
+  areas_response_id      Int                      @unique
+  areas_response         AreasResponse            @relation("EmpalmeOnResponse", fields: [areas_response_id], references: [id], onDelete: Cascade)
+
+  @@map("empalme_response")
+}
+
+model LaminacionResponse {
+  id                     Int                      @id @default(autoincrement())
+  release_quantity       Int                      // Cantidad a liberar
+  comments               String?                  // Comentarios opcionales
+
+  created_at             DateTime                 @default(now()) @map("created_at")
+  updated_at             DateTime                 @updatedAt @map("updated_at")
+
+  form_answer_id         Int                      @unique // Respuesta de CQM aprobada
+  form_answer            FormAnswer               @relation("AnswerOnLaminacion", fields: [form_answer_id], references: [id])
+  areas_response_id      Int                      @unique
+  areas_response         AreasResponse            @relation("LaminacionOnResponse", fields: [areas_response_id], references: [id], onDelete: Cascade)
+
+  @@map("laminacion_response")
+}
+
+model CorteResponse {
+  id                     Int                      @id @default(autoincrement())
+  good_quantity          Int      
+  bad_quantity           Int      
+  excess_quantity        Int      
+  
+  comments               String?                  // Comentarios opcionales
+
+  created_at             DateTime                 @default(now()) @map("created_at")
+  updated_at             DateTime                 @updatedAt @map("updated_at")
+
+  form_answer_id         Int                      @unique // Respuesta de CQM aprobada
+  form_answer            FormAnswer               @relation("AnswerOnCorte", fields: [form_answer_id], references: [id])
+  areas_response_id      Int                      @unique
+  areas_response         AreasResponse            @relation("CorteOnResponse", fields: [areas_response_id], references: [id], onDelete: Cascade)
+  form_auditory_id       Int                      @unique //Respuesta del auditor
+  formAuditory           FormAuditory?            @relation("CorteToFormAuditory", fields: [form_auditory_id], references: [id], onDelete: Cascade)
+
+  @@map("corte_response")
+}
+
+model ColorEdgeResponse {
+  id                     Int                      @id @default(autoincrement())
+  good_quantity          Int      
+  bad_quantity           Int      
+  excess_quantity        Int      
+  
+  comments               String?                  // Comentarios opcionales
+
+  created_at             DateTime                 @default(now()) @map("created_at")
+  updated_at             DateTime                 @updatedAt @map("updated_at")
+
+  form_answer_id         Int                      @unique // Respuesta de CQM aprobada
+  form_answer            FormAnswer               @relation("AnswerOnColorEdge", fields: [form_answer_id], references: [id])
+  areas_response_id      Int                      @unique
+  areas_response         AreasResponse            @relation("ColorEdgeOnResponse", fields: [areas_response_id], references: [id], onDelete: Cascade)
+  form_auditory_id       Int                      @unique
+  formAuditory           FormAuditory?            @relation("ColorEdgeToFormAuditory", fields: [form_auditory_id], references: [id], onDelete: Cascade)
+
+  @@map("color_edge_response")
+}
+
+model HotStampingResponse {
+  id                     Int                      @id @default(autoincrement())
+  good_quantity          Int      
+  bad_quantity           Int      
+  excess_quantity        Int      
+  
+  comments               String?                  // Comentarios opcionales
+
+  created_at             DateTime                 @default(now()) @map("created_at")
+  updated_at             DateTime                 @updatedAt @map("updated_at")
+
+  form_answer_id         Int                      @unique // Respuesta de CQM aprobada
+  form_answer            FormAnswer               @relation("AnswerOnHotStamping", fields: [form_answer_id], references: [id])
+  areas_response_id      Int                      @unique
+  areas_response         AreasResponse            @relation("HotStampingOnResponse", fields: [areas_response_id], references: [id], onDelete: Cascade)
+  form_auditory_id       Int                      @unique
+  formAuditory           FormAuditory?            @relation("HotStampingToFormAuditory", fields: [form_auditory_id], references: [id], onDelete: Cascade)
+
+  @@map("hot_stamping_response")
+}
+
+model MillingChipResponse {
+  id                     Int                       @id @default(autoincrement())
+  good_quantity          Int      
+  bad_quantity           Int      
+  excess_quantity        Int      
+  
+  comments               String?                    // Comentarios opcionales
+
+  created_at             DateTime                   @default(now()) @map("created_at")
+  updated_at             DateTime                   @updatedAt @map("updated_at")
+
+  form_answer_id         Int                        @unique // Respuesta de CQM aprobada
+  form_answer            FormAnswer                 @relation("AnswerOnMillingChip", fields: [form_answer_id], references: [id])
+  areas_response_id      Int                        @unique
+  areas_response         AreasResponse              @relation("MillingChipOnResponse", fields: [areas_response_id], references: [id], onDelete: Cascade)
+  form_auditory_id       Int                        @unique
+  formAuditory           FormAuditory?              @relation("MillingChipToFormAuditory", fields: [form_auditory_id], references: [id], onDelete: Cascade)
+
+  @@map("milling_chip_response")
+}
+
+model PersonalizacionResponse {
+  id                     Int                         @id @default(autoincrement())
+  good_quantity          Int      
+  bad_quantity           Int      
+  excess_quantity        Int      
+  
+  comments               String?                      // Comentarios opcionales
+
+  created_at             DateTime                     @default(now()) @map("created_at")
+  updated_at             DateTime                     @updatedAt @map("updated_at")
+
+  form_answer_id         Int                          @unique // Respuesta de CQM aprobada
+  form_answer            FormAnswer                   @relation("AnswerOnPersonalizacion", fields: [form_answer_id], references: [id])
+  areas_response_id      Int                          @unique
+  areas_response         AreasResponse                @relation("PersonalizacionOnResponse", fields: [areas_response_id], references: [id], onDelete: Cascade)
+  form_auditory_id       Int                          @unique
+  formAuditory           FormAuditory?                @relation("PersonalizacionToFormAuditory", fields: [form_auditory_id], references: [id], onDelete: Cascade)
+
+  @@map("personalizacion_response")
+}
+
+model FormAuditory {
+  id                                Int                       @id @default(autoincrement())
+  reviewed_by_id                    Int?                      //Usuario de Auditoria que revisó
+  comments                          String? 
+
+  corte_answer_auditory             CorteResponse?            @relation("CorteToFormAuditory")
+  color_edge_answer_auditory        ColorEdgeResponse?        @relation("ColorEdgeToFormAuditory")
+  hot_stamping_answer_auditory      HotStampingResponse?      @relation("HotStampingToFormAuditory")
+  milling_chip_answer_auditory      MillingChipResponse?      @relation("MillingChipToFormAuditory")
+  personalizacion_answer_auditory   PersonalizacionResponse?  @relation("PersonalizacionToFormAuditory")
+
+  user                              User?                     @relation("UserAssignedToFormAuditory", fields: [reviewed_by_id], references: [id])
+  created_at                        DateTime                  @default(now()) @map("created_at")
+  updated_at                        DateTime                  @updatedAt @map("updated_at")
+
+  @@map("form_auditory")
+}
+
+model FormQuestion {
+  id                     Int             @id @default(autoincrement())
+  title                  String          // Ej: REVISAR PIOJOS Y VELO EN LA IMPRESIÓN
+  key                    String          @unique
+  role_id                Int?            // Para saber si es para el operador o para calidad
+  
+  areas                  AreasOperator[] @relation("QuestionsOnAreas")
+  role                   Role?           @relation(fields: [role_id], references: [id])
+
+  created_at             DateTime        @default(now())
+  updated_at             DateTime        @updatedAt
+
+  formAnswerResponses    FormAnswerResponse[]
+  @@map("form_questions")
+}
+
+model FormAnswer {
+  id                         Int             @id @default(autoincrement())
+  work_order_id              Int?
+  work_order_flow_id         Int       
+  user_id                    Int
+  area_id                    Int
+
+  sample_quantity            Int?
+  finish_validation          String?
+  testtype_cqm               String?
+  magnetic_band              String?
+  track_type                 String?
+  color                      String?
+  holographic_type           String?
+  color_edge                 String?        //Para respuesta operador Color Edge a CQM
+  color_foil                 String?        //Para respuesta operador Hot Stamping a CQM
+  revisar_posicion           String?        //Para respuesta operador Hot Stamping a CQM
+  imagen_holograma           String?        //Para respuesta operador Hot Stamping a CQM
+  revisar_tecnologia         String?        //Para respuesta operador Milling Chip a CQM
+  validar_kvc                String?        //Para respuesta operador Milling Chip a CQM
+  localizacion_contactos     String?        //Para respuesta calidad Milling Chip a CQM
+  altura_chip                String?        //Para respuesta calidad Milling Chip a CQM
+  tipo_personalizacion       String?        //Para respuesta calidad Personalicion a CQM
+  verificar_etiqueta         String?        //Para respuesta calidad Personalicion a CQM
+  color_personalizacion      String?        //Para respuesta calidad Personalicion a CQM
+  codigo_barras              String?        //Para respuesta calidad Personalicion a CQM
+  verificar_script           String?        //Para respuesta calidad Personalicion a CQM
+  validar_kvc_perso          String?        //Para respuesta calidad Personalicion a CQM
+  carga_aplicacion           String?        //Para respuesta calidad Personalicion a CQM
+  apariencia_quemado         String?        //Para respuesta calidad Personalicion a CQM
+
+  reviewed                   Boolean
+  accepted                   Boolean?
+  reviewed_by_id             Int?             //Usuario de Calidad que revisó
+  reviewer_assigned_at       DateTime?        @map("reviewer_assigned_at") // Cuándo fue asignada a esta área
+
+  created_at                 DateTime         @default(now())
+  updated_at                 DateTime         @updatedAt
+
+  user                       User              @relation("AnsweredBy", fields: [user_id], references: [id])
+  area                       AreasOperator     @relation(fields: [area_id], references: [id])
+  reviewer                   User?             @relation("ReviewedBy", fields: [reviewed_by_id], references: [id])
+  workOrder                  WorkOrder?         @relation("WorkOrderToFormAnswers", fields: [work_order_id], references: [id], onDelete: Cascade)
+  workOrderFlow              WorkOrderFlow     @relation(fields: [work_order_flow_id], references: [id])
+
+  impressionResponse         ImpressionResponse? @relation("AnswerOnImpression")
+  empalmeResponse            EmpalmeResponse?    @relation("AnswerOnEmpalme")
+  laminacionResponse         LaminacionResponse?    @relation("AnswerOnLaminacion")
+  corteResponse              CorteResponse?    @relation("AnswerOnCorte")
+  colorEdgeResponse          ColorEdgeResponse?    @relation("AnswerOnColorEdge")
+  hotStampingResponse        HotStampingResponse?    @relation("AnswerOnHotStamping")
+  millingChipResponse        MillingChipResponse?    @relation("AnswerOnMillingChip")
+  personalizacionResponse    PersonalizacionResponse?    @relation("AnswerOnPersonalizacion")
+  FormAnswerResponse         FormAnswerResponse[]
+
+  @@map("form_answers")
+}
+
+model FormAnswerResponse {
+  id                      Int           @id @default(autoincrement())
+  form_answer_id          Int           // Relación con la tabla principal FormAnswer
+  question_id             Int           // Relación con FormQuestion
+  response_operator       Boolean       // Respuesta individual
+  response_cqm            Boolean?
+
+  formAnswer              FormAnswer    @relation(fields: [form_answer_id], references: [id])
+  question                FormQuestion  @relation(fields: [question_id], references: [id])
+
+  @@map("form_answers_response")
 }

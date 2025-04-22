@@ -1,5 +1,5 @@
 // myorg/apps/backend/src/modules/work-order/controllers/work-order.controller.ts
-import { Body, Controller, Post, UploadedFiles, UseGuards, UseInterceptors, Req } from "@nestjs/common";
+import { Body, Get, ForbiddenException, Controller, Post, Param, UploadedFiles, Query, UseGuards, UseInterceptors, Req } from "@nestjs/common";
 import { WorkOrderService } from "./work-order.service";
 import { CreateWorkOrderDto } from "./dto/create-work-order.dto";
 import { FileFieldsInterceptor } from "@nestjs/platform-express";
@@ -34,10 +34,10 @@ const multerOptions = {
 };
 
 @Controller('work-orders')
+@UseGuards(JwtAuthGuard)
 export class WorkOrderController {
     constructor(private readonly workOrderService: WorkOrderService) {}
 
-    @UseGuards(JwtAuthGuard)
     @Post()
     @UseInterceptors(FileFieldsInterceptor([ { name: 'ot', maxCount: 1 }, { name: 'sku', maxCount: 1 }, { name: 'op', maxCount: 1 }, ], multerOptions)) // Para recibir hasta 3 archivos
     async create(
@@ -65,5 +65,30 @@ export class WorkOrderController {
         );
 
         return { message: 'Orden de trabajo creada correctamente', workOrder };
+    }
+
+    // Para obtener los WorkOrderFlowPendientes
+    @Get('in-progress')
+    async getInProgressWorkOrders(@Req() req: AuthenticatedRequest, @Query('statuses') statusesRaw?: string) {
+        if(!req.user){
+            throw new Error('Usuario no autenticado');
+            throw new ForbiddenException('Usuario no autenticado')
+          }
+          const { user } = req;
+          console.log("📌 ID del usuario:", user.id);
+          console.log("📌 Rol del usuario:", user.role_id);
+          console.log("📌 Áreas asignadas:", user.areas_operator_id);
+          const statuses = statusesRaw ? statusesRaw.split(',').map(status => decodeURIComponent(status.trim())) : ['En proceso'];
+        return await this.workOrderService.getInProgressWorkOrders(user.id, statuses);
+    }
+    
+    // Para obtener los WorkOrder por Id
+    @Get(':id')
+    async getInProgressWorkOrdersById(@Param('id') id: string, @Req() req: AuthenticatedRequest) {
+        const user = req.user;
+        if(!user){
+            throw new ForbiddenException('Usuario no autenticado.');
+        }
+        return await this.workOrderService.getInProgressWorkOrdersById(id);
     }
 }

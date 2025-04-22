@@ -1,4 +1,4 @@
-import { Controller, Patch, Param, Req, UseGuards, UnauthorizedException, Get, ForbiddenException, Res } from '@nestjs/common';
+import { Controller, Patch, Param, Req, UseGuards, UnauthorizedException, Get, ForbiddenException, Res, ParseIntPipe } from '@nestjs/common';
 import { AcceptWorkOrderService } from './accept-work-order.service';
 import { JwtAuthGuard } from 'src/auth/jwt-auth.guard';
 import { Request, Response } from 'express';
@@ -39,6 +39,7 @@ export class AcceptWorkOrderController {
     return await this.AcceptWorkOrderService.getPendingWorkOrders(user.areas_operator_id);
   
   }
+  
   // Para obtener los WorkOrderFiles
   @Get('file/:filename')
   serveWorkOrderFile(@Param('filename') filename: string, @Req() req: AuthenticatedRequest, @Res() res: Response) {
@@ -60,5 +61,16 @@ export class AcceptWorkOrderController {
     const updatedFlow = await this.AcceptWorkOrderService.acceptWorkOrderFlow(+id, userId);
     return { message: 'Orden aceptada correctamente', flow: updatedFlow}
   
+  }
+
+  // Para obtener una Orden de Trabajo En Proceso por ID
+  @Get(':id')
+  async getWorkOrderFlowById(@Param('id', ParseIntPipe) id: number, @Req() req: AuthenticatedRequest) {
+    const user = req.user;
+    if(!user){
+      throw new ForbiddenException('Usuario no autenticado.');
+    }
+              
+    return await this.AcceptWorkOrderService.getWorkOrderFlowById(id, user.areas_operator_id);
   }
 }
