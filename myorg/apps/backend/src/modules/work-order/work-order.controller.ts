@@ -1,5 +1,5 @@
 // myorg/apps/backend/src/modules/work-order/controllers/work-order.controller.ts
-import { Body, Get, ForbiddenException, Controller, Post, Param, UploadedFiles, Query, UseGuards, UseInterceptors, Req } from "@nestjs/common";
+import { Body, Get, ForbiddenException, Controller, Post, Param, UploadedFiles, Query, UseGuards, UseInterceptors, Req, Patch } from "@nestjs/common";
 import { WorkOrderService } from "./work-order.service";
 import { CreateWorkOrderDto } from "./dto/create-work-order.dto";
 import { FileFieldsInterceptor } from "@nestjs/platform-express";
@@ -90,5 +90,14 @@ export class WorkOrderController {
             throw new ForbiddenException('Usuario no autenticado.');
         }
         return await this.workOrderService.getInProgressWorkOrdersById(id);
+    }
+    
+    @Patch('cerrar-work-order')
+    async closeWorkOrderById(@Req() req: AuthenticatedRequest, @Body() dto: CreateWorkOrderDto) {
+        const user = req.user;
+        if(!user){
+            throw new ForbiddenException('Usuario no autenticado.');
+        }
+        return await this.workOrderService.closeWorkOrderById(dto, user.id);
     }
 }

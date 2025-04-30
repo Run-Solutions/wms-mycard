@@ -21,11 +21,14 @@ model User {
   role                  Role                @relation(fields: [role_id], references: [id]) // Relación con Role
   areasOperator         AreasOperator?      @relation(fields: [areas_operator_id], references: [id]) // Relación con area si es operador
   WorkOrders            WorkOrder[]         @relation("UserWorkOrders")
+  WorkOrdersClosed      WorkOrder[]        @relation("UserWorkOrdersClosed")
   WorkOrderFlow         WorkOrderFlow[]     @relation("UserWorkOrderFlow")
   areasResponses        AreasResponse[]     @relation("UserAssignedToResponse")
   answers               FormAnswer[]        @relation("AnsweredBy")  // inverso de `user`
   reviewedAnswers       FormAnswer[]        @relation("ReviewedBy")  // inverso de `reviewer`
   formAuditory          FormAuditory[]      @relation("UserAssignedToFormAuditory")
+  inconformitiesCreated Inconformities[]    @relation("UserInconformities")
+
   created_at            DateTime            @default(now()) @map("created_at")
   updated_at            DateTime            @updatedAt @map("updated_at")
 
@@ -96,10 +99,13 @@ model WorkOrder {
   mycard_id             String
   quantity              Int                 // Estado general de la OT
   created_by            Int                 // Usuario que creó la OT
+  comments              String?
+  closed_by             Int?                // Usuario que cerró la OT
   status                String?
   priority              Boolean             @default(false)
   
   user                  User                @relation("UserWorkOrders", fields: [created_by], references: [id])
+  user_closed           User?               @relation("UserWorkOrdersClosed", fields: [closed_by], references: [id])
   files                 WorkOrderFiles[]    // Relacion con archivos
   flow                  WorkOrderFlow[]     // Relación con las áreas por las que ha pasado
   areasResponses        AreasResponse[]     @relation("WorkOrderOnResponse")
@@ -157,9 +163,11 @@ model AreasResponse {
   area                   AreasOperator            @relation("AreaOnResponse", fields: [area_id], references: [id], onDelete: Cascade)
   workOrder              WorkOrder                @relation("WorkOrderOnResponse", fields: [work_order_id], references: [id], onDelete: Cascade)
   WorkOrderFlow          WorkOrderFlow            @relation("ResponseOnWorkOrderFlow", fields: [work_order_flow_id], references: [id])
+  inconformities         Inconformities[]         // Relacion inversa
 
   prepress               PrepressResponse?        @relation("PrepressOnResponse")
   impression             ImpressionResponse?      @relation("ImpressionOnResponse")
+  serigrafia             SerigrafiaResponse?      @relation("SerigrafiaOnResponse")
   empalme                EmpalmeResponse?         @relation("EmpalmeOnResponse")
   laminacion             LaminacionResponse?      @relation("LaminacionOnResponse")
   corte                  CorteResponse?           @relation("CorteOnResponse")
@@ -184,6 +192,8 @@ model PrepressResponse {
   created_at             DateTime                 @default(now()) @map("created_at")
   updated_at             DateTime                 @updatedAt @map("updated_at")
 
+  form_answer_id         Int?                      @unique // Respuesta de CQM aprobada
+  form_answer            FormAnswer?               @relation("AnswerOnPrepress", fields: [form_answer_id], references: [id])
   areas_response_id      Int                      @unique
   areas_response         AreasResponse            @relation("PrepressOnResponse", fields: [areas_response_id], references: [id], onDelete: Cascade)
 
@@ -204,6 +214,22 @@ model ImpressionResponse {
   areas_response         AreasResponse            @relation("ImpressionOnResponse", fields: [areas_response_id], references: [id], onDelete: Cascade)
 
   @@map("impression_response")
+}
+
+model SerigrafiaResponse {
+  id                     Int                      @id @default(autoincrement())
+  release_quantity       Int                      // Cantidad a liberar
+  comments               String?                  // Comentarios opcionales
+
+  created_at             DateTime                 @default(now()) @map("created_at")
+  updated_at             DateTime                 @updatedAt @map("updated_at")
+
+  form_answer_id         Int                      @unique // Respuesta de CQM aprobada
+  form_answer            FormAnswer               @relation("AnswerOnSerigrafia", fields: [form_answer_id], references: [id])
+  areas_response_id      Int                      @unique
+  areas_response         AreasResponse            @relation("SerigrafiaOnResponse", fields: [areas_response_id], references: [id], onDelete: Cascade)
+
+  @@map("serigrafia_response")
 }
 
 model EmpalmeResponse {
@@ -346,6 +372,7 @@ model PersonalizacionResponse {
 model FormAuditory {
   id                                Int                       @id @default(autoincrement())
   reviewed_by_id                    Int?                      //Usuario de Auditoria que revisó
+  sample_auditory                   Int?                      //Usuario de Auditoria que revisó
   comments                          String? 
 
   corte_answer_auditory             CorteResponse?            @relation("CorteToFormAuditory")
@@ -378,7 +405,7 @@ model FormQuestion {
 }
 
 model FormAnswer {
-  id                         Int             @id @default(autoincrement())
+  id                         Int                @id @default(autoincrement())
   work_order_id              Int?
   work_order_flow_id         Int       
   user_id                    Int
@@ -389,46 +416,50 @@ model FormAnswer {
   testtype_cqm               String?
   magnetic_band              String?
   track_type                 String?
+  validar_inlays             String?
   color                      String?
   holographic_type           String?
-  color_edge                 String?        //Para respuesta operador Color Edge a CQM
-  color_foil                 String?        //Para respuesta operador Hot Stamping a CQM
-  revisar_posicion           String?        //Para respuesta operador Hot Stamping a CQM
-  imagen_holograma           String?        //Para respuesta operador Hot Stamping a CQM
-  revisar_tecnologia         String?        //Para respuesta operador Milling Chip a CQM
-  validar_kvc                String?        //Para respuesta operador Milling Chip a CQM
-  localizacion_contactos     String?        //Para respuesta calidad Milling Chip a CQM
-  altura_chip                String?        //Para respuesta calidad Milling Chip a CQM
-  tipo_personalizacion       String?        //Para respuesta calidad Personalicion a CQM
-  verificar_etiqueta         String?        //Para respuesta calidad Personalicion a CQM
-  color_personalizacion      String?        //Para respuesta calidad Personalicion a CQM
-  codigo_barras              String?        //Para respuesta calidad Personalicion a CQM
-  verificar_script           String?        //Para respuesta calidad Personalicion a CQM
-  validar_kvc_perso          String?        //Para respuesta calidad Personalicion a CQM
-  carga_aplicacion           String?        //Para respuesta calidad Personalicion a CQM
-  apariencia_quemado         String?        //Para respuesta calidad Personalicion a CQM
+  color_edge                 String?            //Para respuesta operador Color Edge a CQM
+  color_foil                 String?            //Para respuesta operador Hot Stamping a CQM
+  revisar_posicion           String?            //Para respuesta operador Hot Stamping a CQM
+  imagen_holograma           String?            //Para respuesta operador Hot Stamping a CQM
+  revisar_tecnologia         String?            //Para respuesta operador Milling Chip a CQM
+  validar_kvc                String?            //Para respuesta operador Milling Chip a CQM
+  localizacion_contactos     String?            //Para respuesta calidad Milling Chip a CQM
+  altura_chip                String?            //Para respuesta calidad Milling Chip a CQM
+  tipo_personalizacion       String?            //Para respuesta calidad Personalicion a CQM
+  verificar_etiqueta         String?            //Para respuesta calidad Personalicion a CQM
+  color_personalizacion      String?            //Para respuesta calidad Personalicion a CQM
+  codigo_barras              String?            //Para respuesta calidad Personalicion a CQM
+  verificar_script           String?            //Para respuesta calidad Personalicion a CQM
+  validar_kvc_perso          String?            //Para respuesta calidad Personalicion a CQM
+  carga_aplicacion           String?            //Para respuesta calidad Personalicion a CQM
+  apariencia_quemado         String?            //Para respuesta calidad Personalicion a CQM
 
   reviewed                   Boolean
   accepted                   Boolean?
-  reviewed_by_id             Int?             //Usuario de Calidad que revisó
-  reviewer_assigned_at       DateTime?        @map("reviewer_assigned_at") // Cuándo fue asignada a esta área
+  reviewed_by_id             Int?               //Usuario de Calidad que revisó
+  reviewer_assigned_at       DateTime?          @map("reviewer_assigned_at") // Cuándo fue asignada a esta área
 
-  created_at                 DateTime         @default(now())
-  updated_at                 DateTime         @updatedAt
+  created_at                 DateTime           @default(now())
+  updated_at                 DateTime           @updatedAt
 
-  user                       User              @relation("AnsweredBy", fields: [user_id], references: [id])
-  area                       AreasOperator     @relation(fields: [area_id], references: [id])
-  reviewer                   User?             @relation("ReviewedBy", fields: [reviewed_by_id], references: [id])
+  user                       User               @relation("AnsweredBy", fields: [user_id], references: [id])
+  area                       AreasOperator      @relation(fields: [area_id], references: [id])
+  reviewer                   User?              @relation("ReviewedBy", fields: [reviewed_by_id], references: [id])
+  inconformities             Inconformities[]         // Relacion inversa
   workOrder                  WorkOrder?         @relation("WorkOrderToFormAnswers", fields: [work_order_id], references: [id], onDelete: Cascade)
-  workOrderFlow              WorkOrderFlow     @relation(fields: [work_order_flow_id], references: [id])
+  workOrderFlow              WorkOrderFlow      @relation(fields: [work_order_flow_id], references: [id])
 
-  impressionResponse         ImpressionResponse? @relation("AnswerOnImpression")
-  empalmeResponse            EmpalmeResponse?    @relation("AnswerOnEmpalme")
-  laminacionResponse         LaminacionResponse?    @relation("AnswerOnLaminacion")
-  corteResponse              CorteResponse?    @relation("AnswerOnCorte")
-  colorEdgeResponse          ColorEdgeResponse?    @relation("AnswerOnColorEdge")
-  hotStampingResponse        HotStampingResponse?    @relation("AnswerOnHotStamping")
-  millingChipResponse        MillingChipResponse?    @relation("AnswerOnMillingChip")
+  prepressResponse           PrepressResponse?           @relation("AnswerOnPrepress")
+  impressionResponse         ImpressionResponse?         @relation("AnswerOnImpression")
+  serigrafiaResponse         SerigrafiaResponse?         @relation("AnswerOnSerigrafia")
+  empalmeResponse            EmpalmeResponse?            @relation("AnswerOnEmpalme")
+  laminacionResponse         LaminacionResponse?         @relation("AnswerOnLaminacion")
+  corteResponse              CorteResponse?              @relation("AnswerOnCorte")
+  colorEdgeResponse          ColorEdgeResponse?          @relation("AnswerOnColorEdge")
+  hotStampingResponse        HotStampingResponse?        @relation("AnswerOnHotStamping")
+  millingChipResponse        MillingChipResponse?        @relation("AnswerOnMillingChip")
   personalizacionResponse    PersonalizacionResponse?    @relation("AnswerOnPersonalizacion")
   FormAnswerResponse         FormAnswerResponse[]
 
@@ -446,4 +477,20 @@ model FormAnswerResponse {
   question                FormQuestion  @relation(fields: [question_id], references: [id])
 
   @@map("form_answers_response")
+}
+
+model Inconformities {
+  id                      Int               @id @default(autoincrement())
+  areas_response_id       Int?              // Relación con la tabla principal FormAnswer
+  form_answer_id          Int?
+  comments                String            // Relación con FormQuestion
+  created_by              Int?              // Respuesta individual
+
+  areaResponse            AreasResponse?     @relation(fields: [areas_response_id], references: [id], onDelete: Cascade)
+  formAnswer              FormAnswer?        @relation(fields: [form_answer_id], references: [id], onDelete: Cascade)
+  user                    User?             @relation("UserInconformities", fields: [created_by], references: [id])
+  
+  created_at             DateTime           @default(now())
+
+  @@map("inconformities")
 }

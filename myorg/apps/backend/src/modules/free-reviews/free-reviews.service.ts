@@ -141,6 +141,66 @@ export class FreeReviewsService {
   }
   
   // Para adjuntar las respuestas de calidad 
+  async postFormExtraImpresion(dto: CreateFormExtraDto) {
+    const { form_answer_id, frente, vuelta, radio } = dto;
+  
+    const formAnswer = await this.prisma.formAnswer.findUnique({
+      where: { id: form_answer_id },
+      select: { work_order_flow_id: true },
+    });
+  
+    // Agrupamos todo en una transacción
+    await this.prisma.$transaction([
+      this.prisma.formAnswer.update({
+        where: { id: form_answer_id },
+        data: {
+          testtype_cqm: radio.value,
+          accepted: true,
+          reviewed: true,
+        },
+      }),
+  
+      this.prisma.workOrderFlow.update({
+        where: { id: formAnswer?.work_order_flow_id },
+        data: {
+          status: 'Listo',
+        },
+      }),
+  
+      ...frente.map(q =>
+        this.prisma.formAnswerResponse.create({
+          data: {
+            formAnswer: {
+              connect: { id: form_answer_id }
+            },
+            question: {
+              connect: { id: q.question_id },
+            },
+            response_cqm: true,
+            response_operator: false, 
+          },
+        })
+      ),
+      ...vuelta.map(q =>
+        this.prisma.formAnswerResponse.create({
+          data: {
+            formAnswer: {
+              connect: { id: form_answer_id }
+            },
+            question: {
+              connect: { id: q.question_id },
+            },
+            response_cqm: true,
+            response_operator: false, 
+          },
+        })
+      )
+    ]);
+  
+    return { message: 'Datos guardados correctamente' };
+  }
+  
+  // Para adjuntar las respuestas de calidad 
   async postFormExtraSeri(dto: CreateFormExtraDto) {
     const { form_answer_id, checkboxes } = dto;
   
@@ -201,6 +261,7 @@ export class FreeReviewsService {
         where: { id: form_answer_id },
         data: {
           testtype_cqm: null,
+          validar_inlays: dto.extra_data.validar_inlays,
           magnetic_band: dto.radio.magnetic_band,
           track_type: dto.radio.track_type,
           color: dto.extra_data.color,
@@ -315,7 +376,7 @@ export class FreeReviewsService {
         },
       }),
   
-      ...checkboxes.map(cb =>
+      ...(checkboxes ?? []).map(cb =>
         this.prisma.formAnswerResponse.create({
           data: {
             formAnswer: {

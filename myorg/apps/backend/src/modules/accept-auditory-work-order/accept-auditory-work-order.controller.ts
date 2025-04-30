@@ -1,6 +1,7 @@
-import { Controller, Get, Post, Param, UseGuards, Req, ForbiddenException, UnauthorizedException } from '@nestjs/common';
+import { Controller, Get, Body, Post, Param, UseGuards, Req, ForbiddenException, UnauthorizedException } from '@nestjs/common';
 import { AcceptAuditoryWorkOrderService } from './accept-auditory-work-order.service';
 import { JwtAuthGuard } from 'src/auth/jwt-auth.guard';
+import { AcceptAuditoryDto } from './dto/accept-workorder-response';
 
 interface AuthenticatedUser {
     id: number;
@@ -33,55 +34,55 @@ export class AcceptAuditoryWorkOrderController {
 
   // Para que el auditor acepte la orden de corte
   @Post(':corteResponseId')
-  async acceptWorkOrderResponse(@Param('corteResponseId') corteResponseId: number, @Req() req: AuthenticatedRequest) {
+  async acceptWorkOrderResponse(@Body() dto: AcceptAuditoryDto, @Param('corteResponseId') corteResponseId: number, @Req() req: AuthenticatedRequest) {
     const userId = req.user?.id;
     if (!userId) throw new UnauthorizedException();
     
-    const updated = await this.AcceptAuditoryWorkOrderService.acceptWorkOrderResponse(+corteResponseId, userId);
+    const updated = await this.AcceptAuditoryWorkOrderService.acceptWorkOrderResponse(+corteResponseId, userId, dto);
     return { message: 'Orden aceptada correctamente', flow: updated}
     
   }
   
   // Para que el auditor acepte la orden de color edge
   @Post('color-edge/:colorEdgeResponseId')
-  async acceptWorkOrderResponseColorEdge(@Param('colorEdgeResponseId') colorEdgeResponseId: number, @Req() req: AuthenticatedRequest) {
+  async acceptWorkOrderResponseColorEdge(@Body() dto: AcceptAuditoryDto, @Param('colorEdgeResponseId') colorEdgeResponseId: number, @Req() req: AuthenticatedRequest) {
     const userId = req.user?.id;
     if (!userId) throw new UnauthorizedException();
     
-    const updated = await this.AcceptAuditoryWorkOrderService.acceptWorkOrderResponseColorEdge(+colorEdgeResponseId, userId);
+    const updated = await this.AcceptAuditoryWorkOrderService.acceptWorkOrderResponseColorEdge(+colorEdgeResponseId, userId, dto);
     return { message: 'Orden aceptada correctamente', flow: updated}
     
   }
   
   // Para que el auditor acepte la orden de hot stamping
   @Post('hot-stamping/:hotStampingResponseId')
-  async acceptWorkOrderResponseHotStamping(@Param('hotStampingResponseId') hotStampingResponseId: number, @Req() req: AuthenticatedRequest) {
+  async acceptWorkOrderResponseHotStamping(@Body() dto: AcceptAuditoryDto, @Param('hotStampingResponseId') hotStampingResponseId: number, @Req() req: AuthenticatedRequest) {
     const userId = req.user?.id;
     if (!userId) throw new UnauthorizedException();
     
-    const updated = await this.AcceptAuditoryWorkOrderService.acceptWorkOrderResponseHotStamping(+hotStampingResponseId, userId);
+    const updated = await this.AcceptAuditoryWorkOrderService.acceptWorkOrderResponseHotStamping(+hotStampingResponseId, userId, dto);
     return { message: 'Orden aceptada correctamente', flow: updated}
     
   }
   
   // Para que el auditor acepte la orden de milling chip
   @Post('milling-chip/:millingChipResponseId')
-  async acceptWorkOrderResponseMillingChip(@Param('millingChipResponseId') millingChipResponseId: number, @Req() req: AuthenticatedRequest) {
+  async acceptWorkOrderResponseMillingChip(@Body() dto: AcceptAuditoryDto, @Param('millingChipResponseId') millingChipResponseId: number, @Req() req: AuthenticatedRequest) {
     const userId = req.user?.id;
     if (!userId) throw new UnauthorizedException();
     
-    const updated = await this.AcceptAuditoryWorkOrderService.acceptWorkOrderResponseMillingChip(+millingChipResponseId, userId);
+    const updated = await this.AcceptAuditoryWorkOrderService.acceptWorkOrderResponseMillingChip(+millingChipResponseId, userId, dto);
     return { message: 'Orden aceptada correctamente', flow: updated}
     
   }
   
   // Para que el auditor acepte la orden de personalizacion
   @Post('personalizacion/:personalizacionResponseId')
-  async acceptWorkOrderResponsePersonalizacion(@Param('personalizacionResponseId') personalizacionResponseId: number, @Req() req: AuthenticatedRequest) {
+  async acceptWorkOrderResponsePersonalizacion(@Body() dto: AcceptAuditoryDto, @Param('personalizacionResponseId') personalizacionResponseId: number, @Req() req: AuthenticatedRequest) {
     const userId = req.user?.id;
     if (!userId) throw new UnauthorizedException();
     
-    const updated = await this.AcceptAuditoryWorkOrderService.acceptWorkOrderResponsePersonalizacion(+personalizacionResponseId, userId);
+    const updated = await this.AcceptAuditoryWorkOrderService.acceptWorkOrderResponsePersonalizacion(+personalizacionResponseId, userId, dto);
     return { message: 'Orden aceptada correctamente', flow: updated}
     
   }

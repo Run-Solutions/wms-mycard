@@ -35,9 +35,9 @@ export const Sidebar: React.FC<SidebarProps> = ({ open, onLogout }) => {
         // Se recupera el token del user logeado
         const token = localStorage.getItem('token');
         if (!token) {
-          throw new Error('⛔ No se la leído el token')
+          router.push('/auth/login');
+          throw new Error('⛔ No se la leído el token');
         }
-
         const response = await fetch('http://localhost:3000/dashboard/modules', {
           method: 'GET',
           headers: {
@@ -45,6 +45,12 @@ export const Sidebar: React.FC<SidebarProps> = ({ open, onLogout }) => {
             'Content-Type': 'application/json',
           },
         });
+        if (response.status === 401) {
+          localStorage.removeItem('token');
+          localStorage.removeItem('user');
+          router.push('/auth/login');
+          return; // salir del fetchModules
+        }
         if (!response.ok) {
           throw new Error('⛔ Error al obtener módulos');
         }

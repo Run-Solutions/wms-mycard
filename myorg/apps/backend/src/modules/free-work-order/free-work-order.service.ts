@@ -87,14 +87,24 @@ export class FreeWorkOrderService {
   async createPrepressResponse(dto: CreatePrepressResponseDto) {
     return this.prisma.$transaction(async (tx) => {
       // Crear AreasResponse
-      const response = await tx.areasResponse.create({
-        data: {
+      let response = await tx.areasResponse.findFirst({
+        where: {
           work_order_id: dto.workOrderId,
           work_order_flow_id: dto.workOrderFlowId,
           area_id: dto.areaId,
-          assigned_user: dto.assignedUser,
         },
       });
+      // Crear AreasResponse si no existe
+      if (!response) {
+        response = await tx.areasResponse.create({
+          data: {
+            work_order_id: dto.workOrderId,
+            work_order_flow_id: dto.workOrderFlowId,
+            area_id: dto.areaId,
+            assigned_user: dto.assignedUser,
+          },
+        });
+      }
 
       // Asociar el área response con el work order flow
       await tx.workOrderFlow.update({
@@ -155,15 +165,44 @@ export class FreeWorkOrderService {
       return { message: 'Respuesta guardada con exito'};
     })
   } 
-  
+
   // Guardar las respuestas del formulario
   async saveFormAnswers(dto: CreateFormAnswerImpressionDto) {
-    const { question_id, work_order_id, response, user_id, area_id, sample_quantity, reviewed, work_order_flow_id } = dto;
-    
-    try {
-      return await this.prisma.$transaction(async (tx) => {
-        // Crear el FormAnswerGeneral
-        const formAnswer = await tx.formAnswer.create({
+  const { question_id, work_order_id, response, user_id, area_id, sample_quantity, reviewed, work_order_flow_id } = dto;
+
+  try {
+    return await this.prisma.$transaction(async (tx) => {
+      // Verificar si ya existe un FormAnswer con ese work_order_flow_id
+      const existingFormAnswer = await tx.formAnswer.findFirst({
+        where: {
+          work_order_flow_id,
+        },
+      });
+
+      let formAnswerId: number;
+
+      if (existingFormAnswer) {
+        // Si existe, actualizamos datos del FormAnswer
+        const updatedFormAnswer = await tx.formAnswer.update({
+          where: { id: existingFormAnswer.id },
+          data: {
+            user_id,
+            area_id,
+            sample_quantity,
+            work_order_id,
+            reviewed: reviewed ?? false,
+          },
+        });
+        formAnswerId = updatedFormAnswer.id;
+
+        // Eliminamos las respuestas anteriores
+        await tx.formAnswerResponse.deleteMany({
+          where: { form_answer_id: formAnswerId },
+        });
+
+      } else {
+        // Si no existe, creamos el FormAnswer
+        const newFormAnswer = await tx.formAnswer.create({
           data: {
             user_id,
             area_id,
@@ -173,15 +212,103 @@ export class FreeWorkOrderService {
             work_order_flow_id,
           },
         });
-        // Mapear las respuestas de cada pregunta 
-        const respuestas = question_id.map((questionId, index) => ({
+        formAnswerId = newFormAnswer.id;
+      }
+
+      // Crear las respuestas nuevas
+      const respuestas = question_id.map((questionId, index) => ({
+        question_id: questionId,
+        response_operator: response[index],
+        form_answer_id: formAnswerId,
+      }));
+
+      await tx.formAnswerResponse.createMany({
+        data: respuestas,
+      });
+
+      // Actualizar estado del WorkOrderFlow
+      await tx.workOrderFlow.update({
+        where: {
+          id: work_order_flow_id,
+        },
+        data: {
+          status: 'Enviado a CQM',
+        },
+      });
+
+      return { message: 'Respuestas guardadas exitosamente' };
+    });
+  } catch (error) {
+    console.log(error);
+    throw new Error('Error al guardar respuestas');
+  }
+}
+  
+  // Guardar las respuestas del formulario
+  async saveFormAnswersImpression(dto: CreateFormAnswerImpressionDto) {
+    const { question_id, work_order_id, frente, vuelta, user_id, area_id, sample_quantity, reviewed, work_order_flow_id } = dto;
+    
+    try {
+      return await this.prisma.$transaction(async (tx) => {
+        // Buscar si ya existe un FormAnswer con ese work_order_flow_id
+        const existingFormAnswer = await tx.formAnswer.findFirst({
+          where: {
+            work_order_flow_id,
+          },
+        });
+  
+        let formAnswerId: number;
+  
+        if (existingFormAnswer) {
+          // Si existe, actualizar los datos
+          const updatedFormAnswer = await tx.formAnswer.update({
+            where: { id: existingFormAnswer.id },
+            data: {
+              user_id,
+              area_id,
+              sample_quantity,
+              work_order_id,
+              reviewed: reviewed ?? false,
+            },
+          });
+  
+          formAnswerId = updatedFormAnswer.id;
+  
+          // Eliminar las respuestas anteriores
+          await tx.formAnswerResponse.deleteMany({
+            where: { form_answer_id: formAnswerId },
+          });
+  
+        } else {
+          // Si no existe, crear el FormAnswer
+          const newFormAnswer = await tx.formAnswer.create({
+            data: {
+              user_id,
+              area_id,
+              sample_quantity,
+              work_order_id,
+              reviewed: reviewed ?? false,
+              work_order_flow_id,
+            },
+          });
+  
+          formAnswerId = newFormAnswer.id;
+        }
+        // Mapear las respuestas de cada pregunta, primero del frente
+        const respuestasFrente = question_id.filter((_, index) => frente[index]).map((questionId, index) => ({
           question_id: questionId,
-          response_operator: response[index],
-          form_answer_id: formAnswer.id,
+          response_operator: frente[index],
+          form_answer_id: formAnswerId,
+        }));
+        // Mapear las respuestas de cada pregunta, luego de vuelta
+        const respuestasVuelta = question_id.filter((_, index) => vuelta[index]).map((questionId, index) => ({
+          question_id: questionId,
+          response_operator: vuelta[index],
+          form_answer_id: formAnswerId,
         }));
         // Crear todas las respuestas 
         await tx.formAnswerResponse.createMany({
-          data: respuestas,
+          data: [...respuestasFrente, ...respuestasVuelta],
         });
         // Actualizar el estado del WorkOrderFlow a Enviado a CQM
         await tx.workOrderFlow.update({
@@ -205,23 +332,57 @@ export class FreeWorkOrderService {
     
     try {
       return await this.prisma.$transaction(async (tx) => {
-        // Crear el FormAnswerGeneral
-        const formAnswer = await tx.formAnswer.create({
-          data: {
-            user_id,
-            area_id,
-            sample_quantity,
-            work_order_id,
-            finish_validation,
-            reviewed: reviewed ?? false,
+        // Buscar si ya existe un FormAnswer con ese work_order_flow_id
+        const existingFormAnswer = await tx.formAnswer.findFirst({
+          where: {
             work_order_flow_id,
           },
         });
+  
+        let formAnswerId: number;
+  
+        if (existingFormAnswer) {
+          // Si existe, actualizar los datos
+          const updatedFormAnswer = await tx.formAnswer.update({
+            where: { id: existingFormAnswer.id },
+            data: {
+              user_id,
+              area_id,
+              sample_quantity,
+              finish_validation,
+              work_order_id,
+              reviewed: reviewed ?? false,
+            },
+          });
+  
+          formAnswerId = updatedFormAnswer.id;
+  
+          // Eliminar las respuestas anteriores
+          await tx.formAnswerResponse.deleteMany({
+            where: { form_answer_id: formAnswerId },
+          });
+  
+        } else {
+          // Si no existe, crear el FormAnswer
+          const newFormAnswer = await tx.formAnswer.create({
+            data: {
+              user_id,
+              area_id,
+              sample_quantity,
+              finish_validation,
+              work_order_id,
+              reviewed: reviewed ?? false,
+              work_order_flow_id,
+            },
+          });
+  
+          formAnswerId = newFormAnswer.id;
+        }
         // Mapear las respuestas de cada pregunta 
         const respuestas = question_id.map((questionId, index) => ({
           question_id: questionId,
           response_operator: response[index],
-          form_answer_id: formAnswer.id,
+          form_answer_id: formAnswerId,
         }));
         // Crear todas las respuestas 
         await tx.formAnswerResponse.createMany({
@@ -245,35 +406,73 @@ export class FreeWorkOrderService {
   
   // Guardar las respuestas del formulario
   async saveFormAnswersHotStamping(dto: CreateFormAnswerImpressionDto) {
-    const { question_id, work_order_id, color_foil, revisar_posicion, imagen_holograma, response, user_id, area_id, sample_quantity, reviewed, work_order_flow_id } = dto;
-    
+    const { question_id, work_order_id, color_foil, revisar_posicion, imagen_holograma, response, user_id, area_id, sample_quantity, reviewed, work_order_flow_id, } = dto;
     try {
       return await this.prisma.$transaction(async (tx) => {
-        // Crear el FormAnswerGeneral
-        const formAnswer = await tx.formAnswer.create({
-          data: {
-            user_id,
-            area_id,
-            sample_quantity,
-            color_foil,
-            work_order_id,
-            revisar_posicion,
-            imagen_holograma,
-            reviewed: reviewed ?? false,
+        // Buscar si ya existe un FormAnswer con ese work_order_flow_id
+        const existingFormAnswer = await tx.formAnswer.findFirst({
+          where: {
             work_order_flow_id,
           },
         });
-        // Mapear las respuestas de cada pregunta 
+  
+        let formAnswerId: number;
+  
+        if (existingFormAnswer) {
+          // Si existe, actualizar los datos
+          const updatedFormAnswer = await tx.formAnswer.update({
+            where: { id: existingFormAnswer.id },
+            data: {
+              user_id,
+              area_id,
+              sample_quantity,
+              color_foil,
+              work_order_id,
+              revisar_posicion,
+              imagen_holograma,
+              reviewed: reviewed ?? false,
+            },
+          });
+  
+          formAnswerId = updatedFormAnswer.id;
+  
+          // Eliminar las respuestas anteriores
+          await tx.formAnswerResponse.deleteMany({
+            where: { form_answer_id: formAnswerId },
+          });
+  
+        } else {
+          // Si no existe, crear el FormAnswer
+          const newFormAnswer = await tx.formAnswer.create({
+            data: {
+              user_id,
+              area_id,
+              sample_quantity,
+              color_foil,
+              work_order_id,
+              revisar_posicion,
+              imagen_holograma,
+              reviewed: reviewed ?? false,
+              work_order_flow_id,
+            },
+          });
+  
+          formAnswerId = newFormAnswer.id;
+        }
+  
+        // Mapear las nuevas respuestas
         const respuestas = question_id.map((questionId, index) => ({
           question_id: questionId,
           response_operator: response[index],
-          form_answer_id: formAnswer.id,
+          form_answer_id: formAnswerId,
         }));
-        // Crear todas las respuestas 
+  
+        // Crear todas las respuestas nuevas
         await tx.formAnswerResponse.createMany({
           data: respuestas,
         });
-        // Actualizar el estado del WorkOrderFlow a Enviado a CQM
+  
+        // Actualizar el estado del WorkOrderFlow a 'Enviado a CQM'
         await tx.workOrderFlow.update({
           where: {
             id: work_order_flow_id,
@@ -282,10 +481,12 @@ export class FreeWorkOrderService {
             status: 'Enviado a CQM',
           },
         });
-        return { message: 'Respuestas guardadas exitosamente'}
+  
+        return { message: 'Respuestas guardadas exitosamente' };
       });
     } catch (error) {
       console.log(error);
+      throw new Error('Error al guardar respuestas de hot stamping');
     }
   }
   
@@ -295,24 +496,59 @@ export class FreeWorkOrderService {
     
     try {
       return await this.prisma.$transaction(async (tx) => {
-        // Crear el FormAnswerGeneral
-        const formAnswer = await tx.formAnswer.create({
-          data: {
-            user_id,
-            area_id,
-            sample_quantity,
-            revisar_tecnologia,
-            work_order_id,
-            validar_kvc,
-            reviewed: reviewed ?? false,
+        // Buscar si ya existe un FormAnswer con ese work_order_flow_id
+        const existingFormAnswer = await tx.formAnswer.findFirst({
+          where: {
             work_order_flow_id,
           },
         });
+  
+        let formAnswerId: number;
+  
+        if (existingFormAnswer) {
+          // Si existe, actualizar los datos
+          const updatedFormAnswer = await tx.formAnswer.update({
+            where: { id: existingFormAnswer.id },
+            data: {
+              user_id,
+              area_id,
+              sample_quantity,
+              revisar_tecnologia,
+              work_order_id,
+              validar_kvc,
+              reviewed: reviewed ?? false,
+            },
+          });
+  
+          formAnswerId = updatedFormAnswer.id;
+  
+          // Eliminar las respuestas anteriores
+          await tx.formAnswerResponse.deleteMany({
+            where: { form_answer_id: formAnswerId },
+          });
+  
+        } else {
+          // Si no existe, crear el FormAnswer
+          const newFormAnswer = await tx.formAnswer.create({
+            data: {
+              user_id,
+              area_id,
+              sample_quantity,
+              revisar_tecnologia,
+              work_order_id,
+              validar_kvc,
+              reviewed: reviewed ?? false,
+              work_order_flow_id,
+            },
+          });
+  
+          formAnswerId = newFormAnswer.id;
+        }
         // Mapear las respuestas de cada pregunta 
         const respuestas = question_id.map((questionId, index) => ({
           question_id: questionId,
           response_operator: response[index],
-          form_answer_id: formAnswer.id,
+          form_answer_id: formAnswerId,
         }));
         // Crear todas las respuestas 
         await tx.formAnswerResponse.createMany({
@@ -340,28 +576,61 @@ export class FreeWorkOrderService {
     
     try {
       return await this.prisma.$transaction(async (tx) => {
-        // Crear el FormAnswerGeneral
-        const formAnswer = await tx.formAnswer.create({
-          data: {
-            user_id,
-            area_id,
-            sample_quantity,
-            tipo_personalizacion,
-            verificar_etiqueta: verificar_etiqueta ?? null,
-            color_personalizacion: color_personalizacion ?? null,
-            codigo_barras: codigo_barras ?? null,
-            verificar_script: verificar_script ?? null,
-            validar_kvc_perso: validar_kvc_perso ?? null,
-            work_order_id,
-            reviewed: reviewed ?? false,
+        // Buscar si ya existe un FormAnswer con ese work_order_flow_id
+        const existingFormAnswer = await tx.formAnswer.findFirst({
+          where: {
             work_order_flow_id,
           },
         });
+  
+        let formAnswerId: number;
+  
+        if (existingFormAnswer) {
+          // Si existe, actualizar los datos
+          const updatedFormAnswer = await tx.formAnswer.update({
+            where: { id: existingFormAnswer.id },
+            data: {
+              user_id,
+              area_id,
+              sample_quantity,
+              tipo_personalizacion,
+              work_order_id,
+              verificar_etiqueta,
+              color_personalizacion, codigo_barras, verificar_script, validar_kvc_perso,
+              reviewed: reviewed ?? false,
+            },
+          });
+  
+          formAnswerId = updatedFormAnswer.id;
+  
+          // Eliminar las respuestas anteriores
+          await tx.formAnswerResponse.deleteMany({
+            where: { form_answer_id: formAnswerId },
+          });
+  
+        } else {
+          // Si no existe, crear el FormAnswer
+          const newFormAnswer = await tx.formAnswer.create({
+            data: {
+              user_id,
+              area_id,
+              sample_quantity,
+              tipo_personalizacion,
+              work_order_id,
+              verificar_etiqueta,
+              color_personalizacion, codigo_barras, verificar_script, validar_kvc_perso,
+              reviewed: reviewed ?? false,
+              work_order_flow_id,
+            },
+          });
+  
+          formAnswerId = newFormAnswer.id;
+        }
         // Mapear las respuestas de cada pregunta 
         const respuestas = question_id.map((questionId, index) => ({
           question_id: questionId,
           response_operator: response[index],
-          form_answer_id: formAnswer.id,
+          form_answer_id: formAnswerId,
         }));
         // Crear todas las respuestas 
         await tx.formAnswerResponse.createMany({
@@ -388,14 +657,24 @@ export class FreeWorkOrderService {
   async createImpressResponse(dto: CreateImpressResponseDto) {
     return this.prisma.$transaction(async (tx) => {
       // Crear AreasResponse
-      const response = await tx.areasResponse.create({
-        data: {
+      let response = await tx.areasResponse.findFirst({
+        where: {
           work_order_id: dto.workOrderId,
           work_order_flow_id: dto.workOrderFlowId,
           area_id: dto.areaId,
-          assigned_user: dto.assignedUser,
         },
       });
+      // Crear AreasResponse si no existe
+      if (!response) {
+        response = await tx.areasResponse.create({
+          data: {
+            work_order_id: dto.workOrderId,
+            work_order_flow_id: dto.workOrderFlowId,
+            area_id: dto.areaId,
+            assigned_user: dto.assignedUser,
+          },
+        });
+      }
 
       // Asociar el área response con el work order flow
       await tx.workOrderFlow.update({
@@ -455,19 +734,109 @@ export class FreeWorkOrderService {
       return { message: 'Respuesta guardada con exito'};
     })
   } 
+  
+  // Para guardar respuesta de liberacion de Impresion
+  async createSerigrafiaResponse(dto: CreateImpressResponseDto) {
+    return this.prisma.$transaction(async (tx) => {
+      let response = await tx.areasResponse.findFirst({
+        where: {
+          work_order_id: dto.workOrderId,
+          work_order_flow_id: dto.workOrderFlowId,
+          area_id: dto.areaId,
+        },
+      });
+      // Crear AreasResponse
+      if (!response) {
+        response = await tx.areasResponse.create({
+          data: {
+            work_order_id: dto.workOrderId,
+            work_order_flow_id: dto.workOrderFlowId,
+            area_id: dto.areaId,
+            assigned_user: dto.assignedUser,
+          },
+        });
+      }
+
+      // Asociar el área response con el work order flow
+      await tx.workOrderFlow.update({
+        where: {
+          id: dto.workOrderFlowId,
+        },
+        data: {
+          area_response_id: response.id,
+        },
+      });
+
+      // Crear PrepressResponse
+      await tx.serigrafiaResponse.create({
+        data: {
+          release_quantity: dto.releaseQuantity,
+          comments: dto.comments,
+          form_answer_id: dto.formAnswerId,  // Pasamos el ID de FormAnswer
+          areas_response_id: response.id,
+        },
+      });
+      
+      // Actualizar el estado del WorkOrderFlow a Completado
+      await tx.workOrderFlow.update({
+        where: {
+          id: dto.workOrderFlowId,
+        },
+        data: {
+          status: 'Completado',
+        },
+      });
+
+      // Buscar el siguiente flujo (por id mayor y mismo work_order)
+      const nextFlow = await tx.workOrderFlow.findFirst({
+        where: {
+          work_order_id: dto.workOrderId,
+          id: {
+            gt: dto.workOrderFlowId,
+          },
+          status: 'En espera',
+        },
+        orderBy: {
+          id: 'asc',
+        }, 
+      });
+
+      // Si hay un siguiente flujo, se actualiza a pendiente 
+      if(nextFlow) {
+        await tx.workOrderFlow.update({
+          where: {
+            id: nextFlow.id,
+          },
+          data: {
+            status: 'Pendiente',
+          },
+        });
+      }
+      return { message: 'Respuesta guardada con exito'};
+    })
+  } 
 
   // Para guardar respuesta de liberacion de Preprensa
   async createEmpalmeResponse(dto: CreateEmpalmeResponseDto) {
     return this.prisma.$transaction(async (tx) => {
-      // Crear AreasResponse
-      const response = await tx.areasResponse.create({
-        data: {
+      let response = await tx.areasResponse.findFirst({
+        where: {
           work_order_id: dto.workOrderId,
           work_order_flow_id: dto.workOrderFlowId,
           area_id: dto.areaId,
-          assigned_user: dto.assignedUser,
         },
       });
+      // Crear AreasResponse si no existe
+      if (!response) {
+        response = await tx.areasResponse.create({
+          data: {
+            work_order_id: dto.workOrderId,
+            work_order_flow_id: dto.workOrderFlowId,
+            area_id: dto.areaId,
+            assigned_user: dto.assignedUser,
+          },
+        });
+      }
 
       // Asociar el área response con el work order flow
       await tx.workOrderFlow.update({
@@ -532,14 +901,24 @@ export class FreeWorkOrderService {
   async createLaminacionResponse(dto: CreateLaminacionResponseDto) {
     return this.prisma.$transaction(async (tx) => {
       // Crear AreasResponse
-      const response = await tx.areasResponse.create({
-        data: {
+      let response = await tx.areasResponse.findFirst({
+        where: {
           work_order_id: dto.workOrderId,
           work_order_flow_id: dto.workOrderFlowId,
           area_id: dto.areaId,
-          assigned_user: dto.assignedUser,
         },
       });
+      // Crear AreasResponse si no existe
+      if (!response) {
+        response = await tx.areasResponse.create({
+          data: {
+            work_order_id: dto.workOrderId,
+            work_order_flow_id: dto.workOrderFlowId,
+            area_id: dto.areaId,
+            assigned_user: dto.assignedUser,
+          },
+        });
+      }
 
       // Asociar el área response con el work order flow
       await tx.workOrderFlow.update({
@@ -604,14 +983,24 @@ export class FreeWorkOrderService {
   async createCorteResponse(dto: CreateCorteResponseDto) {
     return this.prisma.$transaction(async (tx) => {
       // Crear AreasResponse
-      const response = await tx.areasResponse.create({
-        data: {
+      let response = await tx.areasResponse.findFirst({
+        where: {
           work_order_id: dto.workOrderId,
           work_order_flow_id: dto.workOrderFlowId,
           area_id: dto.areaId,
-          assigned_user: dto.assignedUser,
         },
       });
+      // Crear AreasResponse si no existe
+      if (!response) {
+        response = await tx.areasResponse.create({
+          data: {
+            work_order_id: dto.workOrderId,
+            work_order_flow_id: dto.workOrderFlowId,
+            area_id: dto.areaId,
+            assigned_user: dto.assignedUser,
+          },
+        });
+      }
 
       // Asociar el área response con el work order flow
       await tx.workOrderFlow.update({
@@ -662,23 +1051,57 @@ export class FreeWorkOrderService {
     
     try {
       return await this.prisma.$transaction(async (tx) => {
-        // Crear el FormAnswerGeneral
-        const formAnswer = await tx.formAnswer.create({
-          data: {
-            user_id,
-            area_id,
-            sample_quantity,
-            color_edge,
-            work_order_id,
-            reviewed: reviewed ?? false,
+        // Buscar si ya existe un FormAnswer con ese work_order_flow_id
+        const existingFormAnswer = await tx.formAnswer.findFirst({
+          where: {
             work_order_flow_id,
           },
         });
+  
+        let formAnswerId: number;
+  
+        if (existingFormAnswer) {
+          // Si existe, actualizar los datos
+          const updatedFormAnswer = await tx.formAnswer.update({
+            where: { id: existingFormAnswer.id },
+            data: {
+              user_id,
+              area_id,
+              sample_quantity,
+              color_edge,
+              work_order_id,
+              reviewed: reviewed ?? false,
+            },
+          });
+  
+          formAnswerId = updatedFormAnswer.id;
+  
+          // Eliminar las respuestas anteriores
+          await tx.formAnswerResponse.deleteMany({
+            where: { form_answer_id: formAnswerId },
+          });
+  
+        } else {
+          // Si no existe, crear el FormAnswer
+          const newFormAnswer = await tx.formAnswer.create({
+            data: {
+              user_id,
+              area_id,
+              sample_quantity,
+              color_edge,
+              work_order_id,
+              reviewed: reviewed ?? false,
+              work_order_flow_id,
+            },
+          });
+  
+          formAnswerId = newFormAnswer.id;
+        }
         // Mapear las respuestas de cada pregunta 
         const respuestas = question_id.map((questionId, index) => ({
           question_id: questionId,
           response_operator: response[index],
-          form_answer_id: formAnswer.id,
+          form_answer_id: formAnswerId,
         }));
         // Crear todas las respuestas 
         await tx.formAnswerResponse.createMany({
@@ -704,14 +1127,24 @@ export class FreeWorkOrderService {
   async createColorEdgeResponse(dto: CreateCorteResponseDto) {
     return this.prisma.$transaction(async (tx) => {
       // Crear AreasResponse
-      const response = await tx.areasResponse.create({
-        data: {
+      let response = await tx.areasResponse.findFirst({
+        where: {
           work_order_id: dto.workOrderId,
           work_order_flow_id: dto.workOrderFlowId,
           area_id: dto.areaId,
-          assigned_user: dto.assignedUser,
         },
       });
+      // Crear AreasResponse si no existe
+      if (!response) {
+        response = await tx.areasResponse.create({
+          data: {
+            work_order_id: dto.workOrderId,
+            work_order_flow_id: dto.workOrderFlowId,
+            area_id: dto.areaId,
+            assigned_user: dto.assignedUser,
+          },
+        });
+      }
 
       // Asociar el área response con el work order flow
       await tx.workOrderFlow.update({
@@ -759,14 +1192,24 @@ export class FreeWorkOrderService {
   async createHotStampingResponse(dto: CreateCorteResponseDto) {
     return this.prisma.$transaction(async (tx) => {
       // Crear AreasResponse
-      const response = await tx.areasResponse.create({
-        data: {
+      let response = await tx.areasResponse.findFirst({
+        where: {
           work_order_id: dto.workOrderId,
           work_order_flow_id: dto.workOrderFlowId,
           area_id: dto.areaId,
-          assigned_user: dto.assignedUser,
         },
       });
+      // Crear AreasResponse si no existe
+      if (!response) {
+        response = await tx.areasResponse.create({
+          data: {
+            work_order_id: dto.workOrderId,
+            work_order_flow_id: dto.workOrderFlowId,
+            area_id: dto.areaId,
+            assigned_user: dto.assignedUser,
+          },
+        });
+      }
 
       // Asociar el área response con el work order flow
       await tx.workOrderFlow.update({
@@ -814,14 +1257,24 @@ export class FreeWorkOrderService {
   async createMillingChipResponse(dto: CreateCorteResponseDto) {
     return this.prisma.$transaction(async (tx) => {
       // Crear AreasResponse
-      const response = await tx.areasResponse.create({
-        data: {
+      let response = await tx.areasResponse.findFirst({
+        where: {
           work_order_id: dto.workOrderId,
           work_order_flow_id: dto.workOrderFlowId,
           area_id: dto.areaId,
-          assigned_user: dto.assignedUser,
         },
       });
+      // Crear AreasResponse si no existe
+      if (!response) {
+        response = await tx.areasResponse.create({
+          data: {
+            work_order_id: dto.workOrderId,
+            work_order_flow_id: dto.workOrderFlowId,
+            area_id: dto.areaId,
+            assigned_user: dto.assignedUser,
+          },
+        });
+      }
 
       // Asociar el área response con el work order flow
       await tx.workOrderFlow.update({
@@ -869,14 +1322,24 @@ export class FreeWorkOrderService {
   async createPersonalizacionResponse(dto: CreateCorteResponseDto) {
     return this.prisma.$transaction(async (tx) => {
       // Crear AreasResponse
-      const response = await tx.areasResponse.create({
-        data: {
+      let response = await tx.areasResponse.findFirst({
+        where: {
           work_order_id: dto.workOrderId,
           work_order_flow_id: dto.workOrderFlowId,
           area_id: dto.areaId,
-          assigned_user: dto.assignedUser,
         },
       });
+      // Crear AreasResponse si no existe
+      if (!response) {
+        response = await tx.areasResponse.create({
+          data: {
+            work_order_id: dto.workOrderId,
+            work_order_flow_id: dto.workOrderFlowId,
+            area_id: dto.areaId,
+            assigned_user: dto.assignedUser,
+          },
+        });
+      }
 
       // Asociar el área response con el work order flow
       await tx.workOrderFlow.update({

@@ -132,7 +132,7 @@ export default function PrePrensaComponent({ workOrder }: Props) {
       {showConfirm && (
         <ModalOverlay>
           <ModalBox>
-            <h4>¿Estás segura/o que deseas liberar este prducto?</h4>
+            <h4>¿Estás segura/o que deseas liberar este producto?</h4>
             <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '1rem', marginTop: '1rem' }}>
               <CancelButton onClick={() => setShowConfirm(false)}>Cancelar</CancelButton>
               <ConfirmButton onClick={handleSubmit}>Confirmar</ConfirmButton>

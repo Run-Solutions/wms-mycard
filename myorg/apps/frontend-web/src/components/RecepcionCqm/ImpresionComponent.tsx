@@ -11,9 +11,8 @@ interface Props {
 export default function ImpresionComponent({ workOrder }: Props) {
   const router = useRouter();
   const [testTypes, SetTestTypes] = useState('');
-
-  // Para bloquear liberacion hasta que sea aprobado por CQM
-  const isDisabled = workOrder.status === 'En proceso';
+  const [showInconformidad, setShowInconformidad] = useState(false);
+  const [inconformidad, setInconformidad] = useState<string>('');
 
   // Para mostrar formulario de CQM y enviarlo
   const [showConfirmModal, setShowConfirmModal] = useState(false);
@@ -28,42 +27,130 @@ export default function ImpresionComponent({ workOrder }: Props) {
         answer: false
       }))
   );
-  const [sampleQuantity, setSampleQuantity] = useState<number | string>('');
 
   // Para controlar qué preguntas están marcadas
+  const [checkedQuestionsFrente, setCheckedQuestionsFrente] = useState<number[]>([]);
+  const [checkedQuestionsVuelta, setCheckedQuestionsVuelta] = useState<number[]>([]);
   const [checkedQuestions, setCheckedQuestions] = useState<number[]>([]);
-  const handleCheckboxChange = (questionId: number, isChecked: boolean) => {
-    setResponses(prevResponses => 
-      prevResponses.map(response =>
-        response.questionId === questionId 
-          ? {...response, answer: isChecked}
-          : response
-      )
-    );
+
+  const handleCheckboxChange = (
+    questionId: number,
+    isChecked: boolean,
+    setCheckedQuestions: React.Dispatch<React.SetStateAction<number[]>>
+  ) => {
+    setResponses((prevResponses) => {
+      const updateResponses = prevResponses.filter(
+        (response) => response.questionId !== questionId
+      );
+      if (isChecked) {
+        updateResponses.push({ questionId, answer: isChecked });
+      }
+      return updateResponses;
+    });
   
-    // Actualizar visualmente el checkbox
-    setCheckedQuestions(prev =>
-      isChecked ? [...prev, questionId] : prev.filter(id => id !== questionId)
+    setCheckedQuestions((prev) =>
+      isChecked ? [...prev, questionId] : prev.filter((id) => id !== questionId)
     );
   };
 
+  // Uso:
+  const handleCheckboxChangeFrente = (questionId: number, isChecked: boolean) => {
+    handleCheckboxChange(questionId, isChecked, setCheckedQuestionsFrente);
+  };
   
+  const handleCheckboxChangeVuelta = (questionId: number, isChecked: boolean) => {
+    handleCheckboxChange(questionId, isChecked, setCheckedQuestionsVuelta);
+  };
+
+  const handleSelectAllFrente = (isChecked: boolean) => {
+    const questionIds = workOrder.area.formQuestions.filter((q: any) => q.role_id === 3).map((q: any) => q.id);
+  
+    if (isChecked) {
+      setCheckedQuestionsFrente(questionIds);
+  
+      setResponses((prevResponses) => {
+        const updatedResponses = prevResponses.filter(
+          (response) => !questionIds.includes(response.questionId)
+        );
+  
+        const newResponses = questionIds.map((id: number) => ({
+          questionId: id,
+          answer: true,
+        }));
+  
+        return [...updatedResponses, ...newResponses];
+      });
+    } else {
+      setCheckedQuestionsFrente([]);
+  
+      setResponses((prevResponses) =>
+        prevResponses.filter((response) => !questionIds.includes(response.questionId))
+      );
+    }
+  };
+
+  const handleSelectAllVuelta = (isChecked: boolean) => {
+    const questionIds = workOrder.area.formQuestions.filter((q: any) => q.role_id === 3).map((q: any) => q.id);;
+  
+    if (isChecked) {
+      setCheckedQuestionsVuelta(questionIds);
+  
+      setResponses((prevResponses) => {
+        const updatedResponses = prevResponses.filter(
+          (response) => !questionIds.includes(response.questionId)
+        );
+  
+        const newResponses = questionIds.map((id: number) => ({
+          questionId: id,
+          answer: true,
+        }));
+  
+        return [...updatedResponses, ...newResponses];
+      });
+    } else {
+      setCheckedQuestionsVuelta([]);
+  
+      setResponses((prevResponses) =>
+        prevResponses.filter((response) => !questionIds.includes(response.questionId))
+      );
+    }
+  };
+
   const handleSubmit = async () => {
-    const formAnswerId = workOrder.answers[0]?.id; // id de FormAnswer
-  
+    const formAnswerId = workOrder.answers[0]?.id;
     if (!formAnswerId) {
       alert("No se encontró el ID del formulario.");
       return;
     }
-  
-    const checkboxPayload = responses.map(({ questionId, answer }) => ({
+
+    // Preguntas con role_id 3
+    const questions = workOrder.area.formQuestions.filter((q: any) => q.role_id === 3);
+
+    // Validación: al menos un check en Frente o Vuelta
+    const isFrenteVueltaValid = questions.some((q: any) => 
+      checkedQuestionsFrente.includes(q.id) || checkedQuestionsVuelta.includes(q.id)
+    );
+
+    if (!questions.length || !isFrenteVueltaValid) {
+      alert('Por favor, completa las preguntas, selecciona al menos un Frente o Vuelta y la cantidad de muestra.');
+      return;
+    }
+
+    // Preparar payload de frente
+    const frentePayload = checkedQuestionsFrente.map((questionId: number) => ({
       question_id: questionId,
-      answer: answer,     
     }));
-  
+
+    // Preparar payload de vuelta
+    const vueltaPayload = checkedQuestionsVuelta.map((questionId: number) => ({
+      question_id: questionId,
+    }));
+
+    // Payload final
     const payload = {
       form_answer_id: formAnswerId,
-      checkboxes: checkboxPayload,
+      frente: frentePayload,
+      vuelta: vueltaPayload,
       radio: {
         value: testTypes,
       },
@@ -78,7 +165,7 @@ export default function ImpresionComponent({ workOrder }: Props) {
   
       console.log("Datos a enviar:", payload);
   
-      const res = await fetch("http://localhost:3000/free-order-cqm/form-extra", {
+      const res = await fetch("http://localhost:3000/free-order-cqm/form-extra-impresion", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -98,6 +185,30 @@ export default function ImpresionComponent({ workOrder }: Props) {
       console.log("Error al guardar la respuesta: ", error);
     }
   };
+
+  const handleSubmitInconformidad = async () => {
+    const token = localStorage.getItem('token');
+    console.log(inconformidad);
+    const formAnswer = workOrder.id;
+    console.log('el form answer', formAnswer);
+    try {
+      const res = await fetch(`http://localhost:3000/work-order-flow/${formAnswer}/inconformidad-cqm`, {
+        method: 'PATCH',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`,
+        },
+        body: JSON.stringify({inconformidad}),
+      });
+      const data = await res.json();
+      if (res.ok) {
+        router.push('/recepcionCqm');
+      }
+    } catch (error) {
+      console.error(error);
+      alert('Error al conectar con el servidor');
+    }
+  }
   
 
   return (
@@ -130,7 +241,8 @@ export default function ImpresionComponent({ workOrder }: Props) {
             <thead>
               <tr>
                 <th>Pregunta</th>
-                <th>Respuesta</th>
+                <th>Hoja Frente</th>
+                <th>Hoja Vuelta</th>
               </tr>
             </thead>
             <tbody>
@@ -138,26 +250,40 @@ export default function ImpresionComponent({ workOrder }: Props) {
               .filter((question: { role_id: number | null }) => question.role_id === null)
               .map((question: { id: number; title: string }) => {
                 // Buscar la respuesta correspondiente a esta pregunta
-                const answer = workOrder.answers[0]?.FormAnswerResponse?.find(
+                const answer = workOrder.answers[0]?.FormAnswerResponse?.filter(
                   (resp: any) => resp.question_id === question.id
                 );
                 
                 // Obtener la respuesta del operador (response_operator)
-                const operatorResponse = answer?.response_operator;
+                const frontAnswer = answer[0]?.response_operator;
+                const vueltaAnswer = answer[1]?.response_operator;
 
                 return (
                   <tr key={question.id}>
                     <td>{question.title}</td>
                     <td>
-                      {typeof operatorResponse === 'boolean' ? (
+                      {typeof frontAnswer === 'boolean' ? (
                         <input 
                           type="checkbox" 
-                          checked={operatorResponse} 
+                          checked={frontAnswer} 
                           disabled 
                         />
                       ) : (
-                        <span>{operatorResponse !== undefined && operatorResponse !== null 
-                          ? operatorResponse.toString() 
+                        <span>{frontAnswer !== undefined && frontAnswer !== null 
+                          ? frontAnswer.toString() 
+                          : ''}</span>
+                      )}
+                    </td>
+                    <td>
+                      {typeof vueltaAnswer === 'boolean' ? (
+                        <input 
+                          type="checkbox" 
+                          checked={vueltaAnswer} 
+                          disabled 
+                        />
+                      ) : (
+                        <span>{vueltaAnswer !== undefined && vueltaAnswer !== null 
+                          ? vueltaAnswer.toString() 
                           : ''}</span>
                       )}
                     </td>
@@ -178,26 +304,45 @@ export default function ImpresionComponent({ workOrder }: Props) {
             <thead>
               <tr>
                 <th>Pregunta</th>
-                <th>Respuesta</th>
+                <th>
+                <div style={{ display: 'flex', alignItems: 'center' }}>
+                  Hoja Frente
+                  <input
+                    type="checkbox"
+                    checked={workOrder.area.formQuestions
+                      .filter((q: any) => q.role_id === 3)
+                      .every((q: any) => checkedQuestionsFrente.includes(q.id))}
+                    onChange={(e) => handleSelectAllFrente(e.target.checked)}
+                    style={{ marginLeft: '8px' }}
+                  />
+                </div>
+              </th>
+              <th>
+                <div style={{ display: 'flex', alignItems: 'center' }}>
+                  Hoja Vuelta
+                  <input
+                    type="checkbox"
+                    checked={workOrder.area.formQuestions
+                      .filter((q: any) => q.role_id === 3)
+                      .every((q: any) => checkedQuestionsVuelta.includes(q.id)
+                    )}
+                    onChange={(e) => handleSelectAllVuelta(e.target.checked)}
+                    style={{ marginLeft: '8px' }}
+                  />
+                </div>
+              </th>
               </tr>
             </thead>
             <tbody>
               {workOrder.area.formQuestions
               .filter((question: { role_id: number | null }) => question.role_id === 3)
-              .map((question: { id: number; title: string }) => {
-                // Buscar la respuesta correspondiente a esta pregunta
-                const answer = workOrder.answers[0]?.FormAnswerResponse?.find(
-                  (resp: any) => resp.question_id === question.id
-                );
-                return (
-                  <tr key={question.id}>
-                    <td>{question.title}</td>
-                    <td>
-                      <input type="checkbox" checked={checkedQuestions.includes(question.id)} onChange={(e) => handleCheckboxChange(question.id, e.target.checked)}/>
-                    </td>
-                  </tr>
-                );
-              })}
+              .map((question: { id: number; title: string }) => (
+                <tr key={question.id}>
+                  <td>{question.title}</td>
+                  <td><input type="checkbox" checked={checkedQuestionsFrente.includes(question.id)} onChange={(e) => handleCheckboxChangeFrente(question.id, e.target.checked)}/></td>
+                  <td><input type="checkbox" checked={checkedQuestionsVuelta.includes(question.id)} onChange={(e) => handleCheckboxChangeVuelta(question.id, e.target.checked)}/></td>
+                </tr>
+              ))}
             </tbody>
           </Table>
           <SectionTitle>Tipo de Prueba</SectionTitle>
@@ -208,7 +353,7 @@ export default function ImpresionComponent({ workOrder }: Props) {
             </RadioLabel>
             <RadioLabel>
               <Radio type="radio" name="prueba" value="perfil" onChange={(e) => SetTestTypes(e.target.value)}/>
-              Muestra física
+              VoBo Perfil
             </RadioLabel>
             <RadioLabel>
               <Radio type="radio" name="prueba" value="fisica" onChange={(e) => SetTestTypes(e.target.value)}/>
@@ -217,14 +362,16 @@ export default function ImpresionComponent({ workOrder }: Props) {
           </RadioGroup>
         </InputGroup>
       </NewData>
-      <RechazarButton>Rechazar</RechazarButton>
+      <div style={{ display: 'flex', gap: '1rem'}}>
+      <RechazarButton onClick={() => setShowInconformidad(true)}>Rechazar</RechazarButton>
       <AceptarButton onClick={() => setShowConfirmModal(true)}>Aprobado</AceptarButton>
+      </div>
       {showConfirmModal && (
         <ModalOverlay>
           <ModalContent>
             <ModalTitle>¿Estás segura de aprobar?</ModalTitle>
             <ModalActions>
-              <Button onClick={() => setShowConfirmModal(false)}>Cancelar</Button>
+              <Button style={{   backgroundColor: '#BBBBBB'}} onClick={() => setShowConfirmModal(false)}>Cancelar</Button>
               <Button onClick={() => {
                 setShowConfirmModal(false);
                 handleSubmit();
@@ -233,6 +380,30 @@ export default function ImpresionComponent({ workOrder }: Props) {
           </ModalContent>
         </ModalOverlay>
       )}
+      {showInconformidad && (
+          <ModalOverlay>
+            <ModalBox>
+              <h4>Registrar Inconformidad</h4>
+              <h3>Por favor, describe la inconformidad detectada con las respuestas entregadas.</h3>
+              <Textarea
+                value={inconformidad}
+                onChange={(e) => setInconformidad(e.target.value)}
+                placeholder="Escribe aquí la inconformidad..."
+              />
+              <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '1rem', marginTop: '1rem' }}>
+                <CancelButton onClick={() => setShowInconformidad(false)}>Cancelar</CancelButton>
+                <ConfirmButton onClick={() => {
+                  if (!inconformidad.trim()) {
+                    alert('Debes ingresar una inconformidad antes de continuar.');
+                    return;
+                  }
+                  handleSubmitInconformidad();
+                  setShowInconformidad(false);
+                }}>Guardar</ConfirmButton>
+              </div>
+            </ModalBox>
+          </ModalOverlay>
+        )}
     </Container>
 
 
@@ -356,59 +527,41 @@ const Textarea = styled.textarea`
 `;
 
 const AceptarButton = styled.button<{ disabled?: boolean }>`
-  margin-top: 2rem;
-  background-color: ${({ disabled }) => disabled ? '#9CA3AF' : '#2563EB'};
+  margin-top: 1.5rem;
+  background-color: #2563EB;
   color: white;
-  padding: 0.75rem 2rem;
+  padding: 0.5rem 1.25rem;
   border-radius: 0.5rem;
   font-weight: 600;
-  transition: background 0.3s;
-  cursor: ${({ disabled }) => disabled ? 'not-allowed' : 'pointer'};
-  opacity: ${({ disabled }) => disabled ? 0.7 : 1};
+  display: flex;
+  border: none;
+  cursor: pointer;
 
+  transition: background-color 0.3s ease, color 0.3s ease;
+  
   &:hover {
-    background-color: ${({ disabled }) => disabled ? '#9CA3AF' : '#1D4ED8'};
-  }
-
-  &:disabled {
-    background-color: #9CA3AF;
-    cursor: not-allowed;
+    background-color: #1D4ED8;
+    outline: none
   }
 `;
+
 
 const RechazarButton = styled.button<{ disabled?: boolean }>`
-  margin-top: 2rem;
-  margin-right: 2rem;
-  background-color: ${({ disabled }) => disabled ? '#9CA3AF' : '#2563EB'};
+  margin-top: 1.5rem;
+  background-color: #BBBBBB;
   color: white;
-  padding: 0.75rem 2rem;
+  padding: 0.5rem 1.25rem;
   border-radius: 0.5rem;
   font-weight: 600;
-  transition: background 0.3s;
-  cursor: ${({ disabled }) => disabled ? 'not-allowed' : 'pointer'};
-  opacity: ${({ disabled }) => disabled ? 0.7 : 1};
+  display: block;
+  border: none;
+  cursor: pointer;
+
+  transition: background-color 0.3s ease, color 0.3s ease;
 
   &:hover {
-    background-color: ${({ disabled }) => disabled ? '#9CA3AF' : '#1D4ED8'};
-  }
-
-  &:disabled {
-    background-color: #9CA3AF;
-    cursor: not-allowed;
-  }
-`;
-
-const CqmButton = styled.button`
-  margin-top: 2rem;
-  background-color: #2563eb;
-  color: white;
-  padding: 0.75rem 2rem;
-  border-radius: 0.5rem;
-  font-weight: 600;
-  transition: background 0.3s;
-
-  &:hover {
-    background-color: #1d4ed8;
+    background-color: #a0a0a0;
+    outline: none
   }
 `;
 
@@ -425,27 +578,6 @@ const Table = styled.table`
   th {
     background-color: #f3f4f6;
     color: #374151;
-  }
-`;
-
-const CloseButton = styled.button`
-  margin-top: 1.5rem;
-  background-color: #BBBBBB;
-  color: white;
-  padding: 0.5rem 1.25rem;
-  border-radius: 0.5rem;
-  font-weight: 600;
-  display: block;
-  margin-left: auto;
-
-  border: none;
-  cursor: pointer;
-
-  transition: background-color 0.3s ease, color 0.3s ease;
-
-  &:hover {
-    background-color: #a0a0a0;
-    outline: none
   }
 `;
 
@@ -491,5 +623,52 @@ const Button = styled.button`
 
   &:hover {
     background-color: #005bb5;
+  }
+`;
+
+const ModalBox = styled.div`
+  background: white;
+  padding: 2rem;
+  border-radius: 1rem;
+  box-shadow: 0 8px 24px rgba(0,0,0,0.2);
+  max-width: 400px;
+  width: 90%;
+`;
+
+const ConfirmButton = styled.button`
+  background-color: #2563eb;
+  color: white;
+  padding: 0.5rem 1.5rem;
+  border-radius: 0.5rem;
+  font-weight: 600;
+
+  border: none;
+  cursor: pointer;
+
+  transition: background-color 0.3s ease, color 0.3s ease;
+
+  &:hover,
+  &:focus {
+    background-color: #1e40af;
+    outline: none;
+  }
+`;
+
+const CancelButton = styled.button`
+  background-color: #BBBBBB;
+  color: white;
+  padding: 0.5rem 1.5rem;
+  border-radius: 0.5rem;
+  font-weight: 600;
+
+  border: none;
+  cursor: pointer;
+
+  transition: background-color 0.3s ease, color 0.3s ease;
+
+  &:hover,
+  &:focus {
+    background-color: #a0a0a0;
+    outline: none;
   }
 `;

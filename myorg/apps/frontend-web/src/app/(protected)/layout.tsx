@@ -28,7 +28,7 @@ export default function ProtectedLayout({ children }: { children: React.ReactNod
             flexGrow: 1,
             padding: '1rem',
             marginTop: headerHeight,
-            marginLeft: '20px',
+            marginLeft: '-20px',
             backgroundColor: theme.palette.background.default,
           }}
         >

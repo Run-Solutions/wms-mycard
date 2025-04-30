@@ -86,7 +86,6 @@ const RecepcionCQMPage: React.FC = () => {
         <Title>Recepcion CQM</Title>
       </TitleWrapper>
       <WorkOrderTable orders={CQMWorkOrders} title="Órdenes en Calidad" statusFilter="En calidad" />
-      <WorkOrderTable orders={CQMWorkOrders} title="Órdenes aprobadas" statusFilter="ExitoCQM" />
     </PageContainer>
   );
 };
@@ -96,7 +95,7 @@ export default RecepcionCQMPage;
 // =================== Styled Components ===================
 
 const PageContainer = styled.div`
-  padding: 1rem 2rem;
+  padding: 20px 20px 20px 50px;
   margin-top: -70px;
   width: 100%;
   align-content: flex-start;

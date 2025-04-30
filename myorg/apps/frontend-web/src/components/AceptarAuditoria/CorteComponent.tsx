@@ -20,21 +20,18 @@ export default function CorteComponentAcceptAuditory({ workOrder }: Props) {
   const router = useRouter();
   const [message, setMessage] = useState('');
   const [showConfirm, setShowConfirm] = useState(false);
+  const [showInconformidad, setShowInconformidad] = useState(false);
+  const [inconformidad, setInconformidad] = useState<string>('');
 
   // Estado para saber si los valores han sido modificados y para habilitar o deshabilitar el botón
   const [isModified, setIsModified] = useState(false);
   const [isDisabled, setIsDisabled] = useState(true);
 
+  const [sampleAuditory, setSampleQuantity] = useState('');
+
   if (workOrder.area_id >= 2) {
     // Estados tipados para los valores predeterminados y actuales
     const [defaultValues, setDefaultValues] = useState<CorteData>({
-      good_quantity: "",
-      bad_quantity: "",
-      excess_quantity: "",
-      comments: "",
-    });
-
-    const [currentValues, setCurrentValues] = useState<CorteData>({
       good_quantity: "",
       bad_quantity: "",
       excess_quantity: "",
@@ -50,46 +47,25 @@ export default function CorteComponentAcceptAuditory({ workOrder }: Props) {
           comments: workOrder.areaResponse.corte.comments || "",
         };
         setDefaultValues(vals);
-        setCurrentValues(vals);
         // El botón se mantiene deshabilitado hasta que haya un cambio
         setIsModified(false);
         setIsDisabled(true);
       }
     }, [workOrder]);
 
-    const handleInputChange = (event: React.ChangeEvent<HTMLInputElement>) => {
-      const { name, value } = event.target;
-      // Cast de name para que TypeScript sepa que es una clave de PrepressData
-      const key = name as keyof CorteData;
-
-      // Actualizamos el estado de currentValues
-      const newValues = { ...currentValues, [key]: value };
-      setCurrentValues(newValues);
-
-      // Comparamos los valores actuales con los predeterminados
-      if (
-        newValues.good_quantity === defaultValues.good_quantity &&
-        newValues.bad_quantity === defaultValues.bad_quantity &&
-        newValues.excess_quantity === defaultValues.excess_quantity &&
-        newValues.comments === defaultValues.comments
-      ) {
-        setIsModified(false);
-        setIsDisabled(true);
-      } else {
-        setIsModified(true);
-        setIsDisabled(false);
-      }
-    };
-
     const handleSubmit = async (e: React.FormEvent) => {
       e.preventDefault();
-      if (!currentValues.good_quantity) {
-        alert('Por favor, asegurate de que no haya inconformidades con las cantidades entregadas.');
+      if (!sampleAuditory) {
+        alert('Por favor, asegurate de ingresar muestras.');
         return;
       }
       const token = localStorage.getItem('token');
       const CorteId = workOrder.areaResponse.corte.id;
+      const payload = {
+        sample_auditory: Number(sampleAuditory),
+      };
       console.log(CorteId);
+      console.log(payload);
       try {
         const res = await fetch(`http://localhost:3000/work-order-flow-auditory/${CorteId}`, {
           method: 'POST',
@@ -97,6 +73,30 @@ export default function CorteComponentAcceptAuditory({ workOrder }: Props) {
             'Content-Type': 'application/json',
             'Authorization': `Bearer ${token}`,
           },
+          body: JSON.stringify(payload),
+        });
+        const data = await res.json();
+        if (res.ok) {
+          router.push('/aceptarAuditoria');
+        }
+      } catch (error) {
+        console.error(error);
+        alert('Error al conectar con el servidor');
+      }
+    }
+
+    const handleSubmitInconformidad = async () => {
+      const token = localStorage.getItem('token');
+      console.log(workOrder.id);
+      console.log(inconformidad);
+      try {
+        const res = await fetch(`http://localhost:3000/work-order-flow/${workOrder.id}/inconformidad`, {
+          method: 'PATCH',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${token}`,
+          },
+          body: JSON.stringify({inconformidad}),
         });
         const data = await res.json();
         if (res.ok) {
@@ -130,18 +130,20 @@ export default function CorteComponentAcceptAuditory({ workOrder }: Props) {
           <NewDataWrapper>
             <InputGroup>
               <Label>Buenas:</Label>
-              <Input type="number" name="good_quantity" value={currentValues.good_quantity} onChange={handleInputChange}/>
+              <Input type="number" name="good_quantity" value={defaultValues.good_quantity} disabled/>
               <Label>Malas:</Label>
-              <Input type="number" name="bad_quantity" value={currentValues.bad_quantity} onChange={handleInputChange}/>
+              <Input type="number" name="bad_quantity" value={defaultValues.bad_quantity} disabled/>
               <Label>Exceso:</Label>
-              <Input type="number" name="excess_quantity" value={currentValues.excess_quantity} onChange={handleInputChange}/>
+              <Input type="number" name="excess_quantity" value={defaultValues.excess_quantity} disabled/>
+              <Label>Muestras:</Label>
+              <Input type="number" value={sampleAuditory} onChange={(e) => setSampleQuantity(e.target.value)}/>
             </InputGroup>
-            <CqmButton disabled={!isModified}>Inconformidad</CqmButton>
+            <InconformidadButton onClick={() => setShowInconformidad(true)}>Inconformidad</InconformidadButton>
           </NewDataWrapper>
           <InputGroup>
             <SectionTitle>Comentarios</SectionTitle>
             <Textarea
-              value={currentValues.comments}
+              value={defaultValues.comments}
               disabled={isDisabled}
             />
           </InputGroup>
@@ -155,6 +157,31 @@ export default function CorteComponentAcceptAuditory({ workOrder }: Props) {
               <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '1rem', marginTop: '1rem' }}>
                 <CancelButton onClick={() => setShowConfirm(false)}>Cancelar</CancelButton>
                 <ConfirmButton onClick={handleSubmit}>Confirmar</ConfirmButton>
+              </div>
+            </ModalBox>
+          </ModalOverlay>
+        )}
+        {showInconformidad && (
+          <ModalOverlay>
+            <ModalBox>
+              <h4>Registrar Inconformidad</h4>
+              <h3>Por favor, describe la inconformidad detectada con la cantidad entregada.</h3>
+              <Textarea
+                value={inconformidad}
+                onChange={(e) => setInconformidad(e.target.value)}
+                placeholder="Escribe aquí la inconformidad..."
+              />
+              <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '1rem', marginTop: '1rem' }}>
+                <CancelButton onClick={() => setShowInconformidad(false)}>Cancelar</CancelButton>
+                <ConfirmButton onClick={() => {
+                  console.log('Hpli');
+                  if (!inconformidad.trim()) {
+                    alert('Debes ingresar una inconformidad antes de continuar.');
+                    return;
+                  }
+                  handleSubmitInconformidad();
+                  setShowInconformidad(false);
+                }}>Guardar</ConfirmButton>
               </div>
             </ModalBox>
           </ModalOverlay>
@@ -224,6 +251,7 @@ const Value = styled.div`
 const NewDataWrapper = styled.div`
   display: flex;
   gap: 8rem;
+  align-items: center;
   flex-wrap: wrap;
 `;
 
@@ -282,7 +310,7 @@ const AceptarButton = styled.button<{ disabled?: boolean }>`
   }
 `;
 
-const CqmButton = styled.button<{ disabled?: boolean }>`
+const InconformidadButton = styled.button<{ disabled?: boolean }>`
   height: 50px;
   background-color: ${({ disabled }) => (disabled ? "#D1D5DB" : "#2563EB")};
   color: white;
@@ -290,7 +318,7 @@ const CqmButton = styled.button<{ disabled?: boolean }>`
   border-radius: 0.5rem;
   font-weight: 600;
   transition: background 0.3s;
-  align-self: flex-end;
+  align-self: flex-center;
   cursor: ${({ disabled }) => (disabled ? "not-allowed" : "pointer")};
   opacity: ${({ disabled }) => (disabled ? 0.7 : 1)};
 
@@ -298,24 +326,6 @@ const CqmButton = styled.button<{ disabled?: boolean }>`
     background-color: ${({ disabled }) =>
       disabled ? "#D1D5DB" : "#1D4ED8"};
   }
-`;
-
-const RadioGroup = styled.div`
-  display: flex;
-  gap: 2rem;
-  margin-top: 0.5rem;
-`;
-
-const RadioLabel = styled.label`
-  display: flex;
-  align-items: center;
-  gap: 0.5rem;
-  font-weight: 500;
-  color: #374151;
-`;
-
-const Radio = styled.input`
-  accent-color: #2563eb;
 `;
 
 const ModalOverlay = styled.div`

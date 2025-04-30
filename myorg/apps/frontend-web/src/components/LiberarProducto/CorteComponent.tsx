@@ -19,11 +19,9 @@ export default function CorteComponent({ workOrder }: Props) {
 
   // Para mostrar formulario de CQM y enviarlo
   const [showModal, setShowModal] = useState(false);
-
   const openModal = () => {
     setShowModal(true);
   };
-
   const closeModal = () => {
     setShowModal(false);
   };
@@ -58,6 +56,43 @@ export default function CorteComponent({ workOrder }: Props) {
     );
   };
 
+  // Para ver las preguntas de calidad
+  const [qualitySectionOpen, setQualitySectionOpen] = useState(false);
+  const toggleQualitySection = () => {
+    setQualitySectionOpen(!qualitySectionOpen);
+  };
+
+  const handleSelectAll = (isChecked: boolean) => {
+    const questionIds = workOrder.area.formQuestions.filter((question: { role_id: number | null }) => question.role_id === null).map((q: { id: number }) => q.id);
+  
+    if (isChecked) {
+      // Marcar todas las preguntas
+      setCheckedQuestions(questionIds);
+  
+      setResponses((prevResponses) => {
+        // Filtrar respuestas viejas de esas preguntas
+        const updatedResponses = prevResponses.filter(
+          (response) => !questionIds.includes(response.questionId)
+        );
+  
+        // Agregar todas como true
+        const newResponses = questionIds.map((id: number) => ({
+          questionId: id,
+          answer: true,
+        }));
+  
+        return [...updatedResponses, ...newResponses];
+      });
+    } else {
+      // Desmarcar todas
+      setCheckedQuestions([]);
+  
+      setResponses((prevResponses) =>
+        prevResponses.filter((response) => !questionIds.includes(response.questionId))
+      );
+    }
+  };
+
   // Para mandar la OT a evaluacion por CQM
   const handleSubmit = async () => {
     const payload = {
@@ -78,7 +113,7 @@ export default function CorteComponent({ workOrder }: Props) {
         return;
       }
       console.log('Datos a enviar', payload);
-      const res = await fetch('http://localhost:3000/free-order-flow/cqm-impression', {
+      const res = await fetch('http://localhost:3000/free-order-flow/cqm-corte', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -142,8 +177,7 @@ export default function CorteComponent({ workOrder }: Props) {
       console.log('Error al enviar datos:', error);
     }
   };
-  
-  ;
+
 
   return (
     <>
@@ -175,7 +209,7 @@ export default function CorteComponent({ workOrder }: Props) {
             <Label>Excedente:</Label>
             <Input type="number" placeholder="Ej: 2" value={excessQuantity} onChange={(e) => setExcessQuantity(e.target.value)} disabled={isDisabled} />
           </InputGroup>
-          <CqmButton onClick={openModal} disabled={workOrder.status === 'Listo'}>Enviar a CQM</CqmButton>
+          <CqmButton style={{ alignSelf: 'center' }} onClick={openModal} disabled={workOrder.status === 'Listo'}>Enviar a CQM</CqmButton>
         </NewDataWrapper>
         <InputGroup>
           <SectionTitle>Comentarios</SectionTitle>
@@ -189,7 +223,7 @@ export default function CorteComponent({ workOrder }: Props) {
     {showConfirm && (
         <ModalOverlay>
           <ModalBox>
-            <h4>¿Estás segura/o que deseas liberar este prducto?</h4>
+            <h4>¿Estás segura/o que deseas liberar este producto?</h4>
             <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '1rem', marginTop: '1rem' }}>
               <CancelButton onClick={() => setShowConfirm(false)}>Cancelar</CancelButton>
               <ConfirmButton onClick={handleImpressSubmit}>Confirmar</ConfirmButton>
@@ -207,7 +241,19 @@ export default function CorteComponent({ workOrder }: Props) {
             <thead>
               <tr>
                 <th>Pregunta</th>
-                <th>Respuesta</th>
+                <th style={{ display: 'flex'}}>
+                  Respuesta
+                  <input
+                    type="checkbox"
+                    checked={
+                      workOrder.area.formQuestions
+                        .filter((q: { role_id: number | null }) => q.role_id === null)
+                        .every((q: { id: number }) => checkedQuestions.includes(q.id))
+                    }
+                    onChange={(e) => handleSelectAll(e.target.checked)}
+                    style={{ marginLeft: "8px" }}
+                  />
+                </th>
               </tr>
             </thead>
             <tbody>
@@ -225,8 +271,38 @@ export default function CorteComponent({ workOrder }: Props) {
             <Label>Muestras:</Label>
             <Input type="number" placeholder="Ej: 2" value={sampleQuantity} onChange={handleSampleQuantityChange}/>
           </InputGroup>
-          <CloseButton onClick={closeModal}>Cerrar</CloseButton>
-          <SubmitButton onClick={handleSubmit}>Enviar Respuestas</SubmitButton>
+          <ModalTitle style={{ marginTop: '1.5rem', marginBottom: '0.3rem'}}>
+            Preguntas de Calidad
+            <button onClick={toggleQualitySection} style={{ marginLeft: '10px',cursor: "pointer", border: "none", background: "transparent", fontSize: "1.2rem" }}>{qualitySectionOpen ? '▼' : '▶'}</button>
+          </ModalTitle>
+          {qualitySectionOpen && (
+          <>
+          <Table>
+            <thead>
+              <tr>
+                <th>Pregunta</th>
+                <th>
+                  Respuesta
+                </th>
+              </tr>
+            </thead>
+            <tbody>
+              {workOrder.area.formQuestions
+              .filter((question: { role_id: number | null }) => question.role_id === 3)
+              .map((question: { id: number; title: string }) => (
+                <tr key={question.id}>
+                  <td>{question.title}</td>
+                  <td></td>
+                </tr>
+              ))}
+            </tbody>
+          </Table>
+          </>
+          )}
+          <div style={{ display: 'flex', gap: '1rem'}}>
+            <CloseButton onClick={closeModal}>Cerrar</CloseButton>
+            <SubmitButton onClick={handleSubmit}>Enviar Respuestas</SubmitButton>
+          </div>
         </ModalContent>
       </ModalOverlay>
     )}
@@ -313,24 +389,6 @@ const Input = styled.input`
   }
 `;
 
-const RadioGroup = styled.div`
-  display: flex;
-  gap: 2rem;
-  margin-top: 0.5rem;
-`;
-
-const RadioLabel = styled.label`
-  display: flex;
-  align-items: center;
-  gap: 0.5rem;
-  font-weight: 500;
-  color: #374151;
-`;
-
-const Radio = styled.input`
-  accent-color: #2563eb;
-`;
-
 const Textarea = styled.textarea`
   width: 100%;
   color: black;
@@ -373,14 +431,18 @@ const CqmButton = styled.button`
   margin-top: 2rem;
   background-color: ${({ disabled }) => (disabled ? 'green' : '#2563eb')};
   color: white;
-  padding: 0.1rem 1rem;
-  height: 50px;
+  padding: 0.75rem 2rem;
   border-radius: 0.5rem;
   font-weight: 600;
   transition: background 0.3s;
+  cursor: ${({ disabled }) => (disabled ? 'not-allowed' : 'pointer')};
 
   &:hover {
-    background-color: #1d4ed8;
+    ${({ disabled }) =>
+      !disabled &&
+      `
+        background-color: #1d4ed8;
+      `}
   }
 `;
 
@@ -396,13 +458,17 @@ const ModalOverlay = styled.div`
   align-items: center;
   justify-content: center;
   z-index: 999;
+  overflow-y: auto;
 `;
 
 const ModalContent = styled.div`
   background: white;
   padding: 2rem;
   border-radius: 1rem;
-  max-width: 600px;
+  justify-content: center;
+  max-width: 700px;
+  max-height: 80%;
+  overflow-y: auto;
   width: 90%;
   box-shadow: 0 10px 25px rgba(0,0,0,0.2);
 `;
@@ -454,15 +520,22 @@ const CloseButton = styled.button`
 
 const SubmitButton = styled.button`
   margin-top: 1.5rem;
-  background-color: #4CAF50;
+  background-color: #2563eb;
   color: white;
   padding: 0.75rem 2rem;
   border-radius: 0.5rem;
   font-weight: 600;
-  transition: background 0.3s;
+  display: block;
+
+  border: none;
+  cursor: pointer;
+
+  transition: background-color 0.3s ease, color 0.3s ease;
   
-  &:hover {
-    background-color: #45a049;
+  &:hover,
+  &:focus {
+    background-color: #1e40af;
+    outline: none;
   }
 `;
 

@@ -20,6 +20,8 @@ interface WorkOrder {
     ot_id: string;
     mycard_id: string;
     quantity: number;
+    priority: boolean;
+    comments: string;
     created_by: number;  
     validated: boolean;
     createdAt: string;
@@ -138,9 +140,20 @@ const AcceptAuditoryPage: React.FC = () => {
         
         const data = await res.json();
         console.log('Datos obtenidos: ', data);
-        setWorkOrders(data);
-
-        
+        // Ordenar las OTs: primero las marcadas como prioridad, luego por fecha
+        if (data && Array.isArray(data)){
+          const sortedOrders = data.sort((a: WorkOrder, b: WorkOrder) => {
+            // Si a es prioritario y b no, a va primero
+            if (a.workOrder.priority && !b.workOrder.priority) return -1;
+            // Si b es prioritario y a no, b va primero
+            if (!a.workOrder.priority && b.workOrder.priority) return 1;
+            // Si ambos tienen la misma prioridad, ordenar por fecha (más reciente primero)
+            return new Date(a.workOrder.createdAt).getTime() - new Date(b.workOrder.createdAt).getTime();
+          });
+          setWorkOrders(sortedOrders);
+        } else {
+          setWorkOrders([]);
+        }
       } catch (err) {
         console.error(err);
         console.error('Error en fetchWorkOrders:', err);
@@ -159,7 +172,8 @@ const AcceptAuditoryPage: React.FC = () => {
               <p><strong>Id del Presupuesto:</strong> {selectedOrder.workOrder.mycard_id}</p>
               <p><strong>Cantidad:</strong> {selectedOrder.workOrder.quantity}</p>
               <p><strong>Creado por:</strong> {selectedOrder.workOrder.user?.username}</p>
-              <p><strong>Validado:</strong> {selectedOrder.workOrder.validated ? 'Sí' : 'No'}</p>
+              <p><strong>Prioritario:</strong> {selectedOrder.workOrder.priority ? 'Sí' : 'No'}</p>
+              <p><strong>Comentarios:</strong> {selectedOrder.workOrder.comments}</p>
               <p><strong>Archivos:</strong></p>
               <div style={{ display: 'flex', flexDirection: 'row',}}>
                 {selectedOrder.workOrder.files.map((file) => (
@@ -208,7 +222,7 @@ const AcceptAuditoryPage: React.FC = () => {
                 console.log('Ha clickeado');
                 handleCardClick(order);
                 }}>
-                <CardTitle>{workOrder.ot_id}</CardTitle>
+                <CardTitle>{workOrder.priority && <PriorityBadge />}{workOrder.ot_id}</CardTitle>
                 <InfoItem>
                   <p>{workOrder.mycard_id}</p>
                   <p>Cantidad: {workOrder.quantity}</p>
@@ -329,7 +343,7 @@ const ModalContent = styled.div`
   color: black;
   padding: 2rem;
   border-radius: 1rem;
-  max-width: 500px;
+  max-width: 600px;
   width: 90%;
   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.25);
 
@@ -422,5 +436,31 @@ const Line = styled.div`
 const AreaName = styled.span`
   font-size: 1rem;
   font-weight: 500;
+`;
+
+const PriorityBadge = styled.span`
+  display: inline-block;
+  width: 14px;
+  height: 14px;
+  background-color: #FFD700;
+  border-radius: 50%;
+  margin-left: 8px;
+  box-shadow: 0 0 4px rgba(255, 215, 0, 0.7);
+  position: relative;
+  top: -4px;
+  margin-right: 5px;
+  
+  /* Efecto de brillo opcional */
+  &:after {
+    content: '';
+    position: absolute;
+    top: 2px;
+    left: 2px;
+    width: 4px;
+    height: 4px;
+    background-color: white;
+    border-radius: 50%;
+    opacity: 0.8;
+  }
 `;
 

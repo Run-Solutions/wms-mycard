@@ -5,159 +5,174 @@ import { use, useState, useEffect } from "react";
 import styled from "styled-components";
 
 interface Props {
-    params: Promise<{ id: string }>;
+  params: Promise<{ id: string }>;
 }
 
 type AreaData = {
-    name: string;
-    status: string;
-    response: string;
-    answers: any;
-    buenas: number;
-    malas: number;
-    excedente: number;
-    muestras: number;
+  name: string;
+  status: string;
+  response: string;
+  answers: any;
+  buenas: number;
+  malas: number;
+  cqm: number;
+  excedente: number;
+  muestras: number;
 };
 
 export default function SeguimientoDeOtsAuxPage({ params }: Props) {
-    const { id } = use(params);
-    const [workOrder, setWorkOrder] = useState<any>(null)
+  const { id } = use(params);
+  const [workOrder, setWorkOrder] = useState<any>(null);
 
-    useEffect(() => {
-        async function fetchWorkOrder() {
-          const token = localStorage.getItem('token');
-          const res = await fetch(`http://localhost:3000/work-orders/${id}`, {
-            headers: {
-              'Authorization': `Bearer ${token}`,
-            },
-          })
-          const data = await res.json()
-          console.log('Orden:', data)
-          setWorkOrder(data)
-        }
-        fetchWorkOrder()
-    }, [id])
+  useEffect(() => {
+    async function fetchWorkOrder() {
+      const token = localStorage.getItem('token');
+      const res = await fetch(`http://localhost:3000/work-orders/${id}`, {
+        headers: {
+          'Authorization': `Bearer ${token}`,
+        },
+      });
+      const data = await res.json()
+      console.log('Orden:', data)
+      setWorkOrder(data)
+    }
+    fetchWorkOrder()
+  }, [id]);
 
-    // Función para obtener los datos específicos de cada área
-    const getAreaData = (areaId: number, areaResponse: any) => {
-        switch(areaId) {
-            case 1: // preprensa
-                return {
-                    buenas: areaResponse?.prepress?.plates || 0,
-                    malas: areaResponse?.prepress?.bad_quantity || '',
-                    excedente: areaResponse?.prepress?.excess_quantity || '',
-                    muestras: areaResponse?.prepress?.sample_quantity || ''
-                };
-            case 2: // impresión
-                return {
-                    buenas: areaResponse?.impression?.release_quantity || 0,
-                    malas: areaResponse?.impression?.bad_quantity || '',
-                    excedente: areaResponse?.impression?.excess_quantity || '',
-                    muestras: areaResponse?.impression?.form_answer?.sample_quantity ?? ''
-                };
-            case 3: // serigrafía
-                return {
-                    buenas: areaResponse?.impression?.release_quantity || 0,
-                    malas: areaResponse?.impression?.bad_quantity || '',
-                    excedente: areaResponse?.impression?.excess_quantity || '',
-                    muestras: areaResponse?.impression?.form_answer?.sample_quantity ?? ''
-                };
-            case 4: // empalme
-                return {
-                    buenas: areaResponse?.empalme?.release_quantity || '',
-                    malas: areaResponse?.empalme?.bad_quantity || '',
-                    excedente: areaResponse?.empalme?.excess_quantity || '',
-                    muestras: areaResponse?.empalme?.form_answer?.sample_quantity ?? ''
-                };
-            case 5: // empalme
-                return {
-                    buenas: areaResponse?.laminacion?.release_quantity || 0,
-                    malas: areaResponse?.laminacion?.bad_quantity || '',
-                    excedente: areaResponse?.laminacion?.excess_quantity || '',
-                    muestras: areaResponse?.laminacion?.form_answer?.sample_quantity ?? ''
-                };
-            case 6: // empalme
-                return {
-                    buenas: areaResponse?.corte?.good_quantity || 0,
-                    malas: areaResponse?.corte?.bad_quantity || 0,
-                    excedente: areaResponse?.corte?.excess_quantity || 0,
-                    muestras: areaResponse?.corte?.form_answer?.sample_quantity ?? ''
-                };
-            case 7: // empalme
-                return {
-                    buenas: areaResponse?.colorEdge?.good_quantity || 0,
-                    malas: areaResponse?.colorEdge?.bad_quantity || 0,
-                    excedente: areaResponse?.colorEdge?.excess_quantity || 0,
-                    muestras: areaResponse?.colorEdge?.form_answer?.sample_quantity ?? ''
-                };
-            case 8: // empalme
-                return {
-                    buenas: areaResponse?.hotStamping?.good_quantity || 0,
-                    malas: areaResponse?.hotStamping?.bad_quantity || 0,
-                    excedente: areaResponse?.hotStamping?.excess_quantity || 0,
-                    muestras: areaResponse?.hotStamping?.form_answer?.sample_quantity ?? ''
-                };
-            case 9: // empalme
-                return {
-                    buenas: areaResponse?.millingChip?.good_quantity || 0,
-                    malas: areaResponse?.millingChip?.bad_quantity || 0,
-                    excedente: areaResponse?.millingChip?.excess_quantity || 0,
-                    muestras: areaResponse?.millingChip?.form_answer?.sample_quantity ?? ''
-                };
-            case 10: // empalme
-                return {
-                    buenas: areaResponse?.personalizacion?.good_quantity || 0,
-                    malas: areaResponse?.personalizacion?.bad_quantity || 0,
-                    excedente: areaResponse?.personalizacion?.excess_quantity || 0,
-                    muestras: areaResponse?.personalizacion?.form_answer?.sample_quantity ?? ''
-                };
-            // Añade más casos según tus áreas
-            default:
-                return {
-                    buenas: 0,
-                    malas: 0,
-                    excedente: 0,
-                    muestras: 0
-                };
-        }
-    };
-
-    // Para obtener todas las areas del flujo
-    const areas: AreaData[] = workOrder?.flow?.map((item: any) => {
-        const areaData = getAreaData(item.area_id, item.areaResponse);
+  // Función para obtener los datos específicos de cada área
+  const getAreaData = (areaId: number, areaResponse: any) => {
+    switch(areaId) {
+      case 1: // preprensa
         return {
-            id: item.area_id,
-            name: item.area?.name || 'Sin nombre',
-            status: item.status || 'Desconocido',
-            response: item.areaResponse || {},
-            answers: item.answers?.[0] || {},
-            ...areaData
+          buenas: areaResponse?.prepress?.plates || 0,
+          malas: areaResponse?.prepress?.bad_quantity || '',
+          excedente: areaResponse?.prepress?.excess_quantity || '',
+          cqm: '',
+          muestras: '',
         };
-    }) || [];
+      case 2: // impresión
+        return {
+          buenas: areaResponse?.impression?.release_quantity || 0,
+          malas: areaResponse?.impression?.bad_quantity || '',
+          excedente: areaResponse?.impression?.excess_quantity || '',
+          cqm: areaResponse?.impression?.form_answer?.sample_quantity ?? '',
+          muestras: '',
+        };
+      case 3: // serigrafía
+        return {
+          buenas: areaResponse?.serigrafia?.release_quantity || 0,
+          malas: areaResponse?.serigrafia?.bad_quantity || '',
+          excedente: areaResponse?.serigrafia?.excess_quantity || '',
+          cqm: areaResponse?.serigrafia?.form_answer?.sample_quantity ?? '',
+          muestras: '',
+        };
+      case 4: // empalme
+        return {
+          buenas: areaResponse?.empalme?.release_quantity || '',
+          malas: areaResponse?.empalme?.bad_quantity || '',
+          excedente: areaResponse?.empalme?.excess_quantity || '',
+          cqm: areaResponse?.empalme?.form_answer?.sample_quantity ?? '',
+          muestras: '',
+        };
+      case 5: // empalme
+        return {
+          buenas: areaResponse?.laminacion?.release_quantity || 0,
+          malas: areaResponse?.laminacion?.bad_quantity || '',
+          excedente: areaResponse?.laminacion?.excess_quantity || '',
+          cqm: areaResponse?.laminacion?.form_answer?.sample_quantity ?? '',
+          muestras: '',
+        };
+        case 6: // corte
+        return {
+          buenas: areaResponse?.corte?.good_quantity || 0,
+          malas: areaResponse?.corte?.bad_quantity || 0,
+          excedente: areaResponse?.corte?.excess_quantity || 0,
+          cqm: areaResponse?.corte?.form_answer?.sample_quantity ?? 0,
+          muestras: areaResponse?.corte?.formAuditory?.sample_auditory ?? ''
+        };
+      case 7: // color-edge
+        return {
+          buenas: areaResponse?.colorEdge?.good_quantity || 0,
+          malas: areaResponse?.colorEdge?.bad_quantity || 0,
+          excedente: areaResponse?.colorEdge?.excess_quantity || 0,
+          cqm: areaResponse?.colorEdge?.form_answer?.sample_quantity || 0,
+          muestras: areaResponse?.colorEdge?.formAuditory?.sample_auditory ?? ''
+        };
+      case 8: // hot-stamping
+        return {
+          buenas: areaResponse?.hotStamping?.good_quantity || 0,
+          malas: areaResponse?.hotStamping?.bad_quantity || 0,
+          excedente: areaResponse?.hotStamping?.excess_quantity || 0,
+          cqm: areaResponse?.hotStamping?.form_answer?.sample_quantity || 0,
+          muestras: areaResponse?.hotStamping?.formAuditory?.sample_auditory ?? ''
+        };
+      case 9: // milling-chip
+        return {
+          buenas: areaResponse?.millingChip?.good_quantity || 0,
+          malas: areaResponse?.millingChip?.bad_quantity || 0,
+          excedente: areaResponse?.millingChip?.excess_quantity || 0,
+          cqm: areaResponse?.millingChip?.form_answer?.sample_quantity || 0,
+          muestras: areaResponse?.millingChip?.formAuditory?.sample_auditory ?? ''
+        };
+      case 10: // personalizacion
+        return {
+          buenas: areaResponse?.personalizacion?.good_quantity || 0,
+          malas: areaResponse?.personalizacion?.bad_quantity || 0,
+          excedente: areaResponse?.personalizacion?.excess_quantity || 0,
+          cqm: areaResponse?.personalizacion?.form_answer?.sample_quantity || 0,
+          muestras: areaResponse?.personalizacion?.formAuditory?.sample_auditory ?? ''
+        };
+      default:
+        return {
+          buenas: 0,
+          malas: 0,
+          excedente: 0,
+          muestras: 0,
+          cqm: 0
+        };
+    }
+  };
 
-    return (
-        <>
-        <Container>
+  // Para obtener todas las areas del flujo
+  const areas: AreaData[] = workOrder?.flow?.map((item: any) => {
+    const areaData = getAreaData(item.area_id, item.areaResponse);
+      return {
+        id: item.area_id,
+        name: item.area?.name || 'Sin nombre',
+        status: item.status || 'Desconocido',
+        response: item.areaResponse || {},
+        answers: item.answers?.[0] || {},
+        ...areaData
+      };
+  }) || [];
+
+  return (
+    <>
+      <Container>
         <Title>Información Complementaria Orden de Trabajo</Title>
 
         <DataWrapper>
           <InfoItem>
-            <Label>Número de Orden:</Label>
+            <Label>Número de Orden: </Label>
             <Value>{workOrder?.ot_id}</Value>
           </InfoItem>
           <InfoItem>
-            <Label>ID del Presupuesto:</Label>
+            <Label>ID del Presupuesto: </Label>
             <Value>{workOrder?.mycard_id}</Value>
           </InfoItem>
           <InfoItem>
-            <Label>Cantidad:</Label>
+            <Label>Cantidad: </Label>
             <Value>{workOrder?.quantity}</Value>
           </InfoItem>
         </DataWrapper>
+          <InfoItem>
+            <Label>Comentarios: </Label>
+            <Value>{workOrder?.comments}</Value>
+          </InfoItem>
 
-        <NewData>
+        <Section>
           <SectionTitle>Datos de Producción</SectionTitle>
-          <NewDataWrapper>
+          <TableWrapper>
             <Table>
               <thead>
                 <tr>
@@ -197,9 +212,7 @@ export default function SeguimientoDeOtsAuxPage({ params }: Props) {
                   <td>CQM</td>
                   {areas.map((area, index) => (
                     <td key={index}>
-                      {area.answers.reviewed 
-                        ? area.answers.accepted ? 'Aprobado' : 'No aceptado' 
-                        : 'No aplica'}
+                      {area.cqm}
                     </td>
                   ))}
                 </tr>
@@ -222,22 +235,23 @@ export default function SeguimientoDeOtsAuxPage({ params }: Props) {
                 </tr>
               </tbody>
             </Table>
-          </NewDataWrapper>
-        </NewData>
+          </TableWrapper>
+        </Section>
       </Container>
     </>
-    );
-
+  );
 };
 
 // =================== Styled Components ===================
 
 const Container = styled.div`
-  padding: 20px;
+  padding: 20px 20px 20px 50px;
 `;
 
 const Title = styled.h2`
-  margin-bottom: 20px;
+  margin-bottom: 1.5rem;
+  font-size: 2rem;
+  color: ${({ theme }) => theme.palette.text.primary}
 `;
 
 const DataWrapper = styled.div`
@@ -247,99 +261,60 @@ const DataWrapper = styled.div`
 `;
 
 const InfoItem = styled.div`
-  display: flex;
-  flex-direction: column;
+  background: white;
+  padding: 1.25rem 1.5rem;
+  border-radius: 0.75rem;
+  box-shadow: 0 3px 6px rgba(0,0,0,0.08);
+  flex: 1;
 `;
 
 const Label = styled.span`
-  font-weight: bold;
+  font-weight: 600;
+  color: ${({ theme }) => theme.palette.text.primary}
+  margin-bottom: 0.25rem;
 `;
 
 const Value = styled.span`
+  font-size: 1.125rem;  
   margin-top: 5px;
 `;
 
-const NewData = styled.div`
+const Section = styled.div`
   margin-top: 30px;
 `;
 
 const SectionTitle = styled.h3`
-  margin-bottom: 15px;
+  font-size: 1.5rem;
+  margin-bottom: 1rem;
+  color: ${({ theme }) => theme.palette.text.primary}
 `;
 
-const NewDataWrapper = styled.div`
+const TableWrapper = styled.div`
   overflow-x: auto;
+  margin-bottom: 2rem;
 `;
 
 const Table = styled.table`
   width: 100%;
   border-collapse: collapse;
-  
-  th, td {
-    border: 1px solid #ddd;
-    padding: 8px;
-    text-align: center;
-  }
-  
-  th {
-    background-color: #f2f2f2;
-  }
-  
-  tr:nth-child(even) {
-    background-color: #f9f9f9;
-  }
-`;
-
-const LiberarButton = styled.button`
-  margin-top: 20px;
-  padding: 10px 20px;
-  background-color: #4CAF50;
-  color: white;
-  border: none;
-  border-radius: 4px;
-  cursor: pointer;
-  
-  &:disabled {
-    background-color: #cccccc;
-    cursor: not-allowed;
-  }
-`;
-
-const ModalOverlay = styled.div`
-  position: fixed;
-  top: 0;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  background-color: rgba(0, 0, 0, 0.5);
-  display: flex;
-  justify-content: center;
-  align-items: center;
-  z-index: 1000;
-`;
-
-const ModalBox = styled.div`
   background: white;
-  padding: 20px;
-  border-radius: 8px;
-  width: 400px;
-  max-width: 90%;
-`;
+  border-radius: 0.75rem;
+  overflow: hidden;
+  box-shadow: 0 4px 10px rgba(0,0,0,0.05);
 
-const CancelButton = styled.button`
-  padding: 8px 16px;
-  background-color: #f44336;
-  color: white;
-  border: none;
-  border-radius: 4px;
-  cursor: pointer;
-`;
+  th, td {
+    padding: 0.75rem;
+    text-align: center;
+    border-bottom: 1px solid #e5e7eb;
+  }
 
-const ConfirmButton = styled.button`
-  padding: 8px 16px;
-  background-color: #4CAF50;
-  color: white;
-  border: none;
-  border-radius: 4px;
-  cursor: pointer;
+  th {
+    background: #f3f4f6;
+    color: #374151;
+    font-weight: 600;
+  }
+
+  tr:nth-child(even) {
+    background: #fafafa;
+  }
 `;

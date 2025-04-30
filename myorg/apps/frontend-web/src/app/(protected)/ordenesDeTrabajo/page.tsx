@@ -11,7 +11,7 @@ const WorkOrdersPage: React.FC = () => {
   const theme = useTheme();
 
   // Formulacion de los estados
-  const [formData, setFormData] = useState({ ot_id: '', mycard_id: '', quantity: '', areasOperatorIds: [] as string[], priority: false, files: [] as File[], });
+  const [formData, setFormData] = useState({ ot_id: '', mycard_id: '', quantity: '', comments: '', areasOperatorIds: [] as string[], priority: false, files: [] as File[], });
   const [message, setMessage] = useState('');
   const [areasOperator, setAreasOperator] = useState<{ id: number; name: string }[]>([]);
   const [dropdownCount, setDropdownCount] = useState(4);
@@ -27,21 +27,21 @@ const WorkOrdersPage: React.FC = () => {
   console.log("areasOperator:", areasOperator);
 
   // Para manejar los cambios de los campos del formulario
-  const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>, areaIndex?: number) => {
+  const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>, areaIndex?: number) => {
     const target = e.target;
     const name = target.name;
     const value = target.type === 'checkbox' ? (target as HTMLInputElement).checked : target.value;
-  
+    
     if (areaIndex !== undefined) {
       setFormData((prev) => {
         const updatedFlows = [...prev.areasOperatorIds];
-  
+    
         // Evita valores duplicados 
         if (updatedFlows.includes(value as string)) {
           const duplicateIndex = updatedFlows.indexOf(value as string);
           updatedFlows[duplicateIndex] = ""; // Si hay duplicado
         }
-  
+    
         updatedFlows[areaIndex] = value as string || "";  // Asignamos el valor al índice correspondiente
         const filteredFlows = updatedFlows.filter(area => area !== "");
         return { ...prev, areasOperatorIds: filteredFlows };
@@ -137,6 +137,7 @@ const WorkOrdersPage: React.FC = () => {
       });
       if (!response.ok) {
         const errorText = await response.text();
+        alert('Orden de trabajo ya existe')
         console.error(`Error del servidor: ${response.status}`, errorText);
         return;
       }
@@ -168,6 +169,7 @@ const WorkOrdersPage: React.FC = () => {
             <Input type="number" name="quantity" value={formData.quantity} onChange={handleChange} required />
           </Auxiliar>
         </DataWrapper>
+
         <OperationWrapper>
           <Auxiliar>
             <Label>Flujo Asignado:</Label>
@@ -192,9 +194,9 @@ const WorkOrdersPage: React.FC = () => {
                   {dropdownCount > rowIndex * 4 && dropdownCount <= (rowIndex + 1) * 4 && (
                     <div style={{ display: "flex", flexDirection: "column", justifyContent: "center", height: '0px', padding: '0', minWidth: '40px' }}>
                       {dropdownCount < 10 && dropdownCount > rowIndex * 4 && dropdownCount <= (rowIndex + 1) * 4 && (
-                      <IconButton type="button" onClick={addDropdown} style={{ height: "20px", borderRadius: "40em", padding: '0' }}>+</IconButton>
+                      <IconButton type="button" onClick={addDropdown} style={{ height: "20px", borderRadius: "40em", padding: '0', color: '#05060f99'}}>+</IconButton>
                       )}
-                      <IconButton aria-label="delete" type="button" onClick={() => removeDropdown(rowIndex * 4 + 4)} style={{ height: "20px", borderRadius: "40em", marginTop: "5px", padding: '0' }}>
+                      <IconButton aria-label="delete" type="button" onClick={() => removeDropdown(rowIndex * 4 + 4)} style={{ height: "20px", color: '#05060f99', borderRadius: "40em", marginTop: "5px", padding: '0' }}>
                         <DeleteIcon />
                       </IconButton>
                     </div>
@@ -202,7 +204,11 @@ const WorkOrdersPage: React.FC = () => {
                 </SelectRow>
               ))}
             </Selects>
+
+            <Label>Comentarios:</Label>
+            <TextArea name="comments" value={formData.comments} onChange={handleChange} required placeholder="Escribe tus comentarios aquí..." />
           </Auxiliar>
+
           <Auxiliar>
             <Label>Subir OT (PDF):</Label>
             <Input type="file" accept="application/pdf" onChange={(e) => handleFileChange(e, 'ot')} />
@@ -252,7 +258,7 @@ export default WorkOrdersPage;
 
 // =================== Styled Components ===================
 const PageContainer = styled.div`
-  padding: 1rem 2rem;
+  padding: 20px 20px 20px 50px;
   margin-top: -70px;
   width: 100%;
   align-content: flex-start;
@@ -280,6 +286,26 @@ const FormWrapper = styled.form`
   border-radius: 10px;
   background: #f8f9fa; // Color de fondo suave
   box-shadow: 0px 4px 10px rgba(0, 0, 0, 0.1); // Sombra ligera
+`;
+
+const TextArea = styled.textarea`
+  padding: 10px;
+  border-radius: 1rem;
+  border: 2px solid #aeadab;
+  width: 100%;
+  min-height: 80px;
+  outline: none;
+  resize: vertical;
+  transition: border-color 0.3s ease;
+
+  &:focus {
+    border-color: #05060f;
+    box-shadow: 0 0 5px rgba(0, 0, 0, 0.1);
+  }
+
+  &::placeholder {
+    color: #aaa;
+  }
 `;
 
 const DataWrapper = styled.div`

@@ -14,14 +14,10 @@ export default function SerigrafiaComponent({ workOrder }: Props) {
 
   // Para bloquear liberacion hasta que sea aprobado por CQM
   const isDisabled = workOrder.status === 'En proceso';
-
-  // Para mostrar formulario de CQM y enviarlo
   const [showModal, setShowModal] = useState(false);
-
   const openModal = () => {
     setShowModal(true);
   };
-
   const closeModal = () => {
     setShowModal(false);
   };
@@ -53,6 +49,47 @@ export default function SerigrafiaComponent({ workOrder }: Props) {
     );
   };
 
+  // Para ver las preguntas de calidad
+  const [questionsOpen, setQuestionsOpen] = useState(false);
+  const toggleQuestions = () => {
+    setQuestionsOpen(!questionsOpen);
+  };
+  const [qualitySectionOpen, setQualitySectionOpen] = useState(false);
+  const toggleQualitySection = () => {
+    setQualitySectionOpen(!qualitySectionOpen);
+  };
+
+  const handleSelectAll = (isChecked: boolean) => {
+    const questionIds = workOrder.area.formQuestions.filter((question: { role_id: number | null }) => question.role_id === null).map((q: { id: number }) => q.id);
+  
+    if (isChecked) {
+      // Marcar todas las preguntas
+      setCheckedQuestions(questionIds);
+  
+      setResponses((prevResponses) => {
+        // Filtrar respuestas viejas de esas preguntas
+        const updatedResponses = prevResponses.filter(
+          (response) => !questionIds.includes(response.questionId)
+        );
+  
+        // Agregar todas como true
+        const newResponses = questionIds.map((id: number) => ({
+          questionId: id,
+          answer: true,
+        }));
+  
+        return [...updatedResponses, ...newResponses];
+      });
+    } else {
+      // Desmarcar todas
+      setCheckedQuestions([]);
+  
+      setResponses((prevResponses) =>
+        prevResponses.filter((response) => !questionIds.includes(response.questionId))
+      );
+    }
+  };
+
   // Para mandar la OT a evaluacion por CQM
   const handleSubmit = async () => {
     const payload = {
@@ -72,7 +109,7 @@ export default function SerigrafiaComponent({ workOrder }: Props) {
         return;
       }
       console.log('Datos a enviar', payload);
-      const res = await fetch('http://localhost:3000/free-order-flow/cqm-impression', {
+      const res = await fetch('http://localhost:3000/free-order-flow/cqm-serigrafia', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -113,7 +150,7 @@ export default function SerigrafiaComponent({ workOrder }: Props) {
         return;
       }
   
-      const res = await fetch('http://localhost:3000/free-order-flow/impress', {
+      const res = await fetch('http://localhost:3000/free-order-flow/serigrafia', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -133,8 +170,6 @@ export default function SerigrafiaComponent({ workOrder }: Props) {
       console.log('Error al enviar datos:', error);
     }
   };
-  
-  ;
 
   return (
     <>
@@ -176,7 +211,7 @@ export default function SerigrafiaComponent({ workOrder }: Props) {
     {showConfirm && (
         <ModalOverlay>
           <ModalBox>
-            <h4>¿Estás segura/o que deseas liberar este prducto?</h4>
+            <h4>¿Estás segura/o que deseas liberar este producto?</h4>
             <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '1rem', marginTop: '1rem' }}>
               <CancelButton onClick={() => setShowConfirm(false)}>Cancelar</CancelButton>
               <ConfirmButton onClick={handleImpressSubmit}>Confirmar</ConfirmButton>
@@ -194,7 +229,19 @@ export default function SerigrafiaComponent({ workOrder }: Props) {
             <thead>
               <tr>
                 <th>Pregunta</th>
-                <th>Respuesta</th>
+                <th style={{ display: 'flex'}}>
+                  Respuesta
+                  <input
+                    type="checkbox"
+                    checked={
+                      workOrder.area.formQuestions
+                        .filter((q: { role_id: number | null }) => q.role_id === null)
+                        .every((q: { id: number }) => checkedQuestions.includes(q.id))
+                    }
+                    onChange={(e) => handleSelectAll(e.target.checked)}
+                    style={{ marginLeft: "8px" }}
+                  />
+                </th>
               </tr>
             </thead>
             <tbody>
@@ -212,8 +259,38 @@ export default function SerigrafiaComponent({ workOrder }: Props) {
             <Label>Muestras:</Label>
             <Input type="number" placeholder="Ej: 2" value={sampleQuantity} onChange={handleSampleQuantityChange}/>
           </InputGroup>
-          <CloseButton onClick={closeModal}>Cerrar</CloseButton>
-          <SubmitButton onClick={handleSubmit}>Enviar Respuestas</SubmitButton>
+          <ModalTitle style={{ marginTop: '1.5rem', marginBottom: '0.3rem'}}>
+            Preguntas de Calidad
+            <button onClick={toggleQualitySection} style={{ marginLeft: '10px',cursor: "pointer", border: "none", background: "transparent", fontSize: "1.2rem" }}>{qualitySectionOpen ? '▼' : '▶'}</button>
+          </ModalTitle>
+          {qualitySectionOpen && (
+          <>
+          <Table>
+            <thead>
+              <tr>
+                <th>Pregunta</th>
+                <th>
+                  Respuesta
+                </th>
+              </tr>
+            </thead>
+            <tbody>
+              {workOrder.area.formQuestions
+              .filter((question: { role_id: number | null }) => question.role_id === 3)
+              .map((question: { id: number; title: string }) => (
+                <tr key={question.id}>
+                  <td>{question.title}</td>
+                  <td></td>
+                </tr>
+              ))}
+            </tbody>
+          </Table>
+          </>
+          )}
+          <div style={{ display: 'flex', gap: '1rem'}}>
+            <CloseButton onClick={closeModal}>Cerrar</CloseButton>
+            <SubmitButton onClick={handleSubmit}>Enviar Respuestas</SubmitButton>
+          </div>
         </ModalContent>
       </ModalOverlay>
     )}
@@ -366,7 +443,7 @@ const CqmButton = styled.button`
   transition: background 0.3s;
 
   &:hover {
-    background-color: #1d4ed8;
+    background-color: ${({ disabled }) => (disabled ? 'green' : '#1d4ed8')};
   }
 `;
 
@@ -440,15 +517,22 @@ const CloseButton = styled.button`
 
 const SubmitButton = styled.button`
   margin-top: 1.5rem;
-  background-color: #4CAF50;
+  background-color: #2563eb;
   color: white;
   padding: 0.75rem 2rem;
   border-radius: 0.5rem;
   font-weight: 600;
-  transition: background 0.3s;
+  display: block;
+
+  border: none;
+  cursor: pointer;
+
+  transition: background-color 0.3s ease, color 0.3s ease;
   
-  &:hover {
-    background-color: #45a049;
+  &:hover,
+  &:focus {
+    background-color: #1e40af;
+    outline: none;
   }
 `;
 

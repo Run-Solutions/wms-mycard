@@ -8,10 +8,17 @@ export class WorkOrderService {
   constructor(private prisma: PrismaService) {}
 
   async createWorkOrder(dto: CreateWorkOrderDto, files: { ot: Express.Multer.File | null; sku: Express.Multer.File | null; op: Express.Multer.File | null }, userId: number) {
-    const { ot_id, mycard_id, areasOperatorIds } = dto;
-    const priority = Boolean(dto.priority);
+    const { ot_id, mycard_id, areasOperatorIds, comments, } = dto;
     const quantity = Number(dto.quantity); // Se debe asegurar de que llegue como numero
-    
+    // Asegurarse de que priority sea un booleano
+    let priority = false; // Valor por defecto
+    if (dto.priority === 'true') {
+      priority = true;
+    } else if (dto.priority === 'false') {
+      priority = false;
+    } else if (typeof dto.priority === 'boolean') {
+      priority = dto.priority;
+    }
     // Para guardar la OT en la BD
     const workOrder = await this.prisma.workOrder.create({
         data: { 
@@ -20,6 +27,7 @@ export class WorkOrderService {
           quantity, 
           status: 'En proceso', 
           priority,
+          comments,
           created_by: userId 
         }
     });
@@ -33,18 +41,18 @@ export class WorkOrderService {
 
     // Para subir los archivos
     try {
-        for (const { file, type } of fileMappings) {
-            if (file) {
-                console.log(`Guardando archivo (${type}): ${file.filename}`);
-                await this.prisma.workOrderFiles.create({
-                    data: {
-                        work_order_id: workOrder.id,
-                        type,
-                        file_path: file.filename,
-                    },
-                });
-            }
+      for (const { file, type } of fileMappings) {
+        if (file) {
+          console.log(`Guardando archivo (${type}): ${file.filename}`);
+          await this.prisma.workOrderFiles.create({
+            data: {
+              work_order_id: workOrder.id,
+              type,
+              file_path: file.filename,
+            },
+          });
         }
+      }
     } catch (error) {
         console.error('Error al guardar los archivos:', error);
     }
@@ -58,21 +66,21 @@ export class WorkOrderService {
     console.log('Contenido de areasOperatorIds:', areasArray);
 
     try {
-        for (let i = 0; i < areasArray.length; i++) {
-            const areaId = areasArray[i];
-            const status = i === 0 ? 'Pendiente' : 'En espera';
-            console.log(`Creando WorkOrderFlow para area_id: ${areaId}, status: ${status}`);
-            await this.prisma.workOrderFlow.create({
-                        data: {
-                            work_order_id: workOrder.id,
-                            area_id: areaId,
-                            status: status,
-                        },
-            });
-        }
+      for (let i = 0; i < areasArray.length; i++) {
+        const areaId = areasArray[i];
+        const status = i === 0 ? 'Pendiente' : 'En espera';
+        console.log(`Creando WorkOrderFlow para area_id: ${areaId}, status: ${status}`);
+        await this.prisma.workOrderFlow.create({
+          data: {
+            work_order_id: workOrder.id,
+            area_id: areaId,
+            status: status,
+          },
+        });
+      }
     } catch (error: unknown) {
         if (error instanceof Error) {
-            console.error('Error al asignar áreas:', error.message);
+          console.error('Error al asignar áreas:', error.message);
         }
     }
 
@@ -119,11 +127,25 @@ export class WorkOrderService {
         user: true,
         flow: {
           include: {
-            area: true,
+            area: {
+              include: {
+                formQuestions: true
+              }
+            },
             areaResponse: {
               include: {
                 prepress: true,
+                inconformities: {
+                  include: {
+                    user: true,
+                  }
+                },
                 impression: {
+                  include: {
+                    form_answer: true,
+                  },
+                },
+                serigrafia: {
                   include: {
                     form_answer: true,
                   },
@@ -141,31 +163,45 @@ export class WorkOrderService {
                 corte: {
                   include: {
                     form_answer: true,
+                    formAuditory: true,
                   },
                 },
                 colorEdge: {
                   include: {
                     form_answer: true,
+                    formAuditory: true,
                   },
                 },
                 hotStamping: {
                   include: {
                     form_answer: true,
+                    formAuditory: true,
                   },
                 }, 
                 millingChip: {
                   include: {
                     form_answer: true,
+                    formAuditory: true,
                   },
                 },
                 personalizacion: {
                   include: {
                     form_answer: true,
+                    formAuditory: true,
                   },
                 },
               }
             },
-            answers: true,
+            answers: {
+              include:{
+                FormAnswerResponse: true,
+                inconformities: {
+                  include: {
+                    user: true,
+                  }
+                },
+              }
+            },
           },
         }
       },
@@ -175,4 +211,78 @@ export class WorkOrderService {
     }
     return workOrder;
   }
+
+  async getInAuditoryWorkOrderById(id: string){
+      const workOrderFlow = await this.prisma.workOrderFlow.findFirst({
+        where: {
+          workOrder:
+          {
+            is: {
+              ot_id: id,
+            }
+          },
+          status: 'En auditoria',
+        },
+        include: {
+          workOrder: {
+            include: {
+              flow: {
+                include: {
+                  area: true,
+                  areaResponse: {
+                    include: {
+                      corte: {
+                        include: {
+                          form_answer: true,
+                          formAuditory: true,
+                        }
+                      }
+                    },
+                  },
+                },
+              },
+              areasResponses: {
+                include: {
+                  corte: true,
+                }
+              },
+              formAnswers: {
+                include: {
+                  corteResponse: true,
+                  colorEdgeResponse: true,
+                  hotStampingResponse: true,
+                  millingChipResponse: true, 
+                  personalizacionResponse: true,
+                }
+              }
+            },
+          },
+          answers: {
+            include: {
+              corteResponse: true
+            }
+          }
+        },
+      });
+      if(!workOrderFlow) {
+        return { message: 'No se encontró una orden para esta área.'}
+      }
+      return workOrderFlow;
+    }
+  
+    // Para guardar respuesta de liberacion de auditor 
+    async closeWorkOrderById(dto: CreateWorkOrderDto, userId: number) {
+      return this.prisma.$transaction(async (tx) => {
+        await tx.workOrder.update({
+          where: {
+            ot_id: dto.ot_id,
+          },
+          data: {
+            status: 'Cerrado',
+            closed_by: userId,
+          },
+        });
+        return { message: 'Respuesta guardada con exito'};
+      });
+    }
 }

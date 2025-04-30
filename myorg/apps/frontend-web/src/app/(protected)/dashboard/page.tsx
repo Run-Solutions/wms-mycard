@@ -24,10 +24,7 @@ const DashboardPage: React.FC = () => {
       try {
         // Se recupera el token del user logeado
         const token = localStorage.getItem('token');
-        if (!token) {
-          throw new Error('⛔ No se ha leído el token')
-        }
-
+        if (!token) throw new Error('⛔ No se ha leído el token');
         const response = await fetch('http://localhost:3000/dashboard/modules', {
           method: 'GET',
           headers: {
@@ -35,24 +32,14 @@ const DashboardPage: React.FC = () => {
             'Content-Type': 'application/json',
           },
         });
-
-        if (!response.ok) {
-          throw new Error('⛔ Error al obtener módulos');
-        }
-
-        const data = await response.json();
-        console.log('Modulos:', data.modules);
-
-        // Actualizar el estado con los modulos obtenidos 
-        setModules(data.modules)
+        if (!response.ok) throw new Error('⛔ Error al obtener módulos');
+        const data = await response.json();        setModules(data.modules)
       } catch (error) {
         console.error(error);
       } finally {
-        // Cerrar la carga de los modulos cuando finalice
         setLoading(false);
       }
     };
-
     fetchModules();
   }, []);
 
@@ -64,7 +51,6 @@ const DashboardPage: React.FC = () => {
       index === 0 ? match.toLowerCase() : match.toUpperCase()
       )
       .replace(/\s+/g, '')
-
   const handleCardClick = (name: string) => {
     let redirect_page = toCamelCase(name);
     console.log(redirect_page);

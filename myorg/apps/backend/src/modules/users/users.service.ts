@@ -29,4 +29,16 @@ export class UsersService {
       throw error;
     }
   }
+  
+  async deleteUser(id: string) {
+    try {
+      const deletedUser = await this.prisma.user.delete({
+        where: { id: parseInt(id) },
+      });
+      return deletedUser;
+    } catch (error) {
+      console.error('Error al eliminar usuario:', error);
+      throw error;
+    }
+  }
 }

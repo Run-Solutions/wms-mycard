@@ -74,8 +74,28 @@ const WorkOrderTable: React.FC<Props> = ({ orders, title, statusFilter}) => {
         setTimeout(() => window.URL.revokeObjectURL(url), 5000);
     }
     return (
-        <TableContainer component={Paper} sx={{ backgroundColor: 'white', padding: '2rem', mt: 4, borderRadius: '1rem', boxShadow: '0 4px 12px rgba(0,0,0,0.1)', maxWidth: '90%', marginX: 'auto' }}>
-          <Typography variant='h6' component='div' sx={{ p: 2 }}>{title}</Typography>
+        <TableContainer component={Paper} sx={{ backgroundColor: 'white', padding: '2rem', mt: 4, borderRadius: '1rem', boxShadow: '0 4px 12px rgba(0,0,0,0.1)', maxWidth: '100%', minWidth: '800px', marginX: 'auto' }}>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '10px'}}>
+            <Typography variant='h6' component='div' sx={{ p: 2, color: 'black' }}>{title}</Typography>
+            <Box display="flex" gap={2} flexWrap="wrap"  sx={{  }}>
+              <Box display="flex" alignItems="center" gap={1}>
+                <CircleLegend style={{ backgroundColor: '#22c55e' }} />
+                <Typography variant="body2" color="text.secondary">Completado</Typography>
+              </Box>
+              <Box display="flex" alignItems="center" gap={1}>
+                <CircleLegend style={{ backgroundColor: '#facc15' }} />
+                <Typography variant="body2" color="text.secondary">Enviado a CQM</Typography>
+              </Box>
+                <Box display="flex" alignItems="center" gap={1}>
+                <CircleLegend style={{ backgroundColor: '#4a90e2' }} />
+                <Typography variant="body2" color="text.secondary">En Proceso / Calidad</Typography>
+              </Box>
+              <Box display="flex" alignItems="center" gap={1}>
+                <CircleLegend style={{ backgroundColor: '#d1d5db' }} />
+                <Typography variant="body2" color="text.secondary">Sin Estado</Typography>
+              </Box>
+            </Box>
+        </div>
           {filteredOrders.length === 0 ? (
             <Typography sx={{ p: 2 }}>No hay órdenes para mostrar.</Typography>
           ) : (
@@ -83,23 +103,23 @@ const WorkOrderTable: React.FC<Props> = ({ orders, title, statusFilter}) => {
               <Table>
                 <TableHead>
                   <TableRow>
-                    <TableCell>Id OT</TableCell>
-                    <TableCell>Id del presupuesto</TableCell>
-                    <TableCell>Usuario</TableCell>
-                    <TableCell>Área</TableCell>
-                    <TableCell>Fecha</TableCell>
-                    <TableCell>Archivos</TableCell>
+                    <TableCell sx={{ color: 'black' }}>Id OT</TableCell>
+                    <TableCell sx={{ maxWidth: 110, color: 'black' }}>Id del presupuesto</TableCell>
+                    <TableCell sx={{ color: 'black' }}>Usuario</TableCell>
+                    <TableCell sx={{ color: 'black' }}>Área</TableCell>
+                    <TableCell sx={{ color: 'black' }}>Fecha</TableCell>
+                    <TableCell sx={{ color: 'black' }}>Archivos</TableCell>
                   </TableRow>
                 </TableHead>
                 <TableBody>
-                  {displayedOrders.map(order => (
+                  {filteredOrders.map(order => (
                     <TableRow key={order.id}>
-                      <TableCell onClick={() => router.push(`/cerrarOrdenDeTrabajo/${order.ot_id}`)} sx={{ cursor: 'pointer', '&:hover': { textDecoration: 'underline' } }}>
+                      <TableCell onClick={() => router.push(`/cerrarOrdenDeTrabajo/${order.ot_id}`)} sx={{ color: 'black', cursor: 'pointer', '&:hover': { textDecoration: 'underline' } }}>
                         {order.ot_id}
                       </TableCell>
-                      <TableCell>{order.mycard_id}</TableCell>
-                      <TableCell>{order.mycard_id || 'Sin usuario'}</TableCell>
-                      <TableCell>
+                      <TableCell sx={{ color: 'black' }}>{order.mycard_id}</TableCell>
+                      <TableCell sx={{ color: 'black' }}>{order.mycard_id || 'Sin usuario'}</TableCell>
+                      <TableCell sx={{ maxWidth: 900, overflowX: 'hidden' }}>
                         <Timeline>
                           {order.flow?.map((flowStep, index) => {
                             const isActive = ['proceso', 'calidad', 'listo', 'audi'].some(word => flowStep.status?.toLowerCase().includes(word));
@@ -115,8 +135,8 @@ const WorkOrderTable: React.FC<Props> = ({ orders, title, statusFilter}) => {
                           })}
                         </Timeline>
                       </TableCell>
-                      <TableCell>{new Date(order.createdAt).toLocaleDateString()}</TableCell>
-                      <TableCell>
+                      <TableCell sx={{ color: 'black' }}>{new Date(order.createdAt).toLocaleDateString()}</TableCell>
+                      <TableCell sx={{ color: 'black' }}>
                         {order.files.length > 0 ? (
                           order.files.map((file) => (
                             <div key={file.file_path}>
@@ -217,4 +237,11 @@ const AreaName = styled.span.withConfig({
   max-width: 80px;
   text-transform: capitalize;
   transition: color 0.3s, font-weight 0.3s;
+`;
+
+const CircleLegend = styled.div`
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  box-shadow: 0 0 2px rgba(0,0,0,0.3);
 `;

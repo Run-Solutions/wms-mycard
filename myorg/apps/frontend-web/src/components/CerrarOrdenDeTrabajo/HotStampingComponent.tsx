@@ -9,10 +9,20 @@ interface Props {
   workOrder: any;
 }
 
+type AreaData = {
+  name: string;
+  status: string;
+  response: string;
+  answers: any;
+  buenas: number;
+  malas: number;
+  cqm: number;
+  excedente: number;
+  muestras: number;
+};
+
 export default function HotStampingComponent({ workOrder }: Props) {
   const router = useRouter();
-  const [otherValue, setOtherValue] = useState('');
-  const [selectedOption, setSelectedOption] = useState('');
   
   // Para bloquear liberacion hasta que sea aprobado por CQM
   const isDisabled = workOrder.status === 'En proceso';
@@ -29,75 +39,74 @@ export default function HotStampingComponent({ workOrder }: Props) {
   };
 
   //Para guardar las respuestas 
-  const [responses, setResponses] = useState<{ questionId: number, answer: boolean }[]>([]);
-  const [sampleQuantity, setSampleQuantity] = useState<number | string>('');
-  const [goodQuantity, setGoodQuantity] = useState<number | string>('');
-  const [badQuantity, setBadQuantity] = useState<number | string>('');
-  const [excessQuantity, setExcessQuantity] = useState<number | string>('');
-
-  // Para controlar qué preguntas están marcadas
-  const [checkedQuestions, setCheckedQuestions] = useState<number[]>([]);
-
-  // Función para manejar el cambio en el campo de muestras
-  const handleSampleQuantityChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    setSampleQuantity(e.target.value);
+  const getAreaData = (areaId: number, areaResponse: any) => {
+    switch(areaId) {
+      case 6: // corte
+        return {
+          buenas: areaResponse?.corte?.good_quantity || 0,
+          malas: areaResponse?.corte?.bad_quantity || 0,
+          excedente: areaResponse?.corte?.excess_quantity || 0,
+          cqm: areaResponse?.corte?.form_answer?.sample_quantity ?? 0,
+          muestras: areaResponse?.corte?.formAuditory?.sample_auditory ?? ''
+        };
+      case 7: // color-edge
+        return {
+          buenas: areaResponse?.colorEdge?.good_quantity || 0,
+          malas: areaResponse?.colorEdge?.bad_quantity || 0,
+          excedente: areaResponse?.colorEdge?.excess_quantity || 0,
+          cqm: areaResponse?.colorEdge?.form_answer?.sample_quantity || 0,
+          muestras: areaResponse?.colorEdge?.formAuditory?.sample_auditory ?? ''
+        };
+      case 8: // hot-stamping
+        return {
+          buenas: areaResponse?.hotStamping?.good_quantity || 0,
+          malas: areaResponse?.hotStamping?.bad_quantity || 0,
+          excedente: areaResponse?.hotStamping?.excess_quantity || 0,
+          cqm: areaResponse?.hotStamping?.form_answer?.sample_quantity || 0,
+          muestras: areaResponse?.hotStamping?.formAuditory?.sample_auditory ?? ''
+        };
+      case 9: // milling-chip
+        return {
+          buenas: areaResponse?.millingChip?.good_quantity || 0,
+          malas: areaResponse?.millingChip?.bad_quantity || 0,
+          excedente: areaResponse?.millingChip?.excess_quantity || 0,
+          cqm: areaResponse?.millingChip?.form_answer?.sample_quantity || 0,
+          muestras: areaResponse?.millingChip?.formAuditory?.sample_auditory ?? ''
+        };
+      case 10: // personalizacion
+        return {
+          buenas: areaResponse?.personalizacion?.good_quantity || 0,
+          malas: areaResponse?.personalizacion?.bad_quantity || 0,
+          excedente: areaResponse?.personalizacion?.excess_quantity || 0,
+          cqm: areaResponse?.personalizacion?.form_answer?.sample_quantity || 0,
+          muestras: areaResponse?.personalizacion?.formAuditory?.sample_auditory ?? ''
+        };
+      default:
+        return {
+          buenas: 0,
+          malas: 0,
+          excedente: 0,
+          muestras: 0,
+          cqm: 0
+        };
+    }
   };
 
-  const handleCheckboxChange = (questionId: number, isChecked: boolean) => {
-    setResponses((prevResponses) => {
-      const updateResponses = prevResponses.filter(response => response.questionId !== questionId);
-      if(isChecked) { 
-        updateResponses.push({ questionId, answer: isChecked}); 
-      }
-      return updateResponses;
-    });
+  // Para obtener todas las areas del flujo
+  const areas: AreaData[] = workOrder.workOrder?.flow?.filter((item: any) => item.area_id >= 6).map((item: any) => {
+  const areaData = getAreaData(item.area_id, item.areaResponse);
+    return {
+      id: item.area_id,
+      name: item.area?.name || 'Sin nombre',
+      status: item.status || 'Desconocido',
+      response: item.areaResponse || {},
+      answers: item.answers?.[0] || {},
+      ...areaData
+    }
+  }) || [];
 
-    // Actualizar visualmente el checkbox
-    setCheckedQuestions((prev) =>
-      isChecked ? [...prev, questionId] : prev.filter((id) => id !== questionId)
-    );
-  };
-
-  // Para mandar la OT a evaluacion por CQM
-  const handleSubmit = async () => {
-    const payload = {
-      question_id: responses.map(response => response.questionId),
-      work_order_flow_id: workOrder.id,
-      area_id: workOrder.area.id,
-      response: responses.map(response => response.answer),
-      reviewed: false,
-      user_id: workOrder.assigned_user,
-      sample_quantity: Number(sampleQuantity),
-      finish_validation: selectedOption === 'otro' ? otherValue : selectedOption,
-    };
-    try {
-      const token = localStorage.getItem('token');
-      if(!token) {
-        alert('No hay token de autenticación');
-        return;
-      }
-      console.log('Datos a enviar', payload);
-      const res = await fetch('http://localhost:3000/free-order-flow/cqm-impression', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}`,
-        },
-        body: JSON.stringify(payload),
-      });
-      const data = await res.json();
-      if (!res.ok) {
-        console.error("Error en el servidor:", data);
-        return;
-      }
-      router.push('/liberarProducto');
-  } catch (error) {
-    console.log('Error al guardar la respuesta: ', error);
-  }
-  }
-  
-  // Para Liberar el producto cuando ya ha pasado por CQM
   const [showConfirm, setShowConfirm] = useState(false); 
+
   const handleImpressSubmit = async () => {
     const payload = {
       workOrderFlowId: workOrder.id,
@@ -134,12 +143,6 @@ export default function HotStampingComponent({ workOrder }: Props) {
     }
   };
 
-  const sortedAnswers = [...workOrder.workOrder.formAnswers].sort((a, b) => a.id - b.id);
-  const antepenultima = sortedAnswers[sortedAnswers.length - 3];
-  const penultima = sortedAnswers[sortedAnswers.length - 2];
-  const ultima = sortedAnswers[sortedAnswers.length - 1];
-  console.log('hola',antepenultima);
-
   return (
     <>
     <Container>
@@ -165,62 +168,53 @@ export default function HotStampingComponent({ workOrder }: Props) {
           <Table>
             <thead>
               <tr>
-                <th></th>
-                <th>Corte</th>
-                <th>Color Edge</th>
-                <th>Hot Stamping</th>
-                <th>Milling Chip</th>
-                <th>Personalización</th>
+              <th></th>
+                {areas.map((area, index) => (
+                    <th key={index}>{area.name}</th>
+                ))}
               </tr>
             </thead>
             <tbody>
             <tr>
               <td>Buenas</td>
-              <td>{antepenultima?.corteResponse?.good_quantity ?? ''}</td>
-              <td>{penultima?.colorEdgeResponse?.good_quantity ?? ''}</td>
-              <td>{ultima?.hotStampingResponse?.good_quantity ?? ''}</td>
-              <td>{workOrder.answers[0].millingChipResponse?.good_quantity || ''}</td>
-              <td>{workOrder.answers[0].personalizacionResponse?.good_quantity ?? ''}</td>
+              {areas.map((area, index) => (
+                <td key={index}>{area.buenas || ''}</td>
+              ))}
             </tr>
             <tr>
               <td>Malas</td>
-              <td>{antepenultima?.corteResponse?.bad_quantity ?? ''}</td>
-              <td>{penultima?.colorEdgeResponse?.bad_quantity ?? ''}</td>
-              <td>{ultima?.hotStampingResponse?.bad_quantity ?? ''}</td>
-              <td>{workOrder.answers[0].millingChipResponse?.bad_quantity ?? ''}</td>
-              <td>{workOrder.answers[0].personalizacionResponse?.bad_quantity ?? ''}</td>
+              {areas.map((area, index) => (
+                <td key={index}>{area.malas || ''}</td>
+              ))}
             </tr>
             <tr>
               <td>Excedente</td>
-              <td>{antepenultima?.corteResponse?.excess_quantity ?? ''}</td>
-              <td>{penultima?.colorEdgeResponse?.excess_quantity ?? ''}</td>
-              <td>{ultima?.hotStampingResponse?.excess_quantity ?? ''}</td>
-              <td>{workOrder.answers[0].millingChipResponse?.excess_quantity ?? ''}</td>
-              <td>{workOrder.answers[0].personalizacionResponse?.excess_quantity ?? ''}</td>
+              {areas.map((area, index) => (
+                <td key={index}>{area.excedente || ''}</td>
+              ))}
             </tr>
             <tr>
               <td>CQM</td>
-              <td>{antepenultima?.accepted === true ? 'Aprobado' : antepenultima?.accepted===false ? 'No aceptado' : ''}</td>
-              <td>{penultima?.accepted === true ? 'Aprobado' : penultima?.accepted===false ? 'No aceptado' : ''}</td>
-              <td>{ultima?.accepted === true ? 'Aprobado' : ultima?.accepted===false ? 'No aceptado' : ''}</td>
-              <td>{workOrder.answers[0].millingChipResponse?.form_answer?.accepted ?? ''}</td>
-              <td>{workOrder.answers[0].personalizacionResponse?.form_answer?.accepted ?? ''}</td>
+              {areas.map((area, index) => (
+                <td key={index}>{area.cqm || ''}</td>
+              ))}
             </tr>
             <tr>
               <td>Muestras</td>
-              <td>{antepenultima?.sample_quantity ?? ''}</td>
-              <td>{penultima?.sample_quantity ?? ''}</td>
-              <td>{ultima?.sample_quantity ?? ''}</td>
-              <td>{workOrder.answers[0].millingChipResponse?.form_answer?.sample_quantity ?? ''}</td>
-              <td>{workOrder.answers[0].personalizacionResponse?.form_answer?.sample_quantity ?? ''}</td>
+              {areas.map((area, index) => (
+                <td key={index}>{area.muestras || ''}</td>
+              ))}
             </tr>
             <tr>
               <td>SUMA TOTAL</td>
-              <td>{((antepenultima?.corteResponse?.good_quantity ?? '') + (antepenultima?.corteResponse?.bad_quantity ?? '') + (antepenultima?.corteResponse?.excess_quantity ?? '') + (antepenultima?.sample_quantity ?? ''))}</td>
-              <td>{((penultima?.colorEdgeResponse?.good_quantity ?? '') + (penultima?.colorEdgeResponse?.bad_quantity ?? '') + (penultima?.colorEdgeResponse?.excess_quantity ?? '') + (penultima?.sample_quantity ?? ''))}</td>
-              <td>{((ultima?.hotStampingResponse?.good_quantity ?? '') + (ultima?.hotStampingResponse?.bad_quantity ?? '') + (ultima?.hotStampingResponse?.excess_quantity ?? '') + (ultima?.sample_quantity ?? ''))}</td>
-              <td>{workOrder.answers[0].millingChipResponse?.form_answer?.sample_quantity ?? ''}</td>
-              <td>{workOrder.answers[0].personalizacionResponse?.form_answer?.sample_quantity ?? ''}</td>
+              {areas.map((area, index) => {
+                const buenas = Number(area.buenas) || 0;
+                const malas = Number(area.malas) || 0;
+                const excedente = Number(area.excedente) || 0;
+                const muestras = Number(area.muestras) || 0;
+                const total = buenas + malas + excedente + muestras;
+                return <td key={index}>{total}</td>;
+              })}
             </tr>
           </tbody>
           </Table>
@@ -300,63 +294,7 @@ const Value = styled.div`
 const NewDataWrapper = styled.div`
   display: flex;
   gap: 8rem;
-  color: black;
   flex-wrap: wrap;
-`;
-
-const InputGroup = styled.div`
-  width: 50%;
-`;
-
-const Input = styled.input`
-  width: 100%;
-  color: black;
-  padding: 0.75rem 1rem;
-  border: 2px solid #d1d5db;
-  border-radius: 0.5rem;
-  margin-top: 0.25rem;
-  outline: none;
-  font-size: 1rem;
-  transition: border 0.3s;
-
-  &:focus {
-    border-color: #2563eb;
-  }
-`;
-
-const RadioGroup = styled.div`
-  display: flex;
-  gap: 2rem;
-  margin-top: 0.5rem;
-`;
-
-const RadioLabel = styled.label`
-  display: flex;
-  align-items: center;
-  gap: 0.5rem;
-  font-weight: 500;
-  color: #374151;
-`;
-
-const Radio = styled.input`
-  accent-color: #2563eb;
-`;
-
-const Textarea = styled.textarea`
-  width: 100%;
-  color: black;
-  height: 120px;
-  padding: 1rem;
-  border: 2px solid #d1d5db;
-  border-radius: 0.5rem;
-  margin-top: 0.5rem;
-  font-size: 1rem;
-  resize: vertical;
-
-  &:focus {
-    border-color: #2563eb;
-    outline: none;
-  }
 `;
 
 const LiberarButton = styled.button<{ disabled?: boolean }>`
@@ -429,7 +367,7 @@ const ModalTitle = styled.h2`
 const Table = styled.table`
   width: 100%;
   border-collapse: collapse;
-  color: black;
+
   th, td {
     padding: 0.75rem;
     text-align: left;

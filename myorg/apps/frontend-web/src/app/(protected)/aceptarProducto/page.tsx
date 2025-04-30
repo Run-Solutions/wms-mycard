@@ -12,7 +12,6 @@ interface WorkOrder {
   work_order_id: number;
   area_id: number;
   status: string;
-  priority: boolean;
   assigned_at: string;
   created_at: string;
   updated_at: string;
@@ -22,6 +21,7 @@ interface WorkOrder {
     priority: boolean;
     mycard_id: string;
     quantity: number;
+    comments: string;
     created_by: number;  
     validated: boolean;
     createdAt: string;
@@ -89,7 +89,7 @@ const AcceptProductPage: React.FC = () => {
     console.log(flowId);
     if (!selectedOrder) return;
 
-    // 👉 Si el área no es 1, redirigir inmediatamente
+    // Si el área no es 1, redirigir inmediatamente
     if (selectedOrder?.area_id >= 2 && selectedOrder?.area_id <= 6) {
       router.push(`/aceptarProducto/${flowId}`); 
       return;
@@ -160,15 +160,19 @@ const AcceptProductPage: React.FC = () => {
         console.log('Datos obtenidos: ', data);
 
         // Ordenar las OTs: primero las marcadas como prioridad, luego por fecha
-        const sortedOrders = data.sort((a: WorkOrder, b: WorkOrder) => {
-          // Si a es prioritario y b no, a va primero
-          if (a.workOrder.priority && !b.workOrder.priority) return -1;
-          // Si b es prioritario y a no, b va primero
-          if (!a.workOrder.priority && b.workOrder.priority) return 1;
-          // Si ambos tienen la misma prioridad, ordenar por fecha (más reciente primero)
-          return new Date(a.workOrder.createdAt).getTime() - new Date(b.workOrder.createdAt).getTime();
-        });
-        setWorkOrders(sortedOrders);
+        if (data && Array.isArray(data)){
+          const sortedOrders = data.sort((a: WorkOrder, b: WorkOrder) => {
+            // Si a es prioritario y b no, a va primero
+            if (a.workOrder.priority && !b.workOrder.priority) return -1;
+            // Si b es prioritario y a no, b va primero
+            if (!a.workOrder.priority && b.workOrder.priority) return 1;
+            // Si ambos tienen la misma prioridad, ordenar por fecha (más reciente primero)
+            return new Date(a.workOrder.createdAt).getTime() - new Date(b.workOrder.createdAt).getTime();
+          });
+          setWorkOrders(sortedOrders);
+        } else {
+          setWorkOrders([]);
+        }
       } catch (err) {
         console.error(err);
         console.error('Error en fetchWorkOrders:', err);
@@ -187,7 +191,8 @@ const AcceptProductPage: React.FC = () => {
               <p><strong>Id del Presupuesto:</strong> {selectedOrder.workOrder.mycard_id}</p>
               <p><strong>Cantidad:</strong> {selectedOrder.workOrder.quantity}</p>
               <p><strong>Creado por:</strong> {selectedOrder.workOrder.user?.username}</p>
-              <p><strong>Validado:</strong> {selectedOrder.workOrder.validated ? 'Sí' : 'No'}</p>
+              <p><strong>Prioritario:</strong> {selectedOrder.workOrder.priority ? 'Sí' : 'No'}</p>
+              <p><strong>Comentarios:</strong> {selectedOrder.workOrder.comments}</p>
               <p><strong>Archivos:</strong></p>
               <div style={{ display: 'flex', flexDirection: 'row',}}>
                 {selectedOrder.workOrder.files.map((file) => (
@@ -298,7 +303,6 @@ const WorkOrderCard = styled.div`
   transition: border-color 0.3s cubic-bezier(0.25, 0.01, 0.25, 1), 
               color 0.3s cubic-bezier(0.25, 0.01, 0.25, 1), 
               background 0.2s cubic-bezier(0.25, 0.01, 0.25, 1);
-
   &::placeholder {
     color: #aaa;
     font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen,

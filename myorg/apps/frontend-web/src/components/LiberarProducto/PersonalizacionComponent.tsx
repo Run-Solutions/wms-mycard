@@ -60,6 +60,46 @@ export default function PersonalizacionComponent({ workOrder }: Props) {
       isChecked ? [...prev, questionId] : prev.filter((id) => id !== questionId)
     );
   };
+  // Para ver las preguntas de calidad
+  const [questionsOpen, setQuestionsOpen] = useState(false);
+  const toggleQuestions = () => {
+    setQuestionsOpen(!questionsOpen);
+  };
+  const [qualitySectionOpen, setQualitySectionOpen] = useState(false);
+  const toggleQualitySection = () => {
+    setQualitySectionOpen(!qualitySectionOpen);
+  };
+
+  const handleSelectAll = (isChecked: boolean) => {
+    const questionIds = workOrder.area.formQuestions.slice(1, 10).map((q: { id: number }) => q.id);
+  
+    if (isChecked) {
+      // Marcar todas las preguntas
+      setCheckedQuestions(questionIds);
+  
+      setResponses((prevResponses) => {
+        // Filtrar respuestas viejas de esas preguntas
+        const updatedResponses = prevResponses.filter(
+          (response) => !questionIds.includes(response.questionId)
+        );
+  
+        // Agregar todas como true
+        const newResponses = questionIds.map((id: number) => ({
+          questionId: id,
+          answer: true,
+        }));
+  
+        return [...updatedResponses, ...newResponses];
+      });
+    } else {
+      // Desmarcar todas
+      setCheckedQuestions([]);
+  
+      setResponses((prevResponses) =>
+        prevResponses.filter((response) => !questionIds.includes(response.questionId))
+      );
+    }
+  };
 
   // Para mandar la OT a evaluacion por CQM
   const handleSubmit = async () => {
@@ -197,7 +237,7 @@ export default function PersonalizacionComponent({ workOrder }: Props) {
             <Label>Excedente:</Label>
             <Input type="number" placeholder="Ej: 2" value={excessQuantity} onChange={(e) => setExcessQuantity(e.target.value)} disabled={isDisabled} />
           </InputGroup>
-          <CqmButton onClick={openModal} disabled={workOrder.status === 'Listo'}>Enviar a CQM</CqmButton>
+          <CqmButton style={{ alignSelf: 'center' }} onClick={openModal} disabled={workOrder.status === 'Listo'}>Enviar a CQM</CqmButton>
         </NewDataWrapper>
         <InputGroup>
           <SectionTitle>Comentarios</SectionTitle>
@@ -211,7 +251,7 @@ export default function PersonalizacionComponent({ workOrder }: Props) {
     {showConfirm && (
         <ModalOverlay>
           <ModalBox>
-            <h4>¿Estás segura/o que deseas liberar este prducto?</h4>
+            <h4>¿Estás segura/o que deseas liberar este producto?</h4>
             <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '1rem', marginTop: '1rem' }}>
               <CancelButton onClick={() => setShowConfirm(false)}>Cancelar</CancelButton>
               <ConfirmButton onClick={handleImpressSubmit}>Confirmar</ConfirmButton>
@@ -225,9 +265,35 @@ export default function PersonalizacionComponent({ workOrder }: Props) {
       <ModalOverlay>
         <ModalContent>
           <ModalTitle>Preguntas del Área: {workOrder.area.name}</ModalTitle>
-          <Label><input type="radio" value="etiquetadora" checked={selectedOption === 'etiquetadora'} onChange={(e) => setSelectedOption(e.target.value)} />Etiquetadora</Label>
-          <Label><input type="radio" value="persos" checked={selectedOption === 'persos'} onChange={(e) => setSelectedOption(e.target.value)} />Persos's</Label>
-          <Label><input type="radio" value="laser" checked={selectedOption === 'laser'} onChange={(e) => setSelectedOption(e.target.value)} />Láser</Label>
+          <RadioGroup>
+            <RadioButton $checked={selectedOption === 'etiquetadora'}>
+              <input
+                type="radio"
+                value="etiquetadora"
+                checked={selectedOption === 'etiquetadora'}
+                onChange={(e) => setSelectedOption(e.target.value)}
+              />
+              Etiquetadora
+            </RadioButton>
+            <RadioButton $checked={selectedOption === 'persos'}>
+              <input
+                type="radio"
+                value="persos"
+                checked={selectedOption === 'persos'}
+                onChange={(e) => setSelectedOption(e.target.value)}
+              />
+              Persos's
+            </RadioButton>
+            <RadioButton $checked={selectedOption === 'laser'}>
+              <input
+                type="radio"
+                value="laser"
+                checked={selectedOption === 'laser'}
+                onChange={(e) => setSelectedOption(e.target.value)}
+              />
+              Láser
+            </RadioButton>
+          </RadioGroup>
 
           {selectedOption === 'etiquetadora' && (
             <>
@@ -255,27 +321,51 @@ export default function PersonalizacionComponent({ workOrder }: Props) {
           {selectedOption === 'persos' && (
             <>
               <Table>
-                <thead>
-                  <tr>
-                    <th>Pregunta</th>
-                    <th>Respuesta</th>
-                  </tr>
-                </thead>
-                <tbody>
-                {workOrder.area.formQuestions.slice(1, 10).map((question: { id: number; title: string }) => (
-                  <tr key={question.id}>
-                    <td>{question.title}</td>
-                    <td>
-                      <input
-                        type="checkbox"
-                        checked={checkedQuestions.includes(question.id)}
-                        onChange={(e) => handleCheckboxChange(question.id, e.target.checked)}
-                      />
-                    </td>
-                  </tr>
-                ))}
-                </tbody>
-              </Table>
+  <thead>
+    <tr>
+      <th>Pregunta</th>
+      <th>
+        Respuesta
+        <button 
+          onClick={toggleQuestions} 
+          style={{ marginLeft: "3px", cursor: "pointer", border: "none", background: "transparent" }}
+        >
+          {questionsOpen ? '▼' : '▶'}
+        </button>
+        {questionsOpen && (
+          <input
+            type="checkbox"
+            checked={
+              workOrder.area.formQuestions.slice(1, 10).every((q: { id: number }) =>
+                checkedQuestions.includes(q.id)
+              )
+            }
+            onChange={(e) => handleSelectAll(e.target.checked)}
+            style={{ marginLeft: "8px" }}
+          />
+        )}
+      </th>
+    </tr>
+  </thead>
+
+  <tbody>
+    {questionsOpen &&
+      workOrder.area.formQuestions
+      .slice(1, 10)
+      .map((question: { id: number; title: string }) => (
+        <tr key={question.id}>
+          <td>{question.title}</td>
+          <td>
+            <input
+              type="checkbox"
+              checked={checkedQuestions.includes(question.id)}
+              onChange={(e) => handleCheckboxChange(question.id, e.target.checked)}
+            />
+          </td>
+        </tr>
+      ))}
+  </tbody>
+</Table>
               <InputGroup style={{ paddingTop: '30px', width: '70%'}}>
                 <Label>Color De Personalización:</Label>
                 <Input type="text" placeholder="Ej: " value={colorPersonalizacion} onChange={(e) => setColorPersonalizacion(e.target.value)}/>
@@ -295,8 +385,117 @@ export default function PersonalizacionComponent({ workOrder }: Props) {
             <Label style={{ paddingTop: '30px'}}>Muestras:</Label>
             <Input type="number" placeholder="Ej: 2" value={sampleQuantity} onChange={handleSampleQuantityChange}/>
           </InputGroup>
-          <CloseButton onClick={closeModal}>Cerrar</CloseButton>
-          <SubmitButton onClick={handleSubmit}>Enviar Respuestas</SubmitButton>
+          {selectedOption === 'etiquetadora' && (
+            <>
+              <ModalTitle style={{ marginTop: '1.5rem', marginBottom: '0.3rem'}}>
+                Preguntas de Calidad
+                <button onClick={toggleQualitySection} style={{ marginLeft: '10px',cursor: "pointer", border: "none", background: "transparent", fontSize: "1.2rem" }}>{qualitySectionOpen ? '▼' : '▶'}</button>
+              </ModalTitle>
+              {qualitySectionOpen && (
+              <>
+              <InputGroup style={{ paddingTop: '10px', width: '70%'}}>
+                <Label>No hay preguntas</Label>
+              </InputGroup>
+              </>
+              )}
+            </>
+          )}
+          {selectedOption === 'persos' && (
+            <>
+              <ModalTitle style={{ marginTop: '1.5rem', marginBottom: '0.3rem'}}>
+                Preguntas de Calidad
+                <button onClick={toggleQualitySection} style={{ marginLeft: '10px',cursor: "pointer", border: "none", background: "transparent", fontSize: "1.2rem" }}>{qualitySectionOpen ? '▼' : '▶'}</button>
+              </ModalTitle>
+              {qualitySectionOpen && (
+              <>
+              <Table>
+                <thead>
+                  <tr>
+                    <th>Pregunta</th>
+                    <th>
+                      Respuesta
+                      <button onClick={toggleQuestions} style={{ marginLeft: "8px", cursor: "pointer", border: "none", background: "transparent" }}>{questionsOpen ? '▼' : '▶'}</button>
+                    </th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {questionsOpen && workOrder.area.formQuestions
+                  .slice(13, 16)
+                  .filter((question: { role_id: number | null }) => question.role_id === 3)
+                  .map((question: { id: number; title: string }) => {
+                    // Buscar la respuesta correspondiente a esta pregunta
+                    const answer = workOrder.answers[0]?.FormAnswerResponse?.find(
+                      (resp: any) => resp.question_id === question.id
+                    );
+                    return (
+                      <tr key={question.id}>
+                        <td>{question.title}</td>
+                        <td></td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </Table>
+              <InputGroup style={{ paddingTop: '10px', width: '70%'}}>
+                <Label>Validar Carga De Aplicación (PersoMaster)</Label>
+                <Input type="text" placeholder="Ej: " disabled/>
+              </InputGroup>
+              </>
+              )}
+            </>
+          )}
+          {selectedOption === 'laser' && (
+            <>
+              <ModalTitle style={{ marginTop: '1.5rem', marginBottom: '0.3rem'}}>
+                Preguntas de Calidad
+                <button onClick={toggleQualitySection} style={{ marginLeft: '10px',cursor: "pointer", border: "none", background: "transparent", fontSize: "1.2rem" }}>{qualitySectionOpen ? '▼' : '▶'}</button>
+              </ModalTitle>
+              {qualitySectionOpen && (
+              <>
+              <Table>
+                <thead>
+                  <tr>
+                    <th>Pregunta</th>
+                    <th>
+                      Respuesta
+                      <button onClick={toggleQuestions} style={{ marginLeft: "8px", cursor: "pointer", border: "none", background: "transparent" }}>{questionsOpen ? '▼' : '▶'}</button>
+                    </th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {questionsOpen && workOrder.area.formQuestions
+                  .slice(9, 13)
+                  .filter((question: { role_id: number | null }) => question.role_id === 3)
+                  .map((question: { id: number; title: string }) => {
+                    // Buscar la respuesta correspondiente a esta pregunta
+                    const answer = workOrder.answers[0]?.FormAnswerResponse?.find(
+                      (resp: any) => resp.question_id === question.id
+                    );
+                    return (
+                      <tr key={question.id}>
+                        <td>{question.title}</td>
+                        <td></td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </Table>
+              <InputGroup style={{ paddingTop: '10px', width: '70%'}}>
+              <Label>Verificar Script / Layout Vs Ot / Autorizacion:</Label>
+              <Input type="text" placeholder="Ej: " disabled/>
+              <Label>Validar, Anotar KVC (Llaves), Carga de Aplicación o Prehabilitación:</Label>
+              <Input type="text" placeholder="Ej: " disabled/>
+              <Label>Describir Apariencia Del Quemado Del Laser (Color):</Label>
+              <Input type="text" placeholder="Ej: " disabled/>
+            </InputGroup>
+              </>
+              )}
+            </>
+          )}
+          <div style={{ display: 'flex', gap: '1rem'}}>
+            <CloseButton onClick={closeModal}>Cerrar</CloseButton>
+            <SubmitButton onClick={handleSubmit}>Enviar Respuestas</SubmitButton>
+          </div>
         </ModalContent>
       </ModalOverlay>
     )}
@@ -385,20 +584,34 @@ const Input = styled.input`
 
 const RadioGroup = styled.div`
   display: flex;
-  gap: 2rem;
-  margin-top: 0.5rem;
+  gap: 1rem;
+  margin-bottom: 1.5rem;
+  justify-content: center;
+  flex-wrap: wrap;
 `;
 
-const RadioLabel = styled.label`
-  display: flex;
-  align-items: center;
-  gap: 0.5rem;
-  font-weight: 500;
-  color: #374151;
-`;
+interface RadioButtonProps {
+  $checked: boolean;
+}
 
-const Radio = styled.input`
-  accent-color: #2563eb;
+const RadioButton = styled.label<RadioButtonProps>`
+  padding: 0.5rem 1.5rem;
+  border-radius: 9999px;
+  border: 2px solid ${({ $checked }) => ($checked ? '#2563eb' : '#d1d5db')};
+  background-color: ${({ $checked }) => ($checked ? '#2563eb' : 'white')};
+  color: ${({ $checked }) => ($checked ? 'white' : '#374151')};
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  user-select: none;
+
+  input {
+    display: none;
+  }
+
+  &:hover {
+    border-color: #2563eb;
+  }
 `;
 
 const Textarea = styled.textarea`
@@ -443,14 +656,18 @@ const CqmButton = styled.button`
   margin-top: 2rem;
   background-color: ${({ disabled }) => (disabled ? 'green' : '#2563eb')};
   color: white;
-  padding: 0.1rem 1rem;
-  height: 50px;
+  padding: 0.75rem 2rem;
   border-radius: 0.5rem;
   font-weight: 600;
   transition: background 0.3s;
+  cursor: ${({ disabled }) => (disabled ? 'not-allowed' : 'pointer')};
 
   &:hover {
-    background-color: #1d4ed8;
+    ${({ disabled }) =>
+      !disabled &&
+      `
+        background-color: #1d4ed8;
+      `}
   }
 `;
 
@@ -466,13 +683,17 @@ const ModalOverlay = styled.div`
   align-items: center;
   justify-content: center;
   z-index: 999;
+  overflow-y: auto;
 `;
 
 const ModalContent = styled.div`
   background: white;
   padding: 2rem;
   border-radius: 1rem;
-  max-width: 600px;
+  justify-content: center;
+  max-width: 700px;
+  max-height: 80%;
+  overflow-y: auto;
   width: 90%;
   box-shadow: 0 10px 25px rgba(0,0,0,0.2);
 `;
@@ -524,7 +745,7 @@ const CloseButton = styled.button`
 
 const SubmitButton = styled.button`
   margin-top: 1.5rem;
-  background-color: #4CAF50;
+  background-color: #2563eb;
   color: white;
   padding: 0.75rem 2rem;
   border-radius: 0.5rem;
@@ -532,7 +753,7 @@ const SubmitButton = styled.button`
   transition: background 0.3s;
   
   &:hover {
-    background-color: #45a049;
+    background-color: #1D4ED8;
   }
 `;
 

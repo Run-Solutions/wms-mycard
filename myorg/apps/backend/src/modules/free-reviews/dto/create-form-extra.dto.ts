@@ -13,11 +13,14 @@ export class RadioEmpalDto {
 
 export class ExtraDataEmpalDto {
   color: string;
+  validar_inlays: string;
   holographic_type: string;
 }
   
 export class CreateFormExtraDto {
   form_answer_id: number;
+  frente: CheckboxDto[];
+  vuelta: CheckboxDto[];
   checkboxes: CheckboxDto[];
   radio: RadioDto;
 }

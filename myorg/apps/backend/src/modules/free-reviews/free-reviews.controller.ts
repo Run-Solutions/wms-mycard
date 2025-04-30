@@ -52,6 +52,11 @@ export class FreeReviewsController {
     return await this.FreeReviewsService.postFormExtra(dto);
   }
   
+  @Post('form-extra-impresion')
+  async postFormExtraImpresion(@Body() dto: CreateFormExtraDto) {
+    return await this.FreeReviewsService.postFormExtraImpresion(dto);
+  }
+  
   // Para adjuntar las respuestas de calidad 
   @Post('form-extra-seri')
   async postFormExtraSeri(@Body() dto: CreateFormExtraDto) {

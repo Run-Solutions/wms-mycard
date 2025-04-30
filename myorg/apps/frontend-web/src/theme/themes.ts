@@ -4,30 +4,51 @@ import { createTheme } from '@mui/material/styles';
 export const theme1 = createTheme({
   palette: {
     mode: 'light',
-    primary: { main: '#0038A8' },
-    secondary: { main: '#0057D9' },
-    background: { default: '#F5F7FA', paper: '#F5F7FA' }, // Fondo blanco
-    text: { primary: '#1E1E1E', secondary: '#4A4A4A' },
+    primary: { main: '#0038A8' },        
+    secondary: { main: '#007FFF' },     
+    background: { default: '#F9FAFB', paper: '#FFFFFF' },
+    text: { primary: '#202124', secondary: '#5F6368' },
+    error: { main: '#D32F2F' },
+    success: { main: '#388E3C' },
   },
   typography: {
-    fontFamily: 'Arial, sans-serif !important',
+    fontFamily: 'Arial, sans-serif',
   },
   components: {
-    MuiAppBar: { styleOverrides: { root: { backgroundColor: '#6adbef' } } },
+    MuiAppBar: {
+      styleOverrides: {
+        root: {
+          backgroundColor: '#0038A8',  
+          color: '#FFFFFF',
+        },
+      },
+    },
   },
 });
 
 export const theme2 = createTheme({
   palette: {
     mode: 'dark',
-    primary: { main: '#1A4DB7' },
-    secondary: { main: '#297CDA' },
-    background: { default: '#121212', paper: '#424242' },
-    text: { primary: '#B0B0B0', secondary: '#b0bec5' },
+    primary: { main: '#0038A8' },       
+    secondary: { main: '#5C9DED' },     
+    background: { default: '#121212', paper: '#1E1E1E' },
+    text: { primary: '#E0E0E0', secondary: '#B0BEC5' },
+    error: { main: '#EF5350' },
+    success: { main: '#66BB6A' },
   },
   typography: {
-    fontFamily: 'Arial, sans-serif !important',
-  }
+    fontFamily: 'Arial, sans-serif',
+  },
+  components: {
+    MuiAppBar: {
+      styleOverrides: {
+        root: {
+          backgroundColor: '#0038A8',    
+          color: '#FFFFFF',
+        },
+      },
+    },
+  },
 });
 /*
 export const theme3 = createTheme({

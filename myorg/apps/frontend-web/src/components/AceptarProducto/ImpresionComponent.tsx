@@ -4,14 +4,6 @@ import { useRouter } from "next/navigation";
 import { useState, useEffect } from "react";
 import styled from "styled-components";
 
-// Define un tipo para los valores del formulario
-type PrepressData = {
-  plates: string;
-  positives: string;
-  testType: string;
-  comments: string;
-};
-
 type ImpressionData = {
   release_quantity: string;
   comments: string;
@@ -25,319 +17,157 @@ export default function ImpresionComponentAccept({ workOrder }: Props) {
   const router = useRouter();
   const [message, setMessage] = useState('');
   const [showConfirm, setShowConfirm] = useState(false);
+  const [showInconformidad, setShowInconformidad] = useState(false);
+  const [inconformidad, setInconformidad] = useState<string>('');
 
-  // Estado para saber si los valores han sido modificados y para habilitar o deshabilitar el botón
-  const [isModified, setIsModified] = useState(false);
-  const [isDisabled, setIsDisabled] = useState(true);
+  const [defaultValues, setDefaultValues] = useState<ImpressionData>({
+    release_quantity: "",
+    comments: "",
+  });
 
   const lastCompleted = [...workOrder.workOrder.flow]
-    .reverse()
-    .find((item) => item.status === "Completado");
-
+  .reverse()
+  .find((item) => item.status === "Completado");
   const previousArea = lastCompleted?.area.id;
+
   console.log('area previa',previousArea);
 
-  if (previousArea >= 2) {
-    // Estados tipados para los valores predeterminados y actuales
-    const [defaultValues, setDefaultValues] = useState<ImpressionData>({
-      release_quantity: "",
-      comments: "",
-    });
-
-    const [currentValues, setCurrentValues] = useState<ImpressionData>({
-      release_quantity: "",
-      comments: "",
-    });
-
-    useEffect(() => {
-      // Al iniciar, configuramos los valores predeterminados y actuales
-      const lastCompleted = [...workOrder.workOrder.flow]
-        .reverse()
-        .find((item) => item.status === "Completado");
-      console.log('Area previa', lastCompleted);
-      if (lastCompleted?.areaResponse?.impression) {
-        const vals: ImpressionData = {
-          release_quantity: lastCompleted.areaResponse.impression.release_quantity || "",
-          comments: lastCompleted.areaResponse.impression.comments || "",
-        };
-        setDefaultValues(vals);
-        setCurrentValues(vals);
-        // El botón se mantiene deshabilitado hasta que haya un cambio
-        setIsModified(false);
-        setIsDisabled(true);
-      }
-    }, [workOrder]);
-
-    const handleInputChange = (event: React.ChangeEvent<HTMLInputElement>) => {
-      const { name, value } = event.target;
-      // Cast de name para que TypeScript sepa que es una clave de PrepressData
-      const key = name as keyof PrepressData;
-
-      // Actualizamos el estado de currentValues
-      const newValues = { ...currentValues, [key]: value };
-      setCurrentValues(newValues);
-
-      // Comparamos los valores actuales con los predeterminados
-      if (
-        newValues.release_quantity === defaultValues.release_quantity &&
-        newValues.comments === defaultValues.comments
-      ) {
-        setIsModified(false);
-        setIsDisabled(true);
-      } else {
-        setIsModified(true);
-        setIsDisabled(false);
-      }
-    };
-
-    const handleSubmit = async (e: React.FormEvent) => {
-      e.preventDefault();
-      if (!currentValues.release_quantity) {
-        alert('Por favor, asegurate de que no haya inconformidades con las cantidades entregadas.');
-        return;
-      }
-      const token = localStorage.getItem('token');
-      const flowId = workOrder.id;
-      console.log(flowId);
-      try {
-        const res = await fetch(`http://localhost:3000/work-order-flow/${flowId}/accept`, {
-          method: 'PATCH',
-          headers: {
-            'Content-Type': 'application/json',
-            'Authorization': `Bearer ${token}`,
-          },
-        });
-        const data = await res.json();
-        if (res.ok) {
-          router.push('/aceptarProducto');
-        }
-      } catch (error) {
-        console.error(error);
-        alert('Error al conectar con el servidor');
-      }
+  useEffect(() => {
+    // Al iniciar, configuramos los valores predeterminados y actuales
+    const lastCompleted = [...workOrder.workOrder.flow]
+      .reverse()
+      .find((item) => item.status === "Completado");
+    console.log('Area previa', lastCompleted);
+    if (lastCompleted?.areaResponse?.impression) {
+      const vals: ImpressionData = {
+        release_quantity: lastCompleted.areaResponse.impression.release_quantity || "",
+        comments: lastCompleted.areaResponse.impression.comments || "",
+      };
+      setDefaultValues(vals);
     }
+  }, [workOrder]);
 
-    return (
-      <Container>
-        <Title>Área: {workOrder?.area.name || "No definida"}</Title>
-        <DataWrapper>
-          <InfoItem>
-            <Label>Número de Orden:</Label>
-            <Value>{workOrder.workOrder.ot_id}</Value>
-          </InfoItem>
-          <InfoItem>
-            <Label>ID del Presupuesto:</Label>
-            <Value>{workOrder.workOrder.mycard_id}</Value>
-          </InfoItem>
-          <InfoItem>
-            <Label>Área que lo envía:</Label>
-            <Value>{lastCompleted?.area.name || "No definida"}</Value>
-          </InfoItem>
-        </DataWrapper>
-        <NewData>
-          <SectionTitle>Datos de Producción</SectionTitle>
-          <NewDataWrapper>
-            <InputGroup>
-              <Label>Cantidad entregada:</Label>
-              <Input type="number" name="release_quantity" value={currentValues.release_quantity} onChange={handleInputChange}/>
-            </InputGroup>
-            <CqmButton disabled={!isModified}>Inconformidad</CqmButton>
-          </NewDataWrapper>
-          <InputGroup>
-            <SectionTitle>Comentarios</SectionTitle>
-            <Textarea
-              value={currentValues.comments}
-              disabled={isDisabled}
-            />
-          </InputGroup>
-        </NewData>
-        <AceptarButton onClick={() => setShowConfirm(true)}>Aceptar recepción del producto</AceptarButton>
-        {message && <p>{message}</p>}
-        {showConfirm && (
-          <ModalOverlay>
-            <ModalBox>
-              <h4>¿Estás segura/o que deseas liberar este producto?</h4>
-              <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '1rem', marginTop: '1rem' }}>
-                <CancelButton onClick={() => setShowConfirm(false)}>Cancelar</CancelButton>
-                <ConfirmButton onClick={handleSubmit}>Confirmar</ConfirmButton>
-              </div>
-            </ModalBox>
-          </ModalOverlay>
-        )}
-      </Container>
-    );
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!defaultValues.release_quantity) {
+      alert('Por favor, asegurate de que no haya inconformidades con las cantidades entregadas.');
+      return;
+    }
+    const token = localStorage.getItem('token');
+    const flowId = workOrder.id;
+    console.log(flowId);
+    try {
+      const res = await fetch(`http://localhost:3000/work-order-flow/${flowId}/accept`, {
+        method: 'PATCH',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`,
+        },
+      });
+      const data = await res.json();
+      if (res.ok) {
+        router.push('/aceptarProducto');
+      }
+    } catch (error) {
+      console.error(error);
+      alert('Error al conectar con el servidor');
+    }
   }
 
-  if (previousArea === 1) {
-    // Estados tipados para los valores predeterminados y actuales
-    const [defaultValues, setDefaultValues] = useState<PrepressData>({
-      plates: "",
-      positives: "",
-      testType: "",
-      comments: "",
-    });
-
-    const [currentValues, setCurrentValues] = useState<PrepressData>({
-      plates: "",
-      positives: "",
-      testType: "",
-      comments: "",
-    });
-
-    useEffect(() => {
-      // Al iniciar, configuramos los valores predeterminados y actuales
-      const lastCompleted = [...workOrder.workOrder.flow]
-        .reverse()
-        .find((item) => item.status === "Completado");
-      console.log('Area previa', lastCompleted);
-      if (lastCompleted?.areaResponse?.prepress) {
-        const vals: PrepressData = {
-          plates: lastCompleted.areaResponse.prepress.plates || "",
-          positives: lastCompleted.areaResponse.prepress.positives || "",
-          testType: lastCompleted.areaResponse.prepress.testType || "",
-          comments: lastCompleted.areaResponse.prepress.comments || "",
-        };
-        setDefaultValues(vals);
-        setCurrentValues(vals);
-        // El botón se mantiene deshabilitado hasta que haya un cambio
-        setIsModified(false);
-        setIsDisabled(true);
+  const handleSubmitInconformidad = async () => {
+    const token = localStorage.getItem('token');
+    console.log(lastCompleted.id);
+    console.log(inconformidad);
+    try {
+      const res = await fetch(`http://localhost:3000/work-order-flow/${lastCompleted.id}/inconformidad`, {
+        method: 'PATCH',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`,
+        },
+        body: JSON.stringify({inconformidad}),
+      });
+      const data = await res.json();
+      if (res.ok) {
+        router.push('/aceptarProducto');
       }
-    }, [workOrder]);
-
-    const handleInputChange = (event: React.ChangeEvent<HTMLInputElement>) => {
-      const { name, value } = event.target;
-      // Cast de name para que TypeScript sepa que es una clave de PrepressData
-      const key = name as keyof PrepressData;
-
-      // Actualizamos el estado de currentValues
-      const newValues = { ...currentValues, [key]: value };
-      setCurrentValues(newValues);
-
-      // Comparamos los valores actuales con los predeterminados
-      if (
-        newValues.plates === defaultValues.plates &&
-        newValues.positives === defaultValues.positives &&
-        newValues.comments === defaultValues.comments
-      ) {
-        setIsModified(false);
-        setIsDisabled(true);
-      } else {
-        setIsModified(true);
-        setIsDisabled(false);
-      }
-    };
-    const handleSubmit = async (e: React.FormEvent) => {
-      e.preventDefault();
-      if (!currentValues.plates) {
-        alert('Por favor, asegurate de que no haya inconformidades con las cantidades entregadas.');
-        return;
-      }
-      const token = localStorage.getItem('token');
-      const flowId = workOrder.id;
-      console.log(flowId);
-      try {
-        const res = await fetch(`http://localhost:3000/work-order-flow/${flowId}/accept`, {
-          method: 'PATCH',
-          headers: {
-            'Content-Type': 'application/json',
-            'Authorization': `Bearer ${token}`,
-          },
-        });
-        const data = await res.json();
-        if (res.ok) {
-          router.push('/aceptarProducto');
-        }
-      } catch (error) {
-        console.error(error);
-        alert('Error al conectar con el servidor');
-      }
+    } catch (error) {
+      console.error(error);
+      alert('Error al conectar con el servidor');
     }
-    return (
-      <Container>
-        <Title>Área: Impresión</Title>
-        <DataWrapper>
-          <InfoItem>
-            <Label>Número de Orden:</Label>
-            <Value>{workOrder.workOrder.ot_id}</Value>
-          </InfoItem>
-          <InfoItem>
-            <Label>ID del Presupuesto:</Label>
-            <Value>{workOrder.workOrder.mycard_id}</Value>
-          </InfoItem>
-          <InfoItem>
-            <Label>Área que lo envía:</Label>
-            <Value>{lastCompleted?.area.name || "No definida"}</Value>
-          </InfoItem>
-        </DataWrapper>
-        <NewData>
-          <SectionTitle>Cantidad entregada</SectionTitle>
-          <NewDataWrapper>
-            <InputGroup>
-              <Label>Placas:</Label>
-              <Input
-                type="number"
-                name="plates"
-                value={currentValues.plates}
-                onChange={handleInputChange}
-              />
-            </InputGroup>
-            <CqmButton disabled={!isModified}>Inconformidad</CqmButton>
-          </NewDataWrapper>
-          <NewDataWrapper>
-            <InputGroup>
-              <Label>Positivos:</Label>
-              <Input
-                type="number"
-                name="positives"
-                value={currentValues.positives}
-                onChange={handleInputChange}
-              />
-            </InputGroup>
-          </NewDataWrapper>
-          <SectionTitle>Tipo de Prueba</SectionTitle>
-          <RadioGroup>
-            <RadioLabel>
-              <Radio type="radio" name="prueba" value="color" checked={currentValues.testType === "color"} readOnly/>
-              Prueba de color
-            </RadioLabel>
-            <RadioLabel>
-              <Radio type="radio" name="prueba" value="fisica" checked={currentValues.testType === "fisica"} readOnly/>
-              Muestra física
-            </RadioLabel>
-            <RadioLabel>
-              <Radio type="radio" name="prueba" value="digital" checked={currentValues.testType === "digital"} readOnly/>
-              Prueba digital
-            </RadioLabel>
-          </RadioGroup>
-          <InputGroup>
-            <SectionTitle>Comentarios</SectionTitle>
-            <Textarea value={currentValues.comments} disabled={true} />
-          </InputGroup>
-        </NewData>
-        <AceptarButton type='button' onClick={() => setShowConfirm(true)}>Aceptar recepción del producto</AceptarButton>
-        {message && <p>{message}</p>}
-        {showConfirm && (
-          <ModalOverlay>
-            <ModalBox>
-              <h4>¿Estás segura/o que deseas liberar este producto?</h4>
-              <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '1rem', marginTop: '1rem' }}>
-                <CancelButton onClick={() => setShowConfirm(false)}>Cancelar</CancelButton>
-                <ConfirmButton onClick={handleSubmit}>Confirmar</ConfirmButton>
-              </div>
-            </ModalBox>
-          </ModalOverlay>
-        )}
-      </Container>
-    );
   }
 
   return (
     <Container>
-      <Title>Área no reconocida</Title>
+      <Title>Área: {workOrder?.area.name || "No definida"}</Title>
+      <DataWrapper>
+        <InfoItem>
+          <Label>Número de Orden:</Label>
+          <Value>{workOrder.workOrder.ot_id}</Value>
+        </InfoItem>
+        <InfoItem>
+          <Label>ID del Presupuesto:</Label>
+          <Value>{workOrder.workOrder.mycard_id}</Value>
+        </InfoItem>
+        <InfoItem>
+          <Label>Área que lo envía:</Label>
+          <Value>{lastCompleted?.area.name || "No definida"}</Value>
+        </InfoItem>
+      </DataWrapper>
+      <NewData>
+        <SectionTitle>Datos de Producción</SectionTitle>
+        <NewDataWrapper>
+          <InputGroup>
+            <Label>Cantidad entregada:</Label>
+            <Input type="number" name="release_quantity" value={defaultValues.release_quantity} disabled/>
+          </InputGroup>
+          <InconformidadButton onClick={() => setShowInconformidad(true)}>Inconformidad</InconformidadButton>
+        </NewDataWrapper>
+        <InputGroup>
+          <SectionTitle>Comentarios</SectionTitle>
+          <Textarea value={defaultValues.comments} disabled />
+        </InputGroup>
+      </NewData>
+      <AceptarButton onClick={() => setShowConfirm(true)}>Aceptar recepción del producto</AceptarButton>
+      {showConfirm && (
+        <ModalOverlay>
+          <ModalBox>
+            <h4>¿Estás segura/o que deseas liberar este producto?</h4>
+            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '1rem', marginTop: '1rem' }}>
+              <CancelButton onClick={() => setShowConfirm(false)}>Cancelar</CancelButton>
+              <ConfirmButton onClick={handleSubmit}>Confirmar</ConfirmButton>
+            </div>
+          </ModalBox>
+        </ModalOverlay>
+      )}
+      {showInconformidad && (
+        <ModalOverlay>
+          <ModalBox>
+            <h4>Registrar Inconformidad</h4>
+            <h3>Por favor, describe la inconformidad detectada con la cantidad entregada.</h3>
+            <Textarea
+              value={inconformidad}
+              onChange={(e) => setInconformidad(e.target.value)}
+              placeholder="Escribe aquí la inconformidad..."
+            />
+            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '1rem', marginTop: '1rem' }}>
+              <CancelButton onClick={() => setShowInconformidad(false)}>Cancelar</CancelButton>
+              <ConfirmButton onClick={() => {
+                console.log('Hpli');
+                if (!inconformidad.trim()) {
+                  alert('Debes ingresar una inconformidad antes de continuar.');
+                  return;
+                }
+                handleSubmitInconformidad();
+                setShowInconformidad(false);
+              }}>Guardar</ConfirmButton>
+            </div>
+          </ModalBox>
+        </ModalOverlay>
+      )}
     </Container>
   );
-}
+};
 
 // =================== Styled Components ===================
 
@@ -451,7 +281,7 @@ const AceptarButton = styled.button<{ disabled?: boolean }>`
   }
 `;
 
-const CqmButton = styled.button<{ disabled?: boolean }>`
+const InconformidadButton = styled.button<{ disabled?: boolean }>`
   height: 50px;
   background-color: ${({ disabled }) => (disabled ? "#D1D5DB" : "#2563EB")};
   color: white;

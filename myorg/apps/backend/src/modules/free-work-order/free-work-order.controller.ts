@@ -61,8 +61,7 @@ export class FreeWorkOrderController {
       const user = req.user;
       if(!user){
         throw new ForbiddenException('Usuario no autenticado.');
-      }
-            
+      }   
       return await this.FreeWorkOrderService.getWorkOrderFlowById(id, user.areas_operator_id);
     }
     
@@ -74,7 +73,27 @@ export class FreeWorkOrderController {
     
     // Para guardar respuesta de form cqm de impresion
     @Post('cqm-impression')
-    async saveFormAnswers(@Body() dto: CreateFormAnswerImpressionDto) {
+    async saveFormAnswersImpression(@Body() dto: CreateFormAnswerImpressionDto) {
+      const formAnswer = await this.FreeWorkOrderService.saveFormAnswersImpression(dto);
+      return formAnswer;
+    }
+    
+    // Para guardar respuesta de form cqm de impresion
+    @Post('cqm-serigrafia')
+    async saveFormAnswersSerigrafia(@Body() dto: CreateFormAnswerImpressionDto) {
+      const formAnswer = await this.FreeWorkOrderService.saveFormAnswers(dto);
+      return formAnswer;
+    }
+    
+    // Para guardar respuesta de form cqm de impresion
+    @Post('cqm-empalme')
+    async saveFormAnswersEmpalme(@Body() dto: CreateFormAnswerImpressionDto) {
+      const formAnswer = await this.FreeWorkOrderService.saveFormAnswers(dto);
+      return formAnswer;
+    }
+    
+    @Post('cqm-corte')
+    async saveFormAnswersCorte(@Body() dto: CreateFormAnswerImpressionDto) {
       const formAnswer = await this.FreeWorkOrderService.saveFormAnswers(dto);
       return formAnswer;
     }
@@ -118,6 +137,12 @@ export class FreeWorkOrderController {
     @Post('impress')
     createImpressResponse(@Body() dto: CreateImpressResponseDto) {
       return this.FreeWorkOrderService.createImpressResponse(dto);
+    }
+    
+    // Para guardar respuesta de liberacion de Impresion
+    @Post('serigrafia')
+    createSerigrafiaResponse(@Body() dto: CreateImpressResponseDto) {
+      return this.FreeWorkOrderService.createSerigrafiaResponse(dto);
     }
 
     // Para guardar respuesta de form cqm de impresion

@@ -113,33 +113,39 @@ export class CloseAuditoryWorkOrderService {
                     corte: {
                       include: {
                         form_answer: true,
+                        formAuditory: true,
+                      }
+                    },
+                    colorEdge: {
+                      include: {
+                        form_answer: true,
+                        formAuditory: true,
+                      }
+                    },
+                    hotStamping: {
+                      include: {
+                        form_answer: true,
+                        formAuditory: true,
+                      }
+                    },
+                    millingChip: {
+                      include: {
+                        form_answer: true,
+                        formAuditory: true,
+                      }
+                    },
+                    personalizacion: {
+                      include: {
+                        form_answer: true,
+                        formAuditory: true,
                       }
                     }
                   },
                 },
               },
             },
-            areasResponses: {
-              include: {
-                corte: true,
-              }
-            },
-            formAnswers: {
-              include: {
-                corteResponse: true,
-                colorEdgeResponse: true,
-                hotStampingResponse: true,
-                millingChipResponse: true, 
-                personalizacionResponse: true,
-              }
-            }
           },
         },
-        answers: {
-          include: {
-            corteResponse: true
-          }
-        }
       },
     });
     if(!workOrderFlow) {
@@ -184,8 +190,17 @@ export class CloseAuditoryWorkOrderService {
             status: 'Pendiente',
           }
         });
+      } else {
+        await tx.workOrder.update({
+          where: {
+            id: dto.workOrderId,
+          },
+          data: {
+            status: 'Listo',
+          },
+        });
       }
       return { message: 'Respuesta guardada con exito'};
-    })
+    });
   }
 }

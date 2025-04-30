@@ -13,6 +13,7 @@ import { AcceptAuditoryWorkOrderModule } from './modules/accept-auditory-work-or
 import { FreeReviewsModule } from './modules/free-reviews/free-reviews.module';
 import { WorkOrderModule } from './modules/work-order/work-order.module';
 import { FreeWorkOrderModule } from './modules/free-work-order/free-work-order.module';
+import { InconformitiesModule } from './modules/inconformities/inconformities.module';
 import { AcceptReviewsModule } from './modules/accept-reviews/accept-reviews.module';
 import { PermissionsModule } from './modules/permissions/permissions.module';
 import { PrismaService } from 'prisma/prisma.service';
@@ -30,6 +31,7 @@ import { PrismaService } from 'prisma/prisma.service';
     FreeReviewsModule,
     WorkOrderModule,
     FreeWorkOrderModule,
+    InconformitiesModule,
     AcceptReviewsModule,
     PermissionsModule,
   ],

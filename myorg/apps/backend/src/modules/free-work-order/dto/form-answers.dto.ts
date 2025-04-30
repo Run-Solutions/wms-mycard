@@ -13,6 +13,14 @@ export class CreateFormAnswerImpressionDto {
     @IsArray()
     @IsBoolean({ each: true })
     response: boolean[];
+    
+    @IsArray()
+    @IsBoolean({ each: true })
+    frente: boolean[];
+    
+    @IsArray()
+    @IsBoolean({ each: true })
+    vuelta: boolean[];
   
     @IsBoolean()
     @IsOptional()

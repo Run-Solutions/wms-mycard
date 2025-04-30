@@ -85,6 +85,13 @@ export default function CorteComponentAccept({ workOrder }: Props) {
 
     const handleSubmit = async (e: React.FormEvent) => {
       e.preventDefault();
+      if (
+        currentValues.release_quantity !== defaultValues.release_quantity ||
+        currentValues.comments !== defaultValues.comments
+      ) {
+        alert('No se permite modificar los valores entregados por el área anterior.');
+        return;
+      }
       if (!currentValues.release_quantity) {
         alert('Por favor, asegurate de que no haya inconformidades con las cantidades entregadas.');
         return;

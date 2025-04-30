@@ -4,7 +4,6 @@
 import React, { useEffect, useState } from 'react';
 import styled, { useTheme } from 'styled-components';
 import { useRouter } from 'next/navigation';
-import { Table, TableBody, TableCell, TableContainer, TableHead, TableRow, Paper, Typography} from '@mui/material';
 import WorkOrderTable from '@/components/LiberarProducto/WorkOrderTable';
 
 // Se define el tipo de datos
@@ -50,7 +49,7 @@ const FreeProductPage: React.FC = () => {
 
   // Para obtener Ordenes En Proceso
   const [WorkOrders, setWorkOrders] = useState<WorkOrder[]>([]);
-  const [message, setMessage] = useState('');
+  const [currentAreaId, setCurrentAreaId] = useState<number | null>(null);
 
   useEffect (() => {
     async function fetchWorkOrdersInProgress() {
@@ -78,6 +77,11 @@ const FreeProductPage: React.FC = () => {
         console.log('Datos obtenidos de las Ordenes en Proceso: ', data);
         setWorkOrders(data);
 
+        // Si hay órdenes, obtenemos el area_id de la primera (todas serán del mismo área)
+        if (data.length > 0) {
+          setCurrentAreaId(data[0].area_id);
+        }
+
       } catch (err) {
         console.error(err);
         console.error('Error en fetchWorkOrdersInProgress', err);
@@ -85,14 +89,18 @@ const FreeProductPage: React.FC = () => {
     }
     fetchWorkOrdersInProgress();
   },[]);
+
   return (
     <PageContainer>
       <TitleWrapper>
         <Title>Mis Ordenes</Title>
       </TitleWrapper>
-      <WorkOrderTable orders={WorkOrders} title="Órdenes en Proceso" statusFilter="En proceso" />
-      <WorkOrderTable orders={WorkOrders} title="Órdenes enviadas a Calidad" statusFilter="Enviado a CQM" />
-      <WorkOrderTable orders={WorkOrders} title="Órdenes pendientes por Liberar" statusFilter="Listo" />
+      <WorkOrderTable orders={WorkOrders} title="Órdenes en Proceso" statusFilter={["En Proceso", "Enviado a CQM"]} />
+      {currentAreaId !==1 && (
+        <>
+        <WorkOrderTable orders={WorkOrders} title="Órdenes pendientes por Liberar" statusFilter="Listo" />
+        </>
+      )}
     </PageContainer>
   );
 };
@@ -106,7 +114,7 @@ interface StyledProps {
 }
 
 const PageContainer = styled.div`
-  padding: 1rem 2rem;
+  padding: 20px 20px 20px 50px;
   margin-top: -70px;
   width: 100%;
   align-content: flex-start;

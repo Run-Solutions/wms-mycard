@@ -1,5 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import { PrismaService } from 'prisma/prisma.service';
+import { AcceptAuditoryDto } from './dto/accept-workorder-response';
 
 @Injectable()
 export class AcceptAuditoryWorkOrderService {
@@ -39,7 +40,7 @@ export class AcceptAuditoryWorkOrderService {
   }
 
   // Para que el auditor acepte la orden de corte
-  async acceptWorkOrderResponse(id: number, userId: number){
+  async acceptWorkOrderResponse(id: number, userId: number, dto: AcceptAuditoryDto){
     const corte = await this.prisma.corteResponse.findUnique({
       where: { id },
       include: { 
@@ -58,6 +59,7 @@ export class AcceptAuditoryWorkOrderService {
       where: { id: corte.form_auditory_id },
       update: {
         reviewed_by_id: userId,
+        sample_auditory: dto.sample_auditory,
       },
       create: {
         id: corte.id,
@@ -75,7 +77,7 @@ export class AcceptAuditoryWorkOrderService {
   }
 
   // Para que el auditor acepte la orden de color edge
-  async acceptWorkOrderResponseColorEdge(id: number, userId: number){
+  async acceptWorkOrderResponseColorEdge(id: number, userId: number, dto: AcceptAuditoryDto){
     const colorEdge = await this.prisma.colorEdgeResponse.findUnique({
       where: { id },
       include: { 
@@ -94,6 +96,7 @@ export class AcceptAuditoryWorkOrderService {
       where: { id: colorEdge.form_auditory_id },
       update: {
         reviewed_by_id: userId,
+        sample_auditory: dto.sample_auditory,
       },
       create: {
         id: colorEdge.form_auditory_id,
@@ -111,7 +114,7 @@ export class AcceptAuditoryWorkOrderService {
   }
   
   // Para que el auditor acepte la orden de hot stamping
-  async acceptWorkOrderResponseHotStamping(id: number, userId: number){
+  async acceptWorkOrderResponseHotStamping(id: number, userId: number, dto: AcceptAuditoryDto){
     const hotStamping = await this.prisma.hotStampingResponse.findUnique({
       where: { id },
       include: { 
@@ -130,6 +133,7 @@ export class AcceptAuditoryWorkOrderService {
       where: { id: hotStamping.form_auditory_id },
       update: {
         reviewed_by_id: userId,
+        sample_auditory: dto.sample_auditory,
       },
       create: {
         id: hotStamping.form_auditory_id,
@@ -147,7 +151,7 @@ export class AcceptAuditoryWorkOrderService {
   }
   
   // Para que el auditor acepte la orden de milling chip
-  async acceptWorkOrderResponseMillingChip(id: number, userId: number){
+  async acceptWorkOrderResponseMillingChip(id: number, userId: number, dto: AcceptAuditoryDto){
     const millingChip = await this.prisma.millingChipResponse.findUnique({
       where: { id },
       include: { 
@@ -166,6 +170,7 @@ export class AcceptAuditoryWorkOrderService {
       where: { id: millingChip.form_auditory_id },
       update: {
         reviewed_by_id: userId,
+        sample_auditory: dto.sample_auditory,
       },
       create: {
         id: millingChip.form_auditory_id,
@@ -183,7 +188,7 @@ export class AcceptAuditoryWorkOrderService {
   }
   
   // Para que el auditor acepte la orden de personalizacion
-  async acceptWorkOrderResponsePersonalizacion(id: number, userId: number){
+  async acceptWorkOrderResponsePersonalizacion(id: number, userId: number, dto: AcceptAuditoryDto){
     const personalizacion = await this.prisma.personalizacionResponse.findUnique({
       where: { id },
       include: { 
@@ -202,6 +207,7 @@ export class AcceptAuditoryWorkOrderService {
       where: { id: personalizacion.form_auditory_id },
       update: {
         reviewed_by_id: userId,
+        sample_auditory: dto.sample_auditory,
       },
       create: {
         id: personalizacion.form_auditory_id,

@@ -1,5 +1,5 @@
 /* myorg\apps\backend\src\modules\users\users.controller.ts */
-import { Controller, Get, Patch, Param, Body, UseInterceptors, UploadedFile } from '@nestjs/common';
+import { Controller, Get, Delete, Patch, Param, Body, UseInterceptors, UploadedFile } from '@nestjs/common';
 import { UsersService } from './users.service';
 import { UpdateUserDto } from '../../auth/dto/update-user.dto';
 import { FileInterceptor } from '@nestjs/platform-express';
@@ -42,4 +42,9 @@ export class UsersController {
     const updatedUser = await this.usersService.updateUser(id, updateUserDto);
     return updatedUser;
   }
+  
+  @Delete(':id')
+  async deleteUser(@Param('id') id: string) {
+    return this.usersService.deleteUser(id);
+}
 }

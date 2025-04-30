@@ -61,6 +61,12 @@ export default function HotStampingComponent({ workOrder }: Props) {
     );
   };
 
+  // Para ver las preguntas de calidad
+  const [qualitySectionOpen, setQualitySectionOpen] = useState(false);
+  const toggleQualitySection = () => {
+    setQualitySectionOpen(!qualitySectionOpen);
+  };
+
   // Para mandar la OT a evaluacion por CQM
   const handleSubmit = async () => {
     const payload = {
@@ -194,7 +200,7 @@ export default function HotStampingComponent({ workOrder }: Props) {
     {showConfirm && (
         <ModalOverlay>
           <ModalBox>
-            <h4>¿Estás segura/o que deseas liberar este prducto?</h4>
+            <h4>¿Estás segura/o que deseas liberar este producto?</h4>
             <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '1rem', marginTop: '1rem' }}>
               <CancelButton onClick={() => setShowConfirm(false)}>Cancelar</CancelButton>
               <ConfirmButton onClick={handleImpressSubmit}>Confirmar</ConfirmButton>
@@ -260,8 +266,38 @@ export default function HotStampingComponent({ workOrder }: Props) {
             <Label style={{ paddingTop: '30px'}}>Muestras:</Label>
             <Input type="number" placeholder="Ej: 2" value={sampleQuantity} onChange={handleSampleQuantityChange}/>
           </InputGroup>
-          <CloseButton onClick={closeModal}>Cerrar</CloseButton>
-          <SubmitButton onClick={handleSubmit}>Enviar Respuestas</SubmitButton>
+          <ModalTitle style={{ marginTop: '1.5rem', marginBottom: '0.3rem'}}>
+            Preguntas de Calidad
+            <button onClick={toggleQualitySection} style={{ marginLeft: '10px',cursor: "pointer", border: "none", background: "transparent", fontSize: "1.2rem" }}>{qualitySectionOpen ? '▼' : '▶'}</button>
+          </ModalTitle>
+          {qualitySectionOpen && (
+          <>
+          <Table>
+            <thead>
+              <tr>
+                <th>Pregunta</th>
+                <th>
+                  Respuesta
+                </th>
+              </tr>
+            </thead>
+            <tbody>
+              {workOrder.area.formQuestions
+              .filter((question: { role_id: number | null }) => question.role_id === 3)
+              .map((question: { id: number; title: string }) => (
+                <tr key={question.id}>
+                  <td>{question.title}</td>
+                  <td><input type="checkbox" checked={checkedQuestions.includes(question.id)} onChange={(e) => handleCheckboxChange(question.id, e.target.checked)}/></td>
+                </tr>
+              ))}
+            </tbody>
+          </Table>
+          </>
+          )}
+          <div style={{ display: 'flex', gap: '1rem'}}>
+            <CloseButton onClick={closeModal}>Cerrar</CloseButton>
+            <SubmitButton onClick={handleSubmit}>Enviar Respuestas</SubmitButton>
+          </div>
         </ModalContent>
       </ModalOverlay>
     )}
@@ -431,13 +467,17 @@ const ModalOverlay = styled.div`
   align-items: center;
   justify-content: center;
   z-index: 999;
+  overflow-y: auto;
 `;
 
 const ModalContent = styled.div`
   background: white;
   padding: 2rem;
   border-radius: 1rem;
-  max-width: 600px;
+  justify-content: center;
+  max-width: 700px;
+  max-height: 80%;
+  overflow-y: auto;
   width: 90%;
   box-shadow: 0 10px 25px rgba(0,0,0,0.2);
 `;

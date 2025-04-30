@@ -1,6 +1,5 @@
 'use client'
 
-
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 import styled from "styled-components";
@@ -17,11 +16,9 @@ export default function ImpresionComponent({ workOrder }: Props) {
 
   // Para mostrar formulario de CQM y enviarlo
   const [showModal, setShowModal] = useState(false);
-
   const openModal = () => {
     setShowModal(true);
   };
-
   const closeModal = () => {
     setShowModal(false);
   };
@@ -31,6 +28,8 @@ export default function ImpresionComponent({ workOrder }: Props) {
   const [sampleQuantity, setSampleQuantity] = useState<number | string>('');
 
   // Para controlar qué preguntas están marcadas
+  const [checkedQuestionsFrente, setCheckedQuestionsFrente] = useState<number[]>([]);
+  const [checkedQuestionsVuelta, setCheckedQuestionsVuelta] = useState<number[]>([]);
   const [checkedQuestions, setCheckedQuestions] = useState<number[]>([]);
 
   // Función para manejar el cambio en el campo de muestras
@@ -38,33 +37,121 @@ export default function ImpresionComponent({ workOrder }: Props) {
     setSampleQuantity(e.target.value);
   };
 
-  const handleCheckboxChange = (questionId: number, isChecked: boolean) => {
+  const handleCheckboxChange = (
+    questionId: number,
+    isChecked: boolean,
+    setCheckedQuestions: React.Dispatch<React.SetStateAction<number[]>>
+  ) => {
     setResponses((prevResponses) => {
-      const updateResponses = prevResponses.filter(response => response.questionId !== questionId);
-      if(isChecked) { 
-        updateResponses.push({ questionId, answer: isChecked}); 
+      const updateResponses = prevResponses.filter(
+        (response) => response.questionId !== questionId
+      );
+      if (isChecked) {
+        updateResponses.push({ questionId, answer: isChecked });
       }
       return updateResponses;
     });
-
-    // Actualizar visualmente el checkbox
+  
     setCheckedQuestions((prev) =>
       isChecked ? [...prev, questionId] : prev.filter((id) => id !== questionId)
     );
   };
+  
+  // Uso:
+  const handleCheckboxChangeFrente = (questionId: number, isChecked: boolean) => {
+    handleCheckboxChange(questionId, isChecked, setCheckedQuestionsFrente);
+  };
+  
+  const handleCheckboxChangeVuelta = (questionId: number, isChecked: boolean) => {
+    handleCheckboxChange(questionId, isChecked, setCheckedQuestionsVuelta);
+  };
+
+  // Para ver las preguntas de calidad
+  const [questionsOpen, setQuestionsOpen] = useState(false);
+  const toggleQuestions = () => {
+    setQuestionsOpen(!questionsOpen);
+  };
+  const [qualitySectionOpen, setQualitySectionOpen] = useState(false);
+  const toggleQualitySection = () => {
+    setQualitySectionOpen(!qualitySectionOpen);
+  };
+
+  const handleSelectAllFrente = (isChecked: boolean) => {
+    const questionIds = workOrder.area.formQuestions.filter((q: any) => q.role_id === null).map((q: any) => q.id);
+  
+    if (isChecked) {
+      setCheckedQuestionsFrente(questionIds);
+  
+      setResponses((prevResponses) => {
+        const updatedResponses = prevResponses.filter(
+          (response) => !questionIds.includes(response.questionId)
+        );
+  
+        const newResponses = questionIds.map((id: number) => ({
+          questionId: id,
+          answer: true,
+        }));
+  
+        return [...updatedResponses, ...newResponses];
+      });
+    } else {
+      setCheckedQuestionsFrente([]);
+  
+      setResponses((prevResponses) =>
+        prevResponses.filter((response) => !questionIds.includes(response.questionId))
+      );
+    }
+  };
+  
+  const handleSelectAllVuelta = (isChecked: boolean) => {
+    const questionIds = workOrder.area.formQuestions.filter((q: any) => q.role_id === null).map((q: any) => q.id);;
+  
+    if (isChecked) {
+      setCheckedQuestionsVuelta(questionIds);
+  
+      setResponses((prevResponses) => {
+        const updatedResponses = prevResponses.filter(
+          (response) => !questionIds.includes(response.questionId)
+        );
+  
+        const newResponses = questionIds.map((id: number) => ({
+          questionId: id,
+          answer: true,
+        }));
+  
+        return [...updatedResponses, ...newResponses];
+      });
+    } else {
+      setCheckedQuestionsVuelta([]);
+  
+      setResponses((prevResponses) =>
+        prevResponses.filter((response) => !questionIds.includes(response.questionId))
+      );
+    }
+  };
 
   // Para mandar la OT a evaluacion por CQM
   const handleSubmit = async () => {
+    const questions = workOrder.area.formQuestions.filter((q: any) => q.role_id === null);
+
     const payload = {
-      question_id: responses.map(response => response.questionId),
+      question_id: questions.map((q: any) => q.id),
       work_order_flow_id: workOrder.id,
       work_order_id: workOrder.workOrder.id,
       area_id: workOrder.area.id,
-      response: responses.map(response => response.answer),
+      frente: questions.map((q: any) => checkedQuestionsFrente.includes(q.id)),
+      vuelta: questions.map((q: any) => checkedQuestionsVuelta.includes(q.id)),
       reviewed: false,
       user_id: workOrder.assigned_user,
       sample_quantity: Number(sampleQuantity),
     };
+    const isFrenteVueltaValid = payload.frente.includes(true) || payload.vuelta.includes(true);
+    // Validamos que no haya campos vacíos
+    const isPayloadEmpty = !payload.question_id.length || !payload.sample_quantity || !isFrenteVueltaValid;
+    if (isPayloadEmpty) {
+      alert('Por favor, asegúrate de completar todas las preguntas, seleccionar al menos una respuesta en "Frente" o "Vuelta" y establecer la cantidad de muestra antes de enviar.');
+      return; // Evitamos el envío si los datos no son válidos
+    }
     try {
       const token = localStorage.getItem('token');
       if(!token) {
@@ -133,8 +220,6 @@ export default function ImpresionComponent({ workOrder }: Props) {
       console.log('Error al enviar datos:', error);
     }
   };
-  
-  ;
 
   return (
     <>
@@ -176,7 +261,7 @@ export default function ImpresionComponent({ workOrder }: Props) {
     {showConfirm && (
         <ModalOverlay>
           <ModalBox>
-            <h4>¿Estás segura/o que deseas liberar este prducto?</h4>
+            <h4>¿Estás segura/o que deseas liberar este producto?</h4>
             <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '1rem', marginTop: '1rem' }}>
               <CancelButton onClick={() => setShowConfirm(false)}>Cancelar</CancelButton>
               <ConfirmButton onClick={handleImpressSubmit}>Confirmar</ConfirmButton>
@@ -191,19 +276,46 @@ export default function ImpresionComponent({ workOrder }: Props) {
         <ModalContent>
           <ModalTitle>Preguntas del Área: {workOrder.area.name}</ModalTitle>
           <Table>
-            <thead>
-              <tr>
-                <th>Pregunta</th>
-                <th>Respuesta</th>
-              </tr>
-            </thead>
+          <thead>
+            <tr>
+              <th>Pregunta</th>
+              <th>
+                <div style={{ display: 'flex', alignItems: 'center' }}>
+                  Hoja Frente
+                  <input
+                    type="checkbox"
+                    checked={workOrder.area.formQuestions
+                      .filter((q: any) => q.role_id === null)
+                      .every((q: any) => checkedQuestionsFrente.includes(q.id))}
+                    onChange={(e) => handleSelectAllFrente(e.target.checked)}
+                    style={{ marginLeft: '8px' }}
+                  />
+                </div>
+              </th>
+              <th>
+                <div style={{ display: 'flex', alignItems: 'center' }}>
+                  Hoja Vuelta
+                  <input
+                    type="checkbox"
+                    checked={workOrder.area.formQuestions
+                      .filter((q: any) => q.role_id === null)
+                      .every((q: any) => checkedQuestionsVuelta.includes(q.id)
+                    )}
+                    onChange={(e) => handleSelectAllVuelta(e.target.checked)}
+                    style={{ marginLeft: '8px' }}
+                  />
+                </div>
+              </th>
+            </tr>
+          </thead>
             <tbody>
               {workOrder.area.formQuestions
               .filter((question: { role_id: number | null }) => question.role_id === null)
               .map((question: { id: number; title: string }) => (
                 <tr key={question.id}>
                   <td>{question.title}</td>
-                  <td><input type="checkbox" checked={checkedQuestions.includes(question.id)} onChange={(e) => handleCheckboxChange(question.id, e.target.checked)}/></td>
+                  <td><input type="checkbox" checked={checkedQuestionsFrente.includes(question.id)} onChange={(e) => handleCheckboxChangeFrente(question.id, e.target.checked)}/></td>
+                  <td><input type="checkbox" checked={checkedQuestionsVuelta.includes(question.id)} onChange={(e) => handleCheckboxChangeVuelta(question.id, e.target.checked)}/></td>
                 </tr>
               ))}
             </tbody>
@@ -212,8 +324,54 @@ export default function ImpresionComponent({ workOrder }: Props) {
             <Label>Muestras:</Label>
             <Input type="number" placeholder="Ej: 2" value={sampleQuantity} onChange={handleSampleQuantityChange}/>
           </InputGroup>
-          <CloseButton onClick={closeModal}>Cerrar</CloseButton>
-          <SubmitButton onClick={handleSubmit}>Enviar Respuestas</SubmitButton>
+          <ModalTitle style={{ marginTop: '1.5rem', marginBottom: '0.3rem'}}>
+            Preguntas de Calidad
+            <button onClick={toggleQualitySection} style={{ marginLeft: '10px',cursor: "pointer", border: "none", background: "transparent", fontSize: "1.2rem" }}>{qualitySectionOpen ? '▼' : '▶'}</button>
+          </ModalTitle>
+          {qualitySectionOpen && (
+          <>
+          <Table>
+            <thead>
+              <tr>
+                <th>Pregunta</th>
+                <th>
+                  Respuesta
+                  <button onClick={toggleQuestions} style={{ marginLeft: "8px", cursor: "pointer", border: "none", background: "transparent" }}>{questionsOpen ? '▼' : '▶'}</button>
+                </th>
+              </tr>
+            </thead>
+            <tbody>
+              {questionsOpen && workOrder.area.formQuestions
+              .filter((question: { role_id: number | null }) => question.role_id === 3)
+              .map((question: { id: number; title: string }) => (
+                <tr key={question.id}>
+                  <td>{question.title}</td>
+                  <td></td>
+                </tr>
+              ))}
+            </tbody>
+          </Table>
+          <SectionTitle>Tipo de Prueba</SectionTitle>
+          <RadioGroup>
+            <RadioLabel>
+              <Radio type="radio" name="prueba" value="color" disabled/>
+              Prueba de color
+            </RadioLabel>
+            <RadioLabel>
+              <Radio type="radio" name="prueba" value="perfil" disabled/>
+              Muestra física
+            </RadioLabel>
+            <RadioLabel>
+              <Radio type="radio" name="prueba" value="fisica" disabled/>
+              Prueba digital
+            </RadioLabel>
+          </RadioGroup>
+          </>
+          )}
+          <div style={{ display: 'flex', gap: '1rem'}}>
+            <CloseButton onClick={closeModal}>Cerrar</CloseButton>
+            <SubmitButton onClick={handleSubmit}>Enviar Respuestas</SubmitButton>
+          </div>
         </ModalContent>
       </ModalOverlay>
     )}
@@ -256,6 +414,7 @@ const DataWrapper = styled.div`
   display: flex;
   flex-wrap: wrap;
   gap: 2rem;
+  flex-direction: row;
 `;
 
 const InfoItem = styled.div`
@@ -266,6 +425,7 @@ const InfoItem = styled.div`
 const Label = styled.label`
   font-weight: 600;
   color: #6b7280;
+  width: 50%;
 `;
 
 const Value = styled.div`
@@ -298,24 +458,6 @@ const Input = styled.input`
   &:focus {
     border-color: #2563eb;
   }
-`;
-
-const RadioGroup = styled.div`
-  display: flex;
-  gap: 2rem;
-  margin-top: 0.5rem;
-`;
-
-const RadioLabel = styled.label`
-  display: flex;
-  align-items: center;
-  gap: 0.5rem;
-  font-weight: 500;
-  color: #374151;
-`;
-
-const Radio = styled.input`
-  accent-color: #2563eb;
 `;
 
 const Textarea = styled.textarea`
@@ -366,7 +508,7 @@ const CqmButton = styled.button`
   transition: background 0.3s;
 
   &:hover {
-    background-color: #1d4ed8;
+    background-color: ${({ disabled }) => (disabled ? 'green' : '#1d4ed8')};
   }
 `;
 
@@ -382,13 +524,18 @@ const ModalOverlay = styled.div`
   align-items: center;
   justify-content: center;
   z-index: 999;
+  overflow-y: auto;
+
 `;
 
 const ModalContent = styled.div`
   background: white;
   padding: 2rem;
   border-radius: 1rem;
-  max-width: 600px;
+  justify-content: center;
+  max-width: 700px;
+  max-height: 80%;
+  overflow-y: auto;
   width: 90%;
   box-shadow: 0 10px 25px rgba(0,0,0,0.2);
 `;
@@ -440,15 +587,22 @@ const CloseButton = styled.button`
 
 const SubmitButton = styled.button`
   margin-top: 1.5rem;
-  background-color: #4CAF50;
+  background-color: #2563eb;
   color: white;
   padding: 0.75rem 2rem;
   border-radius: 0.5rem;
   font-weight: 600;
-  transition: background 0.3s;
+  display: block;
+
+  border: none;
+  cursor: pointer;
+
+  transition: background-color 0.3s ease, color 0.3s ease;
   
-  &:hover {
-    background-color: #45a049;
+  &:hover,
+  &:focus {
+    background-color: #1e40af;
+    outline: none;
   }
 `;
 
@@ -497,4 +651,22 @@ const CancelButton = styled.button`
     background-color: #a0a0a0;
     outline: none;
   }
+`;
+
+const RadioGroup = styled.div`
+  display: flex;
+  gap: 2rem;
+  margin-top: 0.5rem;
+`;
+
+const RadioLabel = styled.label`
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-weight: 500;
+  color: #374151;
+`;
+
+const Radio = styled.input`
+  accent-color: #2563eb;
 `;
