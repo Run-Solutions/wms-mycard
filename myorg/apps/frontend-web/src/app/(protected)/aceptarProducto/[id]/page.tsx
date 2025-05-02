@@ -15,10 +15,9 @@ interface Props {
     params: Promise<{ id: string }>;
 }
 
-export default function LiberarProductoPage({ params }: Props) {
+export default function AceptarProductoAuxPage({ params }: Props) {
     const { id } = use(params);
     const [workOrder, setWorkOrder] = useState<any>(null)
-    console.log('El id', id);
 
     useEffect(() => {
       async function fetchWorkOrder() {
@@ -34,7 +33,6 @@ export default function LiberarProductoPage({ params }: Props) {
       }
       fetchWorkOrder()
     }, [id])
-    
     
     if (!workOrder) return <div>Cargando...</div>
     const lastCompleted = [...workOrder.workOrder.flow]

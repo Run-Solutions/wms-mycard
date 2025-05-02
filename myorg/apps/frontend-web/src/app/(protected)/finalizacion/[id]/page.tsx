@@ -36,7 +36,6 @@ export default function FinalizacionAuxPage({ params }: Props) {
         },
       })
       const data = await res.json()
-      console.log('Orden:', data)
       setWorkOrder(data)
     }
     fetchWorkOrder()
@@ -341,7 +340,7 @@ const StyledTable = styled.table`
 `;
 
 const CloseButton = styled.button`
-  background: #16a34a;
+  background: #2563EB;
   color: white;
   padding: 0.9rem 1.5rem;
   border: none;
@@ -352,7 +351,7 @@ const CloseButton = styled.button`
   transition: background 0.3s;
 
   &:hover {
-    background: #15803d;
+    background: #1D4ED8;
   }
 `;
 

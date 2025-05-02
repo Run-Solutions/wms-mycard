@@ -12,7 +12,7 @@ interface WorkOrder {
   mycard_id: string;
   quantity: number;
   created_by: number;
-  status: string; // Cambiado a string genérico
+  status: string; 
   validated: boolean;
   createdAt: string;
   updatedAt: string;
@@ -26,15 +26,15 @@ interface WorkOrder {
   }[];
   flow: {
     id: number;
-    area_id: number; // Cambiado de area.name a area_id
-    status: string; // Cambiado a string genérico
+    area_id: number; 
+    status: string; 
     assigned_user?: number;
     area?: {
       name?: string;
     }
-    // otros campos que necesites
+   
   }[];
-  formAnswers?: any[]; // Añadir si es necesario
+  formAnswers?: any[]; 
 }
 
 const FinalizacionPage: React.FC = () => {

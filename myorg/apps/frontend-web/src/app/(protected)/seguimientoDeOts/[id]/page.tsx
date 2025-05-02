@@ -2,6 +2,7 @@
 'use client'
 
 import { use, useState, useEffect } from "react";
+import { useRouter } from "next/navigation";
 import styled from "styled-components";
 
 interface Props {
@@ -22,7 +23,9 @@ type AreaData = {
 
 export default function SeguimientoDeOtsAuxPage({ params }: Props) {
   const { id } = use(params);
+  const router = useRouter();
   const [workOrder, setWorkOrder] = useState<any>(null);
+  const [showConfirm, setShowConfirm] = useState(false); 
 
   useEffect(() => {
     async function fetchWorkOrder() {
@@ -38,6 +41,36 @@ export default function SeguimientoDeOtsAuxPage({ params }: Props) {
     }
     fetchWorkOrder()
   }, [id]);
+
+  const handleCloseOrder = async () => {
+    const payload = {
+      ot_id: workOrder?.ot_id,
+    }
+    console.log(payload);
+    try {
+      const token = localStorage.getItem('token');
+      if (!token) {
+        alert('No hay token de autenticación');
+        return;
+      }
+      const res = await fetch('http://localhost:3000/work-orders/cerrar-work-order', {
+        method: 'PATCH',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`,
+        },
+        body: JSON.stringify(payload),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        console.error('Error en el servidor:', data);
+        return;
+      }
+      router.push('/seguimientoDeOts');
+    } catch (error) {
+      console.log('Error al enviar datos:', error);
+    }
+  }
 
   // Función para obtener los datos específicos de cada área
   const getAreaData = (areaId: number, areaResponse: any) => {
@@ -236,8 +269,22 @@ export default function SeguimientoDeOtsAuxPage({ params }: Props) {
               </tbody>
             </Table>
           </TableWrapper>
+          {workOrder?.status !== 'Cerrado' && (
+            <CloseButton onClick={() => setShowConfirm(true)}>Cerrar Orden de Trabajo</CloseButton>
+          )}
         </Section>
       </Container>
+      {showConfirm && (
+        <ModalOverlay>
+          <ModalBox>
+            <h4>¿Estás segura/o que deseas cerrar esta Orden de Trabajo?</h4>
+            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '1rem', marginTop: '1rem' }}>
+              <CancelButton onClick={() => setShowConfirm(false)}>Cancelar</CancelButton>
+              <ConfirmButton onClick={handleCloseOrder}>Confirmar</ConfirmButton>
+            </div>
+          </ModalBox>
+        </ModalOverlay>
+      )}
     </>
   );
 };
@@ -316,5 +363,82 @@ const Table = styled.table`
 
   tr:nth-child(even) {
     background: #fafafa;
+  }
+`;
+
+const CloseButton = styled.button`
+  background: #2563EB;
+  color: white;
+  padding: 0.9rem 1.5rem;
+  border: none;
+  border-radius: 0.75rem;
+  font-size: 1rem;
+  cursor: pointer;
+  box-shadow: 0 3px 6px rgba(0,0,0,0.08);
+  transition: background 0.3s;
+
+  &:hover {
+    background: #1D4ED8;
+  }
+`;
+
+const ModalOverlay = styled.div`
+  position: fixed;
+  top: 0;
+  left: 0;
+  color: black;
+  width: 100%;
+  height: 100%;
+  background: rgba(0,0,0,0.4);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 999;
+`;
+
+const ModalBox = styled.div`
+  background: white;
+  padding: 2rem;
+  border-radius: 1rem;
+  box-shadow: 0 8px 24px rgba(0,0,0,0.2);
+  max-width: 400px;
+  width: 90%;
+`;
+
+const ConfirmButton = styled.button`
+  background-color: #2563eb;
+  color: white;
+  padding: 0.5rem 1.5rem;
+  border-radius: 0.5rem;
+  font-weight: 600;
+
+  border: none;
+  cursor: pointer;
+
+  transition: background-color 0.3s ease, color 0.3s ease;
+
+  &:hover,
+  &:focus {
+    background-color: #1e40af;
+    outline: none;
+  }
+`;
+
+const CancelButton = styled.button`
+  background-color: #BBBBBB;
+  color: white;
+  padding: 0.5rem 1.5rem;
+  border-radius: 0.5rem;
+  font-weight: 600;
+
+  border: none;
+  cursor: pointer;
+
+  transition: background-color 0.3s ease, color 0.3s ease;
+
+  &:hover,
+  &:focus {
+    background-color: #a0a0a0;
+    outline: none;
   }
 `;

@@ -70,27 +70,99 @@ async function main() {
   });
   
   // 🔹 Seed para FormQuestions asociadas a "impresion"
-  const impressionArea = await prisma.areasOperator.findFirst({
-    where: { name: 'impresion'},
-  });
-  if (!impressionArea) { throw new Error ('No se encontró el área de "impresion"')}
-  const questions: { title: string; key: string }[] = [
-    { title: 'Impresión De Guías, Sensores, Área Para Cinta Mágnetica, Pinzas Y Escuadra', key: 'impresion_guias', }, 
-    { title: 'Revisión Espesor De Material Para Armado Sandwich', key: 'revision_espesor', },
-    { title: 'Revisar Piojos Y Velo En La Impresión', key: 'revisar_piojos', },
-    { title: 'Verificar Coincidencia Frente Y Vuelta', key: 'verificar_coincidencia', },
+  // 🔹 Seed para FormQuestions
+  const questionsData = [
+    { id: 1, title: "Impresión De Guías, Sensores, Área Para Cinta Mágnetica, Pinzas Y Escuadra", key: "impresion_guias", role_id: null, areas: [2] },
+    { id: 2, title: "Revisión Espesor De Material Para Armado Sandwich", key: "revision_espesor", role_id: null, areas: [2] },
+    { id: 3, title: "Revisar Piojos Y Velo En La Impresión", key: "revisar_piojos", role_id: null, areas: [2] },
+    { id: 4, title: "Verificar Coincidencia Frente Y Vuelta", key: "verificar_coincidencia", role_id: null, areas: [2] },
+    { id: 5, title: "Revisar Anclaje De Tinta", key: "review_ink_anchor", role_id: 3, areas: [2] },
+    { id: 6, title: "Verificar Ortografia De Los Textos", key: "verify_text_orthography", role_id: 3, areas: [2] },
+    { id: 7, title: "Validar Textos Completos Vs Prueba De Color", key: "validate_texts_vs_color_test", role_id: 3, areas: [2] },
+    { id: 8, title: "Revisar Elementos VS Prueba De Color", key: "review_elements_vs_color_test", role_id: 3, areas: [2, 3] },
+    { id: 9, title: "Verificar Elemento Se Corte (Usar Mica)", key: "verify_element_cut", role_id: 3, areas: [2] },
+    { id: 11, title: "Revisar Registro De Elementos Vs Imagen O Prueba De Color", key: "revisar_registro", role_id: null, areas: [3] },
+    { id: 12, title: "Validar Espesor Del Material Vs Ot", key: "validar_espesor", role_id: null, areas: [3] },
+    { id: 13, title: "Revisar Coincidencia Frente Y Vuelta", key: "revisar_coincidencia", role_id: null, areas: [3] },
+    { id: 14, title: "Revisar Pinza Y Escuadra", key: "revisar_pinza", role_id: null, areas: [3] },
+    { id: 15, title: "Revisar Tinta Semáforo", key: "revisar_tinta_semaforo", role_id: 3, areas: [3] },
+    { id: 16, title: "Revisar Que Se Pueda Firmar El Panel", key: "revisar_firmar_panel", role_id: 3, areas: [3] },
+    { id: 17, title: "Anclaje De Tinta", key: "anclaje_tinta", role_id: 3, areas: [3] },
+    { id: 18, title: "Revisar Materiales De La Composición Vs Ot", key: "revisar_materiales", role_id: null, areas: [4] },
+    { id: 19, title: "Verificar Calibre Empalmado (Máx 32)", key: "verificar_calibre", role_id: null, areas: [4] },
+    { id: 20, title: "Validad Posición De Cinta Magnética / Holobanda", key: "validar_posicion", role_id: null, areas: [4] },
+    { id: 21, title: "Revisar Posición De Piedra Del Inlay", key: "revisar_posicion", role_id: null, areas: [4] },
+    { id: 22, title: "Validar Posicion De Antenas Para Tarjetas Duales", key: "validar_posicion_antenas", role_id: 3, areas: [4] },
+    { id: 23, title: "Revisar Crudos", key: "revisar_crudos", role_id: null, areas: [5] },
+    { id: 24, title: "Revisar Deformaciones Del Material", key: "revisar_deformaciones", role_id: null, areas: [5] },
+    { id: 25, title: "Revisar Si Existe Tinta Reventada", key: "revisar_tinta_reventada", role_id: null, areas: [5] },
+    { id: 26, title: "Validar Que El Material No Esté Tostado", key: "validar_material_tostado", role_id: null, areas: [5] },
+    { id: 27, title: "Validar Anclaje De Tinta (Overlay/Cinta)", key: "validar_anclaje_tinta", role_id: 3, areas: [5] },
+    { id: 28, title: "Validar Anclaje De Materiales (Si Aplica)", key: "anclaje_si_aplica", role_id: 3, areas: [5] },
+    { id: 31, title: "Verificar Calibre Final Máximo 32", key: "calibre_max", role_id: 3, areas: [5] },
+    { id: 33, title: "Revisar Caja De Seguridad (Que No Se Corte)", key: "revisar_cajaseguridad", role_id: null, areas: [6] },
+    { id: 34, title: "Revisar Distancia De Cinta Magnética U Holobanda", key: "revisar_distancia", role_id: null, areas: [6] },
+    { id: 35, title: "Revisar Plecas De Corte (Si Aplica)", key: "revisar_plecas", role_id: null, areas: [6] },
+    { id: 36, title: "Revisar Tipo De Perforación Y Posición (Si Aplica)", key: "revisar_tipo_perforacion", role_id: null, areas: [6] },
+    { id: 37, title: "Revisar Bordes Y Esquinas (Libre De Rebabas)", key: "revisar_bordes", role_id: null, areas: [6] },
+    { id: 38, title: "Integridad De Las Antenas O Inlays (Si Aplica)", key: "integridad_antenas", role_id: null, areas: [6] },
+    { id: 39, title: "Liberacion De Datos", key: "liberacion_datos", role_id: 3, areas: [6] },
+    { id: 40, title: "Prueba de Adhesión", key: "prueba_adhesion", role_id: null, areas: [7] },
+    { id: 41, title: "Verificar Imagen Y Medidas Del Panel De Firma Vs Ot", key: "verificar_imagen", role_id: null, areas: [8] },
+    { id: 43, title: "Revisar Posición De Panel De Firma Vs Ot", key: "revisar_posicion_firma", role_id: null, areas: [8] },
+    { id: 44, title: "Verificar Anclaje", key: "verificar_anclaje", role_id: 3, areas: [8] },
+    { id: 45, title: "Verificar Anclaje Del Panel De Firma", key: "verificar_anclaje_firma", role_id: 3, areas: [8] },
+    { id: 46, title: "Validar Escritura Sobre Panel De Firma", key: "verificar_escritura", role_id: 3, areas: [8] },
+    { id: 47, title: "Revisar Posición De Tierra En Chip", key: "revisar_posicion_tierra", role_id: null, areas: [9] },
+    { id: 48, title: "Adhesivo Libre De Golpes En Reverso De Tarjeta", key: "adhesivo_libre", role_id: null, areas: [9] },
+    { id: 49, title: "Prueba De Anclaje", key: "prueba_anclaje", role_id: 3, areas: [9] },
+    { id: 50, title: "Revisar Posición De Etiqueta", key: "revisar_etiqueta", role_id: null, areas: [10] },
+    { id: 51, title: "Verificar Base De Datos Vs Autorización (Si Aplica)", key: "verificar_bd", role_id: null, areas: [10] },
+    { id: 52, title: "Revisar Tipo De Fuente Y Tamaño Textos / Folio Vs Ot / Autorización", key: "revisar_tipo_fuente", role_id: null, areas: [10] },
+    { id: 53, title: "Revisa Posición De Textos / Folios", key: "posicion_textos", role_id: null, areas: [10] },
+    { id: 54, title: "Validar Color Textos / Folio Vs Ot / Autorización", key: "validar_ot", role_id: null, areas: [10] },
+    { id: 55, title: "Revisar Código De Barras Vs Ot / Autorización", key: "revisar_codigo", role_id: null, areas: [10] },
+    { id: 56, title: "Revisa La Posición De Código De Barras", key: "codigo_barras", role_id: null, areas: [10] },
+    { id: 57, title: "Validar Lectura De Código De Barras Correcta", key: "barras_correctas", role_id: null, areas: [10] },
+    { id: 58, title: "Verificar Lectura De Cinta Magnética (En Máquina Az)", key: "lectura_correcta", role_id: null, areas: [10] },
+    { id: 59, title: "Verificar Lectura Y Match De Inik Id (Inlays)", key: "ink_id_inlays", role_id: null, areas: [10] },
+    { id: 60, title: "Verificar Tamaño Y Fuente De Folio Vs OT / Autorización", key: "verificacion_tamaño", role_id: 3, areas: [10] },
+    { id: 61, title: "Verificar Fuente Y Tamaño De Textos Vs OT / Autorización", key: "verificacion_fuente", role_id: 3, areas: [10] },
+    { id: 62, title: "Verificar Posición De Los Elementos (Textos / Folio)", key: "verificacion_posicion", role_id: 3, areas: [10] },
+    { id: 65, title: "Verificar Anclaje de Tinta", key: "anclaje_tinta_perso", role_id: 3, areas: [10] },
+    { id: 66, title: "Validar Que Se Haya Revisado Y Autorizado Codificación De Cinta Magnética Y/O Chip", key: "cinta_magnetica", role_id: 3, areas: [10] },
   ];
-  for (const question of questions) {
-    // eslint-disable-next-line @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-member-access
-    await (prisma.formQuestion as any).upsert({
-      where: { key: question.key },
-      update: {},
-      create: {
+
+  for (const question of questionsData) {
+    // Crear o actualizar la pregunta
+    await prisma.formQuestion.upsert({
+      where: { id: question.id },
+      update: {
         title: question.title,
         key: question.key,
-        areas: {connect: { id: impressionArea.id},},
+        role_id: question.role_id,
+      },
+      create: {
+        id: question.id,
+        title: question.title,
+        key: question.key,
+        role_id: question.role_id,
+        created_at: new Date(),
+        updated_at: new Date(),
       },
     });
+
+    // Conectar las áreas a la pregunta
+    for (const areaId of question.areas) {
+      await prisma.areasOperator.update({
+        where: { id: areaId },
+        data: {
+          formQuestions: {
+            connect: { id: question.id },
+          },
+        },
+      });
+    }
   }
 
   console.log("✅ Seed completado!");

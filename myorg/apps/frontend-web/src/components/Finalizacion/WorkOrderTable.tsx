@@ -44,7 +44,7 @@ interface Props {
     statusFilter: string;
 }
 
-const itemsPerPage = 25;
+const itemsPerPage = 10;
 
 
 const WorkOrderTable: React.FC<Props> = ({ orders, title, statusFilter}) => {

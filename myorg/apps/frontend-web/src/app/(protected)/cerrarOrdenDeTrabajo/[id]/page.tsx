@@ -1,4 +1,4 @@
-// myorg/apps/frontend-web/src/app/(protected)/liberarProducto/[id]/page.tsx
+// myorg/apps/frontend-web/src/app/(protected)/cerrarOrdenDeTrabajo/[id]/page.tsx
 'use client'
 
 import { use, useEffect, useState } from "react";
@@ -10,10 +10,10 @@ import MillingChipComponent from "@/components/CerrarOrdenDeTrabajo/MillingChipC
 import PersonalizacionComponent from "@/components/CerrarOrdenDeTrabajo/PersonalizacionComponent";
 
 interface Props {
-    params: Promise<{ id: string }>;
+  params: Promise<{ id: string }>;
 }
 
-export default function LiberarProductoPage({ params }: Props) {
+export default function CloseWorkOrderAuxPage({ params }: Props) {
   const { id } = use(params);
   const [workOrder, setWorkOrder] = useState<any>(null)
 

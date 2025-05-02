@@ -17,8 +17,6 @@ interface Props {
 export default function AcceptWorkOrderFlowAuditoryPage({ params }: Props) {
   const { id } = use(params);
   const [workOrder, setWorkOrder] = useState<any>(null)
-  console.log('El id', id);
-
   useEffect(() => {
     async function fetchWorkOrder() {
       const token = localStorage.getItem('token');
@@ -28,7 +26,6 @@ export default function AcceptWorkOrderFlowAuditoryPage({ params }: Props) {
         },
       })
       const data = await res.json()
-      console.log('Orden:', data)
       setWorkOrder(data)
     }
     fetchWorkOrder()
@@ -36,7 +33,6 @@ export default function AcceptWorkOrderFlowAuditoryPage({ params }: Props) {
 
   if (!workOrder) return <div>Cargando...</div>
 
-  // Mostrar la liberacion del producto por area 
   const renderComponentByArea = () => {
     switch (workOrder.area_id) {
       case 6:

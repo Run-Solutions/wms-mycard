@@ -1,4 +1,4 @@
-// src/app/(protected)/ordenesDeTrabajo/page.tsx
+// myorg/apps/frontend-web/src/app/(protected)/configuracionVistosBuenos/page.tsx
 'use client';
 
 import React, { useEffect, useState } from 'react';

@@ -5,7 +5,6 @@ import React, { useEffect, useState } from 'react';
 import styled, { useTheme } from 'styled-components';
 import { useRouter } from "next/navigation";
 
-
 // Se define el tipo de datos
 interface WorkOrder {
   id: number;
@@ -55,7 +54,6 @@ interface WorkOrder {
   };
 }
 
-
 const AcceptProductPage: React.FC = () => {
   const theme = useTheme();
   const router = useRouter();
@@ -88,13 +86,11 @@ const AcceptProductPage: React.FC = () => {
     const flowId = flowItem?.id;
     console.log(flowId);
     if (!selectedOrder) return;
-
     // Si el área no es 1, redirigir inmediatamente
     if (selectedOrder?.area_id >= 2 && selectedOrder?.area_id <= 6) {
       router.push(`/aceptarProducto/${flowId}`); 
       return;
     }
-
     try {
       const res = await fetch(`http://localhost:3000/work-order-flow/${flowId}/accept`, {
         method: 'PATCH',
@@ -113,7 +109,6 @@ const AcceptProductPage: React.FC = () => {
       alert('Error al conectar con el servidor');
     }
   }
-
   const downloadFile = async (filename: string) => {
     const token = localStorage.getItem('token');  
     const res = await fetch(`http://localhost:3000/work-order-flow/file/${filename}`, {
@@ -129,7 +124,6 @@ const AcceptProductPage: React.FC = () => {
     const blob = await res.blob();
     const url = window.URL.createObjectURL(blob);
     window.open(url, '_blank');
-
     // Limpieza opcional después de unos segundos
     setTimeout(() => window.URL.revokeObjectURL(url), 5000);
   }
@@ -143,7 +137,6 @@ const AcceptProductPage: React.FC = () => {
           console.error('No se encontró el token en localStorage');
           return;
         }
-  
         const res = await fetch('http://localhost:3000/work-order-flow/pending', {
           method: 'GET',
           headers: {
@@ -151,13 +144,10 @@ const AcceptProductPage: React.FC = () => {
             'Authorization': `Bearer ${token}`
           },
         });
-  
         if(!res.ok){
           throw new Error(`Error al obtener las ordenes: ${res.status} ${res.statusText}`);
         }
-        
         const data = await res.json();
-        console.log('Datos obtenidos: ', data);
 
         // Ordenar las OTs: primero las marcadas como prioridad, luego por fecha
         if (data && Array.isArray(data)){
@@ -180,6 +170,7 @@ const AcceptProductPage: React.FC = () => {
     }
     fetchWorkOrders();
   }, []);
+  
   return (
     <>
     {isModalOpen && selectedOrder && (

@@ -135,7 +135,7 @@ model WorkOrderFlow {
   id                     Int                 @id @default(autoincrement())
   work_order_id          Int                 // ID de la OT
   area_id                Int                 // Área por la que pasa la OT
-  status                 String              // Estado dentro de esa área ("En espera", "Pendiente", "En Proceso", "Finalizado")
+  status                 String              // Estado dentro de esa área ("En espera", "Pendiente", "En Proceso", "En calidad", "Listo", "Completado", "En inconformidad")
   assigned_user          Int?                // Usuario asignado
   assigned_at            DateTime?           @map("assigned_at") // Cuándo fue asignada a esta área
   area_response_id       Int?                // Clave foránea

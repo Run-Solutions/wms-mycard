@@ -88,7 +88,7 @@ const AcceptAuditoryPage: React.FC = () => {
     const flowId = flowItem?.id;
     console.log(flowId);
 
-    // 👉 Si el área no es 1, redirigir inmediatamente
+    // Si el área no es 1, redirigir inmediatamente
     if (selectedOrder?.area_id !== 1) {
       router.push(`/aceptarAuditoria/${flowId}`); 
       return;
@@ -124,7 +124,6 @@ const AcceptAuditoryPage: React.FC = () => {
           console.error('No se encontró el token en localStorage');
           return;
         }
-        console.log('Token enviado a headers: ', token)
   
         const res = await fetch('http://localhost:3000/work-order-flow-auditory/pending-auditory', {
           method: 'GET',
@@ -139,7 +138,6 @@ const AcceptAuditoryPage: React.FC = () => {
         }
         
         const data = await res.json();
-        console.log('Datos obtenidos: ', data);
         // Ordenar las OTs: primero las marcadas como prioridad, luego por fecha
         if (data && Array.isArray(data)){
           const sortedOrders = data.sort((a: WorkOrder, b: WorkOrder) => {

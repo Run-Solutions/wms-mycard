@@ -1,4 +1,4 @@
-// src/app/dashboard/page.tsx
+// myorg/apps/frontend-web/src/app/(protected)/dashboard/page.tsx
 'use client';
 import React, { useEffect, useState } from 'react';
 import { Box, CircularProgress } from '@mui/material';
