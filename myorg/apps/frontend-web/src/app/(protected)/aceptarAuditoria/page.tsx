@@ -246,7 +246,7 @@ export default AcceptAuditoryPage;
 // =================== Styled Components ===================
 
 const PageContainer = styled.div`
-  padding: 1rem 2rem;
+  padding: 20px 20px 20px 50px;
   margin-top: -70px;
   width: 100%;
   align-content: flex-start;

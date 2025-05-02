@@ -161,9 +161,9 @@ const DashboardHeader: React.FC<DashboardHeaderProps> = ({
               src={
                 user?.profile_image
                   ? `http://localhost:3000/uploads/${user.profile_image}`
-                  : '/logos/default-avatar.png'
+                  : '/logos/users.webp'
               }
-              alt='User'
+              alt={user?.username}
             />
             <UserName>{user?.username || 'Usuario'}</UserName>
           </UserInfoContainer>

@@ -252,7 +252,7 @@ const AcceptProductPage: React.FC = () => {
             );
           })
         ) : (
-          <p>No hay ordenes pendientes por asignar.</p>
+          <Message>No hay ordenes pendientes por asignar.</Message>
         )}
       </CardsContainer>
     </PageContainer>
@@ -265,7 +265,7 @@ export default AcceptProductPage;
 // =================== Styled Components ===================
 
 const PageContainer = styled.div`
-  padding: 1rem 2rem;
+  padding: 20px 20px 20px 50px;
   margin-top: -70px;
   width: 100%;
   align-content: flex-start;
@@ -373,7 +373,7 @@ const ModalContent = styled.div`
     padding: 0.5rem 1rem;
     border: none;
     border-radius: 0.5rem;
-    background-color: ${(props) => props.theme.palette.background.default};
+    background-color: #F9FAFB;
     color: black;
     cursor: pointer;
     margin: 5px;
@@ -480,4 +480,11 @@ const PriorityBadge = styled.span`
     border-radius: 50%;
     opacity: 0.8;
   }
+`;
+
+const Message = styled.p`
+  color: ${({ theme }) => theme.palette.text.primary};
+  font-size: 1rem;
+  text-align: center;
+  margin-top: 2rem;
 `;

@@ -39,6 +39,11 @@ export default function HotStampingComponent({ workOrder }: Props) {
       alert('Error al conectar con el servidor');
     }
   }
+
+  const lastIndex = workOrder.areaResponse.inconformities.length > 1 
+  ? workOrder.areaResponse.inconformities.length - 1 
+  : 0;
+
   return (
     <>
     <FlexContainer>
@@ -66,11 +71,11 @@ export default function HotStampingComponent({ workOrder }: Props) {
         <SectionTitle>Inconformidad:</SectionTitle>
         <InputGroup>
           <Label>Respuesta de Usuario</Label>
-          <Input type="text" value={workOrder.areaResponse.inconformities[0].user.username} disabled/>
+          <Input type="text" value={workOrder.areaResponse.inconformities[lastIndex].user.username} disabled/>
         </InputGroup>
         <InputGroup>
           <Label>Comentarios</Label>
-          <Textarea value={workOrder.areaResponse.inconformities[0].comments} disabled/>
+          <Textarea value={workOrder.areaResponse.inconformities[lastIndex].comments} disabled/>
         </InputGroup>
       </NewData>
     </Container>

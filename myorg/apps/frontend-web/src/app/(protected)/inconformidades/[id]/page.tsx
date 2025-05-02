@@ -4,21 +4,23 @@
 import { use, useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import styled from "styled-components";
+import PreprensaComponent from "@/components/Inconformidades/PreprensaComponent";
+import ImpresionComponent from "@/components/Inconformidades/ImpresionComponent";
+import ImpresionComponentCQM from "@/components/Inconformidades/ImpresionComponentCQM";
 import SerigrafiaComponent from "@/components/Inconformidades/SerigrafiaComponent";
+import SerigrafiaComponentCQM from "@/components/Inconformidades/SerigrafiaComponentCQM";
 import EmpalmeComponent from "@/components/Inconformidades/EmpalmeComponent";
-import CorteComponentCQM from "@/components/Inconformidades/CorteComponentCQM";
+import EmpalmeComponentCQM from "@/components/Inconformidades/EmpalmeComponentCQM";
+import LaminacionComponent from "@/components/Inconformidades/LaminacionComponent";
+import LaminacionComponentCQM from "@/components/Inconformidades/LaminacionComponentCQM";
 import CorteComponent from "@/components/Inconformidades/CorteComponent";
+import CorteComponentCQM from "@/components/Inconformidades/CorteComponentCQM";
+import ColorEdgeComponent from "@/components/Inconformidades/ColorEdgeComponent";
+import ColorEdgeComponentCQM from "@/components/Inconformidades/ColorEdgeComponentCQM";
 import HotStampingComponent from "@/components/Inconformidades/HotStampingComponent";
 import HotStampingComponentCQM from "@/components/Inconformidades/HotStampingComponentCQM";
-import PersonalizacionComponentCQM from "@/components/Inconformidades/PersonalizacionComponentCQM";
 import PersonalizacionComponent from "@/components/Inconformidades/PersonalizacionComponent";
-import PreprensaComponent from "@/components/Inconformidades/PreprensaComponent";
-import ImpresionComponentCQM from "@/components/Inconformidades/ImpresionComponentCQM";
-import ImpresionComponent from "@/components/Inconformidades/ImpresionComponent";
-import SerigrafiaComponentCQM from "@/components/Inconformidades/SerigrafiaComponentCQM";
-import EmpalmeComponentCQM from "@/components/Inconformidades/EmpalmeComponentCQM";
-import LaminacionComponentCQM from "@/components/Inconformidades/LaminacionComponentCQM";
-import LaminacionComponent from "@/components/Inconformidades/LaminacionComponent";
+import PersonalizacionComponentCQM from "@/components/Inconformidades/PersonalizacionComponentCQM";
 
 interface Props {
   params: Promise<{ id: string }>;
@@ -84,6 +86,8 @@ export default function InconformidadesAuxPage({ params }: Props) {
           return <LaminacionComponent workOrder={lastCompleted}/>
         case 6:
           return <CorteComponent workOrder={lastCompleted}/>
+        case 7:
+          return <ColorEdgeComponent workOrder={lastCompleted}/>
         case 8:
           return <HotStampingComponent workOrder={lastCompleted}/>
         case 10:
@@ -107,6 +111,8 @@ export default function InconformidadesAuxPage({ params }: Props) {
           return <LaminacionComponentCQM workOrder={areaInconformidadCQM}/>
         case 6:
           return <CorteComponentCQM workOrder={areaInconformidadCQM}/>
+        case 7:
+          return <ColorEdgeComponentCQM workOrder={areaInconformidadCQM}/>
         case 8:
           return <HotStampingComponentCQM workOrder={areaInconformidadCQM}/>
         case 10:
@@ -116,147 +122,9 @@ export default function InconformidadesAuxPage({ params }: Props) {
     }
   };
 
-  // Función para obtener los datos específicos de cada área
-  const getAreaData = (areaId: number, areaResponse: any) => {
-    switch(areaId) {
-      case 1: // preprensa
-        return {
-          buenas: areaResponse?.prepress?.plates || 0,
-          malas: areaResponse?.prepress?.bad_quantity || '',
-          excedente: areaResponse?.prepress?.excess_quantity || '',
-          cqm: '',
-          muestras: '',
-        };
-        case 2: // impresión
-          return {
-            buenas: areaResponse?.impression?.release_quantity || 0,
-            malas: areaResponse?.impression?.bad_quantity || '',
-            excedente: areaResponse?.impression?.excess_quantity || '',
-            cqm: areaResponse?.impression?.form_answer?.sample_quantity ?? '',
-            muestras: '',
-          };
-        case 3: // serigrafía
-          return {
-            buenas: areaResponse?.serigrafia?.release_quantity || 0,
-            malas: areaResponse?.serigrafia?.bad_quantity || '',
-            excedente: areaResponse?.serigrafia?.excess_quantity || '',
-            cqm: areaResponse?.serigrafia?.form_answer?.sample_quantity ?? '',
-            muestras: '',
-          };
-          case 4: // empalme
-          return {
-            buenas: areaResponse?.empalme?.release_quantity || '',
-            malas: areaResponse?.empalme?.bad_quantity || '',
-            excedente: areaResponse?.empalme?.excess_quantity || '',
-            cqm: areaResponse?.empalme?.form_answer?.sample_quantity ?? '',
-            muestras: '',
-          };
-          case 5: // empalme
-          return {
-            buenas: areaResponse?.laminacion?.release_quantity || 0,
-            malas: areaResponse?.laminacion?.bad_quantity || '',
-            excedente: areaResponse?.laminacion?.excess_quantity || '',
-            cqm: areaResponse?.laminacion?.form_answer?.sample_quantity ?? '',
-            muestras: '',
-          };
-        case 6: // empalme
-          return {
-            buenas: areaResponse?.corte?.good_quantity || 0,
-            malas: areaResponse?.corte?.bad_quantity || 0,
-            excedente: areaResponse?.corte?.excess_quantity || 0,
-            cqm: areaResponse?.corte?.form_answer?.sample_quantity ?? '',
-            muestras: areaResponse?.corte?.formAuditory?.sample_auditory ?? ''
-          };
-          case 7: // empalme
-          return {
-            buenas: areaResponse?.colorEdge?.good_quantity || 0,
-            malas: areaResponse?.colorEdge?.bad_quantity || 0,
-            excedente: areaResponse?.colorEdge?.excess_quantity || 0,
-            cqm: areaResponse?.colorEdge?.form_answer?.sample_quantity ?? '',
-            muestras: areaResponse?.corte?.formAuditory?.sample_auditory ?? ''
-          };
-          case 8: // empalme
-          return {
-            buenas: areaResponse?.hotStamping?.good_quantity || 0,
-            malas: areaResponse?.hotStamping?.bad_quantity || 0,
-            excedente: areaResponse?.hotStamping?.excess_quantity || 0,
-            cqm: areaResponse?.hotStamping?.form_answer?.sample_quantity ?? '',
-            muestras: areaResponse?.hotStamping?.formAuditory?.sample_auditory ?? ''
-          };
-          case 9: // empalme
-          return {
-            buenas: areaResponse?.millingChip?.good_quantity || 0,
-            malas: areaResponse?.millingChip?.bad_quantity || 0,
-            excedente: areaResponse?.millingChip?.excess_quantity || 0,
-            cqm: areaResponse?.millingChip?.form_answer?.sample_quantity ?? '',
-            muestras: areaResponse?.millingChip?.formAuditory?.sample_auditory ?? ''
-          };
-          case 10: // empalme
-          return {
-            buenas: areaResponse?.personalizacion?.good_quantity || 0,
-            malas: areaResponse?.personalizacion?.bad_quantity || 0,
-            excedente: areaResponse?.personalizacion?.excess_quantity || 0,
-            cqm: areaResponse?.personalizacion?.form_answer?.sample_quantity ?? '',
-            muestras: areaResponse?.personalizacion?.formAuditory?.sample_auditory ?? ''
-          };
-        default:
-          return {
-            buenas: 0,
-            malas: 0,
-            excedente: 0,
-            muestras: 0,
-            cqm: 0
-          };
-      }
-    };
-
-    // Para obtener todas las areas del flujo
-    const areas: AreaData[] = workOrder?.flow?.map((item: any) => {
-        const areaData = getAreaData(item.area_id, item.areaResponse);
-        return {
-          id: item.area_id,
-          name: item.area?.name || 'Sin nombre',
-          status: item.status || 'Desconocido',
-          response: item.areaResponse || {},
-          answers: item.answers?.[0] || {},
-          ...areaData
-        };
-    }) || [];
-
-    const handleCloseOrder = async () => {
-      const payload = {
-        ot_id: workOrder?.ot_id,
-      }
-      console.log(payload);
-      try {
-        const token = localStorage.getItem('token');
-        if (!token) {
-          alert('No hay token de autenticación');
-          return;
-        }
-        const res = await fetch('http://localhost:3000/work-orders/cerrar-work-order', {
-          method: 'PATCH',
-          headers: {
-            'Content-Type': 'application/json',
-            'Authorization': `Bearer ${token}`,
-          },
-          body: JSON.stringify(payload),
-        });
-    
-        const data = await res.json();
-        if (!res.ok) {
-          console.error('Error en el servidor:', data);
-          return;
-        }
-        router.push('/finalizacion');
-      } catch (error) {
-        console.log('Error al enviar datos:', error);
-      }
-    }
-
-    return (
-        <>
-        <Container>
+  return (
+    <>
+      <Container>
         <Title>Información De La Inconformidad De La  Orden de Trabajo</Title>
 
         <DataWrapper>
@@ -273,19 +141,18 @@ export default function InconformidadesAuxPage({ params }: Props) {
             <Value>{workOrder?.quantity}</Value>
           </InfoItem>
         </DataWrapper>
+
         <InfoItem>
           <Label>Comentarios: </Label>
           <Value>{workOrder?.comments}</Value>
         </InfoItem>
-
         <Section>
-        <SectionTitle>Detalles de Producción</SectionTitle>
-        {lastCompleted !== undefined ? renderComponentByArea() : renderComponentByAreaCQM()}
-      </Section>
+          <SectionTitle>Detalles de Producción</SectionTitle>
+          {lastCompleted !== undefined ? renderComponentByArea() : renderComponentByAreaCQM()}
+        </Section>
       </Container>
     </>
-    );
-
+  );
 };
 
 // =================== Styled Components ===================

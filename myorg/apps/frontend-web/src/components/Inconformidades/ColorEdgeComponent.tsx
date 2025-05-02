@@ -7,7 +7,7 @@ interface Props {
   workOrder: any;
 }
 
-export default function CorteComponent({ workOrder }: Props) {
+export default function ColorEdgeComponent({ workOrder }: Props) {
   const router = useRouter();
   const [showModal, setShowModal] = useState(false);
   const openModal = () => {
@@ -23,7 +23,7 @@ export default function CorteComponent({ workOrder }: Props) {
     const areaResponse = workOrder.areaResponse.id;
     console.log(areaResponse);
     try {
-      const res = await fetch(`http://localhost:3000/inconformities/${areaResponse}/corte`, {
+      const res = await fetch(`http://localhost:3000/inconformities/${areaResponse}/color-edge`, {
         method: 'PATCH',
         headers: {
           'Content-Type': 'application/json',
@@ -53,16 +53,16 @@ export default function CorteComponent({ workOrder }: Props) {
         <NewDataWrapper>
           <InputGroup>
           <Label>Buenas:</Label>
-              <Input type="number" name="good_quantity" value={workOrder.areaResponse.corte.good_quantity} disabled/>
+              <Input type="number" name="good_quantity" value={workOrder.areaResponse.colorEdge.good_quantity} disabled/>
               <Label>Malas:</Label>
-              <Input type="number" name="bad_quantity" value={workOrder.areaResponse.corte.bad_quantity} disabled/>
+              <Input type="number" name="bad_quantity" value={workOrder.areaResponse.colorEdge.bad_quantity} disabled/>
               <Label>Exceso:</Label>
-              <Input type="number" name="excess_quantity" value={workOrder.areaResponse.corte.excess_quantity} disabled/>
+              <Input type="number" name="excess_quantity" value={workOrder.areaResponse.colorEdge.excess_quantity} disabled/>
           </InputGroup>
         </NewDataWrapper>
         <InputGroup>
           <Label>Comentarios</Label>
-          <Textarea value={workOrder.areaResponse.corte.comments} disabled/>
+          <Textarea value={workOrder.areaResponse.colorEdge.comments} disabled/>
         </InputGroup>
       </NewData>
     </Container>

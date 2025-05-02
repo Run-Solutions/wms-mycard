@@ -321,51 +321,51 @@ export default function PersonalizacionComponent({ workOrder }: Props) {
           {selectedOption === 'persos' && (
             <>
               <Table>
-  <thead>
-    <tr>
-      <th>Pregunta</th>
-      <th>
-        Respuesta
-        <button 
-          onClick={toggleQuestions} 
-          style={{ marginLeft: "3px", cursor: "pointer", border: "none", background: "transparent" }}
-        >
-          {questionsOpen ? '▼' : '▶'}
-        </button>
-        {questionsOpen && (
-          <input
-            type="checkbox"
-            checked={
-              workOrder.area.formQuestions.slice(1, 10).every((q: { id: number }) =>
-                checkedQuestions.includes(q.id)
-              )
-            }
-            onChange={(e) => handleSelectAll(e.target.checked)}
-            style={{ marginLeft: "8px" }}
-          />
-        )}
-      </th>
-    </tr>
-  </thead>
+                <thead>
+                  <tr>
+                    <th>Pregunta</th>
+                    <th>
+                      Respuesta
+                      <button 
+                        onClick={toggleQuestions} 
+                        style={{ marginLeft: "3px", cursor: "pointer", border: "none", background: "transparent" }}
+                      >
+                        {questionsOpen ? '▼' : '▶'}
+                      </button>
+                      {questionsOpen && (
+                        <input
+                          type="checkbox"
+                          checked={
+                            workOrder.area.formQuestions.slice(1, 10).every((q: { id: number }) =>
+                              checkedQuestions.includes(q.id)
+                            )
+                          }
+                          onChange={(e) => handleSelectAll(e.target.checked)}
+                          style={{ marginLeft: "8px" }}
+                        />
+                      )}
+                    </th>
+                  </tr>
+                </thead>
 
-  <tbody>
-    {questionsOpen &&
-      workOrder.area.formQuestions
-      .slice(1, 10)
-      .map((question: { id: number; title: string }) => (
-        <tr key={question.id}>
-          <td>{question.title}</td>
-          <td>
-            <input
-              type="checkbox"
-              checked={checkedQuestions.includes(question.id)}
-              onChange={(e) => handleCheckboxChange(question.id, e.target.checked)}
-            />
-          </td>
-        </tr>
-      ))}
-  </tbody>
-</Table>
+                <tbody>
+                  {questionsOpen &&
+                    workOrder.area.formQuestions
+                    .slice(1, 10)
+                    .map((question: { id: number; title: string }) => (
+                      <tr key={question.id}>
+                        <td>{question.title}</td>
+                        <td>
+                          <input
+                            type="checkbox"
+                            checked={checkedQuestions.includes(question.id)}
+                            onChange={(e) => handleCheckboxChange(question.id, e.target.checked)}
+                          />
+                        </td>
+                      </tr>
+                    ))}
+                </tbody>
+              </Table>
               <InputGroup style={{ paddingTop: '30px', width: '70%'}}>
                 <Label>Color De Personalización:</Label>
                 <Input type="text" placeholder="Ej: " value={colorPersonalizacion} onChange={(e) => setColorPersonalizacion(e.target.value)}/>

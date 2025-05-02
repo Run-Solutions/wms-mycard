@@ -39,6 +39,11 @@ export default function PreprensaComponent({ workOrder }: Props) {
       alert('Error al conectar con el servidor');
     }
   }
+
+  const lastIndex = workOrder.areaResponse.inconformities.length > 1 
+  ? workOrder.areaResponse.inconformities.length - 1 
+  : 0;
+
   return (
     <>
     <FlexContainer>
@@ -83,11 +88,11 @@ export default function PreprensaComponent({ workOrder }: Props) {
         <SectionTitle>Inconformidad:</SectionTitle>
         <InputGroup>
           <Label>Respuesta de Usuario</Label>
-          <Input type="text" value={workOrder.areaResponse.inconformities[0].user.username} disabled/>
+          <Input type="text" value={workOrder.areaResponse.inconformities[lastIndex].user.username} disabled/>
         </InputGroup>
         <InputGroup>
           <Label>Comentarios</Label>
-          <Textarea value={workOrder.areaResponse.inconformities[0].comments} disabled/>
+          <Textarea value={workOrder.areaResponse.inconformities[lastIndex].comments} disabled/>
         </InputGroup>
       </NewData>
     </Container>
@@ -184,7 +189,7 @@ const Textarea = styled.textarea`
 `;
 
 const CloseButton = styled.button`
-  background: #16a34a;
+  background: #2563EB;
   color: white;
   margin-top: 20px;
   padding: 0.9rem 1.5rem;
@@ -196,7 +201,7 @@ const CloseButton = styled.button`
   transition: background 0.3s;
 
   &:hover {
-    background: #15803d;
+    background: #1D4ED8;
   }
 `;
 

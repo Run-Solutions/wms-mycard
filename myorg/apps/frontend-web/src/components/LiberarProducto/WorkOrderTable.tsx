@@ -97,19 +97,19 @@ const WorkOrderTable: React.FC<Props> = ({ orders, title, statusFilter}) => {
           <Box display="flex" gap={2} flexWrap="wrap"  sx={{  }}>
             <Box display="flex" alignItems="center" gap={1}>
               <CircleLegend style={{ backgroundColor: '#22c55e' }} />
-              <Typography variant="body2" color="text.secondary">Completado</Typography>
+              <Typography variant="body2" sx={{ color: 'black' }}>Completado</Typography>
             </Box>
             <Box display="flex" alignItems="center" gap={1}>
               <CircleLegend style={{ backgroundColor: '#facc15' }} />
-              <Typography variant="body2" color="text.secondary">Enviado a CQM</Typography>
+              <Typography variant="body2" sx={{ color: 'black' }}>Enviado a CQM</Typography>
             </Box>
             <Box display="flex" alignItems="center" gap={1}>
               <CircleLegend style={{ backgroundColor: '#4a90e2' }} />
-              <Typography variant="body2" color="text.secondary">En Proceso / Calidad</Typography>
+              <Typography variant="body2" sx={{ color: 'black' }}>En Proceso / Calidad</Typography>
             </Box>
             <Box display="flex" alignItems="center" gap={1}>
               <CircleLegend style={{ backgroundColor: '#d1d5db' }} />
-              <Typography variant="body2" color="text.secondary">Sin Estado</Typography>
+              <Typography variant="body2" sx={{ color: 'black' }}>Sin Estado</Typography>
             </Box>
           </Box>
           </div>
@@ -120,12 +120,12 @@ const WorkOrderTable: React.FC<Props> = ({ orders, title, statusFilter}) => {
               <Table>
                 <TableHead>
                   <TableRow>
-                    <TableCell sx={{ color: 'black' }}>Id OT</TableCell>
-                    <TableCell sx={{ maxWidth: 110, overflowX: 'hidden' }}>Id del presupuesto</TableCell>
-                    <TableCell sx={{ color: 'black' }}>Usuario</TableCell>
-                    <TableCell sx={{ color: 'black' }}>Área</TableCell>
-                    <TableCell sx={{ color: 'black' }}>Fecha</TableCell>
-                    <TableCell sx={{ color: 'black' }}>Archivos</TableCell>
+                    <CustomTableCell>Id OT</CustomTableCell>
+                    <CustomTableCell sx={{ maxWidth: 110, overflowX: 'hidden' }}>Id del presupuesto</CustomTableCell>
+                    <CustomTableCell>Usuario</CustomTableCell>
+                    <CustomTableCell>Área</CustomTableCell>
+                    <CustomTableCell>Fecha</CustomTableCell>
+                    <CustomTableCell>Archivos</CustomTableCell>
                   </TableRow>
                 </TableHead>
                 <TableBody>
@@ -134,9 +134,9 @@ const WorkOrderTable: React.FC<Props> = ({ orders, title, statusFilter}) => {
                       <TableCell onClick={() => router.push(`/liberarProducto/${orderFlow.workOrder.ot_id}`)} sx={{ color: 'black',cursor:'pointer', '&:hover': { textDecoration: 'underline' } }}>
                         {orderFlow.workOrder.ot_id}
                       </TableCell>
-                      <TableCell sx={{ color: 'black' }}>{orderFlow.workOrder.mycard_id}</TableCell>
-                      <TableCell sx={{ color: 'black' }}>{orderFlow.workOrder.user?.username || 'Sin usuario'}</TableCell>
-                      <TableCell sx={{ maxWidth: 900, overflowX: 'hidden' }}>
+                      <CustomTableCell>{orderFlow.workOrder.mycard_id}</CustomTableCell>
+                      <CustomTableCell>{orderFlow.workOrder.user?.username || 'Sin usuario'}</CustomTableCell>
+                      <CustomTableCell sx={{ maxWidth: 900, overflowX: 'hidden' }}>
                         <Timeline>
                           {orderFlow.workOrder.flow?.map((flowStep, index) => {
                             const isActive = ['proceso', 'calidad'].some(word => flowStep.status?.toLowerCase().includes(word));
@@ -152,9 +152,9 @@ const WorkOrderTable: React.FC<Props> = ({ orders, title, statusFilter}) => {
                             );
                           })}
                         </Timeline>
-                      </TableCell>
-                      <TableCell sx={{ color: 'black' }}>{new Date(orderFlow.workOrder.createdAt).toLocaleDateString()}</TableCell>
-                      <TableCell sx={{ color: 'black' }}>
+                      </CustomTableCell>
+                      <CustomTableCell>{new Date(orderFlow.workOrder.createdAt).toLocaleDateString()}</CustomTableCell>
+                      <CustomTableCell>
                         {orderFlow.workOrder.files.length > 0 ? (
                           orderFlow.workOrder.files.map((file) => (
                             <div key={file.file_path}>
@@ -167,7 +167,7 @@ const WorkOrderTable: React.FC<Props> = ({ orders, title, statusFilter}) => {
                             </div>
                           ))
                         ) : 'No hay archivos'}
-                      </TableCell>
+                      </CustomTableCell>
                     </TableRow>
                   ))}
                 </TableBody>
@@ -262,4 +262,9 @@ const CircleLegend = styled.div`
   height: 16px;
   border-radius: 50%;
   box-shadow: 0 0 2px rgba(0,0,0,0.3);
+`;
+
+const CustomTableCell = styled(TableCell)`
+  color: black !important;
+  font-size: 1rem;
 `;

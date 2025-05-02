@@ -249,7 +249,7 @@ const UsersPage: React.FC = () => {
             );
           })
         ) : (
-          <p>No hay ordenes pendientes por asignar.</p>
+          <Message>No hay ordenes pendientes por asignar.</Message>
         )}
       </CardsContainer>
       
@@ -263,7 +263,7 @@ export default UsersPage;
 // =================== Styled Components ===================
 
 const PageContainer = styled.div`
-  padding: 1rem 2rem;
+  padding: 20px 20px 20px 50px;
   margin-top: -70px;
   width: 100%;
   align-content: flex-start;
@@ -385,6 +385,13 @@ const ModalOverlay = styled.div`
   justify-content: center;
   align-items: center;
   z-index: 999;
+`;
+
+const Message = styled.p`
+  color: ${({ theme }) => theme.palette.text.primary};
+  font-size: 1rem;
+  text-align: center;
+  margin-top: 2rem;
 `;
 
 const ModalContent = styled.div`

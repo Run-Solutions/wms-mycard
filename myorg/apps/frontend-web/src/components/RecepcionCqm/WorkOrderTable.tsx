@@ -91,19 +91,19 @@ const WorkOrderTable: React.FC<Props> = ({ orders, title, statusFilter}) => {
                     <Box display="flex" gap={2} flexWrap="wrap"  sx={{  }}>
                       <Box display="flex" alignItems="center" gap={1}>
                         <CircleLegend style={{ backgroundColor: '#22c55e' }} />
-                        <Typography variant="body2" color="text.secondary">Completado</Typography>
+                        <Typography variant="body2" color="black">Completado</Typography>
                       </Box>
                       <Box display="flex" alignItems="center" gap={1}>
                         <CircleLegend style={{ backgroundColor: '#facc15' }} />
-                        <Typography variant="body2" color="text.secondary">En calidad</Typography>
+                        <Typography variant="body2" color="black">Enviado a CQM</Typography>
                       </Box>
                       <Box display="flex" alignItems="center" gap={1}>
                         <CircleLegend style={{ backgroundColor: '#4a90e2' }} />
-                        <Typography variant="body2" color="text.secondary">En Proceso / Calidad</Typography>
+                        <Typography variant="body2" color="black">En Proceso / Calidad</Typography>
                       </Box>
                       <Box display="flex" alignItems="center" gap={1}>
                         <CircleLegend style={{ backgroundColor: '#d1d5db' }} />
-                        <Typography variant="body2" color="text.secondary">Sin Estado</Typography>
+                        <Typography variant="body2" color="black">Sin Estado</Typography>
                       </Box>
                     </Box>
                     </div>

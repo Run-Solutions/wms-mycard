@@ -1,4 +1,4 @@
-import { Controller, Get, Res, Patch, Req, ForbiddenException, UseGuards, Param, UnauthorizedException } from '@nestjs/common';
+import { Controller, Get, Res, Patch, Req, ForbiddenException, ParseIntPipe, UseGuards, Param, UnauthorizedException, Body, Delete } from '@nestjs/common';
 import { AcceptReviewsService } from './accept-reviews.service';
 import { Request, Response } from 'express';
 import { JwtAuthGuard } from 'src/auth/jwt-auth.guard';
@@ -35,6 +35,44 @@ export class AcceptReviewsController {
     console.log("📌 Rol del usuario:", user.role_id);
     console.log("📌 Áreas asignadas:", user.areas_operator_id);
     return await this.AcceptReviewsService.getPendingWorkOrders();
+  }
+  
+  // Para obtener los todas las formQuestions
+  @Get('form-questions')
+  async getFormQuestions(@Req() req: AuthenticatedRequest) {
+    console.log('Usuario autenticado: ', req.user);
+    if (!req.user){
+      console.log('Usuario no autenticado');
+      throw new ForbiddenException('Usuario no autenticado.')
+    }
+    return await this.AcceptReviewsService.getFormQuestions();
+  }
+
+  @Get(':id/form-questions')
+  async getFormQuestionFlowById(@Param('id', ParseIntPipe) id: number, @Req() req: AuthenticatedRequest) {
+    const user = req.user;
+    if(!user){
+      throw new ForbiddenException('Usuario no autenticado.');
+    }
+    return await this.AcceptReviewsService.getFormQuestionFlowById(id);
+  }
+  
+  @Patch(':id/new-question')
+  async updateQuestionTitleById(@Param('id', ParseIntPipe) id: number, @Body('title') updatedTitle: string, @Req() req: AuthenticatedRequest) {
+    const user = req.user;
+    if(!user){
+      throw new ForbiddenException('Usuario no autenticado.');
+    }
+    return await this.AcceptReviewsService.updateQuestionTitleById(id, updatedTitle);
+  }
+  
+  @Delete(':id/delete')
+  async deleteQuestionById(@Param('id', ParseIntPipe) id: number, @Req() req: AuthenticatedRequest) {
+    const user = req.user;
+    if(!user){
+      throw new ForbiddenException('Usuario no autenticado.');
+    }
+    return await this.AcceptReviewsService.deleteQuestionById(id);
   }
 
   // Para obtener los WorkOrderFiles

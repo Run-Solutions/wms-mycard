@@ -132,7 +132,7 @@ export default function PrePrensaComponent({ workOrder }: Props) {
       {showConfirm && (
         <ModalOverlay>
           <ModalBox>
-            <h4>¿Estás segura/o que deseas liberar este producto?</h4>
+            <h4 style={{ color: 'black'}}>¿Estás segura/o que deseas liberar este producto?</h4>
             <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '1rem', marginTop: '1rem' }}>
               <CancelButton onClick={() => setShowConfirm(false)}>Cancelar</CancelButton>
               <ConfirmButton onClick={handleSubmit}>Confirmar</ConfirmButton>
@@ -209,6 +209,7 @@ const Input = styled.input`
   padding: 0.75rem 1rem;
   border: 2px solid #d1d5db;
   border-radius: 0.5rem;
+  color: black;
   margin-top: 0.25rem;
   outline: none;
   font-size: 1rem;
@@ -241,6 +242,7 @@ const Textarea = styled.textarea`
   width: 100%;
   height: 120px;
   padding: 1rem;
+  color: black;
   border: 2px solid #d1d5db;
   border-radius: 0.5rem;
   margin-top: 0.5rem;

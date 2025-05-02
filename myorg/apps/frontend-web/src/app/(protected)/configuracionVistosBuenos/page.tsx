@@ -2,25 +2,92 @@
 'use client';
 
 import React, { useEffect, useState } from 'react';
+import { useRouter } from 'next/navigation';
 import styled, { useTheme } from 'styled-components';
 
-const UsersPage: React.FC = () => {
+// Se define el tipo de datos
+interface FormQuestion {
+  id: number;
+  title: string;
+  key: string;
+  role_id: number | null;
+  areas: {
+    id: number;
+    name: string;
+  }[];
+  created_at: string;
+  updated_at: string;
+}
+
+const ConfigVistosBuenosPage: React.FC = () => {
+  const [FormQuestions, setFormQuestions] = useState<FormQuestion[]>([]);
+  const router = useRouter();
+
+  useEffect(() => {
+    async function fetchFormQuestions() {
+      try {
+        // Se verifica token
+        const token = localStorage.getItem('token');
+        if(!token) {
+          console.error('No se encontró el token en localStorage');
+          return;
+        }
+        console.log('Token enviado a headers: ', token)
+    
+        const res = await fetch('http://localhost:3000/work-order-cqm/form-questions', {
+          method: 'GET',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${token}`
+          },
+        });
+        if(!res.ok){
+          throw new Error(`Error al obtener las ordenes: ${res.status} ${res.statusText}`);
+        }
+        const data = await res.json();
+        console.log('Datos obtenidos: ', data);
+        setFormQuestions(data);
+      } catch (err) {
+        console.error(err);
+        console.error('Error en fetchWorkOrders:', err);
+      }
+    }
+    fetchFormQuestions();
+  }, []);
+
+  const uniqueAreas = Array.from(
+    new Map(
+      FormQuestions.flatMap((fq) => fq.areas).map((area) => [area.id, area])
+    ).values()
+  );
+
+  const handleClick = (areaId: any) => {
+    router.push(`/configuracionVistosBuenos/${areaId}`);
+  };
+
   return (
     <PageContainer>
       <TitleWrapper>
         <Title>Configuracion de Vistos Buenos</Title>
+        <div style={{marginTop: '50px'}}className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+          {uniqueAreas.map((area) => (
+            <AreaCard key={area.id} onClick={() => handleClick(area.id)}>
+              <h2>{area.name}</h2>
+            </AreaCard>
+          ))}
+        </div>
       </TitleWrapper>
       
     </PageContainer>
   );
 };
 
-export default UsersPage;
+export default ConfigVistosBuenosPage;
 
 // =================== Styled Components ===================
 
 const PageContainer = styled.div`
-  padding: 1rem 2rem;
+  padding: 20px 20px 20px 50px;
   margin-top: -70px;
 `;
 
@@ -31,118 +98,30 @@ const TitleWrapper = styled.div`
 `;
 
 const Title = styled.h1<{ theme: any }>`
-  font-size: 4rem;
+  font-size: 2rem;
   font-weight: 500;
   color: ${({ theme }) => theme.palette.text.primary}
 `;
 
-const CardsContainer = styled.div`
-  display: flex;
-  flex-wrap: wrap;
-  gap: 2rem;
-`;
-
-const UserCard = styled.div`
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-`;
-
-const FlipCard = styled.div`
-  background-color: transparent;
-  width: 245px;
-  height: 270px;
-  perspective: 1000px;
-  font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+const AreaCard = styled.div`
+  background-color: ${({ theme }) => theme.palette.background.paper};
+  color: ${({ theme }) => theme.palette.text.primary};
+  padding: 1.5rem;
+  border-radius: 1rem;
   cursor: pointer;
-
-  &:hover .flip-card-inner {
-    transform: rotateY(180deg);
-  }
-`;
-
-const FlipCardInner = styled.div`
-  position: relative;
-  width: 100%;
-  height: 100%;
+  box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+  transition: all 0.3s ease;
   text-align: center;
-  transition: transform 0.6s;
-  transform-style: preserve-3d;
-`;
-
-interface FlipCardSideProps {
-  theme: any;
-}
-
-const FlipCardFront = styled.div<FlipCardSideProps>`
-  position: absolute;
-  width: 100%;
-  height: 100%;
-  padding: 5px;
-  border-radius: 2em;
-  backface-visibility: hidden;
-  background-color: ${props => props.theme.palette.primary.main};
-  border: 4px solid ${props => props.theme.palette.secondary.main};
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-`;
-
-const ProfileImage = styled.img`
-  border-radius: 50%;
-  width: 120px;
-  height: 120px;
-  object-fit: cover;
-  margin-bottom: 1rem;
-`;
-
-const UserName = styled.div<{ theme: any }>`
-  font-size: 22px;
-  color: ${props => props.theme.palette.secondary.main};
-  font-weight: bold;
-  text-transform: uppercase;
-`;
-
-const FlipCardBack = styled.div<FlipCardSideProps>`
-  position: absolute;
-  width: 100%;
-  height: 100%;
-  padding: 5px;
-  border-radius: 2em;
-  backface-visibility: hidden;
-  background-color: ${props => props.theme.palette.primary.main};
-  border: 4px solid ${props => props.theme.palette.secondary.main};
-  transform: rotateY(180deg);
-  display: flex;
-  flex-direction: column;
-  justify-content: center;
-  align-items: center;
-`;
-
-const InfoItem = styled.div`
-  font-size: 14px;
-  color: white;
-  margin: 0.2rem 0;
-`;
-
-const CardActions = styled.div`
-  margin-top: 0.5rem;
-  display: flex;
-  gap: 0.5rem;
-`;
-
-const ActionButton = styled.button`
-  padding: 0.5rem 1rem;
-  border: none;
-  border-radius: 1em;
-  cursor: pointer;
-  background-color: ${props => props.theme.palette.secondary.main};
-  color: white;
-  font-weight: bold;
-  transition: background-color 0.3s;
+  font-weight: 500;
 
   &:hover {
-    background-color: ${props => props.theme.palette.secondary.dark || '#000'};
+    transform: translateY(-5px);
+    box-shadow: 0 4px 20px rgba(0,0,0,0.2);
+    background-color: ${({ theme }) => theme.palette.primary.main};
+    color: #fff;
+  }
+
+  h2 {
+    font-size: 1.2rem;
   }
 `;

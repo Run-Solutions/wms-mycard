@@ -79,6 +79,16 @@ export class InconformitiesController {
       return await this.InconformitiesService.inconformityCorte(areaResponseId);
   };
   
+  @Patch(':areaResponse/color-edge')
+  async inconformityColorEdge(@Req() req: AuthenticatedRequest, @Param('areaResponse') areaResponseId: number,) {
+    console.log('LLOEGA');
+    const user = req.user;
+      if(!user){
+        throw new ForbiddenException('Usuario no autenticado.');
+      }
+      return await this.InconformitiesService.inconformityColorEdge(areaResponseId);
+  };
+  
   @Patch(':areaResponse/hot-stamping')
   async inconformityHotStamping(@Req() req: AuthenticatedRequest, @Param('areaResponse') areaResponseId: number,) {
     console.log('LLOEGA');

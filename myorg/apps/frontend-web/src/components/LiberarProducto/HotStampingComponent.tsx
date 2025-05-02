@@ -287,7 +287,7 @@ export default function HotStampingComponent({ workOrder }: Props) {
               .map((question: { id: number; title: string }) => (
                 <tr key={question.id}>
                   <td>{question.title}</td>
-                  <td><input type="checkbox" checked={checkedQuestions.includes(question.id)} onChange={(e) => handleCheckboxChange(question.id, e.target.checked)}/></td>
+                  <td></td>
                 </tr>
               ))}
             </tbody>
@@ -529,15 +529,22 @@ const CloseButton = styled.button`
 
 const SubmitButton = styled.button`
   margin-top: 1.5rem;
-  background-color: #4CAF50;
+  background-color: #2563eb;
   color: white;
   padding: 0.75rem 2rem;
   border-radius: 0.5rem;
   font-weight: 600;
-  transition: background 0.3s;
+  display: block;
+
+  border: none;
+  cursor: pointer;
+
+  transition: background-color 0.3s ease, color 0.3s ease;
   
-  &:hover {
-    background-color: #45a049;
+  &:hover,
+  &:focus {
+    background-color: #1e40af;
+    outline: none;
   }
 `;
 

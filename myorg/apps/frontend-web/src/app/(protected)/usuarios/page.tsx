@@ -108,7 +108,7 @@ const UsersPage: React.FC = () => {
       </TitleWrapper>
       <TableContainer component={Paper} sx={{ backgroundColor: 'white', padding: '2rem', mt: 4, borderRadius: '1rem', boxShadow: '0 4px 12px rgba(0,0,0,0.1)', maxWidth: '100%', marginX: 'auto' }}>
         <Box color='black' display="flex" justifyContent="space-between" alignItems="center" mb={2}>
-          <TextField style={{color:'black'}} label="Buscar usuario" variant="outlined" size="small" value={searchValue} onChange={handleSearchChange} />
+          <TextField label="Buscar OT" variant="outlined" size="small" value={searchValue} onChange={handleSearchChange} sx={{ '& label': { color: 'black' }, '& .MuiOutlinedInput-root': { '& fieldset': { borderColor: 'black' }, '&:hover fieldset': { borderColor: 'black' }, '&.Mui-focused fieldset': { borderColor: 'black' }, color: 'black', }, }} />
         </Box>
 
         {filteredUsers.length === 0 ? (

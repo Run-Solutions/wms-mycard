@@ -165,25 +165,25 @@ export default function CorteComponent({ workOrder }: Props) {
             </thead>
             <tbody>
             <tr>
-              <td>Buenas</td>
+              <td style={{ textAlign: 'left'}}>Buenas</td>
               {areas.map((area, index) => (
                 <td key={index}>{area.buenas || ''}</td>
               ))}
             </tr>
             <tr>
-              <td>Malas</td>
+              <td style={{ textAlign: 'left'}}>Malas</td>
               {areas.map((area, index) => (
                 <td key={index}>{area.malas || ''}</td>
               ))}
             </tr>
             <tr>
-              <td>Excedente</td>
+              <td style={{ textAlign: 'left'}}>Excedente</td>
               {areas.map((area, index) => (
                 <td key={index}>{area.excedente || ''}</td>
               ))}
             </tr>
             <tr>
-              <td>CQM</td>
+              <td style={{ textAlign: 'left'}}>CQM</td>
               {areas.map((area, index) => (
                 <td key={index}>{area.cqm ?? ''}</td>
               ))}
@@ -195,7 +195,7 @@ export default function CorteComponent({ workOrder }: Props) {
               ))}
             </tr>
             <tr>
-              <td>SUMA TOTAL</td>
+              <td style={{ textAlign: 'left'}}>SUMA TOTAL</td>
               {areas.map((area, index) => {
                 const buenas = Number(area.buenas) ?? 0;
                 const malas = Number(area.malas) ?? 0;
@@ -307,21 +307,6 @@ const LiberarButton = styled.button<{ disabled?: boolean }>`
   }
 `;
 
-const CqmButton = styled.button`
-  margin-top: 2rem;
-  background-color: ${({ disabled }) => (disabled ? 'green' : '#2563eb')};
-  color: white;
-  padding: 0.1rem 1rem;
-  height: 50px;
-  border-radius: 0.5rem;
-  font-weight: 600;
-  transition: background 0.3s;
-
-  &:hover {
-    background-color: #1d4ed8;
-  }
-`;
-
 const ModalOverlay = styled.div`
   position: fixed;
   top: 0;
@@ -336,72 +321,19 @@ const ModalOverlay = styled.div`
   z-index: 999;
 `;
 
-const ModalContent = styled.div`
-  background: white;
-  padding: 2rem;
-  border-radius: 1rem;
-  max-width: 600px;
-  width: 90%;
-  box-shadow: 0 10px 25px rgba(0,0,0,0.2);
-`;
-
-const ModalTitle = styled.h2`
-  font-size: 1.5rem;
-  font-weight: 700;
-  margin-bottom: 1.5rem;
-  color: #1f2937;
-  text-align: center;
-`;
-
 const Table = styled.table`
   width: 100%;
   border-collapse: collapse;
 
   th, td {
     padding: 0.75rem;
-    text-align: left;
-    color: black;
+    text-align: center;
     border-bottom: 1px solid #e5e7eb;
   }
 
   th {
     background-color: #f3f4f6;
     color: #374151;
-  }
-`;
-
-const CloseButton = styled.button`
-  margin-top: 1.5rem;
-  background-color: #BBBBBB;
-  color: white;
-  padding: 0.5rem 1.25rem;
-  border-radius: 0.5rem;
-  font-weight: 600;
-  display: block;
-  margin-left: auto;
-
-  border: none;
-  cursor: pointer;
-
-  transition: background-color 0.3s ease, color 0.3s ease;
-
-  &:hover {
-    background-color: #a0a0a0;
-    outline: none
-  }
-`;
-
-const SubmitButton = styled.button`
-  margin-top: 1.5rem;
-  background-color: #4CAF50;
-  color: white;
-  padding: 0.75rem 2rem;
-  border-radius: 0.5rem;
-  font-weight: 600;
-  transition: background 0.3s;
-  
-  &:hover {
-    background-color: #45a049;
   }
 `;
 

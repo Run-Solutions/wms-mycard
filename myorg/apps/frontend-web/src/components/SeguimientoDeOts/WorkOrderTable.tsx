@@ -49,6 +49,7 @@ const WorkOrderTable: React.FC<Props> = ({ orders, title, statusFilter}) => {
   const [currentPage, setCurrentPage] = useState(1);
   const [page, setPage] = useState(0);
   const [searchValue, setSearchValue] = useState("");
+  const [activeArea, setActiveArea] = useState<string>("");
 
   const handleSearchChange = (event: React.ChangeEvent<HTMLInputElement>) => {
     setSearchValue(event.target.value);
@@ -60,8 +61,10 @@ const WorkOrderTable: React.FC<Props> = ({ orders, title, statusFilter}) => {
     (order.status.toLowerCase().includes(statusFilter.toLowerCase()) ||
     order.flow.some(flow => flow.status.toLowerCase().includes(statusFilter.toLowerCase())))
     && order.ot_id.toLowerCase().includes(searchValue.toLowerCase())
+    && (
+      !activeArea || order.flow.some(flow => flow.area?.name?.toLowerCase().includes(activeArea.toLowerCase()))
+    )
   );
-  
   const paginatedOrders = filteredOrders.slice(page * itemsPerPage, (page + 1) * itemsPerPage);
   const handleChangePage = (
     event: React.MouseEvent<HTMLButtonElement> | null,
@@ -99,24 +102,25 @@ const WorkOrderTable: React.FC<Props> = ({ orders, title, statusFilter}) => {
   return (
     <TableContainer component={Paper} sx={{ backgroundColor: 'white', padding: '2rem', mt: 4, borderRadius: '1rem', boxShadow: '0 4px 12px rgba(0,0,0,0.1)', maxWidth: '100%', minWidth: '800px', marginX: 'auto' }}>     
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '10px'}}>
-        <Typography variant='h6' component='div' sx={{ p: 2, color: 'black' }}>{title}</Typography>
-        <TextField label='Buscar OT' variant="outlined" size="small" value={searchValue} onChange={handleSearchChange}/>
+        <Typography variant='h6' component='div' sx={{ p: 2, color:'black' }}>{title}</Typography>
+        <TextField label="Buscar OT" variant="outlined" size="small" value={searchValue} onChange={handleSearchChange} sx={{ '& label': { color: 'black' }, '& .MuiOutlinedInput-root': { '& fieldset': { borderColor: 'black' }, '&:hover fieldset': { borderColor: 'black' }, '&.Mui-focused fieldset': { borderColor: 'black' }, color: 'black', }, }} />
+        <TextField label="Filtrar por Área" variant="outlined" size="small" value={activeArea} onChange={(e) => setActiveArea(e.target.value)} sx={{ '& label': { color: 'black' }, '& .MuiOutlinedInput-root': { '& fieldset': { borderColor: 'black' }, '&:hover fieldset': { borderColor: 'black' }, '&.Mui-focused fieldset': { borderColor: 'black' }, color: 'black', }, }} />
         <Box display="flex" gap={2} flexWrap="wrap"  sx={{  }}>
           <Box display="flex" alignItems="center" gap={1}>
             <CircleLegend style={{ backgroundColor: '#22c55e' }} />
-            <Typography variant="body2" color="text.secondary">Completado</Typography>
+            <Typography variant="body2" color="black">Completado</Typography>
           </Box>
           <Box display="flex" alignItems="center" gap={1}>
             <CircleLegend style={{ backgroundColor: '#facc15' }} />
-            <Typography variant="body2" color="text.secondary">Enviado a CQM</Typography>
+            <Typography variant="body2" color="black">Enviado a CQM</Typography>
           </Box>
           <Box display="flex" alignItems="center" gap={1}>
             <CircleLegend style={{ backgroundColor: '#4a90e2' }} />
-            <Typography variant="body2" color="text.secondary">En Proceso / Calidad</Typography>
+            <Typography variant="body2" color="black">En Proceso / Calidad</Typography>
           </Box>
           <Box display="flex" alignItems="center" gap={1}>
             <CircleLegend style={{ backgroundColor: '#d1d5db' }} />
-            <Typography variant="body2" color="text.secondary">Sin Estado</Typography>
+            <Typography variant="body2" color="black">Sin Estado</Typography>
           </Box>
         </Box>
       </div>
@@ -127,12 +131,12 @@ const WorkOrderTable: React.FC<Props> = ({ orders, title, statusFilter}) => {
           <Table>
             <TableHead>
               <TableRow>
-                <TableCell>Id OT</TableCell>
-                <TableCell sx={{ maxWidth: 110, overflowX: 'hidden' }}>Id del presupuesto</TableCell>
-                <TableCell sx={{ maxWidth: 5, overflowX: 'hidden' }}>Usuario</TableCell>
-                <TableCell sx={{ color: 'black' }}>Área</TableCell>
-                <TableCell sx={{ color: 'black' }}>Fecha</TableCell>
-                <TableCell sx={{ color: 'black' }}>Archivos</TableCell>
+                <CustomTableCell>Id OT</CustomTableCell>
+                <CustomTableCell sx={{ maxWidth: 110, overflowX: 'hidden' }}>Id del presupuesto</CustomTableCell>
+                <CustomTableCell sx={{ maxWidth: 5, overflowX: 'hidden' }}>Usuario</CustomTableCell>
+                <CustomTableCell>Área</CustomTableCell>
+                <CustomTableCell>Fecha</CustomTableCell>
+                <CustomTableCell>Archivos</CustomTableCell>
               </TableRow>
             </TableHead>
             <TableBody>
@@ -141,9 +145,9 @@ const WorkOrderTable: React.FC<Props> = ({ orders, title, statusFilter}) => {
                   <TableCell onClick={() => router.push(`/seguimientoDeOts/${orderFlow.ot_id}`)} sx={{ color: 'black', cursor: 'pointer', '&:hover': { textDecoration: 'underline' } }}>
                     {orderFlow.ot_id}
                   </TableCell>
-                  <TableCell sx={{ color: 'black' }}>{orderFlow.mycard_id}</TableCell>
-                  <TableCell sx={{ color: 'black' }}>{orderFlow.user?.username}</TableCell>
-                  <TableCell sx={{ maxWidth: 900, overflowX: 'hidden' }}>
+                  <CustomTableCell>{orderFlow.mycard_id}</CustomTableCell>
+                  <CustomTableCell>{orderFlow.user?.username}</CustomTableCell>
+                  <CustomTableCell>
                     <Timeline>
                       {orderFlow.flow?.map((flowStep, index) => {
                         const isActive = ['proceso', 'listo'].some(word => flowStep.status?.toLowerCase().includes(word));
@@ -159,9 +163,9 @@ const WorkOrderTable: React.FC<Props> = ({ orders, title, statusFilter}) => {
                         );
                       })}
                     </Timeline>
-                  </TableCell>
-                  <TableCell sx={{ color: 'black' }}>{new Date(orderFlow.createdAt).toLocaleDateString()}</TableCell>
-                    <TableCell sx={{ color: 'black' }}>
+                  </CustomTableCell>
+                  <CustomTableCell>{new Date(orderFlow.createdAt).toLocaleDateString()}</CustomTableCell>
+                    <CustomTableCell>
                       {orderFlow.files.length > 0 ? (
                         orderFlow.files.map((file) => (
                           <div key={file.file_path}>
@@ -174,12 +178,12 @@ const WorkOrderTable: React.FC<Props> = ({ orders, title, statusFilter}) => {
                           </div>
                         ))
                       ) : 'No hay archivos'}
-                    </TableCell>
+                    </CustomTableCell>
                 </TableRow>
               ))}
             </TableBody>
           </Table>
-          <TablePagination component='div' count={filteredOrders.length} page={page} onPageChange={handleChangePage} rowsPerPage={itemsPerPage} rowsPerPageOptions={[itemsPerPage]}/>
+          <TablePagination component="div" count={filteredOrders.length} page={page} onPageChange={handleChangePage} rowsPerPage={itemsPerPage} rowsPerPageOptions={[itemsPerPage]} sx={{ color: 'black', '& .MuiTablePagination-toolbar': { color: 'black', }, '& .MuiTablePagination-selectLabel': { color: 'black', }, '& .MuiTablePagination-displayedRows': { color: 'black', }, '& .MuiSvgIcon-root': { color: 'black', }, }} />
         </>
       )}
     </TableContainer>
@@ -264,4 +268,9 @@ const CircleLegend = styled.div`
   height: 16px;
   border-radius: 50%;
   box-shadow: 0 0 2px rgba(0,0,0,0.3);
+`;
+
+const CustomTableCell = styled(TableCell)`
+  color: black !important;
+  font-size: 1rem;
 `;

@@ -97,7 +97,7 @@ const WorkOrderTable: React.FC<Props> = ({ orders, title, statusFilter}) => {
             </Box>
         </div>
           {filteredOrders.length === 0 ? (
-            <Typography sx={{ p: 2 }}>No hay órdenes para mostrar.</Typography>
+            <Typography sx={{ p: 2, color:'black' }}>No hay órdenes para mostrar.</Typography>
           ) : (
             <>
               <Table>
@@ -244,4 +244,9 @@ const CircleLegend = styled.div`
   height: 16px;
   border-radius: 50%;
   box-shadow: 0 0 2px rgba(0,0,0,0.3);
+`;
+
+const CustomTableCell = styled(TableCell)`
+  color: black;
+  font-size: 1rem;
 `;

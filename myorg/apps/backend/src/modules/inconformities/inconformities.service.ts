@@ -188,6 +188,49 @@ export class InconformitiesService {
     });
   }
   
+  async inconformityColorEdge(areaResponseId: number) {
+    return this.prisma.$transaction(async (tx) => {
+      const areaResponse = await tx.areasResponse.findUnique({
+        where: {
+          id: Number(areaResponseId),
+        },
+      });
+      if (!areaResponse) {
+        throw new NotFoundException('No se encontró el registro AreasResponse');
+      }
+      const colorEdgeResponse = await tx.colorEdgeResponse.findUnique({
+        where: {
+          areas_response_id: Number(areaResponseId),
+        },
+      });
+      if (colorEdgeResponse) {
+        // Si existe un form_auditory_id, eliminar el FormAuditory
+        if (colorEdgeResponse.form_auditory_id) {
+          await tx.formAuditory.deleteMany({
+            where: {
+              id: colorEdgeResponse.form_auditory_id,
+            },
+          });
+        }
+      // Eliminar el registro empalme asociado a ese AreasResponse
+      await tx.colorEdgeResponse.deleteMany({
+        where: {
+          areas_response_id: Number(areaResponseId),
+        },
+      });
+      }
+      await tx.workOrderFlow.update({
+        where: {
+          id: Number(areaResponse.work_order_flow_id),
+        },
+        data: {
+          status: 'Listo'
+        }
+      })
+      return { message: 'Respuesta guardada con exito'};
+    });
+  }
+  
   async inconformityHotStamping(areaResponseId: number) {
     return this.prisma.$transaction(async (tx) => {
       const areaResponse = await tx.areasResponse.findUnique({

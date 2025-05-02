@@ -82,32 +82,32 @@ const WorkOrderTable: React.FC<Props> = ({ orders, title, statusFilter}) => {
         setTimeout(() => window.URL.revokeObjectURL(url), 5000);
     }
     return (
-        <TableContainer component={Paper} sx={{ backgroundColor: 'white', padding: '2rem', mt: 4, borderRadius: '1rem', boxShadow: '0 4px 12px rgba(0,0,0,0.1)', maxWidth: '100%', minWidth: '800px', marginX: 'auto' }}>
-          <Typography variant='h6' component='div' sx={{ p: 2 }}>{title}</Typography>
+      <TableContainer component={Paper} sx={{ backgroundColor: 'white', padding: '2rem', mt: 4, borderRadius: '1rem', boxShadow: '0 4px 12px rgba(0,0,0,0.1)', maxWidth: '100%', minWidth: '800px', marginX: 'auto' }}>     
+          <Typography variant='h6' component='div' sx={{ p: 2, color:'black' }}>{title}</Typography>
           {filteredOrders.length === 0 ? (
-            <Typography sx={{ p: 2 }}>No hay órdenes para mostrar.</Typography>
+            <Typography sx={{ p: 2, color:'black' }}>No hay órdenes para mostrar.</Typography>
           ) : (
             <>
               <Table>
                 <TableHead>
                   <TableRow>
-                    <TableCell>Id OT</TableCell>
-                    <TableCell sx={{ maxWidth: 110, overflowX: 'hidden' }}>Id del presupuesto</TableCell>
-                    <TableCell>Usuario</TableCell>
-                    <TableCell>Área</TableCell>
-                    <TableCell>Fecha</TableCell>
-                    <TableCell>Archivos</TableCell>
+                    <CustomTableCell>Id OT</CustomTableCell>
+                    <CustomTableCell sx={{ maxWidth: 110, overflowX: 'hidden' }}>Id del presupuesto</CustomTableCell>
+                    <CustomTableCell>Usuario</CustomTableCell>
+                    <CustomTableCell>Área</CustomTableCell>
+                    <CustomTableCell>Fecha</CustomTableCell>
+                    <CustomTableCell>Archivos</CustomTableCell>
                   </TableRow>
                 </TableHead>
                 <TableBody>
                   {displayedOrders.map((orderFlow) => (
                     <TableRow key={orderFlow.id}>
-                      <TableCell onClick={() => router.push(`/inconformidades/${orderFlow.ot_id}`)} sx={{ cursor: 'pointer', '&:hover': { textDecoration: 'underline' } }}>
+                      <TableCell onClick={() => router.push(`/inconformidades/${orderFlow.ot_id}`)} sx={{ color: 'black', cursor: 'pointer', '&:hover': { textDecoration: 'underline' } }}>
                         {orderFlow.ot_id}
                       </TableCell>
-                      <TableCell>{orderFlow.mycard_id}</TableCell>
-                      <TableCell>{orderFlow.user?.username}</TableCell>
-                      <TableCell sx={{ maxWidth: 900, overflowX: 'hidden' }}>
+                      <CustomTableCell>{orderFlow.mycard_id}</CustomTableCell>
+                      <CustomTableCell>{orderFlow.user?.username}</CustomTableCell>
+                      <CustomTableCell sx={{ maxWidth: 900, overflowX: 'hidden' }}>
                         <Timeline>
                           {orderFlow.flow?.map((flowStep, index) => {
                             const isActive = ['proceso', 'inconformidad', 'listo'].some(word => flowStep.status?.toLowerCase().includes(word));
@@ -122,9 +122,9 @@ const WorkOrderTable: React.FC<Props> = ({ orders, title, statusFilter}) => {
                             );
                           })}
                         </Timeline>
-                      </TableCell>
-                      <TableCell>{new Date(orderFlow.createdAt).toLocaleDateString()}</TableCell>
-                      <TableCell>
+                      </CustomTableCell>
+                      <CustomTableCell>{new Date(orderFlow.createdAt).toLocaleDateString()}</CustomTableCell>
+                      <CustomTableCell>
                         {orderFlow.files.length > 0 ? (
                           orderFlow.files.map((file) => (
                             <div key={file.file_path}>
@@ -137,7 +137,7 @@ const WorkOrderTable: React.FC<Props> = ({ orders, title, statusFilter}) => {
                             </div>
                           ))
                         ) : 'No hay archivos'}
-                      </TableCell>
+                      </CustomTableCell>
                     </TableRow>
                   ))}
                 </TableBody>
@@ -225,4 +225,9 @@ const AreaName = styled.span.withConfig({
   max-width: 80px;
   text-transform: capitalize;
   transition: color 0.3s, font-weight 0.3s;
+`;
+
+const CustomTableCell = styled(TableCell)`
+  color: black !important;
+  font-size: 1rem;
 `;

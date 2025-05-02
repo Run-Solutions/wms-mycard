@@ -7,7 +7,7 @@ interface Props {
   workOrder: any;
 }
 
-export default function CorteComponent({ workOrder }: Props) {
+export default function ColorEdgeComponentCQM({ workOrder }: Props) {
   const router = useRouter();
   const [showModal, setShowModal] = useState(false);
   const openModal = () => {
@@ -20,10 +20,10 @@ export default function CorteComponent({ workOrder }: Props) {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     const token = localStorage.getItem('token');
-    const areaResponse = workOrder.areaResponse.id;
+    const areaResponse = workOrder.answers[0].id;
     console.log(areaResponse);
     try {
-      const res = await fetch(`http://localhost:3000/inconformities/${areaResponse}/corte`, {
+      const res = await fetch(`http://localhost:3000/inconformities/${areaResponse}/cqm`, {
         method: 'PATCH',
         headers: {
           'Content-Type': 'application/json',
@@ -43,7 +43,7 @@ export default function CorteComponent({ workOrder }: Props) {
   const lastIndex = workOrder.areaResponse.inconformities.length > 1 
   ? workOrder.areaResponse.inconformities.length - 1 
   : 0;
-  
+
   return (
     <>
     <FlexContainer>
@@ -51,19 +51,55 @@ export default function CorteComponent({ workOrder }: Props) {
       <NewData>
         <SectionTitle>Entregaste:</SectionTitle>
         <NewDataWrapper>
-          <InputGroup>
-          <Label>Buenas:</Label>
-              <Input type="number" name="good_quantity" value={workOrder.areaResponse.corte.good_quantity} disabled/>
-              <Label>Malas:</Label>
-              <Input type="number" name="bad_quantity" value={workOrder.areaResponse.corte.bad_quantity} disabled/>
-              <Label>Exceso:</Label>
-              <Input type="number" name="excess_quantity" value={workOrder.areaResponse.corte.excess_quantity} disabled/>
+        <Table>
+            <thead>
+              <tr>
+                <th>Pregunta</th>
+                <th>Respuesta</th>
+              </tr>
+            </thead>
+            <tbody>
+              {workOrder.area.formQuestions
+              .filter((question: { role_id: number | null }) => question.role_id === null)
+              .map((question: { id: number; title: string }) => {
+                // Buscar la respuesta correspondiente a esta pregunta
+                const answer = workOrder.answers[0]?.FormAnswerResponse?.find(
+                  (resp: any) => resp.question_id === question.id
+                );
+                
+                // Obtener la respuesta del operador (response_operator)
+                const operatorResponse = answer?.response_operator;
+
+                return (
+                  <tr key={question.id}>
+                    <td>{question.title}</td>
+                    <td>
+                      {typeof operatorResponse === 'boolean' ? (
+                        <input 
+                          type="checkbox" 
+                          checked={operatorResponse} 
+                          disabled 
+                        />
+                      ) : (
+                        <span>{operatorResponse !== undefined && operatorResponse !== null 
+                          ? operatorResponse.toString() 
+                          : ''}</span>
+                      )}
+                    </td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </Table>
+          <InputGroup style={{ marginTop: '-7rem'}}>
+              <Label>Color Edge:</Label>
+              <Input type="number" value={workOrder?.answers[0].color_edge ?? 'No se reconoce la muestra enviada' } readOnly />
+          </InputGroup>
+          <InputGroup style={{ marginTop: '-7rem'}}>
+              <Label>Muestras entregadas:</Label>
+              <Input type="number" value={workOrder?.answers[0].sample_quantity ?? 'No se reconoce la muestra enviada' } readOnly />
           </InputGroup>
         </NewDataWrapper>
-        <InputGroup>
-          <Label>Comentarios</Label>
-          <Textarea value={workOrder.areaResponse.corte.comments} disabled/>
-        </InputGroup>
       </NewData>
     </Container>
     <Container>
@@ -71,11 +107,11 @@ export default function CorteComponent({ workOrder }: Props) {
         <SectionTitle>Inconformidad:</SectionTitle>
         <InputGroup>
           <Label>Respuesta de Usuario</Label>
-          <Input type="text" value={workOrder.areaResponse.inconformities[lastIndex].user.username} disabled/>
+          <Input type="text" value={workOrder.answers[0].inconformities[lastIndex].user.username} disabled/>
         </InputGroup>
         <InputGroup>
           <Label>Comentarios</Label>
-          <Textarea value={workOrder.areaResponse.inconformities[lastIndex].comments} disabled/>
+          <Textarea value={workOrder.answers[0].inconformities[lastIndex].comments} disabled/>
         </InputGroup>
       </NewData>
     </Container>
@@ -245,5 +281,21 @@ const CancelButton = styled.button`
   &:focus {
     background-color: #a0a0a0;
     outline: none;
+  }
+`;
+
+const Table = styled.table`
+  width: 100%;
+  border-collapse: collapse;
+  color: black;
+  th, td {
+    padding: 0.75rem;
+    text-align: left;
+    border-bottom: 1px solid #e5e7eb;
+  }
+
+  th {
+    background-color: #f3f4f6;
+    color: #374151;
   }
 `;

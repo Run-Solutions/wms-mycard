@@ -269,7 +269,7 @@ const Container = styled.div`
 const Title = styled.h2`
   margin-bottom: 1.5rem;
   font-size: 2rem;
-  color: ${({ theme }) => theme.palette.text.primary}
+  color: ${({ theme }) => theme.palette.text.primary};
 `;
 
 const DataWrapper = styled.div`
@@ -283,20 +283,20 @@ const InfoItem = styled.div`
   padding: 1.25rem 1.5rem;
   border-radius: 0.75rem;
   box-shadow: 0 3px 6px rgba(0,0,0,0.08);
-  color: ${({ theme }) => theme.palette.text.primary};
+  color: black;
   flex: 1;
 `;
 
 const Label = styled.span`
   font-weight: 600;
-  color: ${({ theme }) => theme.palette.text.primary}
+  color: black;
   margin-bottom: 0.25rem;
 `;
 
 const Value = styled.span`
   font-size: 1.125rem;
   color: #111827;
-  color: ${({ theme }) => theme.palette.text.primary}
+  color: black;
 `;
 
 const Section = styled.section`
@@ -306,7 +306,7 @@ const Section = styled.section`
 const SectionTitle = styled.h3`
   font-size: 1.5rem;
   margin-bottom: 1rem;
-  color: ${({ theme }) => theme.palette.text.primary}
+  color: ${({ theme }) => theme.palette.text.primary};
 `;
 
 const TableWrapper = styled.div`
@@ -326,7 +326,7 @@ const StyledTable = styled.table`
     padding: 0.75rem;
     text-align: center;
     border-bottom: 1px solid #e5e7eb;
-    color: ${({ theme }) => theme.palette.text.primary}
+    color: black;
   }
 
   th {
