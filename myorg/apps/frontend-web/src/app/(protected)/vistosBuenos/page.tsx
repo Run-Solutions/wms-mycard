@@ -411,7 +411,7 @@ const ModalContent = styled.div`
     padding: 0.5rem 1rem;
     border: none;
     border-radius: 0.5rem;
-    background-color: ${(props) => props.theme.palette.background.default};
+    background-color: #F9FAFB;
     color: black;
     cursor: pointer;
     margin: 5px;

@@ -174,6 +174,10 @@ export default function HotStampingComponent({ workOrder }: Props) {
           <Label>Operador:</Label>
           <Value>{workOrder.user.username}</Value>
         </InfoItem>
+        <InfoItem>
+          <Label>Comentarios:</Label>
+          <Value>{workOrder.workOrder.comments}</Value>
+        </InfoItem>
       </DataWrapper>
 
       <NewData>

@@ -94,6 +94,10 @@ export default function PrePrensaComponent({ workOrder }: Props) {
           <Value>{workOrder.workOrder.quantity}</Value>
         </InfoItem>
       </DataWrapper>
+        <InfoItem style={{ marginTop: '20px'}}>
+          <Label>Comentarios:</Label>
+          <Value>{workOrder.workOrder.comments}</Value>
+        </InfoItem>
       <form onSubmit={handleSubmit}>
         <SectionTitle>Datos de Producción</SectionTitle>
         <NewDataWrapper>

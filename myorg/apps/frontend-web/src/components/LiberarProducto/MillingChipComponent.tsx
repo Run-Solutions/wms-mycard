@@ -167,6 +167,10 @@ export default function MillingChipComponent({ workOrder }: Props) {
           <Value>{workOrder.workOrder.quantity}</Value>
         </InfoItem>
       </DataWrapper>
+        <InfoItem style={{ marginTop: '20px'}}>
+          <Label>Comentarios:</Label>
+          <Value>{workOrder.workOrder.comments}</Value>
+        </InfoItem>
       <NewData>
         <SectionTitle>Datos de Producción</SectionTitle>
         <NewDataWrapper>
