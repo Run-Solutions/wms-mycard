@@ -270,7 +270,6 @@ export class WorkOrderService {
       return workOrderFlow;
     }
   
-    // Para guardar respuesta de liberacion de auditor 
     async closeWorkOrderById(dto: CreateWorkOrderDto, userId: number) {
       return this.prisma.$transaction(async (tx) => {
         await tx.workOrder.update({
@@ -280,6 +279,28 @@ export class WorkOrderService {
           data: {
             status: 'Cerrado',
             closed_by: userId,
+          },
+        });
+        const WorkOrder = await tx.workOrder.findUnique({
+          where: {
+            ot_id: dto.ot_id,
+          },
+          select: {
+            id: true,
+          },
+        });
+        if (!WorkOrder) {
+          throw new Error('Orden de trabajo no encontrada');
+        }
+        await tx.workOrderFlow.updateMany({
+          where: {
+            work_order_id: WorkOrder.id,
+            NOT: {
+              status: 'Completado',
+            },
+          },
+          data: {
+            status: 'Cerrado',
           },
         });
         return { message: 'Respuesta guardada con exito'};

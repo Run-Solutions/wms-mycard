@@ -339,6 +339,7 @@ const Table = styled.table`
   th, td {
     padding: 0.75rem;
     text-align: center;
+    color: black;
     border-bottom: 1px solid #e5e7eb;
   }
 

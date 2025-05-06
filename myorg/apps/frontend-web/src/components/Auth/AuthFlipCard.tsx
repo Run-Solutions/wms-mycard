@@ -6,7 +6,7 @@ import styled, { createGlobalStyle } from 'styled-components';
 import LoginForm from './LoginForm';
 import RegisterForm from './RegisterForm';
 import ToggleSwitch from './ToggleSwitch';
-import { useAuth } from '../../context/AuthContext';
+import { useAuthContext } from '../../context/AuthContext';
 import { useRouter } from 'next/navigation';
 import { toast } from 'react-toastify';
 
@@ -97,7 +97,7 @@ const CardContent = styled.div`
 
 const AuthFlipCard: React.FC = () => {
   const router = useRouter();
-  const { setUser } = useAuth();
+  const { setUser, setToken } = useAuthContext();
 
   // Estados para login
   const [loginEmail, setLoginEmail] = useState('');
@@ -129,11 +129,11 @@ const AuthFlipCard: React.FC = () => {
         // Guardar el token en localStorage para modulos por rol
         if (data.token) {
           localStorage.setItem('token', data.token);
+          setToken(data.token);
           console.log('Token almacenado:', data.token)
         } else {
           console.error('⛔ No se ha recibido el token')
         }
-
         // Guardar el usuario en localStorage
         if (data.user) {
           setUser(data.user);

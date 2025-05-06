@@ -294,6 +294,7 @@ const TextArea = styled.textarea`
   border: 2px solid #aeadab;
   width: 100%;
   min-height: 80px;
+  color: black;
   outline: none;
   resize: vertical;
   transition: border-color 0.3s ease;

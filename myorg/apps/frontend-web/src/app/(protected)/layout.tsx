@@ -1,16 +1,27 @@
 // src/app/(protected)/layout.tsx
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import DashboardHeader from '@/components/Header/DashboardHeader';
 import { Sidebar } from '@/components/Sidebar/Sidebar';
 import { useThemeContext } from '@/components/ThemeContext';
+import { useAuthContext } from '@/context/AuthContext';
+import { useRouter } from 'next/navigation';
 
 export default function ProtectedLayout({ children }: { children: React.ReactNode; }) {
   const [sidebarOpen, setSidebarOpen] = useState(true);
   const toggleDrawer = () => setSidebarOpen(!sidebarOpen);
   const headerHeight = 130;
   const { currentTheme, changeTheme, theme } = useThemeContext();
+  const { token } = useAuthContext();
+  const router = useRouter();
+
+  useEffect(() => {
+    if (!token) {
+      router.push('/auth/login'); // redirige si no hay token
+    }
+  }, [token, router]);
+  if (!token) return null;
 
   return (
     <div style={{ display: 'flex', height: '100vh', backgroundColor: theme.palette.background.default }}>

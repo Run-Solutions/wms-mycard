@@ -11,7 +11,7 @@ import IconButton from '@mui/material/IconButton';
 import Popover from '@mui/material/Popover';
 import Grid from '@mui/material/Grid';
 import EditProfileModal from './EditProfileModal';
-import { useAuth } from '@/context/AuthContext'; 
+import { useAuthContext } from '@/context/AuthContext'; 
 import { themes } from '@/theme/themes';
 import { useRouter } from 'next/navigation';
 
@@ -108,7 +108,7 @@ const DashboardHeader: React.FC<DashboardHeaderProps> = ({
   sidebarWidth,
 }) => {
   // Hook para el usuario real
-  const { user } = useAuth();
+  const { user } = useAuthContext();
   // Estado para el popover del tema
   const [anchorEl, setAnchorEl] = useState<HTMLButtonElement | null>(null);
   // Estado para abrir el modal de editar perfil

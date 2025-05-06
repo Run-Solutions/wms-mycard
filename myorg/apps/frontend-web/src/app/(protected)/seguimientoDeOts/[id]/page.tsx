@@ -352,6 +352,7 @@ const Table = styled.table`
   th, td {
     padding: 0.75rem;
     text-align: center;
+    color:rgb(4, 4, 4);
     border-bottom: 1px solid #e5e7eb;
   }
 

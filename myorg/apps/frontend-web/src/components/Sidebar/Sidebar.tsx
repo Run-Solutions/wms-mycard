@@ -6,6 +6,9 @@ import { Drawer, ListItemButton, ListItemText, Button, Box } from '@mui/material
 import ExitToAppIcon from '@mui/icons-material/ExitToApp';
 import { useRouter } from 'next/navigation';
 import { sidebarItems } from '@/config/sidebarItems';
+import { useAuthContext } from '@/context/AuthContext';
+import { useDispatch } from 'react-redux';
+import { logout } from '../../store/slices/authSlice';
 
 const drawerOpenWidth = 200;
 const collapsedWidth = 60;
@@ -26,8 +29,10 @@ interface Module {
 
 export const Sidebar: React.FC<SidebarProps> = ({ open, onLogout }) => {
   const router = useRouter();
+  const { user, setUser, setToken } = useAuthContext();
   const [modules, setModules] = useState<Module[]>([]);
   const [loading, setLoading] = useState(true);
+  const dispatch = useDispatch();
 
   useEffect(() => {
     const fetchModules = async () => {
@@ -35,7 +40,6 @@ export const Sidebar: React.FC<SidebarProps> = ({ open, onLogout }) => {
         // Se recupera el token del user logeado
         const token = localStorage.getItem('token');
         if (!token) {
-          router.push('/auth/login');
           throw new Error('⛔ No se la leído el token');
         }
         const response = await fetch('http://localhost:3000/dashboard/modules', {
@@ -101,7 +105,10 @@ export const Sidebar: React.FC<SidebarProps> = ({ open, onLogout }) => {
   // Ejemplo de logout: borra el usuario y redirige a /auth/login
   const handleLogout = () => {
     localStorage.removeItem('user');
-    onLogout(); // Llama a la función pasada como prop (si realiza acciones adicionales)
+    localStorage.removeItem('token');
+    setUser(null);
+    setToken(null);
+    dispatch(logout());
     router.push('/auth/login');
   };
 
