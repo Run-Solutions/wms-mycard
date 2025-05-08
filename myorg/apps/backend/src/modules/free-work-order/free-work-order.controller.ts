@@ -101,7 +101,7 @@ export class FreeWorkOrderController {
     // Para guardar respuesta de form cqm de color edge
     @Post('cqm-color-edge')
     async saveFormAnswersColorEdge(@Body() dto: CreateFormAnswerImpressionDto) {
-      const formAnswer = await this.FreeWorkOrderService.saveFormAnswers(dto);
+      const formAnswer = await this.FreeWorkOrderService.saveFormAnswersColorEdge(dto);
       return formAnswer;
     }
     

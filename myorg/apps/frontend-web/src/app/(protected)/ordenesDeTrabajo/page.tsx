@@ -6,6 +6,8 @@ import React, { useEffect, useState } from 'react';
 import styled, { useTheme } from 'styled-components';
 import IconButton from '@mui/material/IconButton';
 import DeleteIcon from '@mui/icons-material/Delete';
+import UploadFileIcon from '@mui/icons-material/UploadFile';
+import Typography from '@mui/material/Typography';
 
 const WorkOrdersPage: React.FC = () => {
   const theme = useTheme();
@@ -37,14 +39,14 @@ const WorkOrdersPage: React.FC = () => {
         const updatedFlows = [...prev.areasOperatorIds];
     
         // Evita valores duplicados 
-        if (updatedFlows.includes(value as string)) {
+        /*if (updatedFlows.includes(value as string)) {
           const duplicateIndex = updatedFlows.indexOf(value as string);
           updatedFlows[duplicateIndex] = ""; // Si hay duplicado
-        }
+        }*/
     
         updatedFlows[areaIndex] = value as string || "";  // Asignamos el valor al índice correspondiente
-        const filteredFlows = updatedFlows.filter(area => area !== "");
-        return { ...prev, areasOperatorIds: filteredFlows };
+        //const filteredFlows = updatedFlows.filter(area => area !== "");
+        return { ...prev, areasOperatorIds: updatedFlows };
       });
     } else {
       setFormData((prev) => ({ ...prev, [name]: value }));
@@ -143,6 +145,18 @@ const WorkOrdersPage: React.FC = () => {
       }
       const result = await response.json();
       setMessage(result.message);
+      // 👉 Reseteamos el formulario y archivos
+      setFormData({ 
+        ot_id: '', 
+        mycard_id: '', 
+        quantity: '', 
+        comments: '', 
+        areasOperatorIds: [], 
+        priority: false, 
+        files: [] 
+      });
+      setFiles({ ot: null, sku: null, op: null });
+      setDropdownCount(4);
     } catch (error) {
       setMessage('Error al crear la orden de trabajo');
     }
@@ -211,35 +225,65 @@ const WorkOrdersPage: React.FC = () => {
 
           <Auxiliar>
             <Label>Subir OT (PDF):</Label>
-            <Input type="file" accept="application/pdf" onChange={(e) => handleFileChange(e, 'ot')} />
-            {files.ot && ( 
-              <div>
-                <span>{files.ot.name}</span> 
-                <IconButton onClick={() => removeFile('ot')}>
+            <label htmlFor="upload-ot" style={{ borderRadius: '10rem', border: '2px solid #aeadab', width: '100%', height: '44px', display: 'flex', flexDirection: 'row' }}>
+              <HiddenInput
+                accept="application/pdf"
+                id="upload-ot"
+                type="file"
+                onChange={(e) => handleFileChange(e, 'ot')}
+              />
+              <IconButton color="primary" component="span">
+                <UploadFileIcon />
+              </IconButton>
+            {files.ot && (
+              <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                <Typography variant="body2">{files.ot.name}</Typography>
+                <IconButton onClick={() => removeFile('ot')} color="error">
                   <DeleteIcon />
                 </IconButton>
               </div>
             )}
+            </label>
             <Label>Subir SKU (PDF):</Label>
-            <Input type="file" accept="application/pdf" onChange={(e) => handleFileChange(e, 'sku')} />
+            <label htmlFor="upload-sku" style={{ borderRadius: '10rem', border: '2px solid #aeadab', width: '100%', height: '44px', display: 'flex', flexDirection: 'row' }}>
+              <HiddenInput
+                accept='application/pdf'
+                id='upload-sku'
+                type='file'
+                onChange={(e) => handleFileChange(e, 'sku')}
+              />
+              <IconButton color="primary" component="span">
+                <UploadFileIcon />
+              </IconButton>
             {files.sku && ( 
-              <div>
-                <span>{files.sku.name}</span> 
-                <IconButton onClick={() => removeFile('sku')}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                <Typography variant="body2">{files.sku.name}</Typography>
+                <IconButton onClick={() => removeFile('sku')} color='error'>
                   <DeleteIcon />
                 </IconButton>
               </div>
             )}
+            </label>
             <Label>Subir OP (PDF):</Label>
-            <Input type="file" accept="application/pdf" onChange={(e) => handleFileChange(e, 'op')} />
+            <label htmlFor="upload-op" style={{ borderRadius: '10rem', border: '2px solid #aeadab', width: '100%', height: '44px', display: 'flex', flexDirection: 'row' }}>
+              <HiddenInput
+                accept='application/pdf'
+                id='upload-op'
+                type='file'
+                onChange={(e) => handleFileChange(e, 'op')}
+              />
+              <IconButton color="primary" component="span">
+                <UploadFileIcon />
+              </IconButton>
             {files.op && ( 
-              <div>
-                <span>{files.op.name}</span> 
-                <IconButton onClick={() => removeFile('op')}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                <Typography variant="body2">{files.op.name}</Typography>
+                <IconButton onClick={() => removeFile('op')} color='error'>
                   <DeleteIcon />
                 </IconButton>
               </div>
             )}
+            </label>
             <CheckboxWrapper>
               <Label>Prioridad:</Label>
               <input type="checkbox" name="priority" checked={formData.priority} onChange={(e) => { handleChange(e)}} />
@@ -430,4 +474,8 @@ const Message = styled.p`
   color: green;
   font-weight: bold;
 `;
+
+const HiddenInput = styled('input')({
+  display: 'none',
+});
 

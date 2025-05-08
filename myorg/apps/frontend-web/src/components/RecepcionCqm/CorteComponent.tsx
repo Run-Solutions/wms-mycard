@@ -466,20 +466,6 @@ const RechazarButton = styled.button<{ disabled?: boolean }>`
   }
 `;
 
-const CqmButton = styled.button`
-  margin-top: 2rem;
-  background-color: #2563eb;
-  color: white;
-  padding: 0.75rem 2rem;
-  border-radius: 0.5rem;
-  font-weight: 600;
-  transition: background 0.3s;
-
-  &:hover {
-    background-color: #1d4ed8;
-  }
-`;
-
 const Table = styled.table`
   width: 100%;
   border-collapse: collapse;
@@ -493,27 +479,6 @@ const Table = styled.table`
   th {
     background-color: #f3f4f6;
     color: #374151;
-  }
-`;
-
-const CloseButton = styled.button`
-  margin-top: 1.5rem;
-  background-color: #BBBBBB;
-  color: white;
-  padding: 0.5rem 1.25rem;
-  border-radius: 0.5rem;
-  font-weight: 600;
-  display: block;
-  margin-left: auto;
-
-  border: none;
-  cursor: pointer;
-
-  transition: background-color 0.3s ease, color 0.3s ease;
-
-  &:hover {
-    background-color: #a0a0a0;
-    outline: none
   }
 `;
 

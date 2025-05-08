@@ -1,6 +1,5 @@
 'use client'
 
-
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 import styled from "styled-components";
@@ -11,23 +10,16 @@ interface Props {
 
 export default function HotStampingComponent({ workOrder }: Props) {
   const router = useRouter();
-  const [otherValue, setOtherValue] = useState('');
-  const [selectedOption, setSelectedOption] = useState('');
-  
   // Para bloquear liberacion hasta que sea aprobado por CQM
   const isDisabled = workOrder.status === 'En proceso';
-
   // Para mostrar formulario de CQM y enviarlo
   const [showModal, setShowModal] = useState(false);
-
   const openModal = () => {
     setShowModal(true);
   };
-
   const closeModal = () => {
     setShowModal(false);
   };
-
   //Para guardar las respuestas 
   const [responses, setResponses] = useState<{ questionId: number, answer: boolean }[]>([]);
   const [sampleQuantity, setSampleQuantity] = useState<number | string>('');
@@ -37,15 +29,12 @@ export default function HotStampingComponent({ workOrder }: Props) {
   const [goodQuantity, setGoodQuantity] = useState<number | string>('');
   const [badQuantity, setBadQuantity] = useState<number | string>('');
   const [excessQuantity, setExcessQuantity] = useState<number | string>('');
-
   // Para controlar qué preguntas están marcadas
   const [checkedQuestions, setCheckedQuestions] = useState<number[]>([]);
-
   // Función para manejar el cambio en el campo de muestras y color edge
   const handleSampleQuantityChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     setSampleQuantity(e.target.value);
   };
-
   const handleCheckboxChange = (questionId: number, isChecked: boolean) => {
     setResponses((prevResponses) => {
       const updateResponses = prevResponses.filter(response => response.questionId !== questionId);
@@ -103,9 +92,9 @@ export default function HotStampingComponent({ workOrder }: Props) {
         return;
       }
       router.push('/liberarProducto');
-  } catch (error) {
-    console.log('Error al guardar la respuesta: ', error);
-  }
+    } catch (error) {
+      console.log('Error al guardar la respuesta: ', error);
+    }
   }
   
   // Para Liberar el producto cuando ya ha pasado por CQM
@@ -188,14 +177,14 @@ export default function HotStampingComponent({ workOrder }: Props) {
             <Label>Excedente:</Label>
             <Input type="number" placeholder="Ej: 2" value={excessQuantity} onChange={(e) => setExcessQuantity(e.target.value)} disabled={isDisabled} />
           </InputGroup>
-          <CqmButton onClick={openModal} disabled={workOrder.status === 'Listo'}>Enviar a CQM</CqmButton>
+          <CqmButton status={workOrder.status} onClick={openModal} disabled={['Enviado a CQM', 'En Calidad', 'Listo'].includes(workOrder.status)}>Enviar a CQM</CqmButton>
         </NewDataWrapper>
         <InputGroup>
           <SectionTitle>Comentarios</SectionTitle>
           <Textarea placeholder="Agrega un comentario adicional..." disabled={isDisabled}/>
         </InputGroup>
       </NewData>
-      <LiberarButton disabled={isDisabled} onClick={() => setShowConfirm(true)}>Liberar Producto</LiberarButton>
+      <LiberarButton disabled={isDisabled || ['Enviado a CQM', 'En Calidad'].includes(workOrder.status)} onClick={() => setShowConfirm(true)}>Liberar Producto</LiberarButton>
     </Container>
 
     {/* Modal para enviar a liberacion */}
@@ -442,18 +431,35 @@ const LiberarButton = styled.button<{ disabled?: boolean }>`
   }
 `;
 
-const CqmButton = styled.button`
+interface CqmButtonProps {
+  status: string;
+}
+
+const CqmButton = styled.button<CqmButtonProps>`
   margin-top: 2rem;
-  background-color: ${({ disabled }) => (disabled ? 'green' : '#2563eb')};
+  height: 48px;
+  background-color: ${({ status }) => {
+    if (status === 'Listo') return '#22c55e'; // verde
+    if (['Enviado a CQM', 'En Calidad'].includes(status)) return '#9ca3af'; // gris
+    return '#2563eb'; // azul
+  }};
   color: white;
-  padding: 0.1rem 1rem;
-  height: 50px;
+  padding: 0.75rem 2rem;
   border-radius: 0.5rem;
   font-weight: 600;
   transition: background 0.3s;
+  cursor: ${({ status }) => {
+    if (['Enviado a CQM', 'En Calidad', 'Listo'].includes(status))
+      return 'not-allowed';
+    return 'pointer';
+  }};
 
   &:hover {
-    background-color: #1d4ed8;
+    background-color: ${({ status }) => {
+      if (status === 'Listo') return '#16a34a'; // verde hover
+      if (['Enviado a CQM', 'En Calidad'].includes(status)) return '#9ca3af'; // gris hover igual
+      return '#1d4ed8'; // azul hover
+    }};
   }
 `;
 

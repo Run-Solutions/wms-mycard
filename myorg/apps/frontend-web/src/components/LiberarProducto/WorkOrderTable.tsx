@@ -101,11 +101,11 @@ const WorkOrderTable: React.FC<Props> = ({ orders, title, statusFilter}) => {
             </Box>
             <Box display="flex" alignItems="center" gap={1}>
               <CircleLegend style={{ backgroundColor: '#facc15' }} />
-              <Typography variant="body2" sx={{ color: 'black' }}>Enviado a CQM</Typography>
+              <Typography variant="body2" sx={{ color: 'black' }}>Enviado a CQM / En Calidad</Typography>
             </Box>
             <Box display="flex" alignItems="center" gap={1}>
               <CircleLegend style={{ backgroundColor: '#4a90e2' }} />
-              <Typography variant="body2" sx={{ color: 'black' }}>En Proceso / Calidad</Typography>
+              <Typography variant="body2" sx={{ color: 'black' }}>En Proceso</Typography>
             </Box>
             <Box display="flex" alignItems="center" gap={1}>
               <CircleLegend style={{ backgroundColor: '#d1d5db' }} />
@@ -139,9 +139,9 @@ const WorkOrderTable: React.FC<Props> = ({ orders, title, statusFilter}) => {
                       <CustomTableCell sx={{ maxWidth: 900, overflowX: 'hidden' }}>
                         <Timeline>
                           {orderFlow.workOrder.flow?.map((flowStep, index) => {
-                            const isActive = ['proceso', 'calidad'].some(word => flowStep.status?.toLowerCase().includes(word));
+                            const isActive = ['proceso'].some(word => flowStep.status?.toLowerCase().includes(word));
                             const isCompleted = flowStep.status?.toLowerCase().includes('completado');
-                            const isCalidad = flowStep.status?.toLowerCase().includes('enviado a cqm');
+                            const isCalidad = ['enviado a cqm', 'en calidad'].some(status => flowStep.status?.toLowerCase().includes(status));
                             const isLast = index === orderFlow.workOrder.flow.length - 1;
                             return (
                               <TimelineItem key={index}>
@@ -156,18 +156,46 @@ const WorkOrderTable: React.FC<Props> = ({ orders, title, statusFilter}) => {
                       <CustomTableCell>{new Date(orderFlow.workOrder.createdAt).toLocaleDateString()}</CustomTableCell>
                       <CustomTableCell>
                         {orderFlow.workOrder.files.length > 0 ? (
-                          orderFlow.workOrder.files.map((file) => (
-                            <div key={file.file_path}>
-                              <button onClick={() => downloadFile(file.file_path)}>
-                                {file.file_path.toLowerCase().includes('ot') ? 'Ver OT' :
-                                  file.file_path.toLowerCase().includes('sku') ? 'Ver SKU' :
-                                    file.file_path.toLowerCase().includes('op') ? 'Ver OP' :
-                                      'Ver Archivo'}
-                              </button>
-                            </div>
-                          ))
-                        ) : 'No hay archivos'}
-                      </CustomTableCell>
+                          <div style={{ display: 'flex', flexDirection: 'column',flexWrap: 'wrap', gap: '0.5rem' }}>
+                            {orderFlow.workOrder.files.map((file) => {
+                              const fileName = file.file_path.toLowerCase();
+                              const label = fileName.includes('ot')
+                                ? 'Ver OT'
+                                : fileName.includes('sku')
+                                ? 'Ver SKU'
+                                : fileName.includes('op')
+                                ? 'Ver OP'
+                                : 'Ver Archivo';
+
+                              return (
+                                <button
+                                  key={file.file_path}
+                                  onClick={() => downloadFile(file.file_path)}
+                                  style={{
+                                    border: '1px solid #c2c2c2',
+                                    borderRadius: '20px',
+                                    padding: '4px 12px',
+                                    backgroundColor: '#f7f7f7',
+                                    cursor: 'pointer',
+                                    fontSize: '0.75rem',
+                                    transition: 'all 0.2s ease-in-out',
+                                  }}
+                                  onMouseOver={(e) => {
+                                    (e.target as HTMLButtonElement).style.backgroundColor = '#e0e0e0';
+                                  }}
+                                  onMouseOut={(e) => {
+                                    (e.target as HTMLButtonElement).style.backgroundColor = '#f7f7f7';
+                                  }}
+                                >
+                                  {label}
+                                </button>
+                            );
+                          })}
+                        </div>
+                      ) : (
+                        'No hay archivos'
+                      )}
+                    </CustomTableCell>
                     </TableRow>
                   ))}
                 </TableBody>
@@ -186,6 +214,7 @@ const WorkOrderTable: React.FC<Props> = ({ orders, title, statusFilter}) => {
 };
 export default WorkOrderTable;
 
+// =================== Styled Components ===================
 interface StyledProps {
     $isActive: boolean;
 }

@@ -286,7 +286,7 @@ export default function HotStampingComponent({ workOrder }: Props) {
           <ModalContent>
             <ModalTitle>¿Estás seguro/a de aprobar?</ModalTitle>
             <ModalActions>
-              <Button style= {{ backgroundColor: '#BBBBBB'}}onClick={() => setShowConfirmModal(false)}>Cancelar</Button>
+              <Button style= {{ backgroundColor: '#BBBBBB'}} onClick={() => setShowConfirmModal(false)}>Cancelar</Button>
               <Button onClick={() => {
                 setShowConfirmModal(false);
                 handleSubmit();

@@ -126,17 +126,44 @@ const WorkOrderTable: React.FC<Props> = ({ orders, title, statusFilter}) => {
                       <CustomTableCell>{new Date(orderFlow.createdAt).toLocaleDateString()}</CustomTableCell>
                       <CustomTableCell>
                         {orderFlow.files.length > 0 ? (
-                          orderFlow.files.map((file) => (
-                            <div key={file.file_path}>
-                              <button onClick={() => downloadFile(file.file_path)}>
-                                {file.file_path.toLowerCase().includes('ot') ? 'Ver OT' :
-                                  file.file_path.toLowerCase().includes('sku') ? 'Ver SKU' :
-                                    file.file_path.toLowerCase().includes('op') ? 'Ver OP' :
-                                      'Ver Archivo'}
-                              </button>
-                            </div>
-                          ))
-                        ) : 'No hay archivos'}
+                          <div style={{ display: 'flex', flexDirection: 'column',flexWrap: 'wrap', gap: '0.5rem' }}>
+                            {orderFlow.files.map((file) => {
+                              const fileName = file.file_path.toLowerCase();
+                              const label = fileName.includes('ot')
+                                ? 'Ver OT'
+                                : fileName.includes('sku')
+                                ? 'Ver SKU'
+                                : fileName.includes('op')
+                                ? 'Ver OP'
+                                : 'Ver Archivo';
+                              return (
+                                <button
+                                  key={file.file_path}
+                                  onClick={() => downloadFile(file.file_path)}
+                                  style={{
+                                    border: '1px solid #c2c2c2',
+                                    borderRadius: '20px',
+                                    padding: '4px 12px',
+                                    backgroundColor: '#f7f7f7',
+                                    cursor: 'pointer',
+                                    fontSize: '0.75rem',
+                                    transition: 'all 0.2s ease-in-out',
+                                  }}
+                                  onMouseOver={(e) => {
+                                    (e.target as HTMLButtonElement).style.backgroundColor = '#e0e0e0';
+                                  }}
+                                  onMouseOut={(e) => {
+                                    (e.target as HTMLButtonElement).style.backgroundColor = '#f7f7f7';
+                                  }}
+                                >
+                                {label}
+                                </button>
+                              );
+                            })}
+                          </div>
+                        ) : (
+                          'No hay archivos'
+                        )}
                       </CustomTableCell>
                     </TableRow>
                   ))}

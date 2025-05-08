@@ -60,7 +60,7 @@ const FreeProductPage: React.FC = () => {
           console.error('No se encontró el token en localStorage');
           return;
         }
-        const estados = ['En proceso', 'Enviado a CQM', 'Listo'];
+        const estados = ['En proceso', 'Enviado a CQM', 'Listo', 'En Calidad'];
         const query = estados.map(estado => encodeURIComponent(estado)).join(',');
 
         const res = await fetch(`http://localhost:3000/free-order-flow/in-progress?statuses=${query}`, {
@@ -95,7 +95,7 @@ const FreeProductPage: React.FC = () => {
       <TitleWrapper>
         <Title>Mis Ordenes</Title>
       </TitleWrapper>
-      <WorkOrderTable orders={WorkOrders} title="Órdenes en Proceso" statusFilter={["En Proceso", "Enviado a CQM"]} />
+      <WorkOrderTable orders={WorkOrders} title="Órdenes en Proceso" statusFilter={["En Proceso", "Enviado a CQM", 'En Calidad']} />
       {currentAreaId !==1 && (
         <>
         <WorkOrderTable orders={WorkOrders} title="Órdenes pendientes por Liberar" statusFilter="Listo" />

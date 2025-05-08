@@ -1,30 +1,50 @@
 // src/components/ThemeContext.tsx
 'use client';
 
-import React, { createContext, useContext, useState } from 'react';
-import { themes } from '@/theme/themes';
+import React, { createContext, useContext, useState, useEffect } from 'react';
+import { ThemeProvider, createTheme } from '@mui/material/styles';
+import CssBaseline from '@mui/material/CssBaseline';
+import { lightTheme, darkTheme } from '@/theme/themes';
+import { Theme } from '@mui/material/styles';
 
 interface ThemeContextType {
-  currentTheme: number;
-  theme: typeof themes[0];
-  changeTheme: (index: number) => void;
+  isDarkMode: boolean;
+  toggleTheme: () => void;
+  theme: Theme;
 }
 
 const ThemeContext = createContext<ThemeContextType | undefined>(undefined);
 
 export function ThemeProviderClient({ children }: { children: React.ReactNode }) {
-  const initialIndex = new Date().getDay() % themes.length;
-  const [currentTheme, setCurrentTheme] = useState(initialIndex);
-  const [theme, setTheme] = useState(themes[initialIndex]);
+  const [isDarkMode, setIsDarkMode] = useState(false);
+  const [theme, setTheme] = useState(lightTheme);
 
-  const changeTheme = (index: number) => {
-    setCurrentTheme(index);
-    setTheme(themes[index]);
+  const toggleTheme = () => {
+    setIsDarkMode((prev) => {
+      const newValue = !prev;
+      localStorage.setItem('theme', newValue ? 'dark' : 'light');
+      setTheme(newValue ? darkTheme : lightTheme);
+      return newValue;
+    });
   };
 
+  useEffect(() => {
+    const savedTheme = localStorage.getItem('theme');
+    if (savedTheme === 'dark') {
+      setTheme(darkTheme);
+      setIsDarkMode(true);
+    } else {
+      setTheme(lightTheme);
+    }
+  }, []);
+
+
   return (
-    <ThemeContext.Provider value={{ currentTheme, theme, changeTheme }}>
-      {children}
+    <ThemeContext.Provider value={{ isDarkMode, toggleTheme, theme }}>
+      <ThemeProvider theme={isDarkMode ? darkTheme : lightTheme}>
+        <CssBaseline />
+        {children}
+      </ThemeProvider>
     </ThemeContext.Provider>
   );
 }

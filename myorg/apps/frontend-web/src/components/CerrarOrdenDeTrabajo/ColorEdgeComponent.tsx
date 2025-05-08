@@ -187,8 +187,8 @@ export default function ColorEdgeComponent({ workOrder }: Props) {
                 <td key={index}>{area.malas || ''}</td>
               ))}
             </tr>
-            <tr style={{ textAlign: 'left'}}> 
-              <td>Excedente</td>
+            <tr> 
+              <td style={{ textAlign: 'left'}}>Excedente</td>
               {areas.map((area, index) => (
                 <td key={index}>{area.excedente || ''}</td>
               ))}

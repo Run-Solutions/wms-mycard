@@ -10,10 +10,8 @@ interface Props {
 
 export default function EmpalmeComponent({ workOrder }: Props) {
   const router = useRouter();
-
   // Para bloquear liberacion hasta que sea aprobado por CQM
   const isDisabled = workOrder.status === 'En proceso';
-
   // Para mostrar formulario de CQM y enviarlo
   const [showModal, setShowModal] = useState(false);
   const openModal = () => {
@@ -22,19 +20,15 @@ export default function EmpalmeComponent({ workOrder }: Props) {
   const closeModal = () => {
     setShowModal(false);
   };
-
   //Para guardar las respuestas 
   const [responses, setResponses] = useState<{ questionId: number, answer: boolean }[]>([]);
   const [sampleQuantity, setSampleQuantity] = useState<number | string>('');
-
   // Para controlar qué preguntas están marcadas
   const [checkedQuestions, setCheckedQuestions] = useState<number[]>([]);
-
   // Función para manejar el cambio en el campo de muestras
   const handleSampleQuantityChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     setSampleQuantity(e.target.value);
   };
-
   const handleCheckboxChange = (questionId: number, isChecked: boolean) => {
     setResponses((prevResponses) => {
       const updateResponses = prevResponses.filter(response => response.questionId !== questionId);
@@ -49,7 +43,6 @@ export default function EmpalmeComponent({ workOrder }: Props) {
       isChecked ? [...prev, questionId] : prev.filter((id) => id !== questionId)
     );
   };
-
   // Para ver las preguntas de calidad
   const [questionsOpen, setQuestionsOpen] = useState(false);
   const toggleQuestions = () => {
@@ -124,9 +117,9 @@ export default function EmpalmeComponent({ workOrder }: Props) {
         return;
       }
       router.push('/liberarProducto');
-  } catch (error) {
-    console.log('Error al guardar la respuesta: ', error);
-  }
+    } catch (error) {
+      console.log('Error al guardar la respuesta: ', error);
+    }
   }
   
   // Para Liberar el producto cuando ya ha pasado por CQM
@@ -202,14 +195,14 @@ export default function EmpalmeComponent({ workOrder }: Props) {
             <Label>Cantidad a Liberar:</Label>
             <Input type="number" placeholder="Ej: 2" value={sampleQuantity} onChange={handleSampleQuantityChange} disabled={isDisabled} />
           </InputGroup>
-          <CqmButton onClick={openModal} disabled={workOrder.status === 'Listo'}>Enviar a CQM</CqmButton>
+          <CqmButton status={workOrder.status} onClick={openModal} disabled={['Enviado a CQM', 'En Calidad', 'Listo'].includes(workOrder.status)}>Enviar a CQM</CqmButton>
         </NewDataWrapper>
         <InputGroup>
           <SectionTitle>Comentarios</SectionTitle>
           <Textarea placeholder="Agrega un comentario adicional..." disabled={isDisabled}/>
         </InputGroup>
       </NewData>
-      <LiberarButton disabled={isDisabled} onClick={() => setShowConfirm(true)}>Liberar Producto</LiberarButton>
+      <LiberarButton disabled={isDisabled || ['Enviado a CQM', 'En Calidad'].includes(workOrder.status)} onClick={() => setShowConfirm(true)}>Liberar Producto</LiberarButton>
     </Container>
 
     {/* Modal para enviar a liberacion */}
@@ -456,22 +449,34 @@ const LiberarButton = styled.button<{ disabled?: boolean }>`
   }
 `;
 
-const CqmButton = styled.button`
+interface CqmButtonProps {
+  status: string;
+}
+
+const CqmButton = styled.button<CqmButtonProps>`
   margin-top: 2rem;
-  background-color: ${({ disabled }) => (disabled ? 'green' : '#2563eb')};
+  background-color: ${({ status }) => {
+    if (status === 'Listo') return '#22c55e'; // verde
+    if (['Enviado a CQM', 'En Calidad'].includes(status)) return '#9ca3af'; // gris
+    return '#2563eb'; // azul
+  }};
   color: white;
   padding: 0.75rem 2rem;
   border-radius: 0.5rem;
   font-weight: 600;
   transition: background 0.3s;
-  cursor: ${({ disabled }) => (disabled ? 'not-allowed' : 'pointer')};
+  cursor: ${({ status }) => {
+    if (['Enviado a CQM', 'En Calidad', 'Listo'].includes(status))
+      return 'not-allowed';
+    return 'pointer';
+  }};
 
   &:hover {
-    ${({ disabled }) =>
-      !disabled &&
-      `
-        background-color: #1d4ed8;
-      `}
+    background-color: ${({ status }) => {
+      if (status === 'Listo') return '#16a34a'; // verde hover
+      if (['Enviado a CQM', 'En Calidad'].includes(status)) return '#9ca3af'; // gris hover igual
+      return '#1d4ed8'; // azul hover
+    }};
   }
 `;
 

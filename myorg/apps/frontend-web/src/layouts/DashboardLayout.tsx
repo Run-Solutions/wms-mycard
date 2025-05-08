@@ -6,7 +6,8 @@ import { ThemeProvider as MuiThemeProvider } from '@mui/material/styles';
 import { ThemeProvider as StyledThemeProvider } from 'styled-components';
 import styled, { keyframes } from 'styled-components';
 import DashboardHeader from '@/components/Header/DashboardHeader';
-import { themes, getDailyTheme } from '@/theme/themes';
+import { lightTheme, darkTheme } from '@/theme/themes';
+import { useThemeContext } from '@/components/ThemeContext';
 import { Sidebar } from '@/components/Sidebar/Sidebar';
 
 // Dimensiones
@@ -45,6 +46,8 @@ const DashboardLayout: React.FC<{ children: React.ReactNode }> = ({ children }) 
   const [mounted, setMounted] = useState(false);
   const [themeIndex, setThemeIndex] = useState<number>(0);
   const [drawerOpen, setDrawerOpen] = useState<boolean>(false);
+  const { toggleTheme, theme } = useThemeContext();
+  const themes = [lightTheme, darkTheme];
 
   useEffect(() => {
     setMounted(true); // Se monta en el cliente
@@ -53,9 +56,7 @@ const DashboardLayout: React.FC<{ children: React.ReactNode }> = ({ children }) 
       let index = stored ? Number(stored) : -1;
 
       if (index < 0 || index >= themes.length) {
-        const DailyTheme = getDailyTheme();
-        index = themes.findIndex((t) => t === DailyTheme);
-        index = index >= 0 ? index : 0;
+        index = 0;
       }
       setThemeIndex(index);
     }
@@ -94,7 +95,7 @@ const DashboardLayout: React.FC<{ children: React.ReactNode }> = ({ children }) 
           drawerOpen={drawerOpen}
           sidebarWidth={currentSidebarWidth}
           onThemeChange={(index: number) => setThemeIndex(index)}
-          currentTheme={themeIndex}
+          currentTheme={theme}
         />
         {/* Contenedor para Sidebar y contenido principal */}
         <Box sx={{ display: 'flex', marginTop: `${headerHeight}px` }}>

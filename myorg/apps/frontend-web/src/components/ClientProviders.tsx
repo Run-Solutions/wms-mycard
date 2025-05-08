@@ -1,6 +1,6 @@
 'use client';
 
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import { Provider } from 'react-redux';
 import { store } from '../store';
 import { ThemeProvider as MuiThemeProvider } from '@mui/material/styles';
@@ -9,11 +9,17 @@ import { AuthProvider } from '@/context/AuthContext';
 import Notification from '../components/Notification/Notification';
 import { ThemeProviderClient, useThemeContext } from '@/components/ThemeContext';
 import { ToastContainer } from 'react-toastify';
+import dynamic from 'next/dynamic';
 import 'react-toastify/dist/ReactToastify.css';
 
 interface ClientProvidersProps {
   children: React.ReactNode;
 }
+
+const ToastContainerDynamic = dynamic(
+  () => import('react-toastify').then((mod) => mod.ToastContainer),
+  { ssr: false }
+);
 
 export default function ClientProviders({ children }: ClientProvidersProps) {
   return (
@@ -29,10 +35,18 @@ export default function ClientProviders({ children }: ClientProvidersProps) {
 
 function InnerProviders({ children }: { children: React.ReactNode }) {
   const { theme } = useThemeContext();
+  const [isClient, setIsClient] = useState(false);
+
+  useEffect(() => {
+    setIsClient(true);
+  }, []);
+
   return (
     <MuiThemeProvider theme={theme}>
       <StyledThemeProvider theme={theme}>
-        <ToastContainer position='top-right' autoClose={5000} />
+      {isClient && (
+        <ToastContainerDynamic position='top-right' autoClose={5000} />
+      )}
         <Notification />
         {children}
       </StyledThemeProvider>

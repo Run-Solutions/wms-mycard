@@ -12,7 +12,7 @@ export default function ProtectedLayout({ children }: { children: React.ReactNod
   const [sidebarOpen, setSidebarOpen] = useState(true);
   const toggleDrawer = () => setSidebarOpen(!sidebarOpen);
   const headerHeight = 130;
-  const { currentTheme, changeTheme, theme } = useThemeContext();
+  const { toggleTheme, theme } = useThemeContext();
   const { token } = useAuthContext();
   const router = useRouter();
 
@@ -30,8 +30,8 @@ export default function ProtectedLayout({ children }: { children: React.ReactNod
         <DashboardHeader
           toggleDrawer={toggleDrawer}
           drawerOpen={sidebarOpen}
-          onThemeChange={changeTheme}
-          currentTheme={currentTheme}
+          onThemeChange={toggleTheme}
+          currentTheme={theme}
           sidebarWidth={sidebarOpen ? 200 : 60}
         />
         <main

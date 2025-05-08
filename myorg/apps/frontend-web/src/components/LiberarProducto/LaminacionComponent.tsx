@@ -1,6 +1,5 @@
 'use client'
 
-
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 import styled from "styled-components";
@@ -13,7 +12,7 @@ export default function LaminacionComponent({ workOrder }: Props) {
   const router = useRouter();
   const [otherValue, setOtherValue] = useState('');
   const [selectedOption, setSelectedOption] = useState('');
-  
+ 
   // Para habilitar entre las opciones en caso de que sea otro
   const handleOptionChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     setSelectedOption(e.target.value);
@@ -131,9 +130,9 @@ export default function LaminacionComponent({ workOrder }: Props) {
         return;
       }
       router.push('/liberarProducto');
-  } catch (error) {
-    console.log('Error al guardar la respuesta: ', error);
-  }
+    } catch (error) {
+      console.log('Error al guardar la respuesta: ', error);
+    }
   }
   
   // Para Liberar el producto cuando ya ha pasado por CQM
@@ -209,14 +208,14 @@ export default function LaminacionComponent({ workOrder }: Props) {
             <Label>Cantidad a Liberar:</Label>
             <Input type="number" placeholder="Ej: 2" value={sampleQuantity} onChange={handleSampleQuantityChange} disabled={isDisabled} />
           </InputGroup>
-          <CqmButton onClick={openModal} disabled={workOrder.status === 'Listo'}>Enviar a CQM</CqmButton>
+          <CqmButton status={workOrder.status} onClick={openModal} disabled={['Enviado a CQM', 'En Calidad', 'Listo'].includes(workOrder.status)}>Enviar a CQM</CqmButton>
         </NewDataWrapper>
         <InputGroup>
           <SectionTitle>Comentarios</SectionTitle>
           <Textarea placeholder="Agrega un comentario adicional..." disabled={isDisabled}/>
         </InputGroup>
       </NewData>
-      <LiberarButton disabled={isDisabled} onClick={() => setShowConfirm(true)}>Liberar Producto</LiberarButton>
+      <LiberarButton disabled={isDisabled || ['Enviado a CQM', 'En Calidad'].includes(workOrder.status)} onClick={() => setShowConfirm(true)}>Liberar Producto</LiberarButton>
     </Container>
 
     {/* Modal para enviar a liberacion */}
@@ -471,17 +470,34 @@ const LiberarButton = styled.button<{ disabled?: boolean }>`
   }
 `;
 
-const CqmButton = styled.button`
+interface CqmButtonProps {
+  status: string;
+}
+
+const CqmButton = styled.button<CqmButtonProps>`
   margin-top: 2rem;
-  background-color: ${({ disabled }) => (disabled ? 'green' : '#2563eb')};
+  background-color: ${({ status }) => {
+    if (status === 'Listo') return '#22c55e'; // verde
+    if (['Enviado a CQM', 'En Calidad'].includes(status)) return '#9ca3af'; // gris
+    return '#2563eb'; // azul
+  }};
   color: white;
   padding: 0.75rem 2rem;
   border-radius: 0.5rem;
   font-weight: 600;
   transition: background 0.3s;
+  cursor: ${({ status }) => {
+    if (['Enviado a CQM', 'En Calidad', 'Listo'].includes(status))
+      return 'not-allowed';
+    return 'pointer';
+  }};
 
   &:hover {
-    background-color: ${({ disabled }) => (disabled ? 'green' : '#1d4ed8')};
+    background-color: ${({ status }) => {
+      if (status === 'Listo') return '#16a34a'; // verde hover
+      if (['Enviado a CQM', 'En Calidad'].includes(status)) return '#9ca3af'; // gris hover igual
+      return '#1d4ed8'; // azul hover
+    }};
   }
 `;
 
@@ -497,13 +513,17 @@ const ModalOverlay = styled.div`
   align-items: center;
   justify-content: center;
   z-index: 999;
+  overflow-y: auto;
 `;
 
 const ModalContent = styled.div`
   background: white;
   padding: 2rem;
   border-radius: 1rem;
-  max-width: 600px;
+  justify-content: center;
+  max-width: 700px;
+  max-height: 80%;
+  overflow-y: auto;
   width: 90%;
   box-shadow: 0 10px 25px rgba(0,0,0,0.2);
 `;

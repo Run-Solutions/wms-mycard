@@ -189,7 +189,7 @@ export default function CorteComponent({ workOrder }: Props) {
               ))}
             </tr>
             <tr>
-              <td>Muestras</td>
+              <td style={{ textAlign: 'left'}}>Muestras</td>
               {areas.map((area, index) => (
                 <td key={index}>{area.muestras || ''}</td>
               ))}

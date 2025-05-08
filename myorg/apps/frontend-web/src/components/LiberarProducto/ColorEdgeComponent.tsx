@@ -1,6 +1,5 @@
 'use client'
 
-
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 import styled from "styled-components";
@@ -11,23 +10,16 @@ interface Props {
 
 export default function ColorEdgeComponent({ workOrder }: Props) {
   const router = useRouter();
-  const [otherValue, setOtherValue] = useState('');
-  const [selectedOption, setSelectedOption] = useState('');
-  
   // Para bloquear liberacion hasta que sea aprobado por CQM
   const isDisabled = workOrder.status === 'En proceso';
-
   // Para mostrar formulario de CQM y enviarlo
   const [showModal, setShowModal] = useState(false);
-
   const openModal = () => {
     setShowModal(true);
   };
-
   const closeModal = () => {
     setShowModal(false);
   };
-
   //Para guardar las respuestas 
   const [responses, setResponses] = useState<{ questionId: number, answer: boolean }[]>([]);
   const [sampleQuantity, setSampleQuantity] = useState<number | string>('');
@@ -35,10 +27,8 @@ export default function ColorEdgeComponent({ workOrder }: Props) {
   const [goodQuantity, setGoodQuantity] = useState<number | string>('');
   const [badQuantity, setBadQuantity] = useState<number | string>('');
   const [excessQuantity, setExcessQuantity] = useState<number | string>('');
-
   // Para controlar qué preguntas están marcadas
   const [checkedQuestions, setCheckedQuestions] = useState<number[]>([]);
-
   // Función para manejar el cambio en el campo de muestras y color edge
   const handleSampleQuantityChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     setSampleQuantity(e.target.value);
@@ -46,7 +36,6 @@ export default function ColorEdgeComponent({ workOrder }: Props) {
   const handleColorEdgeChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     setColorEdge(e.target.value);
   };
-
   const handleCheckboxChange = (questionId: number, isChecked: boolean) => {
     setResponses((prevResponses) => {
       const updateResponses = prevResponses.filter(response => response.questionId !== questionId);
@@ -73,8 +62,7 @@ export default function ColorEdgeComponent({ workOrder }: Props) {
       reviewed: false,
       user_id: workOrder.assigned_user,
       sample_quantity: Number(sampleQuantity),
-      color_edge: Number(colorEdge),
-      finish_validation: selectedOption === 'otro' ? otherValue : selectedOption,
+      color_edge: colorEdge,
     };
     try {
       const token = localStorage.getItem('token');
@@ -97,9 +85,9 @@ export default function ColorEdgeComponent({ workOrder }: Props) {
         return;
       }
       router.push('/liberarProducto');
-  } catch (error) {
-    console.log('Error al guardar la respuesta: ', error);
-  }
+    } catch (error) {
+      console.log('Error al guardar la respuesta: ', error);
+    }
   }
   
   // Para Liberar el producto cuando ya ha pasado por CQM
@@ -147,8 +135,6 @@ export default function ColorEdgeComponent({ workOrder }: Props) {
       console.log('Error al enviar datos:', error);
     }
   };
-  
-  ;
 
   return (
     <>
@@ -184,14 +170,14 @@ export default function ColorEdgeComponent({ workOrder }: Props) {
             <Label>Excedente:</Label>
             <Input type="number" placeholder="Ej: 2" value={excessQuantity} onChange={(e) => setExcessQuantity(e.target.value)} disabled={isDisabled} />
           </InputGroup>
-          <CqmButton onClick={openModal} disabled={workOrder.status === 'Listo'}>Enviar a CQM</CqmButton>
+          <CqmButton status={workOrder.status} onClick={openModal} disabled={['Enviado a CQM', 'En Calidad', 'Listo'].includes(workOrder.status)}>Enviar a CQM</CqmButton>
         </NewDataWrapper>
         <InputGroup>
           <SectionTitle>Comentarios</SectionTitle>
           <Textarea placeholder="Agrega un comentario adicional..." disabled={isDisabled}/>
         </InputGroup>
       </NewData>
-      <LiberarButton disabled={isDisabled} onClick={() => setShowConfirm(true)}>Liberar Producto</LiberarButton>
+      <LiberarButton disabled={isDisabled || ['Enviado a CQM', 'En Calidad'].includes(workOrder.status)} onClick={() => setShowConfirm(true)}>Liberar Producto</LiberarButton>
     </Container>
 
     {/* Modal para enviar a liberacion */}
@@ -232,7 +218,7 @@ export default function ColorEdgeComponent({ workOrder }: Props) {
           </Table>
           <InputGroup style={{ paddingTop: '30px'}}>
             <Label>Color Edge:</Label>
-            <Input type="text" placeholder="Ej: 2" value={colorEdge} onChange={handleColorEdgeChange}/>
+            <Input type="text" placeholder="Ej: Bueno" value={colorEdge} onChange={handleColorEdgeChange}/>
             <Label style={{ paddingTop: '30px'}}>Muestras:</Label>
             <Input type="number" placeholder="Ej: 2" value={sampleQuantity} onChange={handleSampleQuantityChange}/>
           </InputGroup>
@@ -326,24 +312,6 @@ const Input = styled.input`
   }
 `;
 
-const RadioGroup = styled.div`
-  display: flex;
-  gap: 2rem;
-  margin-top: 0.5rem;
-`;
-
-const RadioLabel = styled.label`
-  display: flex;
-  align-items: center;
-  gap: 0.5rem;
-  font-weight: 500;
-  color: #374151;
-`;
-
-const Radio = styled.input`
-  accent-color: #2563eb;
-`;
-
 const Textarea = styled.textarea`
   width: 100%;
   color: black;
@@ -382,18 +350,35 @@ const LiberarButton = styled.button<{ disabled?: boolean }>`
   }
 `;
 
-const CqmButton = styled.button`
+interface CqmButtonProps {
+  status: string;
+}
+
+const CqmButton = styled.button<CqmButtonProps>`
   margin-top: 2rem;
-  background-color: ${({ disabled }) => (disabled ? 'green' : '#2563eb')};
+  height: 48px;
+  background-color: ${({ status }) => {
+    if (status === 'Listo') return '#22c55e'; // verde
+    if (['Enviado a CQM', 'En Calidad'].includes(status)) return '#9ca3af'; // gris
+    return '#2563eb'; // azul
+  }};
   color: white;
-  padding: 0.1rem 1rem;
-  height: 50px;
+  padding: 0.75rem 2rem;
   border-radius: 0.5rem;
   font-weight: 600;
   transition: background 0.3s;
+  cursor: ${({ status }) => {
+    if (['Enviado a CQM', 'En Calidad', 'Listo'].includes(status))
+      return 'not-allowed';
+    return 'pointer';
+  }};
 
   &:hover {
-    background-color: #1d4ed8;
+    background-color: ${({ status }) => {
+      if (status === 'Listo') return '#16a34a'; // verde hover
+      if (['Enviado a CQM', 'En Calidad'].includes(status)) return '#9ca3af'; // gris hover igual
+      return '#1d4ed8'; // azul hover
+    }};
   }
 `;
 
@@ -409,13 +394,17 @@ const ModalOverlay = styled.div`
   align-items: center;
   justify-content: center;
   z-index: 999;
+  overflow-y: auto;
 `;
 
 const ModalContent = styled.div`
   background: white;
   padding: 2rem;
   border-radius: 1rem;
-  max-width: 600px;
+  justify-content: center;
+  max-width: 700px;
+  max-height: 80%;
+  overflow-y: auto;
   width: 90%;
   box-shadow: 0 10px 25px rgba(0,0,0,0.2);
 `;
@@ -472,10 +461,17 @@ const SubmitButton = styled.button`
   padding: 0.75rem 2rem;
   border-radius: 0.5rem;
   font-weight: 600;
-  transition: background 0.3s;
+  display: block;
+
+  border: none;
+  cursor: pointer;
+
+  transition: background-color 0.3s ease, color 0.3s ease;
   
-  &:hover {
-    background-color: #45a049;
+  &:hover,
+  &:focus {
+    background-color: #1e40af;
+    outline: none;
   }
 `;
 

@@ -131,7 +131,7 @@ export default function PersonalizacionComponentAcceptAuditory({ workOrder }: Pr
               <Input type="number" name="good_quantity" value={defaultValues.good_quantity} disabled/>
               <Label>Malas:</Label>
               <Input type="number" name="bad_quantity" value={defaultValues.bad_quantity} disabled/>
-              <Label>Exceso:</Label>
+              <Label>Excedente:</Label>
               <Input type="number" name="excess_quantity" value={defaultValues.excess_quantity} disabled/>
               <Label>Muestras:</Label>
               <Input type="number" value={sampleAuditory} onChange={(e) => setSampleQuantity(e.target.value)}/>

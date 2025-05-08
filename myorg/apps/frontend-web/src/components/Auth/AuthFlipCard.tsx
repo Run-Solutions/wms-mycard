@@ -10,6 +10,136 @@ import { useAuthContext } from '../../context/AuthContext';
 import { useRouter } from 'next/navigation';
 import { toast } from 'react-toastify';
 
+const AuthFlipCard: React.FC = () => {
+  const router = useRouter();
+  const { setUser, setToken } = useAuthContext();
+  
+  // Estados para login
+  const [loginEmail, setLoginEmail] = useState('');
+  const [loginPassword, setLoginPassword] = useState('');
+  
+  // Estados para registro
+  const [regUsername, setRegUsername] = useState('');
+  const [regEmail, setRegEmail] = useState('');
+  const [regPassword, setRegPassword] = useState('');
+  const [regConfirmPassword, setRegConfirmPassword] = useState('');
+  
+  const [isFlipped, setIsFlipped] = useState(false);
+  
+  const handleLoginSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
+    e.preventDefault();
+    try {
+      const res = await fetch('http://localhost:3000/auth/login', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ username: loginEmail, password: loginPassword }),
+      });
+      
+      const data = await res.json();
+      console.log('Respuesta de data desde el back:', data);
+      
+      if (res.ok) {
+        // Se espera que la respuesta contenga { token, user }
+        
+        // Guardar el token en localStorage para modulos por rol
+        if (data.token) {
+          localStorage.setItem('token', data.token);
+          setToken(data.token);
+          console.log('Token almacenado:', data.token)
+        } else {
+          console.error('⛔ No se ha recibido el token')
+        }
+        // Guardar el usuario en localStorage
+        if (data.user) {
+          setUser(data.user);
+          localStorage.setItem('user', JSON.stringify(data.user));
+        }
+        
+        router.push('/dashboard');
+      } else {
+        toast.error(data.message || 'Error en login');
+        console.error('Error en login:', data.message || 'Error en login');
+      }
+    } catch (err) {
+      toast.error('Error en login');
+      console.error('Error en login:', err);
+    }
+  };
+  
+  const handleRegisterSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
+    e.preventDefault();
+    if (regPassword !== regConfirmPassword) {
+      toast.error('Las contraseñas no coinciden');
+      return;
+    }
+    // Guardar los datos en localstorage
+    const pendingUser = {
+      username: regUsername,
+      email: regEmail,
+      password: regPassword,
+    };
+    localStorage.setItem('pendingUser', JSON.stringify(pendingUser));
+    router.push('/auth/roleSelection');
+  };
+  
+  return (
+    <>
+      <GlobalStyle />
+      <PageContainer>
+        <FormContainer>
+          <ToggleContainer>
+            <ToggleSwitch
+              checked={isFlipped}
+              onChange={(e) => setIsFlipped(e.target.checked)}
+              />
+          </ToggleContainer>
+          <FlipCardInner
+            style={{ transform: isFlipped ? 'rotateY(180deg)' : 'none' }}
+            >
+            <FlipCardFront>
+              <Card>
+                <CardContent>
+                  <LoginForm
+                    loginEmail={loginEmail}
+                    loginPassword={loginPassword}
+                    onEmailChange={(e) => setLoginEmail(e.target.value)}
+                    onPasswordChange={(e) => setLoginPassword(e.target.value)}
+                    onSubmit={handleLoginSubmit}
+                    onSignUpClick={() => setIsFlipped(true)}
+                    />
+                </CardContent>
+              </Card>
+            </FlipCardFront>
+            <FlipCardBack>
+              <Card transparent>
+                <CardContent>
+                  <RegisterForm
+                    regUsername={regUsername}
+                    regEmail={regEmail}
+                    regPassword={regPassword}
+                    regConfirmPassword={regConfirmPassword}
+                    onUsernameChange={(e) => setRegUsername(e.target.value)}
+                    onEmailChange={(e) => setRegEmail(e.target.value)}
+                    onPasswordChange={(e) => setRegPassword(e.target.value)}
+                    onConfirmPasswordChange={(e) =>
+                      setRegConfirmPassword(e.target.value)
+                    }
+                    onSubmit={handleRegisterSubmit}
+                    onLoginClick={() => setIsFlipped(false)}
+                    />
+                </CardContent>
+              </Card>
+            </FlipCardBack>
+          </FlipCardInner>
+        </FormContainer>
+      </PageContainer>
+    </>
+  );
+};
+
+export default AuthFlipCard;
+
+// =================== Styled Components ===================
 const GlobalStyle = createGlobalStyle`
   html, body, #__next {
     height: 100%;
@@ -94,132 +224,3 @@ const CardContent = styled.div`
   border-radius: 0;
   transition: all 0.2s;
 `;
-
-const AuthFlipCard: React.FC = () => {
-  const router = useRouter();
-  const { setUser, setToken } = useAuthContext();
-
-  // Estados para login
-  const [loginEmail, setLoginEmail] = useState('');
-  const [loginPassword, setLoginPassword] = useState('');
-
-  // Estados para registro
-  const [regUsername, setRegUsername] = useState('');
-  const [regEmail, setRegEmail] = useState('');
-  const [regPassword, setRegPassword] = useState('');
-  const [regConfirmPassword, setRegConfirmPassword] = useState('');
-
-  const [isFlipped, setIsFlipped] = useState(false);
-
-  const handleLoginSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
-    e.preventDefault();
-    try {
-      const res = await fetch('http://localhost:3000/auth/login', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ username: loginEmail, password: loginPassword }),
-      });
-
-      const data = await res.json();
-      console.log('Respuesta de data desde el back:', data);
-
-      if (res.ok) {
-        // Se espera que la respuesta contenga { token, user }
-
-        // Guardar el token en localStorage para modulos por rol
-        if (data.token) {
-          localStorage.setItem('token', data.token);
-          setToken(data.token);
-          console.log('Token almacenado:', data.token)
-        } else {
-          console.error('⛔ No se ha recibido el token')
-        }
-        // Guardar el usuario en localStorage
-        if (data.user) {
-          setUser(data.user);
-          localStorage.setItem('user', JSON.stringify(data.user));
-        }
-
-        router.push('/dashboard');
-      } else {
-        toast.error(data.message || 'Error en login');
-        console.error('Error en login:', data.message || 'Error en login');
-      }
-    } catch (err) {
-      toast.error('Error en login');
-      console.error('Error en login:', err);
-    }
-  };
-
-  const handleRegisterSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
-    e.preventDefault();
-    if (regPassword !== regConfirmPassword) {
-      toast.error('Las contraseñas no coinciden');
-      return;
-    }
-    // Guardar los datos en localstorage
-    const pendingUser = {
-      username: regUsername,
-      email: regEmail,
-      password: regPassword,
-    };
-      localStorage.setItem('pendingUser', JSON.stringify(pendingUser));
-      router.push('/auth/roleSelection');
-  };
-
-  return (
-    <>
-      <GlobalStyle />
-      <PageContainer>
-        <FormContainer>
-          <ToggleContainer>
-            <ToggleSwitch
-              checked={isFlipped}
-              onChange={(e) => setIsFlipped(e.target.checked)}
-            />
-          </ToggleContainer>
-          <FlipCardInner
-            style={{ transform: isFlipped ? 'rotateY(180deg)' : 'none' }}
-          >
-            <FlipCardFront>
-              <Card>
-                <CardContent>
-                  <LoginForm
-                    loginEmail={loginEmail}
-                    loginPassword={loginPassword}
-                    onEmailChange={(e) => setLoginEmail(e.target.value)}
-                    onPasswordChange={(e) => setLoginPassword(e.target.value)}
-                    onSubmit={handleLoginSubmit}
-                    onSignUpClick={() => setIsFlipped(true)}
-                  />
-                </CardContent>
-              </Card>
-            </FlipCardFront>
-            <FlipCardBack>
-              <Card transparent>
-                <CardContent>
-                  <RegisterForm
-                    regUsername={regUsername}
-                    regEmail={regEmail}
-                    regPassword={regPassword}
-                    regConfirmPassword={regConfirmPassword}
-                    onUsernameChange={(e) => setRegUsername(e.target.value)}
-                    onEmailChange={(e) => setRegEmail(e.target.value)}
-                    onPasswordChange={(e) => setRegPassword(e.target.value)}
-                    onConfirmPasswordChange={(e) =>
-                      setRegConfirmPassword(e.target.value)
-                    }
-                    onSubmit={handleRegisterSubmit}
-                    onLoginClick={() => setIsFlipped(false)}
-                  />
-                </CardContent>
-              </Card>
-            </FlipCardBack>
-          </FlipCardInner>
-        </FormContainer>
-      </PageContainer>
-    </>
-  );
-};
-
-export default AuthFlipCard;

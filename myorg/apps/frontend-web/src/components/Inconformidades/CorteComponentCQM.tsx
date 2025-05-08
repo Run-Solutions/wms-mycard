@@ -40,10 +40,10 @@ export default function CorteComponentCQM({ workOrder }: Props) {
     }
   }
 
-  const lastIndex = workOrder.areaResponse.inconformities.length > 1 
-  ? workOrder.areaResponse.inconformities.length - 1 
+  const lastIndex = workOrder.answers[0].inconformities.length > 1 
+  ? workOrder.answers[0].inconformities.length - 1 
   : 0;
-
+  
   return (
     <>
     <FlexContainer>
