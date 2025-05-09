@@ -65,6 +65,7 @@ export class FreeWorkOrderService {
                     prepress: true,
                   },
                 },
+                answers: true,
               },
             },
           },

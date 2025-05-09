@@ -227,6 +227,7 @@ export class AcceptWorkOrderService {
                     personalizacion: true,
                   },
                 },
+                answers: true,
               }
             },
           },
@@ -243,7 +244,8 @@ export class AcceptWorkOrderService {
             millingChip: true,
             personalizacion: true,
           }
-        }
+        },
+        answers: true,
       },
     });
     if(!workOrderFlow) {

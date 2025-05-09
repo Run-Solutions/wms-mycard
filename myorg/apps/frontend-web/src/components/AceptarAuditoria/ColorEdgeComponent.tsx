@@ -9,6 +9,7 @@ type ColorEdgeData = {
   good_quantity: string;
   bad_quantity: string;
   excess_quantity: string;
+  cqm_quantity: string;
   comments: string;
 };
 
@@ -35,16 +36,22 @@ export default function ColorEdgeComponentAcceptAuditory({ workOrder }: Props) {
       good_quantity: "",
       bad_quantity: "",
       excess_quantity: "",
+      cqm_quantity: "",
       comments: "",
     });
 
+    const currentFLow = [...workOrder.workOrder.flow]
+    .reverse()
+    .find((item) => item.status === "Enviado a Auditoria");
+
     useEffect(() => {
-      if (workOrder?.areaResponse?.colorEdge) {
+      if (currentFLow?.areaResponse?.colorEdge) {
         const vals: ColorEdgeData = {
-          good_quantity: workOrder.areaResponse.colorEdge.good_quantity || "0",
-          bad_quantity: workOrder.areaResponse.colorEdge.bad_quantity || "0",
-          excess_quantity: workOrder.areaResponse.colorEdge.excess_quantity || "0",
-          comments: workOrder.areaResponse.colorEdge.comments || "",
+          good_quantity: currentFLow.areaResponse.colorEdge.good_quantity || "0",
+          bad_quantity: currentFLow.areaResponse.colorEdge.bad_quantity || "0",
+          excess_quantity: currentFLow.areaResponse.colorEdge.excess_quantity || "0",
+          cqm_quantity: currentFLow.answers[0].sample_quantity || "0",
+          comments: currentFLow.areaResponse.colorEdge.comments || "",
         };
         setDefaultValues(vals);
         // El botón se mantiene deshabilitado hasta que haya un cambio
@@ -60,7 +67,7 @@ export default function ColorEdgeComponentAcceptAuditory({ workOrder }: Props) {
         return;
       }
       const token = localStorage.getItem('token');
-      const colorEdgeId = workOrder.areaResponse.colorEdge.id;
+      const colorEdgeId = currentFLow.areaResponse.colorEdge.id;
       const payload = {
         sample_auditory: Number(sampleAuditory),
       };
@@ -86,10 +93,10 @@ export default function ColorEdgeComponentAcceptAuditory({ workOrder }: Props) {
 
     const handleSubmitInconformidad = async () => {
       const token = localStorage.getItem('token');
-      console.log(workOrder.id);
+      console.log(currentFLow.id);
       console.log(inconformidad);
       try {
-        const res = await fetch(`http://localhost:3000/work-order-flow/${workOrder.id}/inconformidad`, {
+        const res = await fetch(`http://localhost:3000/work-order-flow/${currentFLow.id}/inconformidad`, {
           method: 'PATCH',
           headers: {
             'Content-Type': 'application/json',
@@ -134,6 +141,8 @@ export default function ColorEdgeComponentAcceptAuditory({ workOrder }: Props) {
               <Input type="number" name="bad_quantity" value={defaultValues.bad_quantity} disabled/>
               <Label>Excedente:</Label>
               <Input type="number" name="excess_quantity" value={defaultValues.excess_quantity} disabled/>
+              <Label>Muestras en CQM:</Label>
+              <Input type="number" name="excess_quantity" value={defaultValues.cqm_quantity} disabled/>
               <Label>Muestras:</Label>
               <Input type="number" value={sampleAuditory} onChange={(e) => setSampleQuantity(e.target.value)}/>
             </InputGroup>

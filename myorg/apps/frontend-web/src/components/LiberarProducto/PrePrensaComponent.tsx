@@ -18,6 +18,11 @@ export default function PrePrensaComponent({ workOrder }: Props) {
   const [showConfirm, setShowConfirm] = useState(false); 
   const router = useRouter();
 
+  const currentFLow = [...workOrder.workOrder.flow]
+  .reverse()
+  .find((item) => ["Listo", "En proceso", 'Enviado a CQM', 'En Calidad'].includes(item.status));
+  console.log('Nuevo', currentFLow)
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!plates || !positives || !testTypes) {
@@ -26,14 +31,14 @@ export default function PrePrensaComponent({ workOrder }: Props) {
     }
 
     console.log("workOrderId:", workOrder.work_order_id);
-    console.log("workOrderFlowId", workOrder.id);
+    console.log("workOrderFlowId", currentFLow.id);
     console.log("areaId", workOrder.area_id);
     console.log("assignedUser", workOrder.assigned_user);
 
 
     const payload = {
       workOrderId: workOrder.work_order_id,
-      workOrderFlowId: workOrder.id,
+      workOrderFlowId: currentFLow.id,
       areaId: workOrder.area_id,
       assignedUser: workOrder.assigned_user || null,
 

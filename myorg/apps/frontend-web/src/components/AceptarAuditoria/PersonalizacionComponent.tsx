@@ -9,6 +9,7 @@ type PersonalizacionData = {
   good_quantity: string;
   bad_quantity: string;
   excess_quantity: string;
+  cqm_quantity: string;
   comments: string;
 };
 
@@ -34,16 +35,22 @@ export default function PersonalizacionComponentAcceptAuditory({ workOrder }: Pr
       good_quantity: "",
       bad_quantity: "",
       excess_quantity: "",
+      cqm_quantity: "",
       comments: "",
     });
 
+    const currentFLow = [...workOrder.workOrder.flow]
+    .reverse()
+    .find((item) => item.status === "Enviado a Auditoria");
+
     useEffect(() => {
-      if (workOrder?.areaResponse?.personalizacion) {
+      if (currentFLow?.areaResponse?.personalizacion) {
         const vals: PersonalizacionData = {
-          good_quantity: workOrder.areaResponse.personalizacion.good_quantity || "0",
-          bad_quantity: workOrder.areaResponse.personalizacion.bad_quantity || "0",
-          excess_quantity: workOrder.areaResponse.personalizacion.excess_quantity || "0",
-          comments: workOrder.areaResponse.personalizacion.comments || "",
+          good_quantity: currentFLow.areaResponse.personalizacion.good_quantity || "0",
+          bad_quantity: currentFLow.areaResponse.personalizacion.bad_quantity || "0",
+          excess_quantity: currentFLow.areaResponse.personalizacion.excess_quantity || "0",
+          cqm_quantity: currentFLow.answers[0].sample_quantity || "0",
+          comments: currentFLow.areaResponse.personalizacion.comments || "",
         };
         setDefaultValues(vals);
         // El botón se mantiene deshabilitado hasta que haya un cambio
@@ -59,7 +66,7 @@ export default function PersonalizacionComponentAcceptAuditory({ workOrder }: Pr
         return;
       }
       const token = localStorage.getItem('token');
-      const personalizacionId = workOrder.areaResponse.personalizacion.id;
+      const personalizacionId = currentFLow.areaResponse.personalizacion.id;
       const payload = {
         sample_auditory: Number(sampleAuditory),
       };
@@ -85,10 +92,10 @@ export default function PersonalizacionComponentAcceptAuditory({ workOrder }: Pr
 
     const handleSubmitInconformidad = async () => {
       const token = localStorage.getItem('token');
-      console.log(workOrder.id);
+      console.log(currentFLow.id);
       console.log(inconformidad);
       try {
-        const res = await fetch(`http://localhost:3000/work-order-flow/${workOrder.id}/inconformidad`, {
+        const res = await fetch(`http://localhost:3000/work-order-flow/${currentFLow.id}/inconformidad`, {
           method: 'PATCH',
           headers: {
             'Content-Type': 'application/json',
@@ -133,6 +140,8 @@ export default function PersonalizacionComponentAcceptAuditory({ workOrder }: Pr
               <Input type="number" name="bad_quantity" value={defaultValues.bad_quantity} disabled/>
               <Label>Excedente:</Label>
               <Input type="number" name="excess_quantity" value={defaultValues.excess_quantity} disabled/>
+              <Label>Muestras en CQM:</Label>
+              <Input type="number" name="excess_quantity" value={defaultValues.cqm_quantity} disabled/>
               <Label>Muestras:</Label>
               <Input type="number" value={sampleAuditory} onChange={(e) => setSampleQuantity(e.target.value)}/>
             </InputGroup>
@@ -306,42 +315,6 @@ const AceptarButton = styled.button<{ disabled?: boolean }>`
     background-color: ${({ disabled }) =>
       disabled ? "#9CA3AF" : "#1D4ED8"};
   }
-`;
-
-const CqmButton = styled.button<{ disabled?: boolean }>`
-  height: 50px;
-  background-color: ${({ disabled }) => (disabled ? "#D1D5DB" : "#2563EB")};
-  color: white;
-  padding: 0.75rem 2rem;
-  border-radius: 0.5rem;
-  font-weight: 600;
-  transition: background 0.3s;
-  align-self: flex-end;
-  cursor: ${({ disabled }) => (disabled ? "not-allowed" : "pointer")};
-  opacity: ${({ disabled }) => (disabled ? 0.7 : 1)};
-
-  &:hover {
-    background-color: ${({ disabled }) =>
-      disabled ? "#D1D5DB" : "#1D4ED8"};
-  }
-`;
-
-const RadioGroup = styled.div`
-  display: flex;
-  gap: 2rem;
-  margin-top: 0.5rem;
-`;
-
-const RadioLabel = styled.label`
-  display: flex;
-  align-items: center;
-  gap: 0.5rem;
-  font-weight: 500;
-  color: #374151;
-`;
-
-const Radio = styled.input`
-  accent-color: #2563eb;
 `;
 
 const ModalOverlay = styled.div`

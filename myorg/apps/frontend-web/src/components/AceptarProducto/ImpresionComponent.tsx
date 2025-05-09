@@ -38,6 +38,10 @@ export default function ImpresionComponentAccept({ workOrder }: Props) {
       .reverse()
       .find((item) => item.status === "Completado");
     console.log('Area previa', lastCompleted);
+    const currentFLow = [...workOrder.workOrder.flow]
+    .reverse()
+    .find((item) => item.status === "Pendiente");
+    console.log('Area actual', currentFLow);
     if (lastCompleted?.areaResponse?.impression) {
       const vals: ImpressionData = {
         release_quantity: lastCompleted.areaResponse.impression.release_quantity || "",
@@ -54,7 +58,13 @@ export default function ImpresionComponentAccept({ workOrder }: Props) {
       return;
     }
     const token = localStorage.getItem('token');
-    const flowId = workOrder.id;
+
+    const currentFLow = [...workOrder.workOrder.flow]
+    .reverse()
+    .find((item) => item.status === "Pendiente");
+    console.log('Area', currentFLow);
+
+    const flowId = currentFLow.id;
     console.log(flowId);
     try {
       const res = await fetch(`http://localhost:3000/work-order-flow/${flowId}/accept`, {
@@ -301,24 +311,6 @@ const InconformidadButton = styled.button<{ disabled?: boolean }>`
     background-color: ${({ disabled }) =>
       disabled ? "#D1D5DB" : "#1D4ED8"};
   }
-`;
-
-const RadioGroup = styled.div`
-  display: flex;
-  gap: 2rem;
-  margin-top: 0.5rem;
-`;
-
-const RadioLabel = styled.label`
-  display: flex;
-  align-items: center;
-  gap: 0.5rem;
-  font-weight: 500;
-  color: #374151;
-`;
-
-const Radio = styled.input`
-  accent-color: #2563eb;
 `;
 
 const ModalOverlay = styled.div`

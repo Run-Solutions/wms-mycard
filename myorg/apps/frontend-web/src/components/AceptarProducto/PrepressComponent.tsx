@@ -42,6 +42,10 @@ export default function PrepressComponentAccept({ workOrder }: Props) {
       .reverse()
       .find((item) => item.status === "Completado");
     console.log('Area previa', lastCompleted);
+    const currentFLow = [...workOrder.workOrder.flow]
+    .reverse()
+    .find((item) => item.status === "Pendiente");
+    console.log('Area', currentFLow);
     if (lastCompleted?.areaResponse?.prepress) {
       const vals: PrepressData = {
         plates: lastCompleted.areaResponse.prepress.plates || "",
@@ -60,7 +64,13 @@ export default function PrepressComponentAccept({ workOrder }: Props) {
       return;
     }
     const token = localStorage.getItem('token');
-    const flowId = workOrder.id;
+
+    const currentFLow = [...workOrder.workOrder.flow]
+    .reverse()
+    .find((item) => item.status === "Pendiente");
+    console.log('Area', currentFLow);
+
+    const flowId = currentFLow.id;
     console.log(flowId);
     try {
       const res = await fetch(`http://localhost:3000/work-order-flow/${flowId}/accept`, {

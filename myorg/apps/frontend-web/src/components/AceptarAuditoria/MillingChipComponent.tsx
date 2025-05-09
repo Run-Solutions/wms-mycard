@@ -9,6 +9,7 @@ type MillingChipData = {
   good_quantity: string;
   bad_quantity: string;
   excess_quantity: string;
+  cqm_quantity: string;
   comments: string;
 };
 
@@ -35,16 +36,22 @@ export default function MillingChipComponentAcceptAuditory({ workOrder }: Props)
       good_quantity: "",
       bad_quantity: "",
       excess_quantity: "",
+      cqm_quantity: "",
       comments: "",
     });
 
+    const currentFLow = [...workOrder.workOrder.flow]
+    .reverse()
+    .find((item) => item.status === "Enviado a Auditoria");
+
     useEffect(() => {
-      if (workOrder?.areaResponse?.millingChip) {
+      if (currentFLow?.areaResponse?.millingChip) {
         const vals: MillingChipData = {
-          good_quantity: workOrder.areaResponse.millingChip.good_quantity || "0",
-          bad_quantity: workOrder.areaResponse.millingChip.bad_quantity || "0",
-          excess_quantity: workOrder.areaResponse.millingChip.excess_quantity || "0",
-          comments: workOrder.areaResponse.millingChip.comments || "",
+          good_quantity: currentFLow.areaResponse.millingChip.good_quantity || "0",
+          bad_quantity: currentFLow.areaResponse.millingChip.bad_quantity || "0",
+          excess_quantity: currentFLow.areaResponse.millingChip.excess_quantity || "0",
+          cqm_quantity: currentFLow.answers[0].sample_quantity || "0",
+          comments: currentFLow.areaResponse.millingChip.comments || "",
         };
         setDefaultValues(vals);
         // El botón se mantiene deshabilitado hasta que haya un cambio
@@ -60,7 +67,7 @@ export default function MillingChipComponentAcceptAuditory({ workOrder }: Props)
         return;
       }
       const token = localStorage.getItem('token');
-      const millingChipId = workOrder.areaResponse.millingChip.id;
+      const millingChipId = currentFLow.areaResponse.millingChip.id;
       const payload = {
         sample_auditory: Number(sampleAuditory),
       };
@@ -86,10 +93,10 @@ export default function MillingChipComponentAcceptAuditory({ workOrder }: Props)
 
     const handleSubmitInconformidad = async () => {
       const token = localStorage.getItem('token');
-      console.log(workOrder.id);
+      console.log(currentFLow.id);
       console.log(inconformidad);
       try {
-        const res = await fetch(`http://localhost:3000/work-order-flow/${workOrder.id}/inconformidad`, {
+        const res = await fetch(`http://localhost:3000/work-order-flow/${currentFLow.id}/inconformidad`, {
           method: 'PATCH',
           headers: {
             'Content-Type': 'application/json',
@@ -134,6 +141,8 @@ export default function MillingChipComponentAcceptAuditory({ workOrder }: Props)
               <Input type="number" name="bad_quantity" value={defaultValues.bad_quantity} disabled/>
               <Label>Excedente:</Label>
               <Input type="number" name="excess_quantity" value={defaultValues.excess_quantity} disabled/>
+              <Label>Muestras en CQM:</Label>
+              <Input type="number" name="excess_quantity" value={defaultValues.cqm_quantity} disabled/>
               <Label>Muestras:</Label>
               <Input type="number" value={sampleAuditory} onChange={(e) => setSampleQuantity(e.target.value)}/>
             </InputGroup>

@@ -8,8 +8,7 @@ import ImpresionComponentAccept from "@/components/AceptarProducto/ImpresionComp
 import SerigrafiaComponentAccept from "@/components/AceptarProducto/SerigrafiaComponent";
 import EmpalmeComponentAccept from "@/components/AceptarProducto/EmpalmeComponent";
 import LaminacionComponentAccept from "@/components/AceptarProducto/LaminacionComponent";
-import CorteComponentAccept from "@/components/AceptarProducto/CorteComponent";
-import AfterCorteComponentAccept from "@/components/AceptarProducto/AfterCorteComponent";
+import AfterAllComponentAccept from "@/components/AceptarProducto/AfterAllComponentAccept";
 
 interface Props {
     params: Promise<{ id: string }>;
@@ -54,9 +53,15 @@ export default function AceptarProductoAuxPage({ params }: Props) {
         case 5:
             return <LaminacionComponentAccept workOrder={workOrder}/>
         case 6:
-            return <CorteComponentAccept workOrder={workOrder}/>
+            return <AfterAllComponentAccept workOrder={workOrder}/>
         case 7:
-            return <AfterCorteComponentAccept workOrder={workOrder}/>
+            return <AfterAllComponentAccept workOrder={workOrder}/>
+        case 8:
+            return <AfterAllComponentAccept workOrder={workOrder}/>
+        case 9:
+            return <AfterAllComponentAccept workOrder={workOrder}/>
+        case 10:
+            return <AfterAllComponentAccept workOrder={workOrder}/>
         default: 
           return <div>Area no reconocida.</div>
       }

@@ -38,6 +38,10 @@ export default function EmpalmeComponentAccept({ workOrder }: Props) {
       .reverse()
       .find((item) => item.status === "Completado");
     console.log('Area previa', lastCompleted);
+    const currentFLow = [...workOrder.workOrder.flow]
+    .reverse()
+    .find((item) => item.status === "Pendiente");
+    console.log('Area', currentFLow);
     if (lastCompleted?.areaResponse?.empalme) {
       const vals: EmpalmeData = {
         release_quantity: lastCompleted.areaResponse.empalme.release_quantity || "",
@@ -55,7 +59,13 @@ export default function EmpalmeComponentAccept({ workOrder }: Props) {
       return;
     }
     const token = localStorage.getItem('token');
-    const flowId = workOrder.id;
+
+    const currentFLow = [...workOrder.workOrder.flow]
+    .reverse()
+    .find((item) => item.status === "Pendiente");
+    console.log('Area', currentFLow);
+
+    const flowId = currentFLow.id;
     console.log(flowId);
     try {
       const res = await fetch(`http://localhost:3000/work-order-flow/${flowId}/accept`, {

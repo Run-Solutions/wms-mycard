@@ -49,16 +49,22 @@ export default function MillingChipComponent({ workOrder }: Props) {
     );
   };
 
+  const currentFLow = [...workOrder.workOrder.flow]
+  .reverse()
+  .find((item) => ["Listo", "En proceso", 'Enviado a CQM', 'En Calidad'].includes(item.status));
+  console.log('Nuevo', currentFLow)
+
   // Para mandar la OT a evaluacion por CQM
   const handleSubmit = async () => {
+    const flowId = currentFLow.id;
     const payload = {
       question_id: responses.map(response => response.questionId),
-      work_order_flow_id: workOrder.id,
+      work_order_flow_id: flowId,
       work_order_id: workOrder.workOrder.id,
       area_id: workOrder.area.id,
       response: responses.map(response => response.answer),
       reviewed: false,
-      user_id: workOrder.assigned_user,
+      user_id: currentFLow.assigned_user,
       sample_quantity: Number(sampleQuantity),
       revisar_tecnologia:revisarTecnologia,
       validar_kvc: validarKVC,
@@ -94,15 +100,15 @@ export default function MillingChipComponent({ workOrder }: Props) {
   const handleImpressSubmit = async () => {
     const payload = {
       workOrderId: workOrder.workOrder.id,
-      workOrderFlowId: workOrder.id,
+      workOrderFlowId: currentFLow.id,
       areaId: workOrder.area.id,
-      assignedUser: workOrder.assigned_user,
+      assignedUser: currentFLow.assigned_user,
       releaseQuantity: Number(sampleQuantity),
       goodQuantity: Number(goodQuantity),
       badQuantity: Number(badQuantity),
       excessQuantity: Number(excessQuantity),
       comments: document.querySelector('textarea')?.value || '',
-      formAnswerId: workOrder.answers[0].id,
+      formAnswerId: currentFLow.answers[0].id,
     };
 
     console.log('datos a enviar',payload);
@@ -169,14 +175,14 @@ export default function MillingChipComponent({ workOrder }: Props) {
             <Label>Excedente:</Label>
             <Input type="number" placeholder="Ej: 2" value={excessQuantity} onChange={(e) => setExcessQuantity(e.target.value)} disabled={isDisabled} />
           </InputGroup>
-          <CqmButton status={workOrder.status} onClick={openModal} disabled={['Enviado a CQM', 'En Calidad', 'Listo'].includes(workOrder.status)}>Enviar a CQM</CqmButton>
+          <CqmButton status={currentFLow.status} onClick={openModal} disabled={['Enviado a CQM', 'En Calidad', 'Listo'].includes(currentFLow.status)}>Enviar a CQM</CqmButton>
         </NewDataWrapper>
         <InputGroup>
           <SectionTitle>Comentarios</SectionTitle>
           <Textarea placeholder="Agrega un comentario adicional..." disabled={isDisabled}/>
         </InputGroup>
       </NewData>
-      <LiberarButton disabled={isDisabled || ['Enviado a CQM', 'En Calidad'].includes(workOrder.status)} onClick={() => setShowConfirm(true)}>Liberar Producto</LiberarButton>
+      <LiberarButton disabled={isDisabled || ['Enviado a CQM', 'En Calidad'].includes(currentFLow.status)} onClick={() => setShowConfirm(true)}>Liberar Producto</LiberarButton>
     </Container>
 
     {/* Modal para enviar a liberacion */}

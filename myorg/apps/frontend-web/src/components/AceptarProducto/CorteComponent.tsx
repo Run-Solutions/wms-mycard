@@ -18,29 +18,22 @@ export default function CorteComponentAccept({ workOrder }: Props) {
   const router = useRouter();
   const [message, setMessage] = useState('');
   const [showConfirm, setShowConfirm] = useState(false);
+  const [showInconformidad, setShowInconformidad] = useState(false);
+  const [inconformidad, setInconformidad] = useState<string>('');
 
-  // Estado para saber si los valores han sido modificados y para habilitar o deshabilitar el botón
-  const [isModified, setIsModified] = useState(false);
-  const [isDisabled, setIsDisabled] = useState(true);
+  // Estados tipados para los valores predeterminados y actuales
+  const [defaultValues, setDefaultValues] = useState<LaminacionData>({
+    release_quantity: "",
+    comments: "",
+  });
 
   const lastCompleted = [...workOrder.workOrder.flow]
     .reverse()
     .find((item) => item.status === "Completado");
-
   const previousArea = lastCompleted?.area.id;
   console.log('area previa',previousArea);
 
   if (previousArea >= 2) {
-    // Estados tipados para los valores predeterminados y actuales
-    const [defaultValues, setDefaultValues] = useState<LaminacionData>({
-      release_quantity: "",
-      comments: "",
-    });
-
-    const [currentValues, setCurrentValues] = useState<LaminacionData>({
-      release_quantity: "",
-      comments: "",
-    });
 
     useEffect(() => {
       // Al iniciar, configuramos los valores predeterminados y actuales
@@ -54,50 +47,24 @@ export default function CorteComponentAccept({ workOrder }: Props) {
           comments: lastCompleted.areaResponse.laminacion.comments || "",
         };
         setDefaultValues(vals);
-        setCurrentValues(vals);
         // El botón se mantiene deshabilitado hasta que haya un cambio
-        setIsModified(false);
-        setIsDisabled(true);
       }
     }, [workOrder]);
 
-    const handleInputChange = (event: React.ChangeEvent<HTMLInputElement>) => {
-      const { name, value } = event.target;
-      // Cast de name para que TypeScript sepa que es una clave de PrepressData
-      const key = name as keyof LaminacionData;
-
-      // Actualizamos el estado de currentValues
-      const newValues = { ...currentValues, [key]: value };
-      setCurrentValues(newValues);
-
-      // Comparamos los valores actuales con los predeterminados
-      if (
-        newValues.release_quantity === defaultValues.release_quantity &&
-        newValues.comments === defaultValues.comments
-      ) {
-        setIsModified(false);
-        setIsDisabled(true);
-      } else {
-        setIsModified(true);
-        setIsDisabled(false);
-      }
-    };
-
     const handleSubmit = async (e: React.FormEvent) => {
       e.preventDefault();
-      if (
-        currentValues.release_quantity !== defaultValues.release_quantity ||
-        currentValues.comments !== defaultValues.comments
-      ) {
-        alert('No se permite modificar los valores entregados por el área anterior.');
-        return;
-      }
-      if (!currentValues.release_quantity) {
+      if (!defaultValues.release_quantity) {
         alert('Por favor, asegurate de que no haya inconformidades con las cantidades entregadas.');
         return;
       }
       const token = localStorage.getItem('token');
-      const flowId = workOrder.id;
+
+      const currentFLow = [...workOrder.workOrder.flow]
+      .reverse()
+      .find((item) => item.status === "Pendiente");
+      console.log('Area', currentFLow);
+
+      const flowId = currentFLow.id;
       console.log(flowId);
       try {
         const res = await fetch(`http://localhost:3000/work-order-flow/${flowId}/accept`, {
@@ -106,6 +73,29 @@ export default function CorteComponentAccept({ workOrder }: Props) {
             'Content-Type': 'application/json',
             'Authorization': `Bearer ${token}`,
           },
+        });
+        const data = await res.json();
+        if (res.ok) {
+          router.push('/aceptarProducto');
+        }
+      } catch (error) {
+        console.error(error);
+        alert('Error al conectar con el servidor');
+      }
+    }
+
+    const handleSubmitInconformidad = async () => {
+      const token = localStorage.getItem('token');
+      console.log(lastCompleted.id);
+      console.log(inconformidad);
+      try {
+        const res = await fetch(`http://localhost:3000/work-order-flow/${lastCompleted.id}/inconformidad`, {
+          method: 'PATCH',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${token}`,
+          },
+          body: JSON.stringify({inconformidad}),
         });
         const data = await res.json();
         if (res.ok) {
@@ -143,15 +133,15 @@ export default function CorteComponentAccept({ workOrder }: Props) {
           <NewDataWrapper>
             <InputGroup>
               <Label>Cantidad entregada:</Label>
-              <Input type="number" name="release_quantity" value={currentValues.release_quantity} onChange={handleInputChange}/>
+              <Input type="number" name="release_quantity" value={defaultValues.release_quantity} disabled/>
             </InputGroup>
-            <CqmButton disabled={!isModified}>Inconformidad</CqmButton>
+            <InconformidadButton onClick={() => setShowInconformidad(true)}>Inconformidad</InconformidadButton>
           </NewDataWrapper>
           <InputGroup>
             <SectionTitle>Comentarios</SectionTitle>
             <Textarea
-              value={currentValues.comments}
-              disabled={isDisabled}
+              value={defaultValues.comments}
+              disabled
             />
           </InputGroup>
         </NewData>
@@ -164,6 +154,31 @@ export default function CorteComponentAccept({ workOrder }: Props) {
               <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '1rem', marginTop: '1rem' }}>
                 <CancelButton onClick={() => setShowConfirm(false)}>Cancelar</CancelButton>
                 <ConfirmButton onClick={handleSubmit}>Confirmar</ConfirmButton>
+              </div>
+            </ModalBox>
+          </ModalOverlay>
+        )}
+        {showInconformidad && (
+          <ModalOverlay>
+            <ModalBox>
+              <h4>Registrar Inconformidad</h4>
+              <h3>Por favor, describe la inconformidad detectada con la cantidad entregada.</h3>
+              <Textarea
+                value={inconformidad}
+                onChange={(e) => setInconformidad(e.target.value)}
+                placeholder="Escribe aquí la inconformidad..."
+              />
+              <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '1rem', marginTop: '1rem' }}>
+                <CancelButton onClick={() => setShowInconformidad(false)}>Cancelar</CancelButton>
+                <ConfirmButton onClick={() => {
+                  console.log('Hpli');
+                  if (!inconformidad.trim()) {
+                    alert('Debes ingresar una inconformidad antes de continuar.');
+                    return;
+                  }
+                  handleSubmitInconformidad();
+                  setShowInconformidad(false);
+                }}>Guardar</ConfirmButton>
               </div>
             </ModalBox>
           </ModalOverlay>
@@ -291,7 +306,7 @@ const AceptarButton = styled.button<{ disabled?: boolean }>`
   }
 `;
 
-const CqmButton = styled.button<{ disabled?: boolean }>`
+const InconformidadButton = styled.button<{ disabled?: boolean }>`
   height: 50px;
   background-color: ${({ disabled }) => (disabled ? "#D1D5DB" : "#2563EB")};
   color: white;
@@ -307,24 +322,6 @@ const CqmButton = styled.button<{ disabled?: boolean }>`
     background-color: ${({ disabled }) =>
       disabled ? "#D1D5DB" : "#1D4ED8"};
   }
-`;
-
-const RadioGroup = styled.div`
-  display: flex;
-  gap: 2rem;
-  margin-top: 0.5rem;
-`;
-
-const RadioLabel = styled.label`
-  display: flex;
-  align-items: center;
-  gap: 0.5rem;
-  font-weight: 500;
-  color: #374151;
-`;
-
-const Radio = styled.input`
-  accent-color: #2563eb;
 `;
 
 const ModalOverlay = styled.div`

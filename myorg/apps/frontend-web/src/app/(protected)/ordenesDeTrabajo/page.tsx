@@ -66,16 +66,15 @@ const WorkOrdersPage: React.FC = () => {
   };
 
   // Elimina el ultimo dropdown de areas en el flujo asignado
-  const removeDropdown = (index: number) => {
-    if (dropdownCount > 0) {
-      setDropdownCount(dropdownCount - 1);
-      setFormData((prev) => {
-        const updatedAreas = [...prev.areasOperatorIds];
-        updatedAreas.splice(index, 1);  // Eliminar el valor correspondiente al índice
-        return { ...prev, areasOperatorIds: updatedAreas };
-      });
-    }
-  }
+  const removeLastDropdown = () => {
+    setFormData((prev) => {
+      const updatedAreas = [...prev.areasOperatorIds];
+      updatedAreas.pop(); // elimina el último valor seleccionado
+      return { ...prev, areasOperatorIds: updatedAreas };
+    });
+  
+    setDropdownCount((prev) => prev - 1);
+  };
 
   // Para la carga de archivos
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>, type: 'ot' | 'sku' | 'op') => {
@@ -111,8 +110,11 @@ const WorkOrdersPage: React.FC = () => {
     formDataToSend.append('sku', files.sku); // Envia el archivo 'sku'
     formDataToSend.append('op', files.op);  // Envia el archivo 'op'
 
+    // Limpiar areasOperatorIds quitando vacíos o nulos antes de enviar
+    const cleanedAreasOperatorIds = formData.areasOperatorIds.filter((id) => id !== "" && id !== undefined && id !== null);
+
     // Agregar otros datos del formulario
-    Object.entries(formData).forEach(([key, value]) => {
+    Object.entries({ ...formData, areasOperatorIds: cleanedAreasOperatorIds }).forEach(([key, value]) => {
       if (Array.isArray(value)) {
         value.forEach((v) => formDataToSend.append(key, v));
       } else {
@@ -207,10 +209,10 @@ const WorkOrdersPage: React.FC = () => {
                   })}
                   {dropdownCount > rowIndex * 4 && dropdownCount <= (rowIndex + 1) * 4 && (
                     <div style={{ display: "flex", flexDirection: "column", justifyContent: "center", height: '0px', padding: '0', minWidth: '40px' }}>
-                      {dropdownCount < 10 && dropdownCount > rowIndex * 4 && dropdownCount <= (rowIndex + 1) * 4 && (
+                      {dropdownCount < 50 && dropdownCount > rowIndex * 4 && dropdownCount <= (rowIndex + 1) * 4 && (
                       <IconButton type="button" onClick={addDropdown} style={{ height: "20px", borderRadius: "40em", padding: '0', color: '#05060f99'}}>+</IconButton>
                       )}
-                      <IconButton aria-label="delete" type="button" onClick={() => removeDropdown(rowIndex * 4 + 4)} style={{ height: "20px", color: '#05060f99', borderRadius: "40em", marginTop: "5px", padding: '0' }}>
+                      <IconButton aria-label="delete" type="button" onClick={removeLastDropdown} style={{ height: "20px", color: '#05060f99', borderRadius: "40em", marginTop: "5px", padding: '0' }}>
                         <DeleteIcon />
                       </IconButton>
                     </div>
@@ -237,7 +239,7 @@ const WorkOrdersPage: React.FC = () => {
               </IconButton>
             {files.ot && (
               <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                <Typography variant="body2">{files.ot.name}</Typography>
+                <Typography variant="body2" style={{ color: 'black'}}>{files.ot.name}</Typography>
                 <IconButton onClick={() => removeFile('ot')} color="error">
                   <DeleteIcon />
                 </IconButton>
@@ -257,7 +259,7 @@ const WorkOrdersPage: React.FC = () => {
               </IconButton>
             {files.sku && ( 
               <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                <Typography variant="body2">{files.sku.name}</Typography>
+                <Typography variant="body2" style={{ color: 'black'}}>{files.sku.name}</Typography>
                 <IconButton onClick={() => removeFile('sku')} color='error'>
                   <DeleteIcon />
                 </IconButton>
@@ -277,7 +279,7 @@ const WorkOrdersPage: React.FC = () => {
               </IconButton>
             {files.op && ( 
               <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                <Typography variant="body2">{files.op.name}</Typography>
+                <Typography variant="body2" style={{ color: 'black'}}>{files.op.name}</Typography>
                 <IconButton onClick={() => removeFile('op')} color='error'>
                   <DeleteIcon />
                 </IconButton>
