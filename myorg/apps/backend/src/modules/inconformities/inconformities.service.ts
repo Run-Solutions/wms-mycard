@@ -21,6 +21,11 @@ export class InconformitiesService {
           areas_response_id: Number(areaResponseId),
         },
       });
+      await tx.areasResponse.deleteMany({
+        where: {
+          id: Number(areaResponseId),
+        },
+      });
       await tx.workOrderFlow.update({
         where: {
           id: Number(areaResponse.work_order_flow_id),
@@ -35,23 +40,59 @@ export class InconformitiesService {
 
   async inconformityImpresion(areaResponseId: number) {
     return this.prisma.$transaction(async (tx) => {
-      const areaResponse = await tx.areasResponse.findUnique({
+      const areaResponse = await tx.areasResponse.findFirst({
+        where: {
+          work_order_flow_id: Number(areaResponseId),
+        },
+      });
+      const flow = await tx.workOrderFlow.findUnique({
         where: {
           id: Number(areaResponseId),
         },
       });
-      if (!areaResponse) {
-        throw new NotFoundException('No se encontró el registro AreasResponse');
+      const flowParcial = await tx.partialRelease.findMany({
+        where: {
+          work_order_flow_id: flow?.id,
+        },
+      });
+      if (!areaResponse || areaResponse && flowParcial) {
+        if (flowParcial) {
+          await tx.partialRelease.deleteMany({
+            where: {
+              work_order_flow_id: flow?.id,
+              validated: false,
+            },
+          });
+          await tx.areasResponse.deleteMany({
+            where: {
+              work_order_flow_id: flow?.id,
+            },
+          });
+          await tx.workOrderFlow.update({
+            where: {
+              id: flow?.id,
+            },
+            data: {
+              status: 'Listo'
+            }
+          });
+        }
+        return { message: 'Respuesta guardada con exito'};
       }
-      // Eliminar el registro serigrafia asociado a ese AreasResponse
+      // Eliminar el registro impresion asociado a ese AreasResponse
       await tx.impressionResponse.deleteMany({
         where: {
-          areas_response_id: Number(areaResponseId),
+          areas_response_id: areaResponse.id,
+        },
+      });
+      await tx.areasResponse.deleteMany({
+        where: {
+          id: areaResponse.id,
         },
       });
       await tx.workOrderFlow.update({
         where: {
-          id: Number(areaResponse.work_order_flow_id),
+          id: flow?.id,
         },
         data: {
           status: 'Listo'
@@ -63,23 +104,59 @@ export class InconformitiesService {
 
   async inconformitySerigrafia(areaResponseId: number) {
     return this.prisma.$transaction(async (tx) => {
-      const areaResponse = await tx.areasResponse.findUnique({
+      const areaResponse = await tx.areasResponse.findFirst({
+        where: {
+          work_order_flow_id: Number(areaResponseId),
+        },
+      });
+      const flow = await tx.workOrderFlow.findUnique({
         where: {
           id: Number(areaResponseId),
         },
       });
-      if (!areaResponse) {
-        throw new NotFoundException('No se encontró el registro AreasResponse');
+      const flowParcial = await tx.partialRelease.findMany({
+        where: {
+          work_order_flow_id: flow?.id,
+        },
+      });
+      if (!areaResponse || areaResponse && flowParcial) {
+        if (flowParcial) {
+          await tx.partialRelease.deleteMany({
+            where: {
+              work_order_flow_id: flow?.id,
+              validated: false,
+            },
+          });
+          await tx.areasResponse.deleteMany({
+            where: {
+              work_order_flow_id: flow?.id,
+            },
+          });
+          await tx.workOrderFlow.update({
+            where: {
+              id: flow?.id,
+            },
+            data: {
+              status: 'Listo'
+            }
+          });
+        }
+        return { message: 'Respuesta guardada con exito'};
       }
       // Eliminar el registro serigrafia asociado a ese AreasResponse
       await tx.serigrafiaResponse.deleteMany({
         where: {
-          areas_response_id: Number(areaResponseId),
+          areas_response_id: areaResponse.id,
+        },
+      });
+      await tx.areasResponse.deleteMany({
+        where: {
+          id: areaResponse.id,
         },
       });
       await tx.workOrderFlow.update({
         where: {
-          id: Number(areaResponse.work_order_flow_id),
+          id: flow?.id,
         },
         data: {
           status: 'Listo'
@@ -91,23 +168,59 @@ export class InconformitiesService {
   
   async inconformityEmpalme(areaResponseId: number) {
     return this.prisma.$transaction(async (tx) => {
-      const areaResponse = await tx.areasResponse.findUnique({
+      const areaResponse = await tx.areasResponse.findFirst({
+        where: {
+          work_order_flow_id: Number(areaResponseId),
+        },
+      });
+      const flow = await tx.workOrderFlow.findUnique({
         where: {
           id: Number(areaResponseId),
         },
       });
-      if (!areaResponse) {
-        throw new NotFoundException('No se encontró el registro AreasResponse');
+      const flowParcial = await tx.partialRelease.findMany({
+        where: {
+          work_order_flow_id: flow?.id,
+        },
+      });
+      if (!areaResponse || areaResponse && flowParcial) {
+        if (flowParcial) {
+          await tx.partialRelease.deleteMany({
+            where: {
+              work_order_flow_id: flow?.id,
+              validated: false,
+            },
+          });
+          await tx.areasResponse.deleteMany({
+            where: {
+              work_order_flow_id: flow?.id,
+            },
+          });
+          await tx.workOrderFlow.update({
+            where: {
+              id: flow?.id,
+            },
+            data: {
+              status: 'Listo'
+            }
+          });
+        }
+        return { message: 'Respuesta guardada con exito'};
       }
-      // Eliminar el registro empalme asociado a ese AreasResponse
+      // Eliminar el registro serigrafia asociado a ese AreasResponse
       await tx.empalmeResponse.deleteMany({
         where: {
-          areas_response_id: Number(areaResponseId),
+          areas_response_id: areaResponse.id,
+        },    
+      });
+      await tx.areasResponse.deleteMany({
+        where: {
+          id: areaResponse.id,
         },
       });
       await tx.workOrderFlow.update({
         where: {
-          id: Number(areaResponse.work_order_flow_id),
+          id: flow?.id,
         },
         data: {
           status: 'Listo'
@@ -119,23 +232,59 @@ export class InconformitiesService {
   
   async inconformityLaminacion(areaResponseId: number) {
     return this.prisma.$transaction(async (tx) => {
-      const areaResponse = await tx.areasResponse.findUnique({
+      const areaResponse = await tx.areasResponse.findFirst({
+        where: {
+          work_order_flow_id: Number(areaResponseId),
+        },
+      });
+      const flow = await tx.workOrderFlow.findUnique({
         where: {
           id: Number(areaResponseId),
         },
       });
-      if (!areaResponse) {
-        throw new NotFoundException('No se encontró el registro AreasResponse');
+      const flowParcial = await tx.partialRelease.findMany({
+        where: {
+          work_order_flow_id: flow?.id,
+        },
+      });
+      if (!areaResponse || areaResponse && flowParcial) {
+        if (flowParcial) {
+          await tx.partialRelease.deleteMany({
+            where: {
+              work_order_flow_id: flow?.id,
+              validated: false,
+            },
+          });
+          await tx.areasResponse.deleteMany({
+            where: {
+              work_order_flow_id: flow?.id,
+            },
+          });
+          await tx.workOrderFlow.update({
+            where: {
+              id: flow?.id,
+            },
+            data: {
+              status: 'Listo'
+            }
+          });
+        }
+        return { message: 'Respuesta guardada con exito'};
       }
       // Eliminar el registro empalme asociado a ese AreasResponse
       await tx.laminacionResponse.deleteMany({
         where: {
-          areas_response_id: Number(areaResponseId),
+          areas_response_id: areaResponse.id,
+        },
+      });
+      await tx.areasResponse.deleteMany({
+        where: {
+          id: areaResponse.id,
         },
       });
       await tx.workOrderFlow.update({
         where: {
-          id: Number(areaResponse.work_order_flow_id),
+          id: flow?.id,
         },
         data: {
           status: 'Listo'
@@ -147,17 +296,48 @@ export class InconformitiesService {
   
   async inconformityCorte(areaResponseId: number) {
     return this.prisma.$transaction(async (tx) => {
-      const areaResponse = await tx.areasResponse.findUnique({
+      const areaResponse = await tx.areasResponse.findFirst({
+        where: {
+          work_order_flow_id: Number(areaResponseId),
+        },
+      });
+      const flow = await tx.workOrderFlow.findUnique({
         where: {
           id: Number(areaResponseId),
         },
       });
-      if (!areaResponse) {
-        throw new NotFoundException('No se encontró el registro AreasResponse');
+      const flowParcial = await tx.partialRelease.findMany({
+        where: {
+          work_order_flow_id: flow?.id,
+        },
+      });
+      if (!areaResponse || areaResponse && flowParcial) {
+        if (flowParcial) {
+          await tx.partialRelease.deleteMany({
+            where: {
+              work_order_flow_id: flow?.id,
+              validated: false,
+            },
+          });
+          await tx.areasResponse.deleteMany({
+            where: {
+              work_order_flow_id: flow?.id,
+            },
+          });
+          await tx.workOrderFlow.update({
+            where: {
+              id: flow?.id,
+            },
+            data: {
+              status: 'Listo'
+            }
+          });
+        }
+        return { message: 'Respuesta guardada con exito'};
       }
       const corteResponse = await tx.corteResponse.findUnique({
         where: {
-          areas_response_id: Number(areaResponseId),
+          areas_response_id: areaResponse.id,
         },
       });
       if (corteResponse) {
@@ -172,13 +352,18 @@ export class InconformitiesService {
       // Eliminar el registro empalme asociado a ese AreasResponse
       await tx.corteResponse.deleteMany({
         where: {
-          areas_response_id: Number(areaResponseId),
+          areas_response_id: areaResponse.id,
+        },
+      });
+      await tx.areasResponse.deleteMany({
+        where: {
+          id: areaResponse.id,
         },
       });
       }
       await tx.workOrderFlow.update({
         where: {
-          id: Number(areaResponse.work_order_flow_id),
+          id: flow?.id,
         },
         data: {
           status: 'Listo'
@@ -190,17 +375,48 @@ export class InconformitiesService {
   
   async inconformityColorEdge(areaResponseId: number) {
     return this.prisma.$transaction(async (tx) => {
-      const areaResponse = await tx.areasResponse.findUnique({
+      const areaResponse = await tx.areasResponse.findFirst({
+        where: {
+          work_order_flow_id: Number(areaResponseId),
+        },
+      });
+      const flow = await tx.workOrderFlow.findUnique({
         where: {
           id: Number(areaResponseId),
         },
       });
-      if (!areaResponse) {
-        throw new NotFoundException('No se encontró el registro AreasResponse');
+      const flowParcial = await tx.partialRelease.findMany({
+        where: {
+          work_order_flow_id: flow?.id,
+        },
+      });
+      if (!areaResponse || areaResponse && flowParcial) {
+        if (flowParcial) {
+          await tx.partialRelease.deleteMany({
+            where: {
+              work_order_flow_id: flow?.id,
+              validated: false,
+            },
+          });
+          await tx.areasResponse.deleteMany({
+            where: {
+              work_order_flow_id: flow?.id,
+            },
+          });
+          await tx.workOrderFlow.update({
+            where: {
+              id: flow?.id,
+            },
+            data: {
+              status: 'Listo'
+            }
+          });
+        }
+        return { message: 'Respuesta guardada con exito'};
       }
       const colorEdgeResponse = await tx.colorEdgeResponse.findUnique({
         where: {
-          areas_response_id: Number(areaResponseId),
+          areas_response_id: areaResponse.id,
         },
       });
       if (colorEdgeResponse) {
@@ -213,15 +429,20 @@ export class InconformitiesService {
           });
         }
       // Eliminar el registro empalme asociado a ese AreasResponse
+      await tx.areasResponse.deleteMany({
+        where: {
+          id: areaResponse.id,
+        },
+      });
       await tx.colorEdgeResponse.deleteMany({
         where: {
-          areas_response_id: Number(areaResponseId),
+          areas_response_id: areaResponse.id,
         },
       });
       }
       await tx.workOrderFlow.update({
         where: {
-          id: Number(areaResponse.work_order_flow_id),
+          id: flow?.id,
         },
         data: {
           status: 'Listo'
@@ -233,17 +454,48 @@ export class InconformitiesService {
   
   async inconformityHotStamping(areaResponseId: number) {
     return this.prisma.$transaction(async (tx) => {
-      const areaResponse = await tx.areasResponse.findUnique({
+      const areaResponse = await tx.areasResponse.findFirst({
+        where: {
+          work_order_flow_id: Number(areaResponseId),
+        },
+      });
+      const flow = await tx.workOrderFlow.findUnique({
         where: {
           id: Number(areaResponseId),
         },
       });
-      if (!areaResponse) {
-        throw new NotFoundException('No se encontró el registro AreasResponse');
+      const flowParcial = await tx.partialRelease.findMany({
+        where: {
+          work_order_flow_id: flow?.id,
+        },
+      });
+      if (!areaResponse || areaResponse && flowParcial) {
+        if (flowParcial) {
+          await tx.partialRelease.deleteMany({
+            where: {
+              work_order_flow_id: flow?.id,
+              validated: false,
+            },
+          });
+          await tx.areasResponse.deleteMany({
+            where: {
+              work_order_flow_id: flow?.id,
+            },
+          });
+          await tx.workOrderFlow.update({
+            where: {
+              id: flow?.id,
+            },
+            data: {
+              status: 'Listo'
+            }
+          });
+        }
+        return { message: 'Respuesta guardada con exito'};
       }
       const hotStampingResponse = await tx.hotStampingResponse.findUnique({
         where: {
-          areas_response_id: Number(areaResponseId),
+          areas_response_id: areaResponse.id,
         },
       });
       if (hotStampingResponse) {
@@ -258,13 +510,18 @@ export class InconformitiesService {
       // Eliminar el registro empalme asociado a ese AreasResponse
       await tx.hotStampingResponse.deleteMany({
         where: {
-          areas_response_id: Number(areaResponseId),
+          areas_response_id: areaResponse.id,
         },
       });
       }
+      await tx.areasResponse.deleteMany({
+        where: {
+          id: areaResponse.id,
+        },
+      });
       await tx.workOrderFlow.update({
         where: {
-          id: Number(areaResponse.work_order_flow_id),
+          id: flow?.id,
         },
         data: {
           status: 'Listo'
@@ -276,17 +533,48 @@ export class InconformitiesService {
   
   async inconformityPersonalizacion(areaResponseId: number) {
     return this.prisma.$transaction(async (tx) => {
-      const areaResponse = await tx.areasResponse.findUnique({
+      const areaResponse = await tx.areasResponse.findFirst({
+        where: {
+          work_order_flow_id: Number(areaResponseId),
+        },
+      });
+      const flow = await tx.workOrderFlow.findUnique({
         where: {
           id: Number(areaResponseId),
         },
       });
-      if (!areaResponse) {
-        throw new NotFoundException('No se encontró el registro AreasResponse');
+      const flowParcial = await tx.partialRelease.findMany({
+        where: {
+          work_order_flow_id: flow?.id,
+        },
+      });
+      if (!areaResponse || areaResponse && flowParcial) {
+        if (flowParcial) {
+          await tx.partialRelease.deleteMany({
+            where: {
+              work_order_flow_id: flow?.id,
+              validated: false,
+            },
+          });
+          await tx.areasResponse.deleteMany({
+            where: {
+              work_order_flow_id: flow?.id,
+            },
+          });
+          await tx.workOrderFlow.update({
+            where: {
+              id: flow?.id,
+            },
+            data: {
+              status: 'Listo'
+            }
+          });
+        }
+        return { message: 'Respuesta guardada con exito'};
       }
       const personalizacionResponse = await tx.personalizacionResponse.findUnique({
         where: {
-          areas_response_id: Number(areaResponseId),
+          areas_response_id: areaResponse.id,
         },
       });
       if (personalizacionResponse) {
@@ -301,13 +589,18 @@ export class InconformitiesService {
       // Eliminar el registro empalme asociado a ese AreasResponse
       await tx.personalizacionResponse.deleteMany({
         where: {
-          areas_response_id: Number(areaResponseId),
+          areas_response_id: areaResponse.id,
+        },
+      });
+      await tx.areasResponse.deleteMany({
+        where: {
+          id: areaResponse.id,
         },
       });
       }
       await tx.workOrderFlow.update({
         where: {
-          id: Number(areaResponse.work_order_flow_id),
+          id: flow?.id,
         },
         data: {
           status: 'Listo'
@@ -319,28 +612,37 @@ export class InconformitiesService {
   
   async inconformityCQM(areaResponseId: number) {
     return this.prisma.$transaction(async (tx) => {
-      const areaResponse = await tx.formAnswer.findUnique({
+      const answer = await tx.formAnswer.findUnique({
         where: {
           id: Number(areaResponseId),
         },
       });
-      if (!areaResponse) {
-        throw new NotFoundException('No se encontró el registro AreasResponse');
-      }
-      // Eliminar el registro empalme asociado a ese AreasResponse
+      const flow = await tx.workOrderFlow.findUnique({
+        where: {
+          id: answer?.work_order_flow_id,
+        },
+        include: {
+          partialReleases: true,
+        },
+      });
       await tx.formAnswerResponse.deleteMany({
         where: {
-          form_answer_id: Number(areaResponseId),
+          form_answer_id: answer?.id,
+        },
+      });
+      await tx.formAnswer.delete({
+        where: {
+          id: answer?.id,
         },
       });
       await tx.workOrderFlow.update({
         where: {
-          id: Number(areaResponse.work_order_flow_id),
+          id: flow?.id,
         },
         data: {
-          status: 'En proceso'
-        }
-      })
+          status: 'En proceso',
+        },
+      }); 
       return { message: 'Respuesta guardada con exito'};
     });
   }

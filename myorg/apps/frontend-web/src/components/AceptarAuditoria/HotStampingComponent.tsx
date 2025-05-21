@@ -16,14 +16,27 @@ type HotStampingData = {
 interface Props {
   workOrder: any;
 }
+type PartialRelease = {
+  area: string;
+  quantity: string;
+  bad_quantity: string;
+  excess_quantity: string;
+  observation: string;
+  validated: boolean;
+}
+type Answer = {
+  reviewed: boolean;
+  sample_quantity: number;
+  // lo que más tenga...
+};
 
 export default function HotStampingComponentAcceptAuditory({ workOrder }: Props) {
+  console.log('Orden', workOrder);
   const router = useRouter();
   const [message, setMessage] = useState('');
   const [showConfirm, setShowConfirm] = useState(false);
 
   // Estado para saber si los valores han sido modificados y para habilitar o deshabilitar el botón
-  const [isModified, setIsModified] = useState(false);
   const [isDisabled, setIsDisabled] = useState(true);
   const [showInconformidad, setShowInconformidad] = useState(false);
   const [inconformidad, setInconformidad] = useState<string>('');
@@ -39,24 +52,35 @@ export default function HotStampingComponentAcceptAuditory({ workOrder }: Props)
       cqm_quantity: "",
       comments: "",
     });
+    const revisada = workOrder?.answers
+    ?.map((a: Answer, i: number) => ({ ...a, index: i }))
+    .reverse().find((a: Answer) => a.reviewed === true)?.index;
+    const index = revisada?.length >= 1 ? revisada[revisada.length - 1].index : undefined;
+    console.log('el index', index);
 
-    const currentFLow = [...workOrder.workOrder.flow]
-    .reverse()
-    .find((item) => item.status === "Enviado a Auditoria");
 
     useEffect(() => {
-      if (currentFLow?.areaResponse?.hotStamping) {
+      if (workOrder?.areaResponse?.corte && workOrder?.partialReleases?.length === 0) {
         const vals: HotStampingData = {
-          good_quantity: currentFLow.areaResponse.hotStamping.good_quantity || "0",
-          bad_quantity: currentFLow.areaResponse.hotStamping.bad_quantity || "0",
-          excess_quantity: currentFLow.areaResponse.hotStamping.excess_quantity || "0",
-          cqm_quantity: currentFLow.answers[0].sample_quantity || "0",
-          comments: currentFLow.areaResponse.hotStamping.comments || "",
+          good_quantity: workOrder.areaResponse.hotStamping.good_quantity || "0",
+          bad_quantity: workOrder.areaResponse.hotStamping.bad_quantity || "0",
+          excess_quantity: workOrder.areaResponse.hotStamping.excess_quantity || "0",
+          cqm_quantity: workOrder.answers[index].sample_quantity || "0",
+          comments: workOrder.areaResponse.hotStamping.comments || "",
         };
         setDefaultValues(vals);
-        // El botón se mantiene deshabilitado hasta que haya un cambio
-        setIsModified(false);
-        setIsDisabled(true);
+      } else {
+        const firstUnvalidatedPartial = workOrder.partialReleases.find(
+          (release: PartialRelease) => !release.validated
+        );
+        const vals: HotStampingData = {
+          good_quantity: firstUnvalidatedPartial.quantity || '',
+          bad_quantity: firstUnvalidatedPartial.bad_quantity || '',
+          excess_quantity: firstUnvalidatedPartial.excess_quantity || '',
+          cqm_quantity: workOrder.answers[index].sample_quantity || '',
+          comments: firstUnvalidatedPartial.observation || '',
+        };
+        setDefaultValues(vals);
       }
     }, [workOrder]);
 
@@ -67,7 +91,12 @@ export default function HotStampingComponentAcceptAuditory({ workOrder }: Props)
         return;
       }
       const token = localStorage.getItem('token');
-      const hotStampingId = currentFLow.areaResponse.hotStamping.id;
+      let hotStampingId = null;
+      if(workOrder?.partialReleases?.length > 0) {
+        hotStampingId = workOrder.id;
+      } else {
+        hotStampingId = workOrder.areaResponse.hotStamping.id;
+      }
       const payload = {
         sample_auditory: Number(sampleAuditory),
       };
@@ -93,10 +122,10 @@ export default function HotStampingComponentAcceptAuditory({ workOrder }: Props)
 
     const handleSubmitInconformidad = async () => {
       const token = localStorage.getItem('token');
-      console.log(currentFLow.id);
+      console.log(workOrder.id);
       console.log(inconformidad);
       try {
-        const res = await fetch(`http://localhost:3000/work-order-flow/${currentFLow.id}/inconformidad`, {
+        const res = await fetch(`http://localhost:3000/work-order-flow/${workOrder.id}/inconformidad`, {
           method: 'PATCH',
           headers: {
             'Content-Type': 'application/json',

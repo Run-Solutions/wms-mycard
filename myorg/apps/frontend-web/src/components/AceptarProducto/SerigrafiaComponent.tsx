@@ -13,10 +13,15 @@ type SerigrafiaData = {
 interface Props {
   workOrder: any;
 }
+interface PartialRelease {
+  quantity: string;
+  observations: string;
+  validated: boolean;
+  // otros campos si aplica
+}
 
 export default function SerigrafiaComponentAccept({ workOrder }: Props) {
   const router = useRouter();
-  const [message, setMessage] = useState('');
   const [showConfirm, setShowConfirm] = useState(false);
   const [showInconformidad, setShowInconformidad] = useState(false);
   const [inconformidad, setInconformidad] = useState<string>('');
@@ -25,28 +30,41 @@ export default function SerigrafiaComponentAccept({ workOrder }: Props) {
     release_quantity: "",
     comments: "",
   });
-
-  const lastCompleted = [...workOrder.workOrder.flow]
-    .reverse()
-    .find((item) => item.status === "Completado");
-  const previousArea = lastCompleted?.area.id;
-
-  console.log('area previa',previousArea);
+  console.log("El mismo workOrder (workOrder)", workOrder);
+  const flowList = [...workOrder.workOrder.flow];
+  // Índice del flow actual basado en su id
+  const currentIndex = flowList.findIndex((item) => item.id === workOrder.id);
+  console.log('el currentIndex', currentIndex);
+  // Flow actual
+  const currentFlow = currentIndex !== -1 ? flowList[currentIndex] : null;
+  // Anterior (si hay)
+  const lastCompletedOrPartial = currentIndex > 0 ? flowList[currentIndex - 1] : null;
+  // Siguiente (si hay)
+  const nextFlow = currentIndex !== -1 && currentIndex < flowList.length - 1
+    ? flowList[currentIndex + 1]
+    : null;
+  console.log("El flujo actual (currentFlow)", currentFlow);
+  console.log("El siguiente flujo (nextFlow)", nextFlow);
+  console.log("Ultimo parcial o completado", lastCompletedOrPartial);
 
   useEffect(() => {
     // Al iniciar, configuramos los valores predeterminados y actuales
-    const lastCompleted = [...workOrder.workOrder.flow]
-      .reverse()
-      .find((item) => item.status === "Completado");
-    console.log('Area previa', lastCompleted);
-    const currentFLow = [...workOrder.workOrder.flow]
-    .reverse()
-    .find((item) => item.status === "Pendiente");
-    console.log('Area', currentFLow);
-    if (lastCompleted?.areaResponse?.serigrafia) {
+    if (!workOrder) return;
+    if (lastCompletedOrPartial?.areaResponse?.serigrafia && lastCompletedOrPartial?.partialReleases.length === 0) {
       const vals: SerigrafiaData = {
-        release_quantity: lastCompleted.areaResponse.serigrafia.release_quantity || "",
-        comments: lastCompleted.areaResponse.serigrafia.comments || "",
+        release_quantity: lastCompletedOrPartial.areaResponse?.serigrafia?.release_quantity || "",
+        comments: lastCompletedOrPartial.areaResponse?.serigrafia?.comments || "",
+      };
+      setDefaultValues(vals);
+    } else {
+      // Sumar cantidades de partialReleases
+      const firstUnvalidatedPartial = lastCompletedOrPartial.partialReleases.find(
+        (release: PartialRelease) => !release.validated
+      );
+      
+      const vals: SerigrafiaData = {
+        release_quantity: firstUnvalidatedPartial?.quantity || "",
+        comments: firstUnvalidatedPartial?.observation || "",
       };
       setDefaultValues(vals);
     }
@@ -60,13 +78,7 @@ export default function SerigrafiaComponentAccept({ workOrder }: Props) {
       return;
     }
     const token = localStorage.getItem('token');
-
-    const currentFLow = [...workOrder.workOrder.flow]
-    .reverse()
-    .find((item) => item.status === "Pendiente");
-    console.log('Area', currentFLow);
-
-    const flowId = currentFLow.id;
+    const flowId = workOrder?.id;
     console.log(flowId);
     try {
       const res = await fetch(`http://localhost:3000/work-order-flow/${flowId}/accept`, {
@@ -88,10 +100,10 @@ export default function SerigrafiaComponentAccept({ workOrder }: Props) {
   
   const handleSubmitInconformidad = async () => {
     const token = localStorage.getItem('token');
-    console.log(lastCompleted.id);
+    console.log(lastCompletedOrPartial?.id);
     console.log(inconformidad);
     try {
-      const res = await fetch(`http://localhost:3000/work-order-flow/${lastCompleted.id}/inconformidad`, {
+      const res = await fetch(`http://localhost:3000/work-order-flow/${lastCompletedOrPartial.id}/inconformidad`, {
         method: 'PATCH',
         headers: {
           'Content-Type': 'application/json',
@@ -122,11 +134,21 @@ export default function SerigrafiaComponentAccept({ workOrder }: Props) {
           <Value>{workOrder.workOrder.mycard_id}</Value>
         </InfoItem>
         <InfoItem>
-          <Label>Área que lo envía:</Label>
-          <Value>{lastCompleted?.area.name || "No definida"}</Value>
+          <Label>Cantidad:</Label>
+          <Value>{workOrder.workOrder.quantity}</Value>
         </InfoItem>
       </DataWrapper>
-        <InfoItem style={{ marginTop: '20px'}}>
+      <DataWrapper style={{ marginTop: '20px'}}>
+        <InfoItem>
+          <Label>Área que lo envía:</Label>
+          <Value>{lastCompletedOrPartial?.area.name || "No definida"}</Value>
+        </InfoItem>
+        <InfoItem>
+          <Label>Usuario que lo envía:</Label>
+          <Value>{lastCompletedOrPartial?.user?.username || "No definida"}</Value>
+        </InfoItem>
+        </DataWrapper>
+        <InfoItem>
           <Label>Comentarios:</Label>
           <Value>{workOrder.workOrder.comments}</Value>
         </InfoItem>
@@ -148,7 +170,6 @@ export default function SerigrafiaComponentAccept({ workOrder }: Props) {
         </InputGroup>
         </NewData>
         <AceptarButton onClick={() => setShowConfirm(true)}>Aceptar recepción del producto</AceptarButton>
-        {message && <p>{message}</p>}
         {showConfirm && (
           <ModalOverlay>
             <ModalBox>

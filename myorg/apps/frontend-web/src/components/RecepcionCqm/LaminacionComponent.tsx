@@ -7,12 +7,22 @@ import styled from "styled-components";
 interface Props {
   workOrder: any;
 }
+type Answer = {
+  reviewed: boolean;
+  sample_quantity: number;
+  // lo que más tenga...
+};
 
 export default function EmpalmeComponent({ workOrder }: Props) {
   const router = useRouter();
-  const [testTypes, SetTestTypes] = useState('');
   const [showInconformidad, setShowInconformidad] = useState(false);
   const [inconformidad, setInconformidad] = useState<string>('');
+
+  // Para obtener el ultimo FormAnswer 
+  const index = workOrder?.answers
+  ?.map((a: Answer, i: number) => ({ ...a, index: i }))
+  .reverse().find((a: Answer) => a.reviewed === false)?.index;
+  console.log('el index', index);
 
   // Para mostrar formulario de CQM y enviarlo
   const [showConfirmModal, setShowConfirmModal] = useState(false);
@@ -46,11 +56,9 @@ export default function EmpalmeComponent({ workOrder }: Props) {
 
   const handleSelectAll = (isChecked: boolean) => {
     const questionIds = workOrder.area.formQuestions.filter((question: { role_id: number | null }) => question.role_id === 3).map((q: { id: number }) => q.id);
-  
     if (isChecked) {
       // Marcar todas las preguntas
       setCheckedQuestions(questionIds);
-  
       setResponses((prevResponses) => {
         // Filtrar respuestas viejas de esas preguntas
         const updatedResponses = prevResponses.filter(
@@ -68,7 +76,6 @@ export default function EmpalmeComponent({ workOrder }: Props) {
     } else {
       // Desmarcar todas
       setCheckedQuestions([]);
-  
       setResponses((prevResponses) =>
         prevResponses.filter((response) => !questionIds.includes(response.questionId))
       );
@@ -77,32 +84,25 @@ export default function EmpalmeComponent({ workOrder }: Props) {
 
   
   const handleSubmit = async () => {
-    const formAnswerId = workOrder.answers[0]?.id; // id de FormAnswer
-  
+    const formAnswerId = workOrder.answers[index]?.id; // id de FormAnswer
     if (!formAnswerId) {
       alert("No se encontró el ID del formulario.");
       return;
     }
-  
     const checkboxPayload = responses.map(({ questionId, answer }) => ({
       question_id: questionId,
       answer: answer,     
     }));
-  
     const payload = {
       form_answer_id: formAnswerId,
       checkboxes: checkboxPayload,
     };
-  
     try {
       const token = localStorage.getItem("token");
       if (!token) {
         alert("No hay token de autenticación");
         return;
       }
-  
-      console.log("Datos a enviar:", payload);
-  
       const res = await fetch("http://localhost:3000/free-order-cqm/form-extra-seri", {
         method: "POST",
         headers: {
@@ -111,13 +111,11 @@ export default function EmpalmeComponent({ workOrder }: Props) {
         },
         body: JSON.stringify(payload),
       });
-  
       const data = await res.json();
       if (!res.ok) {
         console.error("Error en el servidor:", data);
         return;
       }
-  
       router.push("/recepcionCqm");
     } catch (error) {
       console.log("Error al guardar la respuesta: ", error);
@@ -191,7 +189,7 @@ export default function EmpalmeComponent({ workOrder }: Props) {
               .filter((question: { role_id: number | null }) => question.role_id === null)
               .map((question: { id: number; title: string }) => {
                 // Buscar la respuesta correspondiente a esta pregunta
-                const answer = workOrder.answers[0]?.FormAnswerResponse?.find(
+                const answer = workOrder.answers[index]?.FormAnswerResponse?.find(
                   (resp: any) => resp.question_id === question.id
                 );
                 
@@ -221,11 +219,11 @@ export default function EmpalmeComponent({ workOrder }: Props) {
           </Table>
           <InputGroup style={{ width: '50%'}}>
             <Label>Validar Acabado Vs Orden De Trabajo:</Label>
-            <Input type="text" value={workOrder?.answers[0].finish_validation ?? 'No se reconoce la muestra enviada' } readOnly />
+            <Input type="text" value={workOrder?.answers[index].finish_validation ?? 'No se reconoce la muestra enviada' } readOnly />
           </InputGroup>
           <InputGroup style={{ width: '50%'}}>
               <Label>Muestras entregadas:</Label>
-              <Input type="number" value={workOrder?.answers[0].sample_quantity ?? 'No se reconoce la muestra enviada' } readOnly />
+              <Input type="number" value={workOrder?.answers[index].sample_quantity ?? 'No se reconoce la muestra enviada' } readOnly />
           </InputGroup>
         </NewDataWrapper>
         
@@ -255,7 +253,7 @@ export default function EmpalmeComponent({ workOrder }: Props) {
               .filter((question: { role_id: number | null }) => question.role_id === 3)
               .map((question: { id: number; title: string }) => {
                 // Buscar la respuesta correspondiente a esta pregunta
-                const answer = workOrder.answers[0]?.FormAnswerResponse?.find(
+                const answer = workOrder.answers[index]?.FormAnswerResponse?.find(
                   (resp: any) => resp.question_id === question.id
                 );
                 return (

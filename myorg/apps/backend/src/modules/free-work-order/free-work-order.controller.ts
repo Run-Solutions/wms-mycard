@@ -139,55 +139,55 @@ export class FreeWorkOrderController {
       return this.FreeWorkOrderService.createImpressResponse(dto);
     }
     
-    // Para guardar respuesta de liberacion de Impresion
+    // Para guardar respuesta de liberacion de Serigrafia
     @Post('serigrafia')
     createSerigrafiaResponse(@Body() dto: CreateImpressResponseDto) {
       return this.FreeWorkOrderService.createSerigrafiaResponse(dto);
     }
 
-    // Para guardar respuesta de form cqm de impresion
+    // Para guardar respuesta de liberacion de Empalme
     @Post('empalme')
     async createEmpalmeResponse(@Body() dto: CreateEmpalmeResponseDto) {
       const formAnswer = await this.FreeWorkOrderService.createEmpalmeResponse(dto);
       return formAnswer;
     }
     
-    // Para guardar respuesta de form cqm de impresion
+    // Para guardar respuesta de liberacion de Laminacion
     @Post('laminacion')
     async createLaminacionResponse(@Body() dto: CreateLaminacionResponseDto) {
       const formAnswer = await this.FreeWorkOrderService.createLaminacionResponse(dto);
       return formAnswer;
     }
     
-    // Para guardar respuesta de form cqm de impresion
+    // Para guardar respuesta de liberacion de Corte
     @Post('corte')
     async createCorteResponse(@Body() dto: CreateCorteResponseDto) {
       const formAnswer = await this.FreeWorkOrderService.createCorteResponse(dto);
       return formAnswer;
     }
     
-    // Para guardar respuesta de form cqm de impresion
+    // Para guardar respuesta de liberacionde COlor Edge
     @Post('color-edge')
     async createColorEdgeResponse(@Body() dto: CreateCorteResponseDto) {
       const formAnswer = await this.FreeWorkOrderService.createColorEdgeResponse(dto);
       return formAnswer;
     }
     
-    // Para guardar respuesta de form cqm de impresion
+    // Para guardar respuesta de liberacion de Hot Stamping
     @Post('hot-stamping')
     async createHotStampingResponse(@Body() dto: CreateCorteResponseDto) {
       const formAnswer = await this.FreeWorkOrderService.createHotStampingResponse(dto);
       return formAnswer;
     }
     
-    // Para guardar respuesta de form cqm de impresion
+    // Para guardar respuesta de liberacion de Milling Chip
     @Post('milling-chip')
     async createMillingChipResponse(@Body() dto: CreateCorteResponseDto) {
       const formAnswer = await this.FreeWorkOrderService.createMillingChipResponse(dto);
       return formAnswer;
     }
     
-    // Para guardar respuesta de form cqm de impresion
+    // Para guardar respuesta de liberacion de Personalizacion
     @Post('personalizacion')
     async createPersonalizacionResponse(@Body() dto: CreateCorteResponseDto) {
       const formAnswer = await this.FreeWorkOrderService.createPersonalizacionResponse(dto);

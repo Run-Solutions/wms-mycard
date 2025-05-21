@@ -7,6 +7,11 @@ import styled from "styled-components";
 interface Props {
   workOrder: any;
 }
+type Answer = {
+  reviewed: boolean;
+  sample_quantity: number;
+  // lo que más tenga...
+};
 
 export default function PersonalizacionComponent({ workOrder }: Props) {
   const router = useRouter();
@@ -14,11 +19,17 @@ export default function PersonalizacionComponent({ workOrder }: Props) {
   const [showInconformidad, setShowInconformidad] = useState(false);
   const [inconformidad, setInconformidad] = useState<string>('');
 
+  // Para obtener el ultimo FormAnswer 
+  const index = workOrder?.answers
+  ?.map((a: Answer, i: number) => ({ ...a, index: i }))
+  .reverse().find((a: Answer) => a.reviewed === false)?.index;
+  console.log('el index', index);
+
   // Para mostrar formulario de CQM y enviarlo
   const [showConfirmModal, setShowConfirmModal] = useState(false);
 
   //Para guardar las respuestas 
-  const tipoPersonalizacion = workOrder?.answers[0].tipo_personalizacion;
+  const tipoPersonalizacion = workOrder?.answers[index].tipo_personalizacion;
   let selectedQuestions : { id: number, role_id: number | null }[] = [];
 
   if (tipoPersonalizacion === 'laser'){
@@ -90,19 +101,17 @@ export default function PersonalizacionComponent({ workOrder }: Props) {
 
   
   const handleSubmit = async () => {
-    const formAnswerId = workOrder.answers[0]?.id; // id de FormAnswer
-  
+    const formAnswerId = workOrder.answers[index]?.id; // id de FormAnswer
     if (!formAnswerId) {
       alert("No se encontró el ID del formulario.");
       return;
     }
-
     const basePayload = {
       form_answer_id: formAnswerId,
       
     }
     let aditionalFields = {};
-    if(workOrder?.answers[0].tipo_personalizacion === 'laser'){
+    if(workOrder?.answers[index].tipo_personalizacion === 'laser'){
       const checkboxPayload = responses.map(({ questionId, answer }) => ({
         question_id: questionId,
         answer: answer,     
@@ -113,7 +122,7 @@ export default function PersonalizacionComponent({ workOrder }: Props) {
         apariencia_quemado: aparienciaQuemado,
         checkboxes: checkboxPayload,
       };
-    }else if(workOrder?.answers[0].tipo_personalizacion === 'persos'){
+    }else if(workOrder?.answers[index].tipo_personalizacion === 'persos'){
       const checkboxPayload = responses.map(({ questionId, answer }) => ({
         question_id: questionId,
         answer: answer,     
@@ -122,7 +131,7 @@ export default function PersonalizacionComponent({ workOrder }: Props) {
         carga_aplicacion: cargaAplicacion,
         checkboxes: checkboxPayload,
       };
-    }else if(workOrder?.answers[0].tipo_personalizacion === 'etiquetadora'){
+    }else if(workOrder?.answers[index].tipo_personalizacion === 'etiquetadora'){
       aditionalFields={
 
       };
@@ -131,16 +140,12 @@ export default function PersonalizacionComponent({ workOrder }: Props) {
       ...basePayload,
       ...aditionalFields,
     };
-  
     try {
       const token = localStorage.getItem("token");
       if (!token) {
         alert("No hay token de autenticación");
         return;
       }
-  
-      console.log("Datos a enviar:", payload);
-  
       const res = await fetch("http://localhost:3000/free-order-cqm/form-extra-personalizacion", {
         method: "POST",
         headers: {
@@ -219,19 +224,19 @@ export default function PersonalizacionComponent({ workOrder }: Props) {
         <NewDataWrapper>
           <InputGroup style={{ paddingTop: '5px', width: '70%'}}>
             <Label>Tipo de Personalizacion:</Label>
-            <Input type="text" value={workOrder?.answers[0].tipo_personalizacion ?? 'No se reconoce la muestra enviada' } readOnly />
+            <Input type="text" value={workOrder?.answers[index].tipo_personalizacion ?? 'No se reconoce la muestra enviada' } readOnly />
           </InputGroup>
 
-        {workOrder?.answers[0].tipo_personalizacion === 'laser' && (
+        {workOrder?.answers[index].tipo_personalizacion === 'laser' && (
           <>
             <InputGroup style={{width: '70%'}}>
               <Label>Muestras entregadas:</Label>
-              <Input type="number" value={workOrder?.answers[0].sample_quantity ?? 'No se reconoce la muestra enviada' } readOnly />
+              <Input type="number" value={workOrder?.answers[index].sample_quantity ?? 'No se reconoce la muestra enviada' } readOnly />
             </InputGroup>
           </>
         )}
         
-        {workOrder?.answers[0].tipo_personalizacion === 'persos' && (
+        {workOrder?.answers[index].tipo_personalizacion === 'persos' && (
           <>
             <Table>
               <thead>
@@ -244,7 +249,7 @@ export default function PersonalizacionComponent({ workOrder }: Props) {
                 {workOrder.area.formQuestions.slice(1, 10)
                 .map((question: { id: number; title: string }) => {
                   // Buscar la respuesta correspondiente a esta pregunta
-                  const answer = workOrder.answers[0]?.FormAnswerResponse?.find(
+                  const answer = workOrder.answers[index]?.FormAnswerResponse?.find(
                     (resp: any) => resp.question_id === question.id
                   );
                   
@@ -273,16 +278,16 @@ export default function PersonalizacionComponent({ workOrder }: Props) {
             </Table>
             <InputGroup style={{ paddingTop: '10px', width: '70%'}}>
               <Label>Color De Personalización:</Label>
-              <Input type="text" value={workOrder?.answers[0].color_personalizacion ?? 'No se reconoce la muestra enviada' } readOnly />
+              <Input type="text" value={workOrder?.answers[index].color_personalizacion ?? 'No se reconoce la muestra enviada' } readOnly />
               <Label>Tipo de Código de Barras Que Se Personaliza:</Label>
-              <Input type="text" value={workOrder?.answers[0].codigo_barras ?? 'No se reconoce la muestra enviada' } readOnly />
+              <Input type="text" value={workOrder?.answers[index].codigo_barras ?? 'No se reconoce la muestra enviada' } readOnly />
               <Label>Muestras entregadas:</Label>
-              <Input type="number" value={workOrder?.answers[0].sample_quantity ?? 'No se reconoce la muestra enviada' } readOnly />
+              <Input type="number" value={workOrder?.answers[index].sample_quantity ?? 'No se reconoce la muestra enviada' } readOnly />
             </InputGroup>
           </>
         )}
         
-        {workOrder?.answers[0].tipo_personalizacion === 'etiquetadora' && (
+        {workOrder?.answers[index].tipo_personalizacion === 'etiquetadora' && (
           <>
             <Table>
               <thead>
@@ -295,7 +300,7 @@ export default function PersonalizacionComponent({ workOrder }: Props) {
                 {workOrder.area.formQuestions.slice(0, 1)
                 .map((question: { id: number; title: string }) => {
                   // Buscar la respuesta correspondiente a esta pregunta
-                  const answer = workOrder.answers[0]?.FormAnswerResponse?.find(
+                  const answer = workOrder.answers[index]?.FormAnswerResponse?.find(
                     (resp: any) => resp.question_id === question.id
                   );
                   
@@ -324,9 +329,9 @@ export default function PersonalizacionComponent({ workOrder }: Props) {
             </Table>
             <InputGroup style={{ paddingTop: '10px', width: '70%'}}>
               <Label>Verificar Tipo De Etiqueta Vs Ot Y Pegar Utilizada:</Label>
-              <Input type="text" value={workOrder?.answers[0].verificar_etiqueta ?? 'No se reconoce la muestra enviada' } readOnly />
+              <Input type="text" value={workOrder?.answers[index].verificar_etiqueta ?? 'No se reconoce la muestra enviada' } readOnly />
               <Label>Muestras entregadas:</Label>
-              <Input type="number" value={workOrder?.answers[0].sample_quantity ?? 'No se reconoce la muestra enviada' } readOnly />
+              <Input type="number" value={workOrder?.answers[index].sample_quantity ?? 'No se reconoce la muestra enviada' } readOnly />
             </InputGroup>
           </>
         )}
@@ -335,7 +340,7 @@ export default function PersonalizacionComponent({ workOrder }: Props) {
         <SectionTitle>Mis respuestas</SectionTitle>
         <NewDataWrapper>
           
-          {workOrder?.answers[0].tipo_personalizacion === 'laser' && (
+          {workOrder?.answers[index].tipo_personalizacion === 'laser' && (
             <>
               <Table>
                 <thead>
@@ -350,7 +355,7 @@ export default function PersonalizacionComponent({ workOrder }: Props) {
                   .filter((question: { role_id: number | null }) => question.role_id === 3)
                   .map((question: { id: number; title: string }) => {
                     // Buscar la respuesta correspondiente a esta pregunta
-                    const answer = workOrder.answers[0]?.FormAnswerResponse?.find(
+                    const answer = workOrder.answers[index]?.FormAnswerResponse?.find(
                       (resp: any) => resp.question_id === question.id
                     );
                     return (
@@ -375,7 +380,7 @@ export default function PersonalizacionComponent({ workOrder }: Props) {
             </>
           )}
 
-          {workOrder?.answers[0].tipo_personalizacion === 'persos' && (
+          {workOrder?.answers[index].tipo_personalizacion === 'persos' && (
             <>
               <Table>
                 <thead>
@@ -402,7 +407,7 @@ export default function PersonalizacionComponent({ workOrder }: Props) {
                   .filter((question: { role_id: number | null }) => question.role_id === 3)
                   .map((question: { id: number; title: string }) => {
                     // Buscar la respuesta correspondiente a esta pregunta
-                    const answer = workOrder.answers[0]?.FormAnswerResponse?.find(
+                    const answer = workOrder.answers[index]?.FormAnswerResponse?.find(
                       (resp: any) => resp.question_id === question.id
                     );
                     return (
@@ -423,7 +428,7 @@ export default function PersonalizacionComponent({ workOrder }: Props) {
             </>
           )}
           
-          {workOrder?.answers[0].tipo_personalizacion === 'etiquetadora' && (
+          {workOrder?.answers[index].tipo_personalizacion === 'etiquetadora' && (
             <>
               <InputGroup style={{ paddingTop: '10px', width: '70%'}}>
                 <Label>No tienes preguntas</Label>

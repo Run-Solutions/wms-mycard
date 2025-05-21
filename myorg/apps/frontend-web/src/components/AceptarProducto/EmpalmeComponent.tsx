@@ -4,7 +4,6 @@ import { useRouter } from "next/navigation";
 import { useState, useEffect } from "react";
 import styled from "styled-components";
 
-// Define un tipo para los valores del formulario
 type EmpalmeData = {
   release_quantity: string;
   comments: string;
@@ -14,7 +13,15 @@ interface Props {
   workOrder: any;
 }
 
+interface PartialRelease {
+  quantity: string;
+  observation: string;
+  validated: boolean;
+  // otros campos si aplica
+}
+
 export default function EmpalmeComponentAccept({ workOrder }: Props) {
+  console.log('WorkOrder recibida', workOrder);
   const router = useRouter();
   const [showConfirm, setShowConfirm] = useState(false);
   const [showInconformidad, setShowInconformidad] = useState(false);
@@ -24,33 +31,44 @@ export default function EmpalmeComponentAccept({ workOrder }: Props) {
     release_quantity: "",
     comments: "",
   });
-
-  const lastCompleted = [...workOrder.workOrder.flow]
-  .reverse()
-  .find((item) => item.status === "Completado");
-  const previousArea = lastCompleted?.area.id;
-  
-  console.log('area previa',previousArea);
+  console.log("El mismo workOrder (workOrder)", workOrder);
+  const flowList = [...workOrder.workOrder.flow];
+  // Índice del flow actual basado en su id
+  const currentIndex = flowList.findIndex((item) => item.id === workOrder.id);
+  console.log('el currentIndex', currentIndex);
+  // Flow actual
+  const currentFlow = currentIndex !== -1 ? flowList[currentIndex] : null;
+  // Anterior (si hay)
+  const lastCompletedOrPartial = currentIndex > 0 ? flowList[currentIndex - 1] : null;
+  // Siguiente (si hay)
+  const nextFlow = currentIndex !== -1 && currentIndex < flowList.length - 1
+    ? flowList[currentIndex + 1]
+    : null;
+  console.log("El flujo actual (currentFlow)", currentFlow);
+  console.log("El siguiente flujo (nextFlow)", nextFlow);
+  console.log("Ultimo parcial o completado", lastCompletedOrPartial);
   
   useEffect(() => {
     // Al iniciar, configuramos los valores predeterminados y actuales
-    const lastCompleted = [...workOrder.workOrder.flow]
-      .reverse()
-      .find((item) => item.status === "Completado");
-    console.log('Area previa', lastCompleted);
-    const currentFLow = [...workOrder.workOrder.flow]
-    .reverse()
-    .find((item) => item.status === "Pendiente");
-    console.log('Area', currentFLow);
-    if (lastCompleted?.areaResponse?.empalme) {
+    if (lastCompletedOrPartial?.areaResponse?.empalme && lastCompletedOrPartial?.partialReleases.length === 0) {
       const vals: EmpalmeData = {
-        release_quantity: lastCompleted.areaResponse.empalme.release_quantity || "",
-        comments: lastCompleted.areaResponse.empalme.comments || "",
+        release_quantity: lastCompletedOrPartial.areaResponse.empalme.release_quantity || "",
+        comments: lastCompletedOrPartial.areaResponse.empalme.comments || "",
       };
+      setDefaultValues(vals);
+    } else {
+      const firstUnvalidatedPartial = lastCompletedOrPartial.partialReleases.find(
+        (release: PartialRelease) => !release.validated
+      );
+
+      const vals: EmpalmeData = {
+        release_quantity: firstUnvalidatedPartial?.quantity || "",
+        comments: firstUnvalidatedPartial?.observation || "",
+      };
+    
       setDefaultValues(vals);
     }
   }, [workOrder]);
-
  
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -60,12 +78,7 @@ export default function EmpalmeComponentAccept({ workOrder }: Props) {
     }
     const token = localStorage.getItem('token');
 
-    const currentFLow = [...workOrder.workOrder.flow]
-    .reverse()
-    .find((item) => item.status === "Pendiente");
-    console.log('Area', currentFLow);
-
-    const flowId = currentFLow.id;
+    const flowId = workOrder.id;
     console.log(flowId);
     try {
       const res = await fetch(`http://localhost:3000/work-order-flow/${flowId}/accept`, {
@@ -87,10 +100,10 @@ export default function EmpalmeComponentAccept({ workOrder }: Props) {
    
   const handleSubmitInconformidad = async () => {
     const token = localStorage.getItem('token');
-    console.log(lastCompleted.id);
+    console.log(lastCompletedOrPartial.id);
     console.log(inconformidad);
     try {
-      const res = await fetch(`http://localhost:3000/work-order-flow/${lastCompleted.id}/inconformidad`, {
+      const res = await fetch(`http://localhost:3000/work-order-flow/${lastCompletedOrPartial.id}/inconformidad`, {
         method: 'PATCH',
         headers: {
           'Content-Type': 'application/json',
@@ -108,84 +121,93 @@ export default function EmpalmeComponentAccept({ workOrder }: Props) {
     }
   }
 
-    return (
-      <Container>
-        <Title>Área: {workOrder?.area.name || "No definida"}</Title>
-        <DataWrapper>
-          <InfoItem>
-            <Label>Número de Orden:</Label>
-            <Value>{workOrder.workOrder.ot_id}</Value>
-          </InfoItem>
-          <InfoItem>
-            <Label>ID del Presupuesto:</Label>
-            <Value>{workOrder.workOrder.mycard_id}</Value>
-          </InfoItem>
-          <InfoItem>
-            <Label>Área que lo envía:</Label>
-            <Value>{lastCompleted?.area.name || "No definida"}</Value>
-          </InfoItem>
-        </DataWrapper>
-        <InfoItem style={{ marginTop: '20px'}}>
+  return (
+    <Container>
+      <Title>Área: {workOrder?.area.name || "No definida"}</Title>
+
+      <DataWrapper>
+        <InfoItem>
+          <Label>Número de Orden:</Label>
+          <Value>{workOrder.workOrder.ot_id}</Value>
+        </InfoItem>
+        <InfoItem>
+          <Label>ID del Presupuesto:</Label>
+          <Value>{workOrder.workOrder.mycard_id}</Value>
+        </InfoItem>
+        <InfoItem>
+          <Label>Cantidad:</Label>
+          <Value>{workOrder.workOrder.quantity}</Value>
+        </InfoItem>
+      </DataWrapper>
+      <DataWrapper style={{ marginTop: '20px'}}>
+        <InfoItem>
+          <Label>Área que lo envía:</Label>
+          <Value>{lastCompletedOrPartial?.area.name || "No definida"}</Value>
+        </InfoItem>
+        <InfoItem>
+          <Label>Usuario que lo envía:</Label>
+          <Value>{lastCompletedOrPartial?.user.username || "No definida"}</Value>
+        </InfoItem>
+      </DataWrapper>
+        <InfoItem>
           <Label>Comentarios:</Label>
           <Value>{workOrder.workOrder.comments}</Value>
         </InfoItem>
-        <NewData>
-          <SectionTitle>Datos de Producción</SectionTitle>
-          <NewDataWrapper>
-            <InputGroup>
-              <Label>Cantidad entregada:</Label>
-              <Input type="number" name="release_quantity" value={defaultValues.release_quantity} disabled/>
-            </InputGroup>
-            <InconformidadButton onClick={() => setShowInconformidad(true)}>Inconformidad</InconformidadButton>
-          </NewDataWrapper>
+        
+      <NewData>
+        <SectionTitle>Datos de Producción</SectionTitle>
+        <NewDataWrapper>
           <InputGroup>
-            <SectionTitle>Comentarios</SectionTitle>
-            <Textarea
-              value={defaultValues.comments}
-              disabled
-            />
+            <Label>Cantidad entregada:</Label>
+            <Input type="number" name="release_quantity" value={defaultValues.release_quantity} disabled/>
           </InputGroup>
-        </NewData>
-        <AceptarButton onClick={() => setShowConfirm(true)}>Aceptar recepción del producto</AceptarButton>
-        {showConfirm && (
-          <ModalOverlay>
-            <ModalBox>
-              <h4>¿Estás segura/o que deseas liberar este producto?</h4>
-              <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '1rem', marginTop: '1rem' }}>
-                <CancelButton onClick={() => setShowConfirm(false)}>Cancelar</CancelButton>
-                <ConfirmButton onClick={handleSubmit}>Confirmar</ConfirmButton>
-              </div>
-            </ModalBox>
-          </ModalOverlay>
-        )}
-        {showInconformidad && (
-          <ModalOverlay>
-            <ModalBox>
-              <h4>Registrar Inconformidad</h4>
-              <h3>Por favor, describe la inconformidad detectada con la cantidad entregada.</h3>
-              <Textarea
-                value={inconformidad}
-                onChange={(e) => setInconformidad(e.target.value)}
-                placeholder="Escribe aquí la inconformidad..."
-              />
-              <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '1rem', marginTop: '1rem' }}>
-                <CancelButton onClick={() => setShowInconformidad(false)}>Cancelar</CancelButton>
-                <ConfirmButton onClick={() => {
-                  console.log('Hpli');
-                  if (!inconformidad.trim()) {
-                    alert('Debes ingresar una inconformidad antes de continuar.');
-                    return;
-                  }
-                  handleSubmitInconformidad();
-                  setShowInconformidad(false);
-                }}>Guardar</ConfirmButton>
-              </div>
-            </ModalBox>
-          </ModalOverlay>
-        )}
-      </Container>
-    );
-  }
+          <InconformidadButton onClick={() => setShowInconformidad(true)}>Inconformidad</InconformidadButton>
+        </NewDataWrapper>
+        <InputGroup>
+          <SectionTitle>Comentarios</SectionTitle>
+          <Textarea value={defaultValues.comments} disabled />
+        </InputGroup>
+      </NewData>
+      <AceptarButton onClick={() => setShowConfirm(true)}>Aceptar recepción del producto</AceptarButton>
+      {showConfirm && (
+        <ModalOverlay>
+          <ModalBox>
+            <h4>¿Estás segura/o que deseas liberar este producto?</h4>
+            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '1rem', marginTop: '1rem' }}>
+              <CancelButton onClick={() => setShowConfirm(false)}>Cancelar</CancelButton>
+              <ConfirmButton onClick={handleSubmit}>Confirmar</ConfirmButton>
+            </div>
+          </ModalBox>
+        </ModalOverlay>
+      )}
+      {showInconformidad && (
+        <ModalOverlay>
+          <ModalBox>
+            <h4>Registrar Inconformidad</h4>
+            <h3>Por favor, describe la inconformidad detectada con la cantidad entregada.</h3>
+            <Textarea
+              value={inconformidad}
+              onChange={(e) => setInconformidad(e.target.value)}
+              placeholder="Escribe aquí la inconformidad..."
+            />
+            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '1rem', marginTop: '1rem' }}>
+              <CancelButton onClick={() => setShowInconformidad(false)}>Cancelar</CancelButton>
+              <ConfirmButton onClick={() => {
+                console.log('Hpli');
+                if (!inconformidad.trim()) {
+                  alert('Debes ingresar una inconformidad antes de continuar.');
+                  return;
+                }
+                handleSubmitInconformidad();
+                setShowInconformidad(false);
+              }}>Guardar</ConfirmButton>
+            </div>
+          </ModalBox>
+        </ModalOverlay>
+      )}
+    </Container>
+  );
+}
 
 // =================== Styled Components ===================
 

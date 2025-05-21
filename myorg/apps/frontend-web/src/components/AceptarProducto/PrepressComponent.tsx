@@ -17,6 +17,7 @@ interface Props {
 }
 
 export default function PrepressComponentAccept({ workOrder }: Props) {
+  console.log('WorkOrder recibida', workOrder);
   const router = useRouter();
   const [showConfirm, setShowConfirm] = useState(false);
   const [showInconformidad, setShowInconformidad] = useState(false);
@@ -32,20 +33,11 @@ export default function PrepressComponentAccept({ workOrder }: Props) {
   const lastCompleted = [...workOrder.workOrder.flow]
   .reverse()
   .find((item) => item.status === "Completado");
-  const previousArea = lastCompleted?.area.id;
-
-  console.log('area previa',previousArea);
+  console.log('Ultimo completado', lastCompleted);
 
   useEffect(() => {
     // Al iniciar, configuramos los valores predeterminados y actuales
-    const lastCompleted = [...workOrder.workOrder.flow]
-      .reverse()
-      .find((item) => item.status === "Completado");
-    console.log('Area previa', lastCompleted);
-    const currentFLow = [...workOrder.workOrder.flow]
-    .reverse()
-    .find((item) => item.status === "Pendiente");
-    console.log('Area', currentFLow);
+    if (!workOrder) return;
     if (lastCompleted?.areaResponse?.prepress) {
       const vals: PrepressData = {
         plates: lastCompleted.areaResponse.prepress.plates || "",
@@ -64,14 +56,7 @@ export default function PrepressComponentAccept({ workOrder }: Props) {
       return;
     }
     const token = localStorage.getItem('token');
-
-    const currentFLow = [...workOrder.workOrder.flow]
-    .reverse()
-    .find((item) => item.status === "Pendiente");
-    console.log('Area', currentFLow);
-
-    const flowId = currentFLow.id;
-    console.log(flowId);
+    const flowId = workOrder?.id;
     try {
       const res = await fetch(`http://localhost:3000/work-order-flow/${flowId}/accept`, {
         method: 'PATCH',
@@ -92,10 +77,10 @@ export default function PrepressComponentAccept({ workOrder }: Props) {
 
   const handleSubmitInconformidad = async () => {
     const token = localStorage.getItem('token');
-    console.log(lastCompleted.id);
+    console.log(lastCompleted?.id);
     console.log(inconformidad);
     try {
-      const res = await fetch(`http://localhost:3000/work-order-flow/${lastCompleted.id}/inconformidad`, {
+      const res = await fetch(`http://localhost:3000/work-order-flow/${lastCompleted?.id}/inconformidad`, {
         method: 'PATCH',
         headers: {
           'Content-Type': 'application/json',
@@ -115,7 +100,8 @@ export default function PrepressComponentAccept({ workOrder }: Props) {
   
   return (
     <Container>
-      <Title>Área: Impresión</Title>
+      <Title>Área: {workOrder.area.name}</Title>
+
       <DataWrapper>
         <InfoItem>
           <Label>Número de Orden:</Label>
@@ -126,14 +112,26 @@ export default function PrepressComponentAccept({ workOrder }: Props) {
           <Value>{workOrder.workOrder.mycard_id}</Value>
         </InfoItem>
         <InfoItem>
+          <Label>Cantidad:</Label>
+          <Value>{workOrder.workOrder.quantity || "No definida"}</Value>
+        </InfoItem>
+      </DataWrapper>
+
+      <DataWrapper style={{ marginTop: '20px'}}>
+        <InfoItem>
           <Label>Área que lo envía:</Label>
           <Value>{lastCompleted?.area.name || "No definida"}</Value>
+        </InfoItem>
+        <InfoItem>
+          <Label>Usuario que lo envía:</Label>
+          <Value>{lastCompleted?.user.username || "No definida"}</Value>
         </InfoItem>
       </DataWrapper>
         <InfoItem style={{ marginTop: '20px'}}>
           <Label>Comentarios:</Label>
           <Value>{workOrder.workOrder.comments}</Value>
         </InfoItem>
+      
       <NewData>
         <SectionTitle>Cantidad entregada</SectionTitle>
         <NewDataWrapper>

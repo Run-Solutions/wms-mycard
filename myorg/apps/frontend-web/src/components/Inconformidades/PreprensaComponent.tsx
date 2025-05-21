@@ -8,6 +8,7 @@ interface Props {
 }
 
 export default function PreprensaComponent({ workOrder }: Props) {
+  console.log('la misma workorder',workOrder);
   const router = useRouter();
   const [showModal, setShowModal] = useState(false);
   const openModal = () => {

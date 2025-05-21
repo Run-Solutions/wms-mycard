@@ -6,6 +6,13 @@ import { useState } from "react";
 interface Props {
   workOrder: any;
 }
+interface PartialRelease {
+  quantity: string;
+  observations: string;
+  validated: boolean;
+  work_order_flow_id: number;
+  inconformities: any[];
+}
 
 export default function ImpresionComponent({ workOrder }: Props) {
   const router = useRouter();
@@ -20,10 +27,19 @@ export default function ImpresionComponent({ workOrder }: Props) {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     const token = localStorage.getItem('token');
-    const areaResponse = workOrder.areaResponse.id;
-    console.log(areaResponse);
+    // Si hay parcialidad sin validar, usar esa
+    const partialRelease = workOrder.partialReleases.find(
+      (release: PartialRelease) => !release.validated
+    );
+
+    // Si no hay parcialidad sin validar, usar areaResponse
+    const areaResponseFlowId = workOrder.areaResponse
+      ? workOrder.areaResponse.work_order_flow_id
+      : partialRelease?.work_order_flow_id;
+
+    console.log(areaResponseFlowId);
     try {
-      const res = await fetch(`http://localhost:3000/inconformities/${areaResponse}/impresion`, {
+      const res = await fetch(`http://localhost:3000/inconformities/${areaResponseFlowId}/impresion`, {
         method: 'PATCH',
         headers: {
           'Content-Type': 'application/json',
@@ -40,9 +56,27 @@ export default function ImpresionComponent({ workOrder }: Props) {
     }
   }
 
-  const lastIndex = workOrder.areaResponse.inconformities.length > 1 
-  ? workOrder.areaResponse.inconformities.length - 1 
-  : 0;
+  // Obtener la última parcialidad sin validar
+  const lastPartialRelease = workOrder.partialReleases.find(
+    (release: PartialRelease) => !release.validated
+  );
+
+  // Para los valores mostrados
+  const releaseQuantity = lastPartialRelease
+    ? lastPartialRelease.quantity
+    : workOrder.areaResponse?.empalme.release_quantity;
+
+  const releaseComments = lastPartialRelease
+    ? lastPartialRelease.observation
+    : workOrder.areaResponse?.empalme.comments;
+
+  const inconformityUser = lastPartialRelease
+    ? lastPartialRelease.inconformities[0]?.user.username
+    : workOrder.areaResponse?.inconformities.at(-1)?.user.username;
+
+  const inconformityComments = lastPartialRelease
+    ? lastPartialRelease.inconformities[0]?.comments
+    : workOrder.areaResponse?.inconformities.at(-1)?.comments;
 
   return (
     <>
@@ -53,12 +87,12 @@ export default function ImpresionComponent({ workOrder }: Props) {
         <NewDataWrapper>
           <InputGroup>
             <Label>Cantidad Liberada:</Label>
-            <Input type="number" value={workOrder.areaResponse.impression.release_quantity} disabled/>
+            <Input type="number" value={releaseQuantity} disabled/>
           </InputGroup>
         </NewDataWrapper>
         <InputGroup>
           <Label>Comentarios</Label>
-          <Textarea value={workOrder.areaResponse.impression.comments} disabled/>
+          <Textarea value={releaseComments} disabled/>
         </InputGroup>
       </NewData>
     </Container>
@@ -67,11 +101,11 @@ export default function ImpresionComponent({ workOrder }: Props) {
         <SectionTitle>Inconformidad:</SectionTitle>
         <InputGroup>
           <Label>Respuesta de Usuario</Label>
-          <Input type="text" value={workOrder.areaResponse.inconformities[lastIndex].user.username} disabled/>
+          <Input type="text" value={inconformityUser} disabled/>
         </InputGroup>
         <InputGroup>
           <Label>Comentarios</Label>
-          <Textarea value={workOrder.areaResponse.inconformities[lastIndex].comments} disabled/>
+          <Textarea value={inconformityComments} disabled/>
         </InputGroup>
       </NewData>
     </Container>

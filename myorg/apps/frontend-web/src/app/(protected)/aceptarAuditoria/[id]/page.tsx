@@ -26,6 +26,7 @@ export default function AcceptWorkOrderFlowAuditoryPage({ params }: Props) {
         },
       })
       const data = await res.json()
+      console.log('Orden:', data)
       setWorkOrder(data)
     }
     fetchWorkOrder()

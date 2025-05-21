@@ -13,7 +13,9 @@ export class AcceptWorkOrderService {
     }
     const pendingOrders = await this.prisma.workOrderFlow.findMany({
       where: {
-        status: 'Pendiente',
+        status: {
+          in: ['Pendiente', 'Pendiente parcial'],
+        },
         area_id: areasOperatorIds,
       },
       include: {
@@ -25,6 +27,7 @@ export class AcceptWorkOrderService {
               include: {
                 area: true,
                 areaResponse: true,
+                partialReleases: true
               },
             },
           },
@@ -88,83 +91,127 @@ export class AcceptWorkOrderService {
 
   // Para que el usuario acepte la orden en su flow
   async acceptWorkOrderFlow(workOrderFlowId: number, userId: number) {
-    console.log('Asignando orden al operador...');
-    const updated = await this.prisma.workOrderFlow.update({
-        where: {
-            id: workOrderFlowId,
-        },
-        data: {
-            assigned_user: userId,
-            assigned_at: new Date(),
-            status: 'En proceso',
-        },
-        include: {
-            user: true,
-            area: true,
-        }
-    });
-    return updated;
-  }
-
-  // Para que el usuario acepte la orden en su flow
-  async inconformidadWorkOrderFlow(workOrderFlowId: number, userId: number, inconformidad: string) {
-    console.log('Marcando inconformidad...');
-    const updated = await this.prisma.workOrderFlow.update({
-        where: {
-            id: workOrderFlowId,
-        },
-        data: {
-            status: 'En inconformidad',
-        },
-        include: {
-            user: true,
-            area: true,
-        }
-    });
-    const areasResponse = await this.prisma.areasResponse.findUnique({
-      where: {
-        work_order_flow_id: workOrderFlowId,
-      }
-    });
-    if (!areasResponse) throw new Error ();
-    const createInconformidad = await this.prisma.inconformities.create({
-      data: {
-        areas_response_id: areasResponse.id,
-        comments: inconformidad,
-        created_by: userId,
-      },
-    });
-    // Obtiene el flow actual para saber a qué work_order pertenece
-    const currentFlow = await this.prisma.workOrderFlow.findUnique({
+    console.log('Asignando orden al operador...', workOrderFlowId);
+    const workOrder = await this.prisma.workOrderFlow.findUnique({
       where: { id: workOrderFlowId },
     });
-    if (!currentFlow) throw new Error('Flujo no encontrado');
-    const nextWorkOrderFlow = await this.prisma.workOrderFlow.findFirst({
+    if (!workOrder) throw new Error('Orden de trabajo no encontrada');
+    const previousWorkOrderFlow = await this.prisma.workOrderFlow.findFirst({
       where: {
-        work_order_id: currentFlow.work_order_id,
-        id: {
-          gt: workOrderFlowId,
-        },
-        status: 'Pendiente',
+        work_order_id: workOrder.work_order_id,
+        id: { lt: workOrderFlowId },
       },
-      orderBy: {
-        id: 'asc',
+      orderBy: { id: 'desc' },
+    });
+    if(previousWorkOrderFlow) {
+      const partial = await this.prisma.partialRelease.findFirst({
+        where: {
+          work_order_flow_id: previousWorkOrderFlow.id,
+          validated: false,
+        },
+      });
+      console.log('partial:', partial);
+      if (partial) {
+        try {
+          await this.prisma.partialRelease.update({
+            where: { id: partial.id },
+            data: { validated: true },
+          });
+          console.log('Actualización de partialRelease exitosa');
+        } catch (error) {
+          console.error('Error al actualizar partialRelease:', error);
+        }
+      } else {
+        console.log('No se encontró partialRelease sin validar para actualizar');
+      }
+    } else {
+      console.log('No se encontró flujo de trabajo anterior');
+    }
+    const updatedWorkOrderFlow = await this.prisma.workOrderFlow.update({
+      where: { id: workOrderFlowId },
+      data: {
+        assigned_user: userId,
+        assigned_at: new Date(),
+        status: 'En proceso',
+      },
+      include: {
+        user: true,
+        area: true,
       },
     });
-    if (nextWorkOrderFlow) {
-      // Cambiar el estado del siguiente flujo de trabajo a 'En espera'
-      await this.prisma.workOrderFlow.update({
-        where: {
-          id: nextWorkOrderFlow.id,
-        },
+    return {
+      workOrderFlow: updatedWorkOrderFlow,
+    };
+  }
+
+  // Para que el usuario marque inconformidad del flow anterior
+  async inconformidadWorkOrderFlow(workOrderFlowId: number, userId: number, inconformidad: string) {
+    console.log('Marcando inconformidad...');
+    const lastCompletedOrPartial = await this.prisma.workOrderFlow.findUnique({
+      where: { id: workOrderFlowId },
+    });
+    const partial = await this.prisma.partialRelease.findFirst({
+      where: {
+        work_order_flow_id: workOrderFlowId,
+        validated: false,
+      },
+    });
+    if (!lastCompletedOrPartial) throw new Error('Flujo no encontrado');
+    let createInconformidad: object | null;
+    // Si el flujo anterior es parcial o está en estado de 'Parcial' debe crear la inconformidad en el partial
+    if (lastCompletedOrPartial.status === 'Parcial' || partial) {
+      createInconformidad = await this.prisma.inconformities.create({
         data: {
-          status: 'En espera',
+          partial_release_id: partial?.id,
+          comments: inconformidad,
+          created_by: userId,
         },
+      });
+    } else {
+      const areasResponse = await this.prisma.areasResponse.findUnique({
+        where: { work_order_flow_id: workOrderFlowId },
+      });
+      if (!areasResponse) throw new Error('Área response no encontrada');
+      createInconformidad = await this.prisma.inconformities.create({
+        data: {
+          areas_response_id: areasResponse.id,
+          comments: inconformidad,
+          created_by: userId,
+        },
+      });
+    }
+    // Actualiza estado a 'En inconformidad'
+    const updated = await this.prisma.workOrderFlow.update({
+      where: { id: workOrderFlowId },
+      data: { status: 'En inconformidad' },
+      include: { user: true, area: true },
+    });
+    // Cambiar estado del siguiente flujo si existe
+    await this.updateNextWorkOrderFlow(workOrderFlowId, updated.work_order_id);
+    return { updated, createInconformidad };
+  }
+
+  // Actualiza siguiente flujo de trabajo a 'En espera' si existe
+  private async updateNextWorkOrderFlow(workOrderFlowId: number, workOrderId: number) {
+    const nextWorkOrderFlow = await this.prisma.workOrderFlow.findFirst({
+      where: {
+        work_order_id: workOrderId,
+        id: { gt: workOrderFlowId },
+        status: {
+          in: ['Pendiente', 'Pendiente parcial'],
+        },
+      },
+      orderBy: { id: 'asc' },
+    });
+
+    if (nextWorkOrderFlow) {
+      await this.prisma.workOrderFlow.update({
+        where: { id: nextWorkOrderFlow.id },
+        data: { status: 'En espera' },
       });
     } else {
       console.log('No se encontró un siguiente WorkOrderFlow.');
     }
-    return {updated, createInconformidad};
   }
   
   // Para que el usuario acepte la orden en su flow
@@ -185,7 +232,10 @@ export class AcceptWorkOrderService {
     const formAnswer = await this.prisma.formAnswer.findFirst({
       where: {
         work_order_flow_id: workOrderFlowId,
-      }
+      },
+      orderBy: {
+        id: 'desc',
+      },
     });
     if (!formAnswer) throw new Error ();
     const createInconformidad = await this.prisma.inconformities.create({
@@ -206,6 +256,7 @@ export class AcceptWorkOrderService {
         area_id: areasOperatorIds,
       },
       include: {
+        partialReleases: true,
         workOrder: {
           include: {
             user: true,
@@ -228,6 +279,8 @@ export class AcceptWorkOrderService {
                   },
                 },
                 answers: true,
+                partialReleases: true,
+                user: true,
               }
             },
           },

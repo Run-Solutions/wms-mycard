@@ -6,6 +6,13 @@ import { useState } from "react";
 interface Props {
   workOrder: any;
 }
+interface PartialRelease {
+  quantity: string;
+  observations: string;
+  validated: boolean;
+  work_order_flow_id: number;
+  inconformities: any[];
+}
 
 export default function CorteComponent({ workOrder }: Props) {
   const router = useRouter();
@@ -20,10 +27,19 @@ export default function CorteComponent({ workOrder }: Props) {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     const token = localStorage.getItem('token');
-    const areaResponse = workOrder.areaResponse.id;
-    console.log(areaResponse);
+    // Si hay parcialidad sin validar, usar esa
+    const partialRelease = workOrder.partialReleases.find(
+      (release: PartialRelease) => !release.validated
+    );
+
+    // Si no hay parcialidad sin validar, usar areaResponse
+    const areaResponseFlowId = workOrder.areaResponse
+      ? workOrder.areaResponse.work_order_flow_id
+      : partialRelease?.work_order_flow_id;
+
+    console.log(areaResponseFlowId);
     try {
-      const res = await fetch(`http://localhost:3000/inconformities/${areaResponse}/corte`, {
+      const res = await fetch(`http://localhost:3000/inconformities/${areaResponseFlowId}/corte`, {
         method: 'PATCH',
         headers: {
           'Content-Type': 'application/json',
@@ -40,9 +56,33 @@ export default function CorteComponent({ workOrder }: Props) {
     }
   }
 
-  const lastIndex = workOrder.areaResponse.inconformities.length > 1 
-  ? workOrder.areaResponse.inconformities.length - 1 
-  : 0;
+  // Obtener la última parcialidad sin validar
+  const lastPartialRelease = workOrder.partialReleases.find(
+    (release: PartialRelease) => !release.validated
+  );
+
+  // Para los valores mostrados
+  const releaseQuantity = lastPartialRelease
+    ? lastPartialRelease.quantity
+    : workOrder.areaResponse?.corte.good_quantity;
+  const releaseBad = lastPartialRelease
+    ? lastPartialRelease.bad_quantity
+    : workOrder.areaResponse?.corte.bad_quantity;
+  const releaseExcess = lastPartialRelease
+    ? lastPartialRelease.excess_quantity
+    : workOrder.areaResponse?.corte.excess_quantity;
+
+  const releaseComments = lastPartialRelease
+    ? lastPartialRelease.observation
+    : workOrder.areaResponse?.corte.comments;
+
+  const inconformityUser = lastPartialRelease
+    ? lastPartialRelease.inconformities[0]?.user.username
+    : workOrder.areaResponse?.inconformities.at(-1)?.user.username;
+
+  const inconformityComments = lastPartialRelease
+    ? lastPartialRelease.inconformities[0]?.comments
+    : workOrder.areaResponse?.inconformities.at(-1)?.comments;
   
   return (
     <>
@@ -53,11 +93,11 @@ export default function CorteComponent({ workOrder }: Props) {
         <NewDataWrapper>
           <InputGroup>
           <Label>Buenas:</Label>
-              <Input type="number" name="good_quantity" value={workOrder.areaResponse.corte.good_quantity} disabled/>
+              <Input type="number" name="good_quantity" value={releaseQuantity} disabled/>
               <Label>Malas:</Label>
-              <Input type="number" name="bad_quantity" value={workOrder.areaResponse.corte.bad_quantity} disabled/>
+              <Input type="number" name="bad_quantity" value={releaseBad} disabled/>
               <Label>Exceso:</Label>
-              <Input type="number" name="excess_quantity" value={workOrder.areaResponse.corte.excess_quantity} disabled/>
+              <Input type="number" name="excess_quantity" value={releaseExcess} disabled/>
           </InputGroup>
         </NewDataWrapper>
         <InputGroup>
@@ -71,11 +111,11 @@ export default function CorteComponent({ workOrder }: Props) {
         <SectionTitle>Inconformidad:</SectionTitle>
         <InputGroup>
           <Label>Respuesta de Usuario</Label>
-          <Input type="text" value={workOrder.areaResponse.inconformities[lastIndex].user.username} disabled/>
+          <Input type="text" value={inconformityUser} disabled/>
         </InputGroup>
         <InputGroup>
           <Label>Comentarios</Label>
-          <Textarea value={workOrder.areaResponse.inconformities[lastIndex].comments} disabled/>
+          <Textarea value={inconformityComments} disabled/>
         </InputGroup>
       </NewData>
     </Container>

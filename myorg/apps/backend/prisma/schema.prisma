@@ -145,11 +145,31 @@ model WorkOrderFlow {
   area                   AreasOperator       @relation(fields: [area_id], references: [id], onDelete: Cascade)
   areaResponse           AreasResponse?      @relation("ResponseOnWorkOrderFlow")
   answers                FormAnswer[]
+  partialReleases        PartialRelease[]
+  formAuditory           FormAuditory[]
 
   created_at             DateTime            @default(now()) @map("created_at")
   updated_at             DateTime            @updatedAt @map("updated_at")
 
   @@map("work_order_flows")
+}
+
+model PartialRelease {
+  id                     Int                     @id @default(autoincrement())
+  work_order_flow_id     Int                     
+  quantity               Int
+  positives              Int?
+  test_type              String?
+  bad_quantity           Int?               
+  excess_quantity        Int?
+
+  observation            String?
+  validated              Boolean             @default(false)
+  form_auditory_id       Int?
+  created_at             DateTime            @default(now()) @map("created_at")
+
+  inconformities         Inconformities[]         // Relacion inversa
+  WorkOrderFlow          WorkOrderFlow       @relation(fields: [work_order_flow_id], references: [id], onDelete: Cascade)
 }
 
 model AreasResponse {
@@ -381,6 +401,9 @@ model FormAuditory {
   milling_chip_answer_auditory      MillingChipResponse?      @relation("MillingChipToFormAuditory")
   personalizacion_answer_auditory   PersonalizacionResponse?  @relation("PersonalizacionToFormAuditory")
 
+  work_order_flow_id                Int?                      // NUEVO campo para relación
+  workOrderFlow                     WorkOrderFlow?            @relation(fields: [work_order_flow_id], references: [id])
+
   user                              User?                     @relation("UserAssignedToFormAuditory", fields: [reviewed_by_id], references: [id])
   created_at                        DateTime                  @default(now()) @map("created_at")
   updated_at                        DateTime                  @updatedAt @map("updated_at")
@@ -483,9 +506,11 @@ model Inconformities {
   id                      Int               @id @default(autoincrement())
   areas_response_id       Int?              // Relación con la tabla principal FormAnswer
   form_answer_id          Int?
+  partial_release_id      Int?      
   comments                String            // Relación con FormQuestion
   created_by              Int?              // Respuesta individual
 
+  partialReleases         PartialRelease?    @relation(fields: [partial_release_id], references: [id], onDelete: Cascade)
   areaResponse            AreasResponse?     @relation(fields: [areas_response_id], references: [id], onDelete: Cascade)
   formAnswer              FormAnswer?        @relation(fields: [form_answer_id], references: [id], onDelete: Cascade)
   user                    User?             @relation("UserInconformities", fields: [created_by], references: [id])

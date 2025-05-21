@@ -6,6 +6,11 @@ import { useState } from "react";
 interface Props {
   workOrder: any;
 }
+type Answer = {
+  reviewed: boolean;
+  sample_quantity: number;
+  // lo que más tenga...
+};
 
 export default function PersonalizacionComponentCQM({ workOrder }: Props) {
   const router = useRouter();
@@ -17,10 +22,16 @@ export default function PersonalizacionComponentCQM({ workOrder }: Props) {
     setShowModal(false);
   };
 
+  // Para obtener el ultimo FormAnswer 
+  const index = workOrder?.answers
+  ?.map((a: Answer, i: number) => ({ ...a, index: i }))
+  .reverse().find((a: Answer) => a.reviewed === false)?.index;
+  console.log('el index', index);
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     const token = localStorage.getItem('token');
-    const areaResponse = workOrder.answers[0].id;
+    const areaResponse = workOrder.answers[index].id;
     console.log(areaResponse);
     try {
       const res = await fetch(`http://localhost:3000/inconformities/${areaResponse}/cqm`, {
@@ -40,8 +51,8 @@ export default function PersonalizacionComponentCQM({ workOrder }: Props) {
     }
   }
 
-  const lastIndex = workOrder.answers[0].inconformities.length > 1 
-  ? workOrder.answers[0].inconformities.length - 1 
+  const lastIndex = workOrder.answers[index].inconformities.length > 1 
+  ? workOrder.answers[index].inconformities.length - 1 
   : 0;
 
   return (
@@ -53,9 +64,9 @@ export default function PersonalizacionComponentCQM({ workOrder }: Props) {
         <NewDataWrapper>
         <InputGroup style={{ marginBottom: '10px', width: '70%'}}>
             <Label>Tipo de Personalizacion:</Label>
-            <Input type="text" value={workOrder?.answers[0].tipo_personalizacion ?? 'No se reconoce la muestra enviada' } readOnly />
+            <Input type="text" value={workOrder?.answers[index].tipo_personalizacion ?? 'No se reconoce la muestra enviada' } readOnly />
         </InputGroup>
-        {workOrder?.answers[0].tipo_personalizacion === 'etiquetadora' && (
+        {workOrder?.answers[index].tipo_personalizacion === 'etiquetadora' && (
           <>
             <Table>
               <thead>
@@ -68,7 +79,7 @@ export default function PersonalizacionComponentCQM({ workOrder }: Props) {
                 {workOrder.area.formQuestions.slice(0, 1)
                 .map((question: { id: number; title: string }) => {
                   // Buscar la respuesta correspondiente a esta pregunta
-                  const answer = workOrder.answers[0]?.FormAnswerResponse?.find(
+                  const answer = workOrder.answers[index]?.FormAnswerResponse?.find(
                     (resp: any) => resp.question_id === question.id
                   );
                   
@@ -97,13 +108,13 @@ export default function PersonalizacionComponentCQM({ workOrder }: Props) {
             </Table>
             <InputGroup style={{ marginTop: '10px', width: '70%'}}>
               <Label>Verificar Tipo De Etiqueta Vs Ot Y Pegar Utilizada:</Label>
-              <Input type="text" value={workOrder?.answers[0].verificar_etiqueta ?? 'No se reconoce la muestra enviada' } readOnly />
+              <Input type="text" value={workOrder?.answers[index].verificar_etiqueta ?? 'No se reconoce la muestra enviada' } readOnly />
               <Label>Muestras entregadas:</Label>
-              <Input type="number" value={workOrder?.answers[0].sample_quantity ?? 'No se reconoce la muestra enviada' } readOnly />
+              <Input type="number" value={workOrder?.answers[index].sample_quantity ?? 'No se reconoce la muestra enviada' } readOnly />
             </InputGroup>
           </>
         )}
-        {workOrder?.answers[0].tipo_personalizacion === 'persos' && (
+        {workOrder?.answers[index].tipo_personalizacion === 'persos' && (
           <>
             <Table>
               <thead>
@@ -116,7 +127,7 @@ export default function PersonalizacionComponentCQM({ workOrder }: Props) {
                 {workOrder.area.formQuestions.slice(1, 10)
                 .map((question: { id: number; title: string }) => {
                   // Buscar la respuesta correspondiente a esta pregunta
-                  const answer = workOrder.answers[0]?.FormAnswerResponse?.find(
+                  const answer = workOrder.answers[index]?.FormAnswerResponse?.find(
                     (resp: any) => resp.question_id === question.id
                   );
                   
@@ -145,19 +156,19 @@ export default function PersonalizacionComponentCQM({ workOrder }: Props) {
             </Table>
             <InputGroup style={{ paddingTop: '10px', width: '70%'}}>
               <Label>Color De Personalización:</Label>
-              <Input type="text" value={workOrder?.answers[0].color_personalizacion ?? 'No se reconoce la muestra enviada' } readOnly />
+              <Input type="text" value={workOrder?.answers[index].color_personalizacion ?? 'No se reconoce la muestra enviada' } readOnly />
               <Label>Tipo de Código de Barras Que Se Personaliza:</Label>
-              <Input type="text" value={workOrder?.answers[0].codigo_barras ?? 'No se reconoce la muestra enviada' } readOnly />
+              <Input type="text" value={workOrder?.answers[index].codigo_barras ?? 'No se reconoce la muestra enviada' } readOnly />
               <Label>Muestras entregadas:</Label>
-              <Input type="number" value={workOrder?.answers[0].sample_quantity ?? 'No se reconoce la muestra enviada' } readOnly />
+              <Input type="number" value={workOrder?.answers[index].sample_quantity ?? 'No se reconoce la muestra enviada' } readOnly />
             </InputGroup>
           </>
         )}
-        {workOrder?.answers[0].tipo_personalizacion === 'laser' && (
+        {workOrder?.answers[index].tipo_personalizacion === 'laser' && (
           <>
             <InputGroup style={{width: '70%'}}>
               <Label>Muestras entregadas:</Label>
-              <Input type="number" value={workOrder?.answers[0].sample_quantity ?? 'No se reconoce la muestra enviada' } readOnly />
+              <Input type="number" value={workOrder?.answers[index].sample_quantity ?? 'No se reconoce la muestra enviada' } readOnly />
             </InputGroup>
           </>
         )}
@@ -169,11 +180,11 @@ export default function PersonalizacionComponentCQM({ workOrder }: Props) {
         <SectionTitle>Inconformidad:</SectionTitle>
         <InputGroup>
           <Label>Respuesta de Usuario</Label>
-          <Input type="text" value={workOrder.answers[0].inconformities[lastIndex].user.username} disabled/>
+          <Input type="text" value={workOrder.answers[index].inconformities[lastIndex].user.username} disabled/>
         </InputGroup>
         <InputGroup>
           <Label>Comentarios</Label>
-          <Textarea value={workOrder.answers[0].inconformities[lastIndex].comments} disabled/>
+          <Textarea value={workOrder.answers[index].inconformities[lastIndex].comments} disabled/>
         </InputGroup>
       </NewData>
     </Container>

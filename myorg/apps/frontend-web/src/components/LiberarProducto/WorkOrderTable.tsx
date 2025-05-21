@@ -104,8 +104,12 @@ const WorkOrderTable: React.FC<Props> = ({ orders, title, statusFilter}) => {
               <Typography variant="body2" sx={{ color: 'black' }}>Enviado a CQM / En Calidad</Typography>
             </Box>
             <Box display="flex" alignItems="center" gap={1}>
+              <CircleLegend style={{ backgroundColor: '#f5945c' }} />
+              <Typography variant="body2" sx={{ color: 'black' }}>Parcial</Typography>
+            </Box>
+            <Box display="flex" alignItems="center" gap={1}>
               <CircleLegend style={{ backgroundColor: '#4a90e2' }} />
-              <Typography variant="body2" sx={{ color: 'black' }}>En Proceso</Typography>
+              <Typography variant="body2" sx={{ color: 'black' }}>En Proceso / Listo</Typography>
             </Box>
             <Box display="flex" alignItems="center" gap={1}>
               <CircleLegend style={{ backgroundColor: '#d1d5db' }} />
@@ -139,15 +143,16 @@ const WorkOrderTable: React.FC<Props> = ({ orders, title, statusFilter}) => {
                       <CustomTableCell sx={{ maxWidth: 900, overflowX: 'hidden' }}>
                         <Timeline>
                           {orderFlow.workOrder.flow?.map((flowStep, index) => {
-                            const isActive = ['proceso'].some(word => flowStep.status?.toLowerCase().includes(word));
+                            const isActive = ['proceso', 'listo'].some(word => flowStep.status?.toLowerCase().includes(word));
+                            const isParcial = flowStep.status?.toLowerCase() === 'parcial';
                             const isCompleted = flowStep.status?.toLowerCase().includes('completado');
                             const isCalidad = ['enviado a cqm', 'en calidad'].some(status => flowStep.status?.toLowerCase().includes(status));
                             const isLast = index === orderFlow.workOrder.flow.length - 1;
                             return (
                               <TimelineItem key={index}>
-                                <Circle $isActive={isActive} $isCompleted={isCompleted} $isCalidad={isCalidad}>{index + 1}</Circle>
+                                <Circle $isActive={isActive} $isParcial={isParcial} $isCompleted={isCompleted} $isCalidad={isCalidad}>{index + 1}</Circle>
                                 {!isLast && <Line $isLast={isLast} />}
-                                <AreaName $isActive={isActive} $isCalidad={isCalidad}>{flowStep.area.name ?? 'Área desconocida'}</AreaName>
+                                <AreaName $isActive={isActive} $isParcial={isParcial} $isCalidad={isCalidad}>{flowStep.area.name ?? 'Área desconocida'}</AreaName>
                               </TimelineItem>
                             );
                           })}
@@ -242,11 +247,11 @@ const TimelineItem = styled.div`
 `;
 
 const Circle = styled.div.withConfig({
-  shouldForwardProp: (prop) => !['$isActive', '$isCompleted', '$isCalidad'].includes(prop),
-})<StyledProps & { $isActive?: boolean; $isCompleted?: boolean; $isCalidad?: boolean }>`
+  shouldForwardProp: (prop) => !['$isActive', '$isCompleted', '$isCalidad', '$isParcial'].includes(prop),
+})<StyledProps & { $isActive?: boolean; $isCompleted?: boolean; $isCalidad?: boolean; $isParcial?: boolean }>`
   width: 30px;
   height: 30px;
-  background-color: ${({ $isCompleted, $isActive, $isCalidad }) => ($isCompleted ? '#22c55e' : $isCalidad ? '#facc15': $isActive ? '#4a90e2' : '#d1d5db' )};
+  background-color: ${({ $isCompleted, $isActive, $isCalidad, $isParcial }) => ($isCompleted ? '#22c55e' : $isCalidad ? '#facc15': $isActive ? '#4a90e2' : $isParcial ? '#f5945c' : '#d1d5db' )};
   border-radius: 50%;
   color: white;
   font-size: 12px;
@@ -255,7 +260,7 @@ const Circle = styled.div.withConfig({
   align-items: center;
   justify-content: center;
   z-index: 2;
-  box-shadow: ${({ $isCompleted, $isActive, $isCalidad }) => ($isCompleted ? '0 0 5px #22c55e' : $isCalidad ? '0 0 5px #facc15' : $isActive ? '0 0 5px #4a90e2' : 'none')};
+  box-shadow: ${({ $isCompleted, $isActive, $isCalidad, $isParcial }) => ($isCompleted ? '0 0 5px #22c55e' : $isCalidad ? '0 0 5px #facc15' : $isActive ? '0 0 5px #4a90e2' : $isParcial ? ' 0 0 5px #f5945c' : 'none')};
   transition: background-color 0.3s, box-shadow 0.3s;
 `;
 
@@ -275,11 +280,11 @@ const Line = styled.div.withConfig({
 
 const AreaName = styled.span.withConfig({
   shouldForwardProp: (prop) => prop !== '$isActive',
-})<StyledProps & { $isActive?: boolean; $isCompleted?: boolean; $isCalidad?: boolean }>`
+})<StyledProps & { $isActive?: boolean; $isCompleted?: boolean; $isCalidad?: boolean; $isParcial?: boolean }>`
   margin-top: 0.5rem;
   font-size: 0.75rem;
   font-weight: ${({ $isActive }) => ($isActive ? 'bold' : 'normal')};
-  color: ${({ $isCompleted, $isActive, $isCalidad }) => ($isCompleted ? '#22c55e' : $isCalidad ? '#facc15': $isActive ? '#4a90e2' : '#6b7280')};
+  color: ${({ $isCompleted, $isActive, $isCalidad, $isParcial }) => ($isCompleted ? '#22c55e' : $isCalidad ? '#facc15': $isActive ? '#4a90e2' : $isParcial ? '#f5945c' : '#6b7280')};
   text-align: center;
   max-width: 80px;
   text-transform: capitalize;

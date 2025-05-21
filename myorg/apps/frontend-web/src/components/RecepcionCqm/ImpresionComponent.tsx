@@ -7,6 +7,11 @@ import styled from "styled-components";
 interface Props {
   workOrder: any;
 }
+type Answer = {
+  reviewed: boolean;
+  sample_quantity: number;
+  // lo que más tenga...
+};
 
 export default function ImpresionComponent({ workOrder }: Props) {
   const router = useRouter();
@@ -14,9 +19,24 @@ export default function ImpresionComponent({ workOrder }: Props) {
   const [showInconformidad, setShowInconformidad] = useState(false);
   const [inconformidad, setInconformidad] = useState<string>('');
 
+  // Obtener todos los índices de respuestas no revisadas
+  const index = workOrder?.answers
+  ?.map((a: Answer, i: number) => ({ ...a, index: i }))
+  .reverse().find((a: Answer) => a.reviewed === false)?.index;
+  console.log('el index', index);
+  /*const noRevisadas = workOrder?.answers
+  ?.map((a: Answer, i: number) => ({ ...a, index: i }))
+  .filter((a: Answer) => a.reviewed === false);
+
+  // Obtener los dos últimos (penúltimo y último)
+  const index = noRevisadas?.length >= 2 ? noRevisadas[noRevisadas.length - 2].index : undefined;
+  const indexVuelta = noRevisadas?.length >= 1 ? noRevisadas[noRevisadas.length - 1].index : undefined;
+
+  console.log('Index Frente:', index);
+  console.log('Index Vuelta:', indexVuelta);*/
+
   // Para mostrar formulario de CQM y enviarlo
   const [showConfirmModal, setShowConfirmModal] = useState(false);
-
 
   //Para guardar las respuestas 
   const [responses, setResponses] = useState<{questionId: number, answer: boolean}[]>(
@@ -117,35 +137,29 @@ export default function ImpresionComponent({ workOrder }: Props) {
   };
 
   const handleSubmit = async () => {
-    const formAnswerId = workOrder.answers[0]?.id;
+    const formAnswerId = workOrder.answers[index]?.id;
     if (!formAnswerId) {
       alert("No se encontró el ID del formulario.");
       return;
     }
-
     // Preguntas con role_id 3
     const questions = workOrder.area.formQuestions.filter((q: any) => q.role_id === 3);
-
     // Validación: al menos un check en Frente o Vuelta
     const isFrenteVueltaValid = questions.some((q: any) => 
       checkedQuestionsFrente.includes(q.id) || checkedQuestionsVuelta.includes(q.id)
     );
-
     if (!questions.length || !isFrenteVueltaValid) {
       alert('Por favor, completa las preguntas, selecciona al menos un Frente o Vuelta y la cantidad de muestra.');
       return;
     }
-
     // Preparar payload de frente
     const frentePayload = checkedQuestionsFrente.map((questionId: number) => ({
       question_id: questionId,
     }));
-
     // Preparar payload de vuelta
     const vueltaPayload = checkedQuestionsVuelta.map((questionId: number) => ({
       question_id: questionId,
     }));
-
     // Payload final
     const payload = {
       form_answer_id: formAnswerId,
@@ -155,7 +169,6 @@ export default function ImpresionComponent({ workOrder }: Props) {
         value: testTypes,
       },
     };
-  
     try {
       const token = localStorage.getItem("token");
       if (!token) {
@@ -254,7 +267,7 @@ export default function ImpresionComponent({ workOrder }: Props) {
               .filter((question: { role_id: number | null }) => question.role_id === null)
               .map((question: { id: number; title: string }) => {
                 // Buscar la respuesta correspondiente a esta pregunta
-                const answer = workOrder.answers[0]?.FormAnswerResponse?.filter(
+                const answer = workOrder.answers[index]?.FormAnswerResponse?.filter(
                   (resp: any) => resp.question_id === question.id
                 );
                 
@@ -298,7 +311,7 @@ export default function ImpresionComponent({ workOrder }: Props) {
           </Table>
           <InputGroup style={{ width: '50%'}}>
               <Label>Muestras entregadas:</Label>
-              <Input type="number" value={workOrder?.answers[0].sample_quantity ?? 'No se reconoce la muestra enviada' } readOnly />
+              <Input type="number" value={workOrder?.answers[index].sample_quantity ?? 'No se reconoce la muestra enviada' } readOnly />
           </InputGroup>
         </NewDataWrapper>
 

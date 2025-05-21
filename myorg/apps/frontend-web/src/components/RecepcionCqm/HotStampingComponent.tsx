@@ -7,12 +7,22 @@ import styled from "styled-components";
 interface Props {
   workOrder: any;
 }
+type Answer = {
+  reviewed: boolean;
+  sample_quantity: number;
+  // lo que más tenga...
+};
 
 export default function HotStampingComponent({ workOrder }: Props) {
   const router = useRouter();
-  const [testTypes, SetTestTypes] = useState('');
   const [showInconformidad, setShowInconformidad] = useState(false);
   const [inconformidad, setInconformidad] = useState<string>('');
+
+  // Para obtener el ultimo FormAnswer 
+  const index = workOrder?.answers
+  ?.map((a: Answer, i: number) => ({ ...a, index: i }))
+  .reverse().find((a: Answer) => a.reviewed === false)?.index;
+  console.log('el index', index);
 
   // Para mostrar formulario de CQM y enviarlo
   const [showConfirmModal, setShowConfirmModal] = useState(false);
@@ -26,11 +36,6 @@ export default function HotStampingComponent({ workOrder }: Props) {
         answer: false
       }))
   );
-  const [color, setColor] = useState('');
-  const [holographicType, setHolographicType] = useState('');
-  const [magneticBandType, setMagneticBandType] = useState('');
-  const [trackType, setTrackType] = useState('');
-
   // Para controlar qué preguntas están marcadas
   const [checkedQuestions, setCheckedQuestions] = useState<number[]>([]);
   const handleCheckboxChange = (questionId: number, isChecked: boolean) => {
@@ -81,32 +86,25 @@ export default function HotStampingComponent({ workOrder }: Props) {
 
   
   const handleSubmit = async () => {
-    const formAnswerId = workOrder.answers[0]?.id; // id de FormAnswer
-  
+    const formAnswerId = workOrder.answers[index]?.id; // id de FormAnswer
     if (!formAnswerId) {
       alert("No se encontró el ID del formulario.");
       return;
     }
-  
     const checkboxPayload = responses.map(({ questionId, answer }) => ({
       question_id: questionId,
       answer: answer,     
     }));
-  
     const payload = {
       form_answer_id: formAnswerId,
       checkboxes: checkboxPayload,
     };
-  
     try {
       const token = localStorage.getItem("token");
       if (!token) {
         alert("No hay token de autenticación");
         return;
       }
-  
-      console.log("Datos a enviar:", payload);
-  
       const res = await fetch("http://localhost:3000/free-order-cqm/form-extra-seri", {
         method: "POST",
         headers: {
@@ -115,13 +113,11 @@ export default function HotStampingComponent({ workOrder }: Props) {
         },
         body: JSON.stringify(payload),
       });
-  
       const data = await res.json();
       if (!res.ok) {
         console.error("Error en el servidor:", data);
         return;
       }
-  
       router.push("/recepcionCqm");
     } catch (error) {
       console.log("Error al guardar la respuesta: ", error);
@@ -195,7 +191,7 @@ export default function HotStampingComponent({ workOrder }: Props) {
               .filter((question: { role_id: number | null }) => question.role_id === null)
               .map((question: { id: number; title: string }) => {
                 // Buscar la respuesta correspondiente a esta pregunta
-                const answer = workOrder.answers[0]?.FormAnswerResponse?.find(
+                const answer = workOrder.answers[index]?.FormAnswerResponse?.find(
                   (resp: any) => resp.question_id === question.id
                 );
                 
@@ -225,13 +221,13 @@ export default function HotStampingComponent({ workOrder }: Props) {
           </Table>
           <InputGroup style={{ width: '50%'}}>
               <Label>Color Foil:</Label>
-              <Input type="text" value={workOrder?.answers[0].color_foil ?? 'No se reconoce la muestra enviada' } readOnly />
+              <Input type="text" value={workOrder?.answers[index].color_foil ?? 'No se reconoce la muestra enviada' } readOnly />
               <Label>Revisar Posición Vs Ot:</Label>
-                <Input type="text" value={workOrder?.answers[0].revisar_posicion ?? 'No se reconoce la muestra enviada' } readOnly />
+                <Input type="text" value={workOrder?.answers[index].revisar_posicion ?? 'No se reconoce la muestra enviada' } readOnly />
               <Label>Imagen de Holograma Vs Ot:</Label>
-                <Input type="text" value={workOrder?.answers[0].imagen_holograma ?? 'No se reconoce la muestra enviada' } readOnly />
+                <Input type="text" value={workOrder?.answers[index].imagen_holograma ?? 'No se reconoce la muestra enviada' } readOnly />
               <Label>Muestras entregadas:</Label>
-              <Input type="number" value={workOrder?.answers[0].sample_quantity ?? 'No se reconoce la muestra enviada' } readOnly />
+              <Input type="number" value={workOrder?.answers[index].sample_quantity ?? 'No se reconoce la muestra enviada' } readOnly />
           </InputGroup>
         </NewDataWrapper>
         <SectionTitle>Mis respuestas</SectionTitle>
@@ -260,7 +256,7 @@ export default function HotStampingComponent({ workOrder }: Props) {
               .filter((question: { role_id: number | null }) => question.role_id === 3)
               .map((question: { id: number; title: string }) => {
                 // Buscar la respuesta correspondiente a esta pregunta
-                const answer = workOrder.answers[0]?.FormAnswerResponse?.find(
+                const answer = workOrder.answers[index]?.FormAnswerResponse?.find(
                   (resp: any) => resp.question_id === question.id
                 );
                 return (

@@ -17,6 +17,7 @@ interface CQMWorkOrder {
   answers: {
     id: number;
     work_order_flow_id: number;
+    accepted: boolean;
   }[];
   user: {
     id: number;
@@ -153,10 +154,20 @@ const UsersPage: React.FC = () => {
     console.log("Se hizo clic en Aceptar OT");
     const token = localStorage.getItem('token');
     //const flowId = selectedOrder?.workOrder.flow[0].id;
-    const flowItem = selectedOrder?.answers.find(
-      (f) => f.work_order_flow_id === selectedOrder.id
-    );
-    const flowId = flowItem?.id;
+    let index: number = 0;
+    if (selectedOrder?.answers?.length) {
+      for (let i = selectedOrder.answers.length - 1; i >= 0; i--) {
+        if (selectedOrder.answers[i].accepted === false) {
+          index = i;
+          break;
+        }
+      }
+    }
+    const flowId = index !== -1 ? selectedOrder?.answers[index]?.id : null; // Validamos el índice
+    if (!flowId) {
+      console.error('No se encontró un ID válido para FormAnswer.');
+      return; // Salimos de la función si no hay un ID válido
+    }
     console.log('ID del FormAnswer:', flowId);
 
     try {

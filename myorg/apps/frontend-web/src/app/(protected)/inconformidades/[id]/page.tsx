@@ -68,7 +68,7 @@ export default function InconformidadesAuxPage({ params }: Props) {
   const areaInconformidadCQM = [...workOrder.flow]
     .reverse()
     .find((item) => item.status === "En inconformidad CQM");
-  console.log('Area previa', areaInconformidadCQM);
+  console.log('CQM previa', areaInconformidadCQM);
 
   // Mostrar la liberacion del producto por area 
   const renderComponentByArea = () => {

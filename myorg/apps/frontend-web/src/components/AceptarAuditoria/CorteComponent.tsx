@@ -6,9 +6,9 @@ import styled from "styled-components";
 
 // Define un tipo para los valores del formulario
 type CorteData = {
-  good_quantity: string;
-  bad_quantity: string;
-  excess_quantity: string;
+  good_quantity: number | string;
+  bad_quantity: number | string;
+  excess_quantity: number | string;
   cqm_quantity: string;
   comments: string;
 };
@@ -16,17 +16,23 @@ type CorteData = {
 interface Props {
   workOrder: any;
 }
+type PartialRelease = {
+  area: string;
+  quantity: string;
+  bad_quantity: string;
+  excess_quantity: string;
+  observation: string;
+  validated: boolean;
+}
 
 export default function CorteComponentAcceptAuditory({ workOrder }: Props) {
   console.log('Orden', workOrder);
   const router = useRouter();
-  const [message, setMessage] = useState('');
   const [showConfirm, setShowConfirm] = useState(false);
   const [showInconformidad, setShowInconformidad] = useState(false);
   const [inconformidad, setInconformidad] = useState<string>('');
 
   // Estado para saber si los valores han sido modificados y para habilitar o deshabilitar el botón
-  const [isModified, setIsModified] = useState(false);
   const [isDisabled, setIsDisabled] = useState(true);
 
   const [sampleAuditory, setSampleQuantity] = useState('');
@@ -40,24 +46,35 @@ export default function CorteComponentAcceptAuditory({ workOrder }: Props) {
       cqm_quantity: "",
       comments: "",
     });
+    const cqm_quantity = workOrder.answers.reduce(
+      (total: number, answer: { sample_quantity?: number | string }) => {
+        return total + (Number(answer.sample_quantity) || 0);
+      },
+      0
+    );
 
-    const currentFLow = [...workOrder.workOrder.flow]
-    .reverse()
-    .find((item) => item.status === "Enviado a Auditoria");
-    console.log('Area', currentFLow);
     useEffect(() => {
-      if (currentFLow?.areaResponse?.corte) {
+      if (workOrder?.areaResponse?.corte && workOrder?.partialReleases?.length === 0) {
         const vals: CorteData = {
-          good_quantity: currentFLow.areaResponse.corte.good_quantity || "0",
-          bad_quantity: currentFLow.areaResponse.corte.bad_quantity || "0",
-          excess_quantity: currentFLow.areaResponse.corte.excess_quantity || "0",
-          cqm_quantity: currentFLow.answers[0].sample_quantity || "0",
-          comments: currentFLow.areaResponse.corte.comments || "",
+          good_quantity: workOrder.areaResponse.corte.good_quantity || "0",
+          bad_quantity: workOrder.areaResponse.corte.bad_quantity || "0",
+          excess_quantity: workOrder.areaResponse.corte.excess_quantity || "0",
+          cqm_quantity: cqm_quantity || "0",
+          comments: workOrder.areaResponse.corte.comments || "",
         };
         setDefaultValues(vals);
-        // El botón se mantiene deshabilitado hasta que haya un cambio
-        setIsModified(false);
-        setIsDisabled(true);
+      } else {
+        const firstUnvalidatedPartial = workOrder.partialReleases.find(
+          (release: PartialRelease) => !release.validated
+        );
+        const vals: CorteData = {
+          good_quantity: firstUnvalidatedPartial.quantity || '',
+          bad_quantity: firstUnvalidatedPartial.bad_quantity || '',
+          excess_quantity: firstUnvalidatedPartial.excess_quantity || '',
+          cqm_quantity: cqm_quantity || '',
+          comments: firstUnvalidatedPartial.observation || '',
+        };
+        setDefaultValues(vals);
       }
     }, [workOrder]);
 
@@ -68,7 +85,12 @@ export default function CorteComponentAcceptAuditory({ workOrder }: Props) {
         return;
       }
       const token = localStorage.getItem('token');
-      const CorteId = currentFLow.areaResponse.corte.id;
+      let CorteId  = null;
+      if (workOrder?.partialReleases?.length > 0) {
+        CorteId = workOrder.id;
+      } else {
+        CorteId = workOrder?.areaResponse?.corte?.id;
+      }
       const payload = {
         sample_auditory: Number(sampleAuditory),
       };
@@ -95,10 +117,10 @@ export default function CorteComponentAcceptAuditory({ workOrder }: Props) {
 
     const handleSubmitInconformidad = async () => {
       const token = localStorage.getItem('token');
-      console.log(currentFLow.id);
+      console.log(workOrder.id);
       console.log(inconformidad);
       try {
-        const res = await fetch(`http://localhost:3000/work-order-flow/${currentFLow.id}/inconformidad`, {
+        const res = await fetch(`http://localhost:3000/work-order-flow/${workOrder.id}/inconformidad`, {
           method: 'PATCH',
           headers: {
             'Content-Type': 'application/json',
@@ -146,20 +168,16 @@ export default function CorteComponentAcceptAuditory({ workOrder }: Props) {
               <Label>Muestras en CQM:</Label>
               <Input type="number" name="excess_quantity" value={defaultValues.cqm_quantity} disabled/>
               <Label>Muestras:</Label>
-              <Input type="number" value={sampleAuditory} onChange={(e) => setSampleQuantity(e.target.value)}/>
+              <Input type="number" min='0' value={sampleAuditory} onChange={(e) => setSampleQuantity(e.target.value)}/>
             </InputGroup>
             <InconformidadButton onClick={() => setShowInconformidad(true)}>Inconformidad</InconformidadButton>
           </NewDataWrapper>
           <InputGroup>
             <SectionTitle>Comentarios</SectionTitle>
-            <Textarea
-              value={defaultValues.comments}
-              disabled={isDisabled}
-            />
+            <Textarea value={defaultValues.comments} disabled={isDisabled} />
           </InputGroup>
         </NewData>
         <AceptarButton onClick={() => setShowConfirm(true)}>Aceptar recepción del producto</AceptarButton>
-        {message && <p>{message}</p>}
         {showConfirm && (
           <ModalOverlay>
             <ModalBox>

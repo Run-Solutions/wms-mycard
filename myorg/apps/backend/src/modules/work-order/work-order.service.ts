@@ -127,6 +127,14 @@ export class WorkOrderService {
         user: true,
         flow: {
           include: {
+            partialReleases: {
+              include: {
+                inconformities: {
+                  include: {
+                  user: true,
+                },}
+              }
+            },
             area: {
               include: {
                 formQuestions: true

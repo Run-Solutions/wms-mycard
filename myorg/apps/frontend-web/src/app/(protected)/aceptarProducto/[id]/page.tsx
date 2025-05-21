@@ -8,7 +8,6 @@ import ImpresionComponentAccept from "@/components/AceptarProducto/ImpresionComp
 import SerigrafiaComponentAccept from "@/components/AceptarProducto/SerigrafiaComponent";
 import EmpalmeComponentAccept from "@/components/AceptarProducto/EmpalmeComponent";
 import LaminacionComponentAccept from "@/components/AceptarProducto/LaminacionComponent";
-import AfterAllComponentAccept from "@/components/AceptarProducto/AfterAllComponentAccept";
 
 interface Props {
     params: Promise<{ id: string }>;
@@ -34,14 +33,26 @@ export default function AceptarProductoAuxPage({ params }: Props) {
     }, [id])
     
     if (!workOrder) return <div>Cargando...</div>
-    const lastCompleted = [...workOrder.workOrder.flow]
+    let lastCompletedOrPartial: { status: string; area_id: number, area: { id: number } } | undefined;
+    if (workOrder.status === 'Pendiente'){
+      lastCompletedOrPartial = [...workOrder.workOrder.flow]
       .reverse()
       .find((item) => item.status === "Completado");
-    console.log('Area previa', lastCompleted);
+    } else if (['Pendiente'].includes(workOrder.status) && workOrder.workOrder.flow.partialReleases.length > 0) {
+      lastCompletedOrPartial = [...workOrder.workOrder.flow]
+      .reverse()
+      .find((item) => ['Listo', 'Enviado a CQM', 'En calidad', 'Parcial'].includes(item.status));
+    } else if (['Pendiente parcial'].includes(workOrder.status)) {
+      lastCompletedOrPartial = [...workOrder.workOrder.flow]
+      .reverse()
+      .find((item) => ['Listo', 'Enviado a CQM', 'En calidad', 'Parcial'].includes(item.status));
+    }
+
+    console.log('Area previa', lastCompletedOrPartial);
 
     // Mostrar la liberacion del producto por area 
     const renderComponentByArea = () => {
-      switch (lastCompleted.area_id) {
+      switch (lastCompletedOrPartial?.area_id) {
         case 1:
             return <PrepressComponentAccept workOrder={workOrder}/>
         case 2:
@@ -52,16 +63,6 @@ export default function AceptarProductoAuxPage({ params }: Props) {
             return <EmpalmeComponentAccept workOrder={workOrder}/>
         case 5:
             return <LaminacionComponentAccept workOrder={workOrder}/>
-        case 6:
-            return <AfterAllComponentAccept workOrder={workOrder}/>
-        case 7:
-            return <AfterAllComponentAccept workOrder={workOrder}/>
-        case 8:
-            return <AfterAllComponentAccept workOrder={workOrder}/>
-        case 9:
-            return <AfterAllComponentAccept workOrder={workOrder}/>
-        case 10:
-            return <AfterAllComponentAccept workOrder={workOrder}/>
         default: 
           return <div>Area no reconocida.</div>
       }

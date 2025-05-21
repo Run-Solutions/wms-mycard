@@ -7,6 +7,10 @@ import styled from "styled-components";
 interface Props {
   workOrder: any;
 }
+interface PartialRelease {
+  validated: boolean;
+  quantity: number;
+}
 
 export default function ImpresionComponent({ workOrder }: Props) {
   const router = useRouter();
@@ -26,7 +30,6 @@ export default function ImpresionComponent({ workOrder }: Props) {
   // Para controlar qué preguntas están marcadas
   const [checkedQuestionsFrente, setCheckedQuestionsFrente] = useState<number[]>([]);
   const [checkedQuestionsVuelta, setCheckedQuestionsVuelta] = useState<number[]>([]);
-  const [checkedQuestions, setCheckedQuestions] = useState<number[]>([]);
   // Función para manejar el cambio en el campo de muestras
   const handleSampleQuantityChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     setSampleQuantity(e.target.value);
@@ -93,7 +96,6 @@ export default function ImpresionComponent({ workOrder }: Props) {
       );
     }
   };
-  
   const handleSelectAllVuelta = (isChecked: boolean) => {
     const questionIds = workOrder.area.formQuestions.filter((q: any) => q.role_id === null).map((q: any) => q.id);;
   
@@ -121,17 +123,31 @@ export default function ImpresionComponent({ workOrder }: Props) {
     }
   };
 
-  const currentFLow = [...workOrder.workOrder.flow]
-  .reverse()
-  .find((item) => ["Listo", "En proceso", 'Enviado a CQM', 'En Calidad'].includes(item.status));
-  console.log('Nuevo', currentFLow)
+  console.log("El mismo workOrder (workOrder)", workOrder);
+  const flowList = [...workOrder.workOrder.flow];
+  // Índice del flow actual basado en su id
+  const currentIndex = flowList.findIndex((item) => item.id === workOrder.id);
+  console.log('el currentIndex', currentIndex);
+  // Flow actual
+  const currentFlow = currentIndex !== -1 ? flowList[currentIndex] : null;
+  // Anterior (si hay)
+  const lastCompletedOrPartial = currentIndex > 0 ? flowList[currentIndex - 1] : null;
+  // Siguiente (si hay)
+  const nextFlow = currentIndex !== -1 && currentIndex < flowList.length - 1
+    ? flowList[currentIndex + 1]
+    : null;
+  console.log("El flujo actual (currentFlow)", currentFlow);
+  console.log("El siguiente flujo (nextFlow)", nextFlow);
+  console.log("Ultimo parcial o completado", lastCompletedOrPartial);
+
+  const allParcialsValidated = workOrder.partialReleases?.every(
+    (r: PartialRelease) => r.validated
+  );
 
   // Para mandar la OT a evaluacion por CQM
   const handleSubmit = async () => {
     const questions = workOrder.area.formQuestions.filter((q: any) => q.role_id === null);
-
-    const flowId = currentFLow.id;
-
+    const flowId = workOrder.id;
     const payload = {
       question_id: questions.map((q: any) => q.id),
       work_order_flow_id: flowId,
@@ -140,12 +156,12 @@ export default function ImpresionComponent({ workOrder }: Props) {
       frente: questions.map((q: any) => checkedQuestionsFrente.includes(q.id)),
       vuelta: questions.map((q: any) => checkedQuestionsVuelta.includes(q.id)),
       reviewed: false,
-      user_id: currentFLow.assigned_user,
+      user_id: workOrder.assigned_user,
       sample_quantity: Number(sampleQuantity),
     };
     const isFrenteVueltaValid = payload.frente.includes(true) || payload.vuelta.includes(true);
     // Validamos que no haya campos vacíos
-    const isPayloadEmpty = !payload.question_id.length || !isFrenteVueltaValid;
+    const isPayloadEmpty = !payload.question_id.length || !isFrenteVueltaValid || Number(sampleQuantity) <= 0;
     if (isPayloadEmpty) {
       alert('Por favor, asegúrate de completar todas las preguntas, seleccionar al menos una respuesta en "Frente" o "Vuelta" y establecer la cantidad de muestra antes de enviar.');
       return; // Evitamos el envío si los datos no son válidos
@@ -178,15 +194,31 @@ export default function ImpresionComponent({ workOrder }: Props) {
   
   // Para Liberar el producto cuando ya ha pasado por CQM
   const [showConfirm, setShowConfirm] = useState(false); 
+  const handleLiberarClick = () => {
+    if (Number(sampleQuantity) <= 0) {
+      alert('Por favor, ingresa una cantidad de muestra válida.');
+      return;
+    }
+  
+    if (lastCompletedOrPartial.partialReleases.length > 0) {
+      const totalValidatedQuantity = lastCompletedOrPartial.partialReleases
+        .filter((release: { validated: boolean, quantity: number }) => release.validated)
+        .reduce((sum: number, release: { quantity: number }) => sum + release.quantity, 0);
+    
+      console.log('Total validado:', totalValidatedQuantity);
+    }
+  
+    setShowConfirm(true); // Si pasa todas las validaciones, ahora sí abre el modal
+  };
   const handleImpressSubmit = async () => {
     const payload = {
       workOrderId: workOrder.workOrder.id,
-      workOrderFlowId: currentFLow.id,
+      workOrderFlowId: currentFlow.id,
       areaId: workOrder.area.id,
-      assignedUser: currentFLow.assigned_user,
+      assignedUser: currentFlow.assigned_user,
       releaseQuantity: Number(sampleQuantity),
       comments: document.querySelector('textarea')?.value || '',
-      formAnswerId: currentFLow.answers[0].id,
+      formAnswerId: currentFlow.answers[0].id,
     };
 
     console.log('datos a enviar',payload);
@@ -238,6 +270,79 @@ export default function ImpresionComponent({ workOrder }: Props) {
           <Value>{workOrder.workOrder.quantity}</Value>
         </InfoItem>
       </DataWrapper>
+      <DataWrapper style={{ marginTop: '20px'}}>
+        <InfoItem>
+          <Label>Área que lo envía:</Label>
+          <Value>{lastCompletedOrPartial.area.name}</Value>
+        </InfoItem>
+        <InfoItem>
+          <Label>Usuario del area previa:</Label>
+          <Value>{lastCompletedOrPartial.user.username}</Value>
+        </InfoItem>
+        <InfoItem>
+          <Label>{lastCompletedOrPartial.areaResponse ? ('Cantidad entregada:') : lastCompletedOrPartial.partialReleases?.some((r: PartialRelease) => r.validated) ? 'Cantidad entregada validada:' : 'Cantidad faltante por liberar:'}</Label>
+          <Value>
+            {lastCompletedOrPartial.areaResponse
+              ? (
+                // Mostrar cantidad según sub-área disponible
+                lastCompletedOrPartial.areaResponse.prepress?.plates ??
+                lastCompletedOrPartial.areaResponse.impression?.quantity ??
+                lastCompletedOrPartial.areaResponse.serigrafia?.quantity ??
+                lastCompletedOrPartial.areaResponse.empalme?.quantity ??
+                lastCompletedOrPartial.areaResponse.laminacion?.quantity ??
+                lastCompletedOrPartial.areaResponse.corte?.quantity ??
+                lastCompletedOrPartial.areaResponse.colorEdge?.quantity ??
+                lastCompletedOrPartial.areaResponse.hotStamping?.quantity ??
+                lastCompletedOrPartial.areaResponse.millingChip?.quantity ??
+                lastCompletedOrPartial.areaResponse.personalizacion?.quantity ??
+                'Sin cantidad'
+              )
+              : lastCompletedOrPartial.partialReleases?.some((r: PartialRelease) => r.validated)
+              ? (
+                lastCompletedOrPartial.partialReleases
+                  .filter((release: PartialRelease) => release.validated)
+                  .reduce((sum: number, release: PartialRelease) => sum + release.quantity, 0)
+              )
+              : 
+              (lastCompletedOrPartial.workOrder?.quantity ?? 0) - (lastCompletedOrPartial.partialReleases?.reduce((sum: number, release: PartialRelease) => sum + release.quantity, 0) ?? 0)
+            }
+          </Value>
+        </InfoItem>
+        {(
+          (workOrder?.partialReleases?.length > 0 && lastCompletedOrPartial?.partialReleases?.length > 0)
+          || (workOrder?.partialReleases?.length > 0)
+        ) && (
+          <InfoItem>
+            <Label>Cantidad por Liberar:</Label>
+            <Value>
+            {
+              workOrder?.partialReleases?.length > 0
+                ? (
+                  lastCompletedOrPartial.area.name === 'preprensa'
+                    ? (
+                      workOrder.workOrder.quantity -
+                      workOrder.partialReleases.reduce((sum: number, release: PartialRelease) => sum + release.quantity, 0)
+                    )
+                    : (
+                      lastCompletedOrPartial?.partialReleases?.length > 0
+                        ? (
+                          lastCompletedOrPartial.partialReleases
+                            .filter((release: { validated: boolean, quantity: number }) => release.validated)
+                            .reduce((sum: number, release: PartialRelease) => sum + release.quantity, 0)
+                          -
+                          workOrder.partialReleases.reduce((sum: number, release: PartialRelease) => sum + release.quantity, 0)
+                        )
+                        : (
+                          workOrder.partialReleases.reduce((sum: number, release: PartialRelease) => sum + release.quantity, 0)
+                        )
+                    )
+                )
+                : 0
+            }
+            </Value>
+          </InfoItem>
+        )}
+      </DataWrapper>
         <InfoItem style={{ marginTop: '20px'}}>
           <Label>Comentarios:</Label>
           <Value>{workOrder.workOrder.comments}</Value>
@@ -247,16 +352,16 @@ export default function ImpresionComponent({ workOrder }: Props) {
         <NewDataWrapper>
           <InputGroup>
             <Label>Cantidad a Liberar:</Label>
-            <Input type="number" placeholder="Ej: 2" value={sampleQuantity} onChange={handleSampleQuantityChange} disabled={isDisabled} />
+            <Input type="number" min='0' placeholder="Ej: 2" value={sampleQuantity} onChange={handleSampleQuantityChange} disabled={isDisabled} />
           </InputGroup>
-          <CqmButton status={currentFLow.status} onClick={openModal} disabled={['Enviado a CQM', 'En Calidad', 'Listo'].includes(currentFLow.status)}>Enviar a CQM</CqmButton>
+          <CqmButton status={workOrder.status} onClick={openModal} disabled={['Enviado a CQM', 'En Calidad', 'Listo'].includes(workOrder.status)}>Enviar a CQM</CqmButton>
         </NewDataWrapper>
         <InputGroup>
           <SectionTitle>Comentarios</SectionTitle>
           <Textarea placeholder="Agrega un comentario adicional..." disabled={isDisabled}/>
         </InputGroup>
       </NewData>
-      <LiberarButton disabled={isDisabled || ['Enviado a CQM', 'En Calidad'].includes(currentFLow.status)} onClick={() => setShowConfirm(true)}>Liberar Producto</LiberarButton>
+      <LiberarButton disabled={isDisabled || ['Enviado a CQM', 'En Calidad', 'Parcial'].includes(workOrder.status) || ['Listo', 'Enviado a CQM', 'En calidad', 'Parcial', 'Pendiente parcial'].includes(nextFlow.status) && !allParcialsValidated} onClick={handleLiberarClick}>Liberar Producto</LiberarButton>
     </Container>
 
     {/* Modal para enviar a liberacion */}
@@ -337,7 +442,6 @@ export default function ImpresionComponent({ workOrder }: Props) {
               <tr>
                 <th>Pregunta</th>
                 <th>
-                  Respuesta
                   <button onClick={toggleQuestions} style={{ marginLeft: "8px", cursor: "pointer", border: "none", background: "transparent" }}>{questionsOpen ? '▼' : '▶'}</button>
                 </th>
               </tr>

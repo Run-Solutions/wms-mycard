@@ -6,6 +6,11 @@ import { useState } from "react";
 interface Props {
   workOrder: any;
 }
+type Answer = {
+  reviewed: boolean;
+  sample_quantity: number;
+  // lo que más tenga...
+};
 
 export default function HotStampingComponentCQM({ workOrder }: Props) {
   const router = useRouter();
@@ -16,11 +21,16 @@ export default function HotStampingComponentCQM({ workOrder }: Props) {
   const closeModal = () => {
     setShowModal(false);
   };
+  // Para obtener el ultimo FormAnswer 
+  const index = workOrder?.answers
+  ?.map((a: Answer, i: number) => ({ ...a, index: i }))
+  .reverse().find((a: Answer) => a.reviewed === false)?.index;
+  console.log('el index', index);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     const token = localStorage.getItem('token');
-    const areaResponse = workOrder.answers[0].id;
+    const areaResponse = workOrder.answers[index].id;
     console.log(areaResponse);
     try {
       const res = await fetch(`http://localhost:3000/inconformities/${areaResponse}/cqm`, {
@@ -40,8 +50,8 @@ export default function HotStampingComponentCQM({ workOrder }: Props) {
     }
   }
 
-  const lastIndex = workOrder.answers[0].inconformities.length > 1 
-  ? workOrder.answers[0].inconformities.length - 1 
+  const lastIndex = workOrder.answers[index].inconformities.length > 1 
+  ? workOrder.answers[index].inconformities.length - 1 
   : 0;
 
   return (
@@ -63,7 +73,7 @@ export default function HotStampingComponentCQM({ workOrder }: Props) {
               .filter((question: { role_id: number | null }) => question.role_id === null)
               .map((question: { id: number; title: string }) => {
                 // Buscar la respuesta correspondiente a esta pregunta
-                const answer = workOrder.answers[0]?.FormAnswerResponse?.find(
+                const answer = workOrder.answers[index]?.FormAnswerResponse?.find(
                   (resp: any) => resp.question_id === question.id
                 );
                 
@@ -93,13 +103,13 @@ export default function HotStampingComponentCQM({ workOrder }: Props) {
           </Table>
           <InputGroup style={{ marginTop: '-7rem'}}>
           <Label>Color Foil:</Label>
-              <Input type="text" value={workOrder?.answers[0].color_foil ?? 'No se reconoce la muestra enviada' } readOnly />
+              <Input type="text" value={workOrder?.answers[index].color_foil ?? 'No se reconoce la muestra enviada' } readOnly />
               <Label>Revisar Posición Vs Ot:</Label>
-                <Input type="text" value={workOrder?.answers[0].revisar_posicion ?? 'No se reconoce la muestra enviada' } readOnly />
+                <Input type="text" value={workOrder?.answers[index].revisar_posicion ?? 'No se reconoce la muestra enviada' } readOnly />
               <Label>Imagen de Holograma Vs Ot:</Label>
-                <Input type="text" value={workOrder?.answers[0].imagen_holograma ?? 'No se reconoce la muestra enviada' } readOnly />
+                <Input type="text" value={workOrder?.answers[index].imagen_holograma ?? 'No se reconoce la muestra enviada' } readOnly />
               <Label>Muestras entregadas:</Label>
-              <Input type="number" value={workOrder?.answers[0].sample_quantity ?? 'No se reconoce la muestra enviada' } readOnly />
+              <Input type="number" value={workOrder?.answers[index].sample_quantity ?? 'No se reconoce la muestra enviada' } readOnly />
           </InputGroup>
         </NewDataWrapper>
       </NewData>
@@ -109,11 +119,11 @@ export default function HotStampingComponentCQM({ workOrder }: Props) {
         <SectionTitle>Inconformidad:</SectionTitle>
         <InputGroup>
           <Label>Respuesta de Usuario</Label>
-          <Input type="text" value={workOrder.answers[0].inconformities[lastIndex].user.username} disabled/>
+          <Input type="text" value={workOrder.answers[index].inconformities[lastIndex].user.username} disabled/>
         </InputGroup>
         <InputGroup>
           <Label>Comentarios</Label>
-          <Textarea value={workOrder.answers[0].inconformities[lastIndex].comments} disabled/>
+          <Textarea value={workOrder.answers[index].inconformities[lastIndex].comments} disabled/>
         </InputGroup>
       </NewData>
     </Container>

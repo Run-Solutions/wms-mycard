@@ -8,20 +8,25 @@ import styled from "styled-components";
 interface Props {
   workOrder: any;
 }
+type PartialRelease = {
+  area: string;
+  quantity: number;
+}
 
 export default function PrePrensaComponent({ workOrder }: Props) {
   const [plates, setPlates] = useState('');
   const [positives, SetPositives] = useState('');
   const [testTypes, SetTestTypes] = useState('');
   const [comments, SetComments] = useState('');
-  const [message, setMessage] = useState('');
   const [showConfirm, setShowConfirm] = useState(false); 
+
   const router = useRouter();
 
-  const currentFLow = [...workOrder.workOrder.flow]
+  const currentFlow = [...workOrder.workOrder.flow]
   .reverse()
-  .find((item) => ["Listo", "En proceso", 'Enviado a CQM', 'En Calidad'].includes(item.status));
-  console.log('Nuevo', currentFLow)
+  .find((item) =>
+    ["Listo", "En proceso", "Enviado a CQM", "En Calidad"].includes(item.status)
+  );
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -29,16 +34,9 @@ export default function PrePrensaComponent({ workOrder }: Props) {
       alert('Por favor. completa los campos obligatorios');
       return;
     }
-
-    console.log("workOrderId:", workOrder.work_order_id);
-    console.log("workOrderFlowId", currentFLow.id);
-    console.log("areaId", workOrder.area_id);
-    console.log("assignedUser", workOrder.assigned_user);
-
-
     const payload = {
       workOrderId: workOrder.work_order_id,
-      workOrderFlowId: currentFLow.id,
+      workOrderFlowId: currentFlow.id,
       areaId: workOrder.area_id,
       assignedUser: workOrder.assigned_user || null,
 
@@ -54,7 +52,6 @@ export default function PrePrensaComponent({ workOrder }: Props) {
         alert('No hay token de autenticacion');
         return;
       }
-      console.log('payload antes de enviar: ', payload);
       const res = await fetch('http://localhost:3000/free-order-flow/prepress', {
         method: 'POST',
         headers: {
@@ -67,11 +64,9 @@ export default function PrePrensaComponent({ workOrder }: Props) {
 
       if (!res.ok) {
         console.error("Error en el servidor:", data);
-        setMessage("Error al guardar la respuesta.");
         return;
       }
 
-      setMessage(data.message || "Respuesta guardada con éxito.");
       router.push('/liberarProducto');
     } catch (error) {
       console.error('Error al enviar respuesta', error);
@@ -99,20 +94,24 @@ export default function PrePrensaComponent({ workOrder }: Props) {
           <Value>{workOrder.workOrder.quantity}</Value>
         </InfoItem>
       </DataWrapper>
+
+      <DataWrapper>
         <InfoItem style={{ marginTop: '20px'}}>
           <Label>Comentarios:</Label>
           <Value>{workOrder.workOrder.comments}</Value>
         </InfoItem>
+      </DataWrapper>
+
       <form onSubmit={handleSubmit}>
         <SectionTitle>Datos de Producción</SectionTitle>
         <NewDataWrapper>
           <InputGroup>
             <Label>Placas:</Label>
-            <Input type="number" placeholder="Ej: 2" value={plates} onChange={(e) => setPlates(e.target.value)} />
+            <Input type="number" min="0" placeholder="Ej: 2" value={plates} onChange={(e) => setPlates(e.target.value)} />
           </InputGroup>
           <InputGroup>
             <Label>Positivos:</Label>
-            <Input type="number" placeholder="Ej: 3" value={positives} onChange={(e) => SetPositives(e.target.value)} />
+            <Input type="number" min="0" placeholder="Ej: 3" value={positives} onChange={(e) => SetPositives(e.target.value)} />
           </InputGroup>
         </NewDataWrapper>
 
@@ -137,7 +136,6 @@ export default function PrePrensaComponent({ workOrder }: Props) {
 
         <LiberarButton type="button" onClick={() => setShowConfirm(true)}>Liberar producto</LiberarButton>
       </form>
-      {message && <p>{message}</p>}
       {showConfirm && (
         <ModalOverlay>
           <ModalBox>
@@ -182,8 +180,9 @@ const SectionTitle = styled.h3`
 
 const DataWrapper = styled.div`
   display: flex;
+  flex-direction: row;
   flex-wrap: wrap;
-  gap: 2rem;
+  gap: 1rem;
 `;
 
 const InfoItem = styled.div`
