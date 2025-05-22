@@ -4,75 +4,62 @@ import React, { useEffect, useState } from 'react';
 import { View, StyleSheet, ScrollView, ActivityIndicator } from 'react-native';
 import { Text, Title, Surface } from 'react-native-paper';
 import { useNavigation } from '@react-navigation/native';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import { TouchableRipple } from 'react-native-paper';
+import { NativeStackNavigationProp } from '@react-navigation/native-stack';
+import { RootStackParamList } from '../navigation/types';
 
-interface KPIs {
-  stock: number;
-  orders: number;
-  incidents: number;
-  averageProcessingTime: string;
-}
+type RootStackParamList = {
+  Login: undefined;
+  Dashboard: undefined;
+  aceptarAuditoria: undefined;
+  cerrarOrdenDeTrabajo: undefined;
+  // ... otras rutas
+};
+
+const modules = [
+  { id: 10, name: 'Aceptar Auditoria' },
+  { id: 11, name: 'Cerrar Orden de Trabajo' },
+];
+
+const toCamelCase = (str: string) =>
+  str
+    .replace(/\s(.)/g, function(match, group1) {
+      return group1.toUpperCase();
+    })
+    .replace(/\s/g, '')
+    .replace(/^(.)/, function(match, group1) {
+      return group1.toLowerCase();
+    });
+
+const moduleRouteMap: Record<string, keyof RootStackParamList> = {
+  aceptarAuditoria: 'aceptarAuditoria',
+  cerrarOrdenDeTrabajo: 'cerrarOrdenDeTrabajo',
+};
 
 const DashboardScreen: React.FC = () => {
-  const [kpis, setKpis] = useState<KPIs | null>(null);
-  const [notifications, setNotifications] = useState<any[]>([]);
-  const [loading, setLoading] = useState(true);
-  const navigation = useNavigation();
-
-  useEffect(() => {
-    Promise.all([
-      fetch('http://192.168.1.12:3000/dashboard/kpis').then(res => res.json()),
-      fetch('http://192.168.1.12:3000/dashboard/notifications').then(res => res.json()),
-    ])
-      .then(([kpisData, notificationsData]) => {
-        setKpis(kpisData);
-        if (Array.isArray(notificationsData)) {
-          setNotifications(notificationsData);
-        } else {
-          console.error("Notificaciones no es un array:", notificationsData);
-          setNotifications([]);
-        }
-      })
-      .catch(err => console.error(err))
-      .finally(() => setLoading(false));
-  }, []);
-
-  if (loading) {
-    return <ActivityIndicator style={styles.loading} size="large" />;
-  }
+  const navigation = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
 
   return (
-    <ScrollView contentContainerStyle={styles.container}>
-      <Title style={styles.title}>Dashboard</Title>
-      {kpis && (
-        <View style={styles.kpiContainer}>
-          <Surface style={styles.kpiBox}>
-            <Text style={styles.kpiLabel}>Stock</Text>
-            <Text style={styles.kpiValue}>{kpis.stock}</Text>
-          </Surface>
-          <Surface style={styles.kpiBox}>
-            <Text style={styles.kpiLabel}>Pedidos</Text>
-            <Text style={styles.kpiValue}>{kpis.orders}</Text>
-          </Surface>
-          <Surface style={styles.kpiBox}>
-            <Text style={styles.kpiLabel}>Incidencias</Text>
-            <Text style={styles.kpiValue}>{kpis.incidents}</Text>
-          </Surface>
-          <Surface style={styles.kpiBox}>
-            <Text style={styles.kpiLabel}>Tiempo Promedio</Text>
-            <Text style={styles.kpiValue}>{kpis.averageProcessingTime}</Text>
-          </Surface>
-        </View>
-      )}
-      <Title style={styles.subtitle}>Notificaciones</Title>
-      {notifications.map((notif) => (
-        <Surface key={notif.id} style={styles.notificationBox}>
-          <Text>{notif.message}</Text>
-          <Text style={styles.notificationTimestamp}>
-            {new Date(notif.timestamp).toLocaleString()}
-          </Text>
-        </Surface>
+    <View>
+      {modules.map(module => (
+        <TouchableRipple
+          key={module.id}
+          onPress={() => {
+            const routeName = moduleRouteMap[toCamelCase(module.name)];
+            if (routeName) {
+              navigation.navigate(routeName);
+            } else {
+              console.warn(`Ruta no definida para módulo ${module.name}`);
+            }
+          }}
+        >
+          <View style={{ padding: 16 }}>
+            <Text>{module.name}</Text>
+          </View>
+        </TouchableRipple>
       ))}
-    </ScrollView>
+    </View>
   );
 };
 
@@ -80,6 +67,20 @@ const styles = StyleSheet.create({
   loading: {
     flex: 1,
     justifyContent: 'center',
+  },
+  moduleBox: {
+    padding: 16,
+    marginVertical: 8,
+    width: '100%',
+    alignItems: 'center',
+    backgroundColor: '#fff',
+    borderRadius: 8,
+    elevation: 4,
+  },
+  moduleName: {
+    fontSize: 18,
+    fontWeight: 'bold',
+    color: '#333',
   },
   container: {
     padding: 16,
