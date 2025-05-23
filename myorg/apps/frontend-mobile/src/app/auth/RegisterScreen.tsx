@@ -10,6 +10,8 @@ import {
 import { TextInput, Button, Text, Title } from 'react-native-paper';
 import { NavigationProp, useNavigation } from '@react-navigation/native';
 import { RootStackParamList } from '../../navigation/types';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import RoleSelection from './RoleSelectionScreen';
 
 // Definimos el tipo específico para la navegación en la pantalla de Registro
 type RegisterScreenNavigationProp = NavigationProp<RootStackParamList, 'Register'>;
@@ -21,40 +23,24 @@ const RegisterScreen: React.FC = () => {
   const [password, setPassword] = useState('');
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
+  const [confirmPassword, setConfirmPassword] = useState('');
 
-  const handleRegister = async () => {
-    // Validamos que todos los campos estén completos
-    if (!username || !email || !password) {
-      setError('Todos los campos son obligatorios');
-      return;
-    }
+const handleRegisterSubmit = async () => {
+  if (password !== confirmPassword) {
+    setError("Las contraseñas no coinciden");
+    return;
+  }
 
-    setLoading(true);
-    try {
-      // Realizamos la llamada a la API de registro.
-      // Si trabajas en un dispositivo, reemplaza "localhost" con la IP adecuada.
-      const response = await fetch('http://192.168.80.22:3000/auth/register', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ username, email, password }),
-      });
+  const pendingUser = { username, email, password };
 
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.message || 'Error al registrarse');
-      }
-
-      const data = await response.json();
-      Alert.alert('Registro exitoso', 'Ahora puedes iniciar sesión.');
-      navigation.navigate('Login');
-    } catch (err: any) {
-      setError(err.message);
-    } finally {
-      setLoading(false);
-    }
-  };
+  try {
+    await AsyncStorage.setItem('pendingUser', JSON.stringify(pendingUser));
+    navigation.navigate("RoleSelection", { pendingUser });
+  } catch (err) {
+    console.error('Error al guardar usuario pendiente:', err);
+    setError("No se pudo guardar la información");
+  }
+};
 
   return (
     <ImageBackground
@@ -84,18 +70,17 @@ const RegisterScreen: React.FC = () => {
           secureTextEntry
           style={styles.input}
         />
+        <TextInput
+          label="Confirmar Contraseña"
+          value={confirmPassword}
+          onChangeText={setConfirmPassword}
+          secureTextEntry
+          style={styles.input}
+        />
         {error && <Text style={styles.error}>{error}</Text>}
         <Button
           mode="contained"
-          onPress={() => {
-            if (!username || !email || !password) {
-              setError('Todos los campos son obligatorios');
-              return;
-            }
-
-            const pendingUser = { username, email, password };
-            navigation.navigate('RoleSelection', { pendingUser });
-          }}
+          onPress={handleRegisterSubmit}
           style={styles.button}
           disabled={loading}
         >

@@ -5,11 +5,7 @@ import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import AuthStack from './AuthStack';
 import AppDrawer from './AppDrawer';
 import { AuthContext } from '../contexts/AuthContext';
-
-export type RootStackParamList = {
-  Auth: undefined;
-  App: undefined;
-};
+import { RootStackParamList } from '../navigation/types';
 
 const Stack = createNativeStackNavigator<RootStackParamList>();
 
@@ -19,10 +15,11 @@ const RootNavigator: React.FC = () => {
   return (
     <Stack.Navigator screenOptions={{ headerShown: false }}>
       {isAuthenticated ? (
-        <Stack.Screen name="App" component={AppDrawer} />
+        <>
+          <Stack.Screen name="Dashboard" component={AppDrawer} />
+        </>
       ) : (
-        // Forzamos el tipo para "Auth" si es necesario:
-        <Stack.Screen name={"Auth" as keyof RootStackParamList} component={AuthStack} />
+        <Stack.Screen name="Login" component={AuthStack} />
       )}
     </Stack.Navigator>
   );

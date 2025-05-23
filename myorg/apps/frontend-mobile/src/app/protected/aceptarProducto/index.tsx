@@ -1,12 +1,12 @@
-// packages/frontend-mobile/src/screens/RecibosScreen.tsx
+"use client";// packages/frontend-mobile/src/screens/ProductosScreen.tsx
 
 import React from 'react';
 import { View, Text, StyleSheet } from 'react-native';
 
-const RecibosScreen: React.FC = () => {
+const ProductosScreen: React.FC = () => {
   return (
     <View style={styles.container}>
-      <Text>RecibosScreen</Text>
+      <Text>ProductosScreen</Text>
     </View>
   );
 };
@@ -19,4 +19,4 @@ const styles = StyleSheet.create({
   },
 });
 
-export default RecibosScreen;
+export default ProductosScreen;

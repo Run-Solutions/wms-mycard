@@ -5,6 +5,7 @@ import { View, StyleSheet, Alert } from 'react-native';
 import { Button, Text, Title, RadioButton } from 'react-native-paper';
 import { NavigationProp, RouteProp, useNavigation, useRoute } from '@react-navigation/native';
 import { RootStackParamList } from '../../navigation/types';
+import { getRoles, register } from '../../api/auth'; // 👈 importar funciones
 
 type RoleSelectionScreenNavigationProp = NavigationProp<RootStackParamList, 'RoleSelection'>;
 type RoleSelectionScreenRouteProp = RouteProp<RootStackParamList, 'RoleSelection'>;
@@ -18,9 +19,8 @@ const RoleSelectionScreen: React.FC = () => {
   const [selectedRole, setSelectedRole] = useState<number | null>(null);
 
   useEffect(() => {
-    fetch('http://192.168.80.22:3000/auth/roles')
-      .then((res) => res.json())
-      .then(setRoles)
+    getRoles()
+      .then((res) => setRoles(res.data))
       .catch(() => Alert.alert('Error', 'No se pudieron cargar los roles'));
   }, []);
 
@@ -29,24 +29,13 @@ const RoleSelectionScreen: React.FC = () => {
       Alert.alert('Error', 'Debes seleccionar un rol');
       return;
     }
-
     try {
-      const response = await fetch('http://192.168.80.22:3000/auth/register', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ ...pendingUser, role_id: selectedRole }),
-      });
-
-      const data = await response.json();
-
-      if (response.ok) {
-        Alert.alert('Registro exitoso', 'Ahora puedes iniciar sesión.');
-        navigation.navigate('Login');
-      } else {
-        Alert.alert('Error', data.message || 'Error en el registro');
-      }
-    } catch (error) {
-      Alert.alert('Error', 'No se pudo completar el registro');
+      const response = await register({ ...pendingUser, role_id: selectedRole });
+      Alert.alert('Registro exitoso', 'Ahora puedes iniciar sesión.');
+      navigation.navigate('Login');
+    } catch (error: any) {
+      const message = error.response?.data?.message || 'Error en el registro';
+      Alert.alert('Error', message);
     }
   };
 

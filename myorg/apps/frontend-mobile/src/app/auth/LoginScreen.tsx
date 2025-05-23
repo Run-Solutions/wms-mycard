@@ -9,6 +9,8 @@ import { NavigationProp, useNavigation } from "@react-navigation/native";
 import { RootStackParamList } from "../../navigation/types";
 import { AuthContext } from "../../contexts/AuthContext";
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { login } from '../../api/auth'; // o la ruta relativa según tu estructura
+
 
 type LoginScreenNavigationProp = NavigationProp<RootStackParamList, "Login">;
 
@@ -31,21 +33,9 @@ const LoginScreen: React.FC = () => {
   const handleLogin = async () => {
     console.log("Iniciando login con:", username, password);
     try {
-      const response = await fetch("http://192.168.80.22:3000/auth/login", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ username, password }),
-      });
-      
-      if (!response.ok) {
-        const errorData = await response.json();
-        setError(errorData.message || "Error al iniciar sesión");
-        return;
-      }
-      
-      const data = await response.json();
-      if (data.token) {
-        // Marcar usuario como autenticado y navegar al flujo principal
+      const response = await login(username, password); 
+      const data = response.data;
+        if (data.token) {
         await AsyncStorage.setItem('token', data.token);
         setIsAuthenticated(true);
       } else {

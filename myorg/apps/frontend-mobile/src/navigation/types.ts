@@ -5,6 +5,5 @@ export type RootStackParamList = {
   Register: undefined;
   RoleSelection: { pendingUser: { username: string; email: string; password: string } };
 
-  aceptarAuditoria: undefined;
-  cerrarOrdenDeTrabajo: undefined;
+  WorkOrderDetailScreen: { id: number };
 };
