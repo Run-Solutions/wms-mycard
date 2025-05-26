@@ -167,8 +167,8 @@ export class AuthService {
   }
 
   async getAreasOperator(): Promise<{ id: number; name: string }[]> {
-    // Agregamos await para cumplir la regla require-await
-    return await this.prisma.areasOperator.findMany();
+    const areas = await this.prisma.areasOperator.findMany();
+    return areas.sort((a, b) => a.id - b.id);
   }
 
   async getUsers() {
@@ -185,5 +185,10 @@ export class AuthService {
   async checkRoleExists(role_id: number): Promise<boolean> {
     const role = await this.prisma.role.findUnique({ where: { id: role_id } });
     return !!role;
+  }
+
+  async verifyUsername(username: string): Promise<boolean> {
+    const user = await this.prisma.user.findUnique({ where: { username } });
+    return !!user;
   }
 }

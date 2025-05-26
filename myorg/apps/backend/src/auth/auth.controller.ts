@@ -17,7 +17,7 @@ export class AuthController {
   @Get('areas_operator')
   async getAreasOperator(){
   return await this.authService.getAreasOperator(); // Llama al servicio en lugar de usar this.prisma directamente
-}
+  }
   @Get('check-role/:role')
   async checkRole(@Param('role') role: string): Promise<boolean> {
     return this.authService.checkRoleExists(parseInt(role, 10)); // Llama al servicio para obtener los roles
@@ -43,5 +43,9 @@ export class AuthController {
   @Post('forgot-password')
   async forgotPassword(@Body() forgotPasswordDto: ForgotPasswordDto) {
     return this.authService.forgotPassword(forgotPasswordDto);
+  }
+  @Get('verify-username/:username')
+  async verifyUsername(@Param('username') username: string): Promise<boolean> {
+    return this.authService.verifyUsername(username);
   }
 }

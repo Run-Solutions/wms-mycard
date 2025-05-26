@@ -20,3 +20,7 @@ export const register = (data: RegisterRequest) =>
   API.post("/auth/register", data);
 
 export const getRoles = () => API.get<Role[]>("/auth/roles");
+
+export const getAreas = () => API.get<Role[]>("/auth/areas_operator");
+
+export const verifyUsername = (username: string) => API.get(`/auth/verify-username/${username}`);

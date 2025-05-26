@@ -10,8 +10,8 @@ import {
 import { TextInput, Button, Text, Title } from 'react-native-paper';
 import { NavigationProp, useNavigation } from '@react-navigation/native';
 import { RootStackParamList } from '../../navigation/types';
-import AsyncStorage from '@react-native-async-storage/async-storage';
-import RoleSelection from './RoleSelectionScreen';
+import { validateEmail } from '../../utils/validateEmail';
+import { verifyUsername } from '../../api/auth';
 
 // Definimos el tipo específico para la navegación en la pantalla de Registro
 type RegisterScreenNavigationProp = NavigationProp<RootStackParamList, 'Register'>;
@@ -21,66 +21,91 @@ const RegisterScreen: React.FC = () => {
   const [username, setUsername] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [confirmPassword, setConfirmPassword] = useState('');
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
-  const [confirmPassword, setConfirmPassword] = useState('');
 
-const handleRegisterSubmit = async () => {
-  if (password !== confirmPassword) {
-    setError("Las contraseñas no coinciden");
-    return;
-  }
-
-  const pendingUser = { username, email, password };
-
-  try {
-    await AsyncStorage.setItem('pendingUser', JSON.stringify(pendingUser));
-    navigation.navigate("RoleSelection", { pendingUser });
-  } catch (err) {
-    console.error('Error al guardar usuario pendiente:', err);
-    setError("No se pudo guardar la información");
-  }
-};
+  const handleRegister = async () => {
+    try {
+      if (!username || !email || !password || !confirmPassword) {
+        setError('Todos los campos son obligatorios');
+        return;
+      }
+      const response = await verifyUsername(username.trim());
+      if (response.status === 200) {
+        const data = await response.data;
+        if (data) {
+          setError(`El nombre de usuario "${username}" ya está en uso`);
+          return;
+        }
+      }
+      if (password !== confirmPassword) {
+        setError('Las contraseñas no coinciden');
+        return;
+      }
+      if (!validateEmail(email)) {
+        setError('El correo electrónico no es válido');
+        return;
+      }
+      const pendingUser = { username, email, password };
+      navigation.navigate('RoleSelection', { pendingUser });
+      setLoading(true);
+    } catch (error) {
+      setError('Error al verificar el nombre de usuario');
+    }
+  };
 
   return (
     <ImageBackground
-      source={require('../../../assets/login-background.jpg')}
+      source={require('../../../assets/images/cards.png')}
       style={styles.background}
       resizeMode="cover"
+      blurRadius={15}
     >
       <View style={styles.formContainer}>
         <Title style={styles.title}>Registro</Title>
-        <TextInput
-          label="Usuario"
-          value={username}
-          onChangeText={setUsername}
-          style={styles.input}
-        />
-        <TextInput
-          label="Correo Electrónico"
-          value={email}
-          onChangeText={setEmail}
-          style={styles.input}
-          keyboardType="email-address"
-        />
-        <TextInput
-          label="Contraseña"
-          value={password}
-          onChangeText={setPassword}
-          secureTextEntry
-          style={styles.input}
-        />
-        <TextInput
-          label="Confirmar Contraseña"
-          value={confirmPassword}
-          onChangeText={setConfirmPassword}
-          secureTextEntry
-          style={styles.input}
-        />
+        <View style={styles.input}>
+          <TextInput
+            label="Usuario"
+            value={username}
+            onChangeText={setUsername}
+            mode="outlined"
+            activeOutlineColor='#000'
+            theme={{ roundness: 30 }}
+
+          />
+          <TextInput
+            label="Correo Electrónico"
+            value={email}
+            onChangeText={setEmail}
+            keyboardType="email-address"
+            mode="outlined"
+            activeOutlineColor='#000'
+            theme={{ roundness: 30 }}
+          />
+          <TextInput
+            label="Contraseña"
+            value={password}
+            onChangeText={setPassword}
+            secureTextEntry
+            mode="outlined"
+            activeOutlineColor='#000'
+            theme={{ roundness: 30 }}
+          />
+          <TextInput
+            label="Confirmar Contraseña"
+            value={confirmPassword}
+            onChangeText={setConfirmPassword}
+            secureTextEntry
+            mode="outlined"
+            activeOutlineColor='#000'
+            theme={{ roundness: 30 }}
+          />
+        </View>
         {error && <Text style={styles.error}>{error}</Text>}
         <Button
           mode="contained"
-          onPress={handleRegisterSubmit}
+          onPress={handleRegister}
           style={styles.button}
           disabled={loading}
         >
@@ -89,7 +114,8 @@ const handleRegisterSubmit = async () => {
         <Button
           mode="outlined"
           onPress={() => navigation.navigate('Login')}
-          style={styles.button}
+          style={styles.outlinedButton}
+          labelStyle={{ color: '#0139a8' }}
         >
           Volver al Login
         </Button>
@@ -105,37 +131,49 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   formContainer: {
-    backgroundColor: 'rgba(255, 255, 255, 0.95)',
+    fontSize: 14,
+    backgroundColor: "#fff",
     padding: 20,
     borderRadius: 12,
-    width: '90%',
-    maxWidth: 400,
-    // Sombra para iOS
-    shadowColor: '#000',
+    width: 400,
+    maxWidth: "90%",
+    shadowColor: "#000",
     shadowOffset: { width: 0, height: 8 },
     shadowOpacity: 0.2,
     shadowRadius: 32,
-    // Sombra para Android
     elevation: 5,
   },
   title: {
-    textAlign: 'center',
+    textAlign: "center",
     marginBottom: 16,
-    color: '#000', // Título en negro
+    fontWeight: "bold",
+    color: '#0a0d0c',
+    fontSize: 20,
   },
   input: {
     marginBottom: 16,
-    backgroundColor: 'transparent',
+    backgroundColor: "#fff",
+    borderRadius: 30,
+    fontSize: 14,
+    gap: 10,
   },
   button: {
     marginVertical: 8,
+    backgroundColor: "#0038A8",
+    borderRadius: 30,
   },
   error: {
     color: 'red',
     textAlign: 'center',
     marginBottom: 8,
   },
+  outlinedButton: {
+    marginVertical: 8,
+    backgroundColor: "#fff",
+    borderColor: "#0038A8",
+    borderWidth: 1.5,
+    borderRadius: 30,
+  },
 });
 
 export default RegisterScreen;
-

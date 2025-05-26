@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useState, useEffect, useContext } from "react";
-import { View, StyleSheet, Alert } from "react-native";
+import { View, StyleSheet, Alert, ImageBackground } from "react-native";
 import { Video } from "expo-av";
 import { TextInput, Button, Text, Title } from "react-native-paper";
 import * as LocalAuthentication from "expo-local-authentication";
@@ -9,7 +9,7 @@ import { NavigationProp, useNavigation } from "@react-navigation/native";
 import { RootStackParamList } from "../../navigation/types";
 import { AuthContext } from "../../contexts/AuthContext";
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { login } from '../../api/auth'; // o la ruta relativa según tu estructura
+import { login } from '../../api/auth'; 
 
 
 type LoginScreenNavigationProp = NavigationProp<RootStackParamList, "Login">;
@@ -31,18 +31,29 @@ const LoginScreen: React.FC = () => {
   }, []);
 
   const handleLogin = async () => {
-    console.log("Iniciando login con:", username, password);
     try {
-      const response = await login(username, password); 
-      const data = response.data;
-        if (data.token) {
+      const response = await login(username.trim(), password.trim());
+      console.log(response);
+      if (response.status === 500) {
+        setError(error || "Error al iniciar sesión");
+        return;
+      }
+
+      const data = await response.data;
+      if (data.token) {
+        // Marcar usuario como autenticado y navegar al flujo principal
         await AsyncStorage.setItem('token', data.token);
         setIsAuthenticated(true);
       } else {
         setError("Respuesta inválida de la API");
       }
     } catch (err: any) {
-      setError("Error de conexión");
+      if (err.response) {
+        setError(err.response.data.message);
+      }else {
+        console.error("Error de conexión:", err);
+        setError("Error de conexión");
+      }
     }
   };
 
@@ -59,15 +70,11 @@ const LoginScreen: React.FC = () => {
 
   return (
     <View style={styles.container}>
-      <Video
-        source={require("../../../assets/login-background.mp4")}
-        rate={1.0}
-        volume={1.0}
-        isMuted
+      <ImageBackground
+        source={require("../../../assets/images/cards.png")}
         resizeMode={"cover" as any}
-        shouldPlay
-        isLooping
         style={StyleSheet.absoluteFill}
+        blurRadius={15}
       />
       <View style={styles.overlay} />
       <View style={styles.formContainer}>
@@ -76,7 +83,10 @@ const LoginScreen: React.FC = () => {
           label="Usuario"
           value={username}
           onChangeText={setUsername}
+          mode="outlined"
+          activeOutlineColor="#000"
           style={styles.input}
+          theme={{ roundness: 30 }}
         />
         <TextInput
           label="Contraseña"
@@ -84,38 +94,46 @@ const LoginScreen: React.FC = () => {
           onChangeText={setPassword}
           secureTextEntry
           style={styles.input}
+          mode="outlined"
+          activeOutlineColor="#000"
+          theme={{ roundness: 30 }}
         />
         {error && <Text style={styles.error}>{error}</Text>}
         <Button mode="contained" onPress={handleLogin} style={styles.button}>
           Iniciar Sesión
         </Button>
-        {biometricSupported && (
-          <Button mode="outlined" onPress={handleBiometricAuth} style={styles.button}>
-            Autenticación Biométrica
-          </Button>
-        )}
-        <Button onPress={() => navigation.navigate("Register")} style={styles.button}>
+
+        <Button
+          mode="outlined"
+          onPress={() => navigation.navigate("Register")}
+          style={styles.outlinedButton}
+          labelStyle={{ color: "#0139a8" }}
+        >
           Registrarse
         </Button>
+        {biometricSupported && (
+          <Text onPress={handleBiometricAuth} style={ {fontSize: 14, textAlign: "center", marginTop: 16, color: "#0139a8"} }>
+            Autenticación Biométrica
+          </Text>
+        )}
       </View>
     </View>
   );
 };
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-  },
   overlay: {
     ...StyleSheet.absoluteFillObject,
     backgroundColor: "rgba(0, 0, 0, 0.3)",
   },
+  container: {
+    flex: 1,
+    justifyContent: "center",
+    alignItems: "center",
+  },
   formContainer: {
-    position: "absolute",
-    top: "50%",
-    left: "50%",
-    transform: [{ translateX: -200 }, { translateY: -150 }],
-    backgroundColor: "rgba(255, 255, 255, 0.95)",
+    fontSize: 14,
+    backgroundColor: "#fff",
     padding: 20,
     borderRadius: 12,
     width: 400,
@@ -129,14 +147,27 @@ const styles = StyleSheet.create({
   title: {
     textAlign: "center",
     marginBottom: 16,
-    color: "#000",
+    fontWeight: "bold",
+    color: '#0a0d0c',
+    fontSize: 20,
   },
   input: {
     marginBottom: 16,
-    backgroundColor: "transparent",
+    backgroundColor: "#fff",
+    borderRadius: 30,
+    fontSize: 14,
   },
   button: {
     marginVertical: 8,
+    backgroundColor: "#0038A8",
+    borderRadius: 30,
+  },
+  outlinedButton: {
+    marginVertical: 8,
+    backgroundColor: "#fff",
+    borderColor: "#0038A8",
+    borderWidth: 1.5,
+    borderRadius: 30,
   },
   error: {
     color: "red",
@@ -146,9 +177,3 @@ const styles = StyleSheet.create({
 });
 
 export default LoginScreen;
-
-
-
-
-
-
