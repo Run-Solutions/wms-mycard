@@ -5,6 +5,10 @@ import { MODULE_CONFIG, ModuleFromApi } from '../navigation/moduleConfig';
 import DashboardScreen from '../screens/DashboardScreen';
 import CustomDrawerContent from './CustomDrawerContent';
 import WorkOrderDetailScreen from '../app/protected/seguimientoDeOts/[id]/page';
+import AceptarProductoAuxScreen from '../app/protected/aceptarProducto/[id]/page';
+import LiberarProductoAuxPage from '../app/protected/liberarProducto/[id]/page';
+import RecepcionCQMAuxScreen from '../app/protected/recepcionCqm/[id]/page';
+import InconformidadesAuxScreen from '../app/protected/inconformidades/[id]/page';
 import { useModules } from '../api/navigation';
 
 
@@ -21,6 +25,38 @@ const AppDrawer: React.FC = () => {
       <Stack.Screen
         name="WorkOrderDetailScreen"
         component={WorkOrderDetailScreen}
+        options={({ route }) => ({
+          headerShown: false,
+          title: `OT #${(route.params as { id: number }).id}`,
+        })}
+      />
+      <Stack.Screen
+        name="AceptarProductoAuxScreen"
+        component={AceptarProductoAuxScreen}
+        options={({ route }) => ({
+          headerShown: false,
+          title: `Flujo #${(route.params as { flowId: string }).flowId}`,
+        })}
+      />
+      <Stack.Screen
+        name="LiberarProductoAuxScreen"
+        component={LiberarProductoAuxPage}
+        options={({ route }) => ({
+          headerShown: false,
+          title: `OT #${(route.params as { id: number }).id}`,
+        })}
+      />
+      <Stack.Screen
+        name="RecepcionCQMAuxScreen"
+        component={RecepcionCQMAuxScreen}
+        options={({ route }) => ({
+          headerShown: false,
+          title: `OT #${(route.params as { id: number }).id}`,
+        })}
+      />
+      <Stack.Screen
+        name="InconformidadesAuxScreen"
+        component={InconformidadesAuxScreen}
         options={({ route }) => ({
           headerShown: false,
           title: `OT #${(route.params as { id: number }).id}`,

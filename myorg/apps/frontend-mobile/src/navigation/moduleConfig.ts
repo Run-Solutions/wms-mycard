@@ -5,12 +5,12 @@ import FinalizacionScreen from '../app/protected/finalizacion/FinalizacionScreen
 import PermisosScreen from '../app/protected/permisos/PermisosScreen';
 import UsuariosScreen from '../app/protected/usuarios/UsuariosScreen';
 // Para operadores
-import AceptarProductoScreen from '../app/protected/aceptarProducto/index';
-import LiberarProductoScreen from '../app/protected/liberarProducto/index';
-import InconformidadesScreen from '../app/protected/inconformidades/index';
+import AceptarProductoScreen from '../app/protected/aceptarProducto/page';
+import LiberarProductoScreen from '../app/protected/liberarProducto/page';
+import InconformidadesScreen from '../app/protected/inconformidades/page';
 // Para calidad
-import VistosBuenosScreen from '../app/protected/vistosBuenos/index';
-import RecepcionCQMScreen from '../app/protected/recepcionCqm/index';
+import VistosBuenosScreen from '../app/protected/vistosBuenos/page';
+import RecepcionCQMScreen from '../app/protected/recepcionCqm/page';
 import ConfiguracionVistosBuenosScreen from '../app/protected/configuracionVistosBuenos/index';
 // Para auditor
 import AceptarAuditoriaScreen from '../app/protected/aceptarAuditoria/index';

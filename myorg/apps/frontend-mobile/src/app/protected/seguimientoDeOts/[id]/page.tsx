@@ -226,6 +226,7 @@ const styles = StyleSheet.create({
     fontSize: 20,
     fontWeight: 'bold',
     marginBottom: 16,
+    color: 'black',
   },
   card: {
     backgroundColor: '#fff',
