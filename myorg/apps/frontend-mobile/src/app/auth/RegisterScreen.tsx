@@ -1,11 +1,11 @@
 "use client";
 
 import React, { useState } from 'react';
-import { 
-  View, 
-  StyleSheet, 
-  Alert, 
-  ImageBackground 
+import {
+  View,
+  StyleSheet,
+  Alert,
+  ImageBackground
 } from 'react-native';
 import { TextInput, Button, Text, Title } from 'react-native-paper';
 import { NavigationProp, useNavigation } from '@react-navigation/native';
@@ -151,11 +151,11 @@ const styles = StyleSheet.create({
     fontSize: 20,
   },
   input: {
+    gap: 4,
     marginBottom: 16,
     backgroundColor: "#fff",
     borderRadius: 30,
-    fontSize: 14,
-    gap: 10,
+    fontSize: 14
   },
   button: {
     marginVertical: 8,

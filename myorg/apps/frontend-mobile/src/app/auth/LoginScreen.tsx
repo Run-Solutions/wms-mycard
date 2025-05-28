@@ -2,7 +2,6 @@
 
 import React, { useState, useEffect, useContext } from "react";
 import { View, StyleSheet, Alert, ImageBackground } from "react-native";
-import { Video } from "expo-av";
 import { TextInput, Button, Text, Title } from "react-native-paper";
 import * as LocalAuthentication from "expo-local-authentication";
 import { NavigationProp, useNavigation } from "@react-navigation/native";
@@ -10,13 +9,19 @@ import { RootStackParamList } from "../../navigation/types";
 import { AuthContext } from "../../contexts/AuthContext";
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { login } from '../../api/auth'; 
+import { decodeJwtClean } from "../../utils/jwt";
 
 
 type LoginScreenNavigationProp = NavigationProp<RootStackParamList, "Login">;
-
+interface User {
+  username: String,
+  role: String,
+  role_id: number,
+  modules: Array<String>,
+}
 const LoginScreen: React.FC = () => {
   const navigation = useNavigation<LoginScreenNavigationProp>();
-  const { setIsAuthenticated } = useContext(AuthContext);
+  const { setIsAuthenticated, setUser } = useContext(AuthContext);
 
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
@@ -32,8 +37,11 @@ const LoginScreen: React.FC = () => {
 
   const handleLogin = async () => {
     try {
+      if (!username.trim() || !password.trim()) {
+        setError("Por favor, ingrese usuario y contraseña");
+        return;
+      }
       const response = await login(username.trim(), password.trim());
-      console.log(response);
       if (response.status === 500) {
         setError(error || "Error al iniciar sesión");
         return;
@@ -43,7 +51,13 @@ const LoginScreen: React.FC = () => {
       if (data.token) {
         // Marcar usuario como autenticado y navegar al flujo principal
         await AsyncStorage.setItem('token', data.token);
-        setIsAuthenticated(true);
+        const user = decodeJwtClean<User>(data.token)
+        if (user) {
+          setUser(user);
+          setIsAuthenticated(true);
+        } else {
+          setError("No se pudo decodificar el usuario del token");
+        }
       } else {
         setError("Respuesta inválida de la API");
       }

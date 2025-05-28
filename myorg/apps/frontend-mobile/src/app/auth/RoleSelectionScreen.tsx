@@ -29,6 +29,7 @@ const RoleSelectionScreen: React.FC = () => {
       Alert.alert('Error', 'No se pudieron cargar los roles');
     }
   };
+
   const fetchAreas = async () => {
     try {
       const response = await getAreas();

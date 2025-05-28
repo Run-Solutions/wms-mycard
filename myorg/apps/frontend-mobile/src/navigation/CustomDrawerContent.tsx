@@ -1,13 +1,13 @@
 "use client";
 
 import React, { useContext } from 'react';
-import { View, StyleSheet, Text, TouchableOpacity } from 'react-native';
+import { View, StyleSheet, Text, TouchableOpacity, Image } from 'react-native';
 import { DrawerContentScrollView, DrawerItemList, DrawerItem } from '@react-navigation/drawer';
 import { AuthContext } from '../contexts/AuthContext';
 import { useNavigation } from '@react-navigation/native';
 
 const CustomDrawerContent: React.FC<any> = (props) => {
-  const { setIsAuthenticated } = useContext(AuthContext);
+  const { setIsAuthenticated, user } = useContext(AuthContext);
   const navigation = useNavigation<any>();
 
   const handleGoToDashboard = () => {
@@ -33,6 +33,13 @@ const CustomDrawerContent: React.FC<any> = (props) => {
 
       <DrawerItemList {...props} />
 
+      <View style={styles.profileContainer}>
+        <DrawerItem
+          label={typeof user?.username === "string" ? user.username : "Perfil"}
+          onPress={() => console.log('Profile pressed')}
+          icon={() => <Image source={require('../../assets/logos/users.webp')} style={{ width: 40, height: 40 }} />}
+        />
+      </View>
       <View style={styles.logoutContainer}>
         <DrawerItem
           label="Cerrar sesión"
@@ -54,8 +61,12 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: 'bold',
   },
-  logoutContainer: {
+  profileContainer: {
     marginTop: 'auto',
+    fontSize: 16,
+    
+  },
+  logoutContainer: {
     borderTopWidth: 1,
     borderColor: '#ccc',
   },
