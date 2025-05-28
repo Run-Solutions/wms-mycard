@@ -49,10 +49,11 @@ const PermisosScreen: React.FC = () => {
       <View>
         {
           permissions.map(permission => (
-            <View style={styles.card}>
+            <View key={permission.id} style={styles.card}>
               <Dropdown
                 label={permission.name}
                 options={permission.modules.map((item: any) => ({
+                  key: `role-${permission.id}-mod-${item.id}`, 
                   label: item.name,
                   value: item.id.toString(),
                   component: (
