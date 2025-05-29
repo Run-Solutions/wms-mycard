@@ -83,7 +83,7 @@ const LiberarProductoScreen: React.FC = () => {
       ) : (
         <>
           <WorkOrderList
-            orders={filterOrdersByStatus(['En proceso', 'Enviado a CQM', 'En Calidad', 'Parcial'])}
+            orders={filterOrdersByStatus(['En proceso', 'Enviado a CQM', 'Listo', 'En Calidad', 'Parcial'])}
             title="Órdenes en Proceso"
           />
           {areaId !== 1 && (

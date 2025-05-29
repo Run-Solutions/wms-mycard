@@ -16,8 +16,8 @@
 
   // Componentes por área
   import PrepressComponentAccept from '../../../../components/AceptarProducto/PrepressComponentAccept';
-  /*import ImpresionComponentAccept from '../../../../components/AceptarProducto/ImpresionComponentAccept';
-  import SerigrafiaComponentAccept from '../../../../components/AceptarProducto/SerigrafiaComponentAccept';
+  import ImpresionComponentAccept from '../../../../components/AceptarProducto/ImpresionComponentAccept';
+  /*import SerigrafiaComponentAccept from '../../../../components/AceptarProducto/SerigrafiaComponentAccept';
   import EmpalmeComponentAccept from '../../../../components/AceptarProducto/EmpalmeComponentAccept';
   import LaminacionComponentAccept from '../../../../components/AceptarProducto/LaminacionComponentAccept';*/
 
@@ -69,9 +69,9 @@
       switch (lastStep?.area_id) {
         case 1:
           return <PrepressComponentAccept workOrder={workOrder} />;
-        /*case 2:
+        case 2:
           return <ImpresionComponentAccept workOrder={workOrder} />;
-        case 3:
+        /*case 3:
           return <SerigrafiaComponentAccept workOrder={workOrder} />;
         case 4:
           return <EmpalmeComponentAccept workOrder={workOrder} />;

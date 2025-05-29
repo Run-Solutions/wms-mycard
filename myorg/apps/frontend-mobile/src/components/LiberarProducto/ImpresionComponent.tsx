@@ -44,11 +44,12 @@ const ImpresionComponent = ({ workOrder }: { workOrder: any }) => {
 
   const disableLiberarButton = 
     isDisabled ||
-    ['Enviado a CQM', 'En Calidad', 'Parcial'].includes(workOrder.status) ||
+    ['Enviado a CQM', 'En Calidad', 'Parcial', ].includes(workOrder.status) ||
     (nextFlow && 
       ['Listo', 'Enviado a CQM', 'En calidad', 'Parcial', 'Pendiente parcial'].includes(nextFlow.status) &&
       !allParcialsValidated);
-  const disableLiberarCQM = ['Enviado a CQM', 'En Calidad', 'Listo'].includes(workOrder.status);
+    const disableLiberarCQM = ['Enviado a CQM', 'En Calidad', 'Listo'].includes(workOrder.status);
+    const isListo = workOrder.status === 'Listo';
 
   const toggleCheckbox = (
     id: number,
@@ -107,8 +108,9 @@ const ImpresionComponent = ({ workOrder }: { workOrder: any }) => {
   
     try {
       await releaseProductFromImpress(payload);
-      Alert.alert('Producto liberado correctamente');
       setShowConfirm(false);
+      Alert.alert('Producto liberado correctamente');
+      navigation.navigate('liberarProducto')
     } catch (err) {
       Alert.alert('Error del servidor al liberar.');
     }
@@ -136,8 +138,15 @@ const ImpresionComponent = ({ workOrder }: { workOrder: any }) => {
         onChangeText={setComments}
       />
 
-      <TouchableOpacity style={[styles.button, disableLiberarCQM && styles.disabledButton]} onPress={() => !disableLiberarCQM &&setShowCqmModal(true)}
-        disabled={disableLiberarCQM}>
+      <TouchableOpacity
+        style={[
+          styles.button,
+          disableLiberarCQM && styles.disabledButton,
+          isListo && styles.greenDisabledButton
+        ]}
+        onPress={() => !disableLiberarCQM && setShowCqmModal(true)}
+        disabled={disableLiberarCQM}
+      >
         <Text style={styles.buttonText}>Enviar a CQM</Text>
       </TouchableOpacity>
 
@@ -345,7 +354,7 @@ const styles = StyleSheet.create({
     backgroundColor: '#2563eb',
   },
   buttonSecondary: {
-    backgroundColor: '#9CA3AF',
+    backgroundColor: '#0038A8',
     padding: 12,
     borderRadius: 16,
     alignItems: 'center',
@@ -500,5 +509,9 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'space-between',
     marginTop: 20,
+  },
+  greenDisabledButton: {
+    backgroundColor: '#4CAF50', 
+    opacity: 1, 
   },
 });

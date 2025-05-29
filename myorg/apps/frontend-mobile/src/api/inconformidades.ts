@@ -36,3 +36,12 @@ export const acceptCQMInconformity = async (areaResponseId: number): Promise<voi
     throw new Error('No se pudo aceptar la inconformidad desde CQM.');
   }
 };
+
+export const acceptImpressionInconformity = async (areaResponseFlowId: number): Promise<void> => {
+  try {
+    await API.patch(`/inconformities/${areaResponseFlowId}/impresion`);
+  } catch (error: any) {
+    console.error('Error en acceptImpressionInconformity:', error?.response?.data || error.message);
+    throw new Error('No se pudo aceptar la inconformidad de impresion.');
+  }
+};

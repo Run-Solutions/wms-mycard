@@ -3,7 +3,6 @@ import { View, Text, FlatList, TouchableOpacity, StyleSheet, ActivityIndicator, 
 import { getPendingOrders } from '../../../api/aceptarProducto'; 
 import { NavigationProp, useNavigation } from '@react-navigation/native';
 import { RootStackParamList } from '../../../navigation/types';
-import AsyncStorage from '@react-native-async-storage/async-storage';
 import { acceptWorkOrderFlow } from '../../../api/aceptarProducto';
 
 interface WorkOrder {

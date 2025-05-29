@@ -13,7 +13,7 @@ import { getWorkOrderInconformidadById } from '../../../../api/inconformidades';
 
 // Componentes por área (ajusta según los que tengas)
 import PreprensaComponent from '../../../../components/Inconformidades/PreprensaComponent';
-// import ImpresionComponent from '../../../../components/Inconformidades/ImpresionComponent';
+import ImpresionComponent from '../../../../components/Inconformidades/ImpresionComponent';
 import ImpresionComponentCQM from '../../../../components/Inconformidades/ImpresionComponentCQM';
 
 // ...otros componentes
@@ -57,6 +57,8 @@ const InconformidadesAuxScreen: React.FC = () => {
       switch (lastCompleted.area_id) {
         case 1:
           return <PreprensaComponent workOrder={lastCompleted} />;
+        case 2:
+          return <ImpresionComponent workOrder={lastCompleted} />;
         // Agrega tus otros componentes aquí como en la web
         default:
           return <Text style={styles.title}>Área no reconocida</Text>;

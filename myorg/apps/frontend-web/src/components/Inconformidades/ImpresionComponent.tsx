@@ -64,11 +64,11 @@ export default function ImpresionComponent({ workOrder }: Props) {
   // Para los valores mostrados
   const releaseQuantity = lastPartialRelease
     ? lastPartialRelease.quantity
-    : workOrder.areaResponse?.empalme.release_quantity;
+    : workOrder.areaResponse?.impression.release_quantity;
 
   const releaseComments = lastPartialRelease
     ? lastPartialRelease.observation
-    : workOrder.areaResponse?.empalme.comments;
+    : workOrder.areaResponse?.impression.comments;
 
   const inconformityUser = lastPartialRelease
     ? lastPartialRelease.inconformities[0]?.user.username

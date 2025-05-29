@@ -67,7 +67,7 @@ const WorkOrderList: React.FC<Props> = ({ orders, onSelectOrder }) => {
           contentContainerStyle={styles.timelineContainer}
         >
           {item.flow.map((step, index) => {
-            const isActive = step.status.toLowerCase().includes('proceso');
+            const isActive = ['proceso', 'listo'].some(word => step.status.toLowerCase().includes(word));
             const isCompleted = step.status.toLowerCase().includes('completado');
             const isParcial = step.status.toLowerCase() === 'parcial';
             const isCalidad = ['calidad', 'cqm'].some(word => step.status.toLowerCase().includes(word));
