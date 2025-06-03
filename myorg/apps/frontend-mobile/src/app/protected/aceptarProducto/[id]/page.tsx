@@ -1,86 +1,83 @@
-  // apps/frontend-mobile/src/app/protected/aceptarProducto/[id]/page.tsx
+// apps/frontend-mobile/src/app/protected/aceptarProducto/[id]/page.tsx
 
-  import React, { useEffect, useState } from 'react';
-  import {
-    View,
-    Text,
-    ScrollView,
-    StyleSheet,
-    ActivityIndicator,
-    Alert,
-  } from 'react-native';
-  import { useRoute, RouteProp } from '@react-navigation/native';
-  import AsyncStorage from '@react-native-async-storage/async-storage';
-  import { RootStackParamList } from '../../../../navigation/types';
-  import { getWorkOrderByFlowId } from '../../../../api/aceptarProducto';
+import React, { useEffect, useState } from 'react';
+import {
+  View,
+  Text,
+  ScrollView,
+  StyleSheet,
+  ActivityIndicator,
+  Alert,
+} from 'react-native';
+import { useRoute, RouteProp } from '@react-navigation/native';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import { RootStackParamList } from '../../../../navigation/types';
+import { getWorkOrderByFlowId } from '../../../../api/aceptarProducto';
 
-  // Componentes por área
-  import PrepressComponentAccept from '../../../../components/AceptarProducto/PrepressComponentAccept';
-  import ImpresionComponentAccept from '../../../../components/AceptarProducto/ImpresionComponentAccept';
-  /*import SerigrafiaComponentAccept from '../../../../components/AceptarProducto/SerigrafiaComponentAccept';
-  import EmpalmeComponentAccept from '../../../../components/AceptarProducto/EmpalmeComponentAccept';
-  import LaminacionComponentAccept from '../../../../components/AceptarProducto/LaminacionComponentAccept';*/
+// Componentes por área
+import PrepressComponentAccept from '../../../../components/AceptarProducto/PrepressComponentAccept';
+import ImpresionComponentAccept from '../../../../components/AceptarProducto/ImpresionComponentAccept';
+import SerigrafiaComponentAccept from '../../../../components/AceptarProducto/SerigrafiaComponentAccept';
+import EmpalmeComponentAccept from '../../../../components/AceptarProducto/EmpalmeComponentAccept';
+import LaminacionComponentAccept from '../../../../components/AceptarProducto/LaminacionComponentAccept';
 
-  type RouteParams = RouteProp<RootStackParamList, 'AceptarProductoAuxScreen'>;
+type RouteParams = RouteProp<RootStackParamList, 'AceptarProductoAuxScreen'>;
 
-  const AceptarProductoAuxScreen: React.FC = () => {
-    const route = useRoute<RouteParams>();
-    const { flowId } = route.params;
+const AceptarProductoAuxScreen: React.FC = () => {
+  const route = useRoute<RouteParams>();
+  const { flowId } = route.params;
 
-    const [loading, setLoading] = useState(true);
-    const [workOrder, setWorkOrder] = useState<any>(null);
+  const [loading, setLoading] = useState(true);
+  const [workOrder, setWorkOrder] = useState<any>(null);
 
-    useEffect(() => {
-      const fetchWorkOrder = async () => {
-        try {
-          const data = await getWorkOrderByFlowId(flowId);
-          console.log('Orden:', data);
-          setWorkOrder(data);
-        } catch (error) {
-          console.error('Error al obtener la OT:', error);
-          Alert.alert('Error', 'No se pudo cargar la orden.');
-        } finally {
-          setLoading(false);
-        }
-      };
-      fetchWorkOrder();
-    }, [flowId]);
-
-    const renderComponentByArea = () => {
-      if (!workOrder || !workOrder.workOrder?.flow) return null;
-
-      let lastStep;
-
-      if (workOrder.status === 'Pendiente') {
-        lastStep = [...workOrder.workOrder.flow].reverse().find((step) => step.status === 'Completado');
-      } else if (
-        workOrder.status === 'Pendiente' &&
-        workOrder.workOrder.flow.partialReleases?.length > 0
-      ) {
-        lastStep = [...workOrder.workOrder.flow].reverse().find((step) =>
-          ['Listo', 'Enviado a CQM', 'En calidad', 'Parcial'].includes(step.status)
-        );
-      } else if (workOrder.status === 'Pendiente parcial') {
-        lastStep = [...workOrder.workOrder.flow].reverse().find((step) =>
-          ['Listo', 'Enviado a CQM', 'En calidad', 'Parcial'].includes(step.status)
-        );
-      }
-
-      switch (lastStep?.area_id) {
-        case 1:
-          return <PrepressComponentAccept workOrder={workOrder} />;
-        case 2:
-          return <ImpresionComponentAccept workOrder={workOrder} />;
-        /*case 3:
-          return <SerigrafiaComponentAccept workOrder={workOrder} />;
-        case 4:
-          return <EmpalmeComponentAccept workOrder={workOrder} />;
-        case 5:
-          return <LaminacionComponentAccept workOrder={workOrder} />;*/
-        default:
-          return <Text style={styles.title}>Área no reconocida.</Text>;
+  useEffect(() => {
+    const fetchWorkOrder = async () => {
+      try {
+        const data = await getWorkOrderByFlowId(flowId);
+        console.log('Orden:', data);
+        setWorkOrder(data);
+      } catch (error) {
+        console.error('Error al obtener la OT:', error);
+        Alert.alert('Error', 'No se pudo cargar la orden.');
+      } finally {
+        setLoading(false);
       }
     };
+    fetchWorkOrder();
+  }, [flowId]);
+
+  const renderComponentByArea = () => {
+    if (!workOrder || !workOrder.workOrder?.flow) return null;
+
+    let lastStep;
+
+    if (workOrder.status === 'Pendiente') {
+      lastStep = [...workOrder.workOrder.flow].reverse().find((step) => step.status === 'Completado');
+    } else if (workOrder.status === 'Pendiente' && workOrder.workOrder.flow.partialReleases?.length > 0) {
+      lastStep = [...workOrder.workOrder.flow].reverse().find((step) =>
+        ['Listo', 'Enviado a CQM', 'En calidad', 'Parcial'].includes(step.status)
+      );
+    } else if (workOrder.status === 'Pendiente parcial') {
+      lastStep = [...workOrder.workOrder.flow].reverse().find((step) =>
+        ['Listo', 'Enviado a CQM', 'En calidad', 'Parcial'].includes(step.status)
+      );
+    }
+
+    switch (lastStep?.area_id) {
+      case 1:
+        return <PrepressComponentAccept workOrder={workOrder} />;
+      case 2:
+        return <ImpresionComponentAccept workOrder={workOrder} />;
+      case 3:
+        return <SerigrafiaComponentAccept workOrder={workOrder} />;
+      case 4:
+        return <EmpalmeComponentAccept workOrder={workOrder} />;
+      case 5:
+        return <LaminacionComponentAccept workOrder={workOrder} />;
+    default:
+        return <Text style={styles.title}>Área no reconocida.</Text>;
+    }
+  };
 
     return (
       <ScrollView contentContainerStyle={styles.container}>

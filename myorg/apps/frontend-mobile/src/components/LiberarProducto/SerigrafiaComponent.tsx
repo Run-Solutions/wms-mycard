@@ -10,20 +10,20 @@ import {
   Platform,
   Modal,
 } from 'react-native';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useNavigation } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { RootStackParamList } from '../../navigation/types';
-import { submitToCQMImpression, releaseProductFromImpress } from '../../api/liberarProducto';
+import { submitToCQMSerigrafia, releaseProductFromSerigrafia } from '../../api/liberarProducto';
 
-const ImpresionComponent = ({ workOrder }: { workOrder: any }) => {
+const SerigrafiaComponent = ({ workOrder }: { workOrder: any }) => {
   console.log('Order', workOrder);
   const navigation = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
   const [sampleQuantity, setSampleQuantity] = useState('');
   const [comments, setComments] = useState('');
   const [showCqmModal, setShowCqmModal] = useState(false);
   const [showConfirm, setShowConfirm] = useState(false);
-  const [checkedFrente, setCheckedFrente] = useState<number[]>([]);
-  const [checkedVuelta, setCheckedVuelta] = useState<number[]>([]);
+  const [checkedQuestion, setCheckedQuestion] = useState<number[]>([]);
   const [showQuality, setShowQuality] = useState<boolean>(false);
 
   const questions = workOrder.area.formQuestions?.filter((q: any) => q.role_id === null) || [];
@@ -59,7 +59,7 @@ const ImpresionComponent = ({ workOrder }: { workOrder: any }) => {
   };
 
   const enviarACQM = async () => {
-    const isFrenteVueltaValid = checkedFrente.length > 0 || checkedVuelta.length > 0;
+    const isFrenteVueltaValid = checkedQuestion.length > 0 || checkedQuestion.length > 0;
     const isSampleValid = Number(sampleQuantity) > 0;
   
     if (!questions.length || !isFrenteVueltaValid || !isSampleValid) {
@@ -67,20 +67,23 @@ const ImpresionComponent = ({ workOrder }: { workOrder: any }) => {
       return;
     }
   
+    const answeredQuestions = questions.filter((q: any) =>
+      checkedQuestion.includes(q.id)
+    );
+    
     const payload = {
-      question_id: questions.map((q: any) => q.id),
+      question_id: answeredQuestions.map((q: any) => q.id),
       work_order_flow_id: workOrder.id,
       work_order_id: workOrder.workOrder.id,
       area_id: workOrder.area.id,
-      frente: questions.map((q: any) => checkedFrente.includes(q.id)),
-      vuelta: questions.map((q: any) => checkedVuelta.includes(q.id)),
+      response: answeredQuestions.map(() => true), // todas las marcadas son true
       reviewed: false,
       user_id: workOrder.assigned_user,
       sample_quantity: Number(sampleQuantity),
     };
   
     try {
-      await submitToCQMImpression(payload);
+      await submitToCQMSerigrafia(payload);
       Alert.alert('Formulario enviado a CQM');
       navigation.navigate('liberarProducto');
       setShowCqmModal(false);
@@ -106,7 +109,7 @@ const ImpresionComponent = ({ workOrder }: { workOrder: any }) => {
     };
   
     try {
-      await releaseProductFromImpress(payload);
+      await releaseProductFromSerigrafia(payload);
       setShowConfirm(false);
       Alert.alert('Producto liberado correctamente');
       navigation.navigate('liberarProducto')
@@ -117,7 +120,7 @@ const ImpresionComponent = ({ workOrder }: { workOrder: any }) => {
 
   return (
     <ScrollView style={styles.container}>
-      <Text style={styles.title}>Área: Impresión</Text>
+      <Text style={styles.title}>Área: Serigrafia</Text>
 
       <Text style={styles.label}>Cantidad a liberar:</Text>
       <TextInput
@@ -169,8 +172,7 @@ const ImpresionComponent = ({ workOrder }: { workOrder: any }) => {
           {/* Encabezado estilo tabla */}
           <View style={styles.tableHeader}>
             <Text style={[styles.tableCell, { flex: 2 }]}>Pregunta</Text>
-            <Text style={styles.tableCell}>Frente</Text>
-            <Text style={styles.tableCell}>Vuelta</Text>
+            <Text style={styles.tableCell}>Respuesta</Text>
           </View>
 
           {/* Preguntas normales */}
@@ -181,23 +183,13 @@ const ImpresionComponent = ({ workOrder }: { workOrder: any }) => {
               <Text style={styles.questionText}>{q.title}</Text>
             </View>
           
-            {/* Frente */}
+           {/* Respuesta */}
             <View style={[styles.tableCell, { flex: 1, alignItems: 'center' }]}>
               <TouchableOpacity
-                onPress={() => toggleCheckbox(q.id, checkedFrente, setCheckedFrente)}
+                onPress={() => toggleCheckbox(q.id, checkedQuestion, setCheckedQuestion)}
                 style={styles.radioCircle}
               >
-                {checkedFrente.includes(q.id) && <View style={styles.radioDot} />}
-              </TouchableOpacity>
-            </View>
-          
-            {/* Vuelta */}
-            <View style={[styles.tableCell, { flex: 1, alignItems: 'center' }]}>
-              <TouchableOpacity
-                onPress={() => toggleCheckbox(q.id, checkedVuelta, setCheckedVuelta)}
-                style={styles.radioCircle}
-              >
-                {checkedVuelta.includes(q.id) && <View style={styles.radioDot} />}
+                {checkedQuestion.includes(q.id) && <View style={styles.radioDot} />}
               </TouchableOpacity>
             </View>
           </View>
@@ -276,7 +268,7 @@ const ImpresionComponent = ({ workOrder }: { workOrder: any }) => {
   );
 };
 
-export default ImpresionComponent;
+export default SerigrafiaComponent;
 
 const styles = StyleSheet.create({
   container: { 

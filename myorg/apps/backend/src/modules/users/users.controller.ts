@@ -15,6 +15,11 @@ export class UsersController {
     return await this.usersService.getUsers();
   }
 
+  @Get('all')
+  async getUsersAndRoles() {
+    return await this.usersService.getUsersAndRoles();
+  }
+
   @Patch(':id')
   @UseInterceptors(
     FileInterceptor('profile_image', {
@@ -46,5 +51,5 @@ export class UsersController {
   @Delete(':id')
   async deleteUser(@Param('id') id: string) {
     return this.usersService.deleteUser(id);
-}
+  }
 }

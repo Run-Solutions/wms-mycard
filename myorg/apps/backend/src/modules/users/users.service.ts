@@ -13,6 +13,27 @@ export class UsersService {
     });
   }
 
+  async getUsersAndRoles() {
+    const users= await this.prisma.user.findMany({
+      select: {
+        id: true,
+        email: true,
+        username: true,
+        phone: true,
+        profile_image: true,
+        role: {
+          select: {
+            name: true
+          }
+        }
+      }
+    });
+    return users.map(user => ({
+      ...user,
+      role: user.role.name
+    }))
+  }
+
   async updateUser(id: string, updateUserDto: UpdateUserDto) {
     try {
       // Extraemos el campo 'role' para descartarlo y dejamos el resto en 'data'

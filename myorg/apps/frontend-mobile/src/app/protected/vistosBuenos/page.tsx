@@ -3,8 +3,7 @@ import { View, Text, FlatList, TouchableOpacity, StyleSheet, ActivityIndicator, 
 import { getPendingOrders } from '../../../api/aceptarProducto'; 
 import { NavigationProp, useNavigation } from '@react-navigation/native';
 import { RootStackParamList } from '../../../navigation/types';
-import AsyncStorage from '@react-native-async-storage/async-storage';
-import { acceptWorkOrderFlow } from '../../../api/aceptarProducto';
+import { fetchPendingOrders, acceptWorkOrder } from '../../../api/vistosBuenos';
 
 interface WorkOrder {
   id: number;
@@ -47,75 +46,27 @@ const VistosBuenosScreen = () => {
   const navigation = useNavigation<NavigationProp<RootStackParamList>>();
 
   useEffect(() => {
-    const fetchOrders = async () => {
+    const loadData = async () => {
       try {
-        const token = await AsyncStorage.getItem('token');
-        const res = await fetch('http://192.168.80.22:3000/work-order-cqm/pending', {
-          headers: {
-            'Authorization': `Bearer ${token}`
-          }
-        });
-        const data = await res.json();
-        if (Array.isArray(data)) {
-          const sorted = data.sort((a, b) => {
-            if (a.workOrder.priority && !b.workOrder.priority) return -1;
-            if (!a.workOrder.priority && b.workOrder.priority) return 1;
-            return new Date(a.workOrder.createdAt).getTime() - new Date(b.workOrder.createdAt).getTime();
-          });
-          setOrders(sorted);
-        } else {
-          setOrders([]);
-        }
-      } catch (err) {
-        console.error(err);
-        Alert.alert("Error", "No se pudieron obtener las órdenes.");
+        const orders = await fetchPendingOrders();
+        setOrders(orders);
+      } catch (err: any) {
+        Alert.alert('Error', err.message);
       } finally {
         setLoading(false);
       }
     };
-    fetchOrders();
+    loadData();
   }, []);
-
+  
   const aceptarOT = async () => {
-    if (!selectedOrder) return;
-  
-    let index: number = 0;
-    if (selectedOrder.answers?.length) {
-      for (let i = selectedOrder.answers.length - 1; i >= 0; i--) {
-        if (selectedOrder.answers[i].accepted === false) {
-          index = i;
-          break;
-        }
-      }
-    }
-  
-    const flowId = index !== -1 ? selectedOrder.answers[index]?.id : null;
-    if (!flowId) {
-      Alert.alert('Error', 'No se encontró un ID válido para FormAnswer.');
-      return;
-    }
-  
+    console.log(selectedOrder)
     try {
-      const token = await AsyncStorage.getItem('token');
-      const res = await fetch(`http://192.168.80.22:3000/work-order-cqm/${flowId}/accept`, {
-        method: 'PATCH',
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${token}`,
-        },
-      });
-  
-      if (res.ok) {
-        closeModal();
-        // 🔄 Refrescar datos sin recargar pantalla
-        setOrders((prev) => prev.filter((o) => o.id !== selectedOrder.id));
-      } else {
-        const error = await res.json();
-        Alert.alert('Error', error.message || 'No se pudo aceptar la OT');
-      }
-    } catch (err) {
-      console.error(err);
-      Alert.alert('Error', 'Ocurrió un error al aceptar la OT');
+      await acceptWorkOrder(selectedOrder);
+      closeModal();
+      setOrders((prev) => prev.filter((o) => o.id !== selectedOrder?.id));
+    } catch (err: any) {
+      Alert.alert('Error', err.message);
     }
   };
 

@@ -15,8 +15,8 @@ import { fetchWorkOrderById } from '../../../../api/liberarProducto';
 // Componentes por área (similares a los de la web)
 import PrePrensaComponent from '../../../../components/LiberarProducto/PrePrensaComponent';
 import ImpresionComponent from '../../../../components/LiberarProducto/ImpresionComponent';
-/*import SerigrafiaComponent from '../../../../components/LiberarProducto/SerigrafiaComponent';
-import EmpalmeComponent from '../../../../components/LiberarProducto/EmpalmeComponent';
+import SerigrafiaComponent from '../../../../components/LiberarProducto/SerigrafiaComponent';
+/*import EmpalmeComponent from '../../../../components/LiberarProducto/EmpalmeComponent';
 import LaminacionComponent from '../../../../components/LiberarProducto/LaminacionComponent';
 import CorteComponent from '../../../../components/LiberarProducto/CorteComponent';
 import ColorEdgeComponent from '../../../../components/LiberarProducto/ColorEdgeComponent';
@@ -55,8 +55,9 @@ const LiberarProductoAuxScreen: React.FC = () => {
         return <PrePrensaComponent workOrder={workOrder} />;
       case 2: 
         return <ImpresionComponent workOrder={workOrder} />;
-      /*case 3: return <SerigrafiaComponent workOrder={workOrder} />;
-      case 4: return <EmpalmeComponent workOrder={workOrder} />;
+      case 3: 
+        return <SerigrafiaComponent workOrder={workOrder} />;
+      /*case 4: return <EmpalmeComponent workOrder={workOrder} />;
       case 5: return <LaminacionComponent workOrder={workOrder} />;
       case 6: return <CorteComponent workOrder={workOrder} />;
       case 7: return <ColorEdgeComponent workOrder={workOrder} />;

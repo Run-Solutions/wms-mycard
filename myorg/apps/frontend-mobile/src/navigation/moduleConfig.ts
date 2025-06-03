@@ -3,7 +3,7 @@ import OrdenesScreen from '../app/protected/ordenesDeTrabajo/page';
 import SeguimientoScreen from '../app/protected/seguimientoDeOts/page';
 import FinalizacionScreen from '../app/protected/finalizacion/FinalizacionScreen';
 import PermisosScreen from '../app/protected/permisos/page';
-import UsuariosScreen from '../app/protected/usuarios/UsuariosScreen';
+import UsuariosScreen from '../app/protected/usuarios/page';
 // Para operadores
 import AceptarProductoScreen from '../app/protected/aceptarProducto/page';
 import LiberarProductoScreen from '../app/protected/liberarProducto/page';

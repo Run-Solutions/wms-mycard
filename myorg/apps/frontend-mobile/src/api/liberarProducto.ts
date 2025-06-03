@@ -34,7 +34,7 @@ export const submitPrepressForm = async (payload: PrepressPayload): Promise<void
   }
 };
 
-interface CQMImpressionPayload {
+interface CQMImpressPayload {
   question_id: number[];
   work_order_flow_id: number;
   work_order_id: number;
@@ -45,8 +45,18 @@ interface CQMImpressionPayload {
   user_id: number;
   sample_quantity: number;
 }
+interface CQMPayload {
+  question_id: number[];
+  work_order_flow_id: number;
+  work_order_id: number;
+  area_id: number;
+  response: boolean[];
+  reviewed: boolean;
+  user_id: number;
+  sample_quantity: number;
+}
 
-export const submitToCQMImpression = async (payload: CQMImpressionPayload): Promise<void> => {
+export const submitToCQMImpression = async (payload: CQMImpressPayload): Promise<void> => {
   try {
     await API.post('/free-order-flow/cqm-impression', payload);
   } catch (error: any) {
@@ -54,8 +64,16 @@ export const submitToCQMImpression = async (payload: CQMImpressionPayload): Prom
     throw new Error('No se pudo enviar el formulario a CQM.');
   }
 };
+export const submitToCQMSerigrafia = async (payload: CQMPayload): Promise<void> => {
+  try {
+    await API.post('/free-order-flow/cqm-serigrafia', payload);
+  } catch (error: any) {
+    console.error('Error en submitToCQMSerigrafia:', error?.response?.data || error.message);
+    throw new Error('No se pudo enviar el formulario a CQM.');
+  }
+};
 
-interface ReleaseImpressPayload {
+interface ReleasePayload {
   workOrderId: number;
   workOrderFlowId: number;
   areaId: number;
@@ -65,11 +83,19 @@ interface ReleaseImpressPayload {
   formAnswerId?: number;
 }
 
-export const releaseProductFromImpress = async (payload: ReleaseImpressPayload): Promise<void> => {
+export const releaseProductFromImpress = async (payload: ReleasePayload): Promise<void> => {
   try {
     await API.post('/free-order-flow/impress', payload);
   } catch (error: any) {
     console.error('Error en releaseProductFromImpress:', error?.response?.data || error.message);
+    throw new Error('No se pudo liberar el producto desde Impresión.');
+  }
+};
+export const releaseProductFromSerigrafia = async (payload: ReleasePayload): Promise<void> => {
+  try {
+    await API.post('/free-order-flow/serigrafia', payload);
+  } catch (error: any) {
+    console.error('Error en releaseProductFromSerigrafia', error?.response?.data || error.message);
     throw new Error('No se pudo liberar el producto desde Impresión.');
   }
 };

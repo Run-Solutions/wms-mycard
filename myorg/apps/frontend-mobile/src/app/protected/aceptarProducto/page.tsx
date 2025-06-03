@@ -4,6 +4,8 @@ import { getPendingOrders } from '../../../api/aceptarProducto';
 import { NavigationProp, useNavigation } from '@react-navigation/native';
 import { RootStackParamList } from '../../../navigation/types';
 import { acceptWorkOrderFlow } from '../../../api/aceptarProducto';
+import { useFocusEffect } from '@react-navigation/native';
+import { useCallback } from 'react';
 
 interface WorkOrder {
   id: number;
@@ -86,9 +88,11 @@ const AceptarProductoScreen = () => {
     }
   };
 
-  useEffect(() => {
-    fetchOrders();
-  }, []);
+  useFocusEffect(
+    useCallback(() => {
+      fetchOrders();
+    }, [])
+  );
 
   const openModal = (order: WorkOrder) => {
     setSelectedOrder(order);

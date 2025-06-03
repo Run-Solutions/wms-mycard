@@ -3,7 +3,6 @@
 
 import React, { useEffect, useState } from 'react';
 import { View, Text, ActivityIndicator, StyleSheet } from 'react-native';
-import AsyncStorage from '@react-native-async-storage/async-storage';
 import WorkOrderList from '../../../components/SeguimientoDeOts/WorkOrderList'; // importa el componente
 import { Platform } from 'react-native';
 import { fetchWorkOrdersInProgress } from '../../../api/seguimientoDeOts';
