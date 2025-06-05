@@ -15,24 +15,36 @@ model User {
   password              String
   phone                 String?
   profile_image         String?
-  role_id               Int                 @map("role_id") // Clave foránea
-  areas_operator_id     Int?                // Puede ser nulo si no es operador
+  role_id               Int                 @map("role_id")
+  areas_operator_id     Int?
 
-  role                  Role                @relation(fields: [role_id], references: [id]) // Relación con Role
-  areasOperator         AreasOperator?      @relation(fields: [areas_operator_id], references: [id]) // Relación con area si es operador
+  role                  Role                @relation(fields: [role_id], references: [id])
+  areasOperator         AreasOperator?      @relation(fields: [areas_operator_id], references: [id])
   WorkOrders            WorkOrder[]         @relation("UserWorkOrders")
-  WorkOrdersClosed      WorkOrder[]        @relation("UserWorkOrdersClosed")
+  WorkOrdersClosed      WorkOrder[]         @relation("UserWorkOrdersClosed")
   WorkOrderFlow         WorkOrderFlow[]     @relation("UserWorkOrderFlow")
   areasResponses        AreasResponse[]     @relation("UserAssignedToResponse")
-  answers               FormAnswer[]        @relation("AnsweredBy")  // inverso de `user`
-  reviewedAnswers       FormAnswer[]        @relation("ReviewedBy")  // inverso de `reviewer`
+  answers               FormAnswer[]        @relation("AnsweredBy")
+  reviewedAnswers       FormAnswer[]        @relation("ReviewedBy")
   formAuditory          FormAuditory[]      @relation("UserAssignedToFormAuditory")
   inconformitiesCreated Inconformities[]    @relation("UserInconformities")
+  biometricKeys         UserBiometricKey[]  // <-- este es el campo que faltaba
 
   created_at            DateTime            @default(now()) @map("created_at")
   updated_at            DateTime            @updatedAt @map("updated_at")
 
   @@map("users")
+}
+
+model UserBiometricKey {
+  id        Int     @id @default(autoincrement())
+  userId    Int
+  alias     String?
+  publicKey String @db.Text
+
+  user      User    @relation(fields: [userId], references: [id])
+
+  @@unique([userId, alias])
 }
 
 model Role {

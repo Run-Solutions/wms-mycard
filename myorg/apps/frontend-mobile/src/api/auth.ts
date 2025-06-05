@@ -1,3 +1,4 @@
+// myorg/apps/frontend-mobile/src/api/auth.ts
 import API from "./http";
 
 interface Role {
@@ -11,6 +12,7 @@ interface RegisterRequest {
     password: string;
     role_id?: number;
     areas_operator_id?: number;
+    biometric_public_key?: string;
 }
 
 export const login = (username: string, password: string) =>
@@ -18,6 +20,23 @@ export const login = (username: string, password: string) =>
 
 export const register = (data: RegisterRequest) =>
   API.post("/auth/register", data);
+
+export const getBiometricChallenge = (username: string) =>
+  API.post("/auth/biometric-challenge", { username });
+
+export const biometricLogin = (data: {
+  username: string;
+  challenge: string;
+  signature: string;
+}) => API.post("/auth/login/biometric", data);
+
+export const updateBiometricPublicKey = (username: string, publicKey: string) =>
+  API.patch('/auth/biometric-key', { username, publicKey });
+
+export const biometricRegister = (data: {
+  username: string;
+  publicKey: string;
+}) => API.post("/auth/biometric/register", data);
 
 export const getRoles = () => API.get<Role[]>("/auth/roles");
 

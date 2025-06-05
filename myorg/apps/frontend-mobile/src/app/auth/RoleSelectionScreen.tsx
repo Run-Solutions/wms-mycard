@@ -1,3 +1,4 @@
+// myorg/apps/frontend-mobile/src/app/auth/RoleSelectionScreen.tsx
 "use client";
 
 import React, { useEffect, useState } from 'react';
@@ -5,8 +6,14 @@ import { View, StyleSheet, Alert, ImageBackground } from 'react-native';
 import { Button, Title, RadioButton, TextInput } from 'react-native-paper';
 import { NavigationProp, RouteProp, useNavigation, useRoute } from '@react-navigation/native';
 import { RootStackParamList } from '../../navigation/types';
-import { getAreas, getRoles, register } from '../../api/auth';
+import { getAreas, getRoles, biometricRegister, register } from '../../api/auth';
+import ReactNativeBiometrics from 'react-native-biometrics';
 import Dropdown from '../../utils/dropdown';
+import 'react-native-get-random-values';
+import nacl from 'tweetnacl';
+import { encodeBase64 } from 'tweetnacl-util';
+import * as SecureStore from 'expo-secure-store';
+import 'react-native-get-random-values';
 
 type RoleSelectionScreenNavigationProp = NavigationProp<RootStackParamList, 'RoleSelection'>;
 type RoleSelectionScreenRouteProp = RouteProp<RootStackParamList, 'RoleSelection'>;
@@ -56,22 +63,70 @@ const RoleSelectionScreen: React.FC = () => {
       return;
     }
     try {
+      const rnBiometrics = new ReactNativeBiometrics();
+      const { available, biometryType } = await rnBiometrics.isSensorAvailable();
+      if (!available) {
+        Alert.alert('Error', 'La biometría no está disponible');
+        return;
+      }
+      console.log('Biometría disponible:', biometryType);
+      const promptResult = await rnBiometrics.simplePrompt({
+        promptMessage: 'Confirma tu huella para continuar',
+      });
+      if (!promptResult.success) {
+        Alert.alert('Cancelado', 'No se pudo autenticar con huella');
+        return;
+      }
+      // ✅ Validar si ya existe una clave registrada
+      const alias = `biometric_${pendingUser.username}`;
+      const existingKey = await SecureStore.getItemAsync(alias);
+      if (existingKey) {
+        Alert.alert('Ya registrado', 'Este usuario ya tiene una clave biométrica en este dispositivo.');
+        return;
+      }
+  
+      const { publicKey, secretKey } = nacl.sign.keyPair();
+      if (!publicKey || publicKey.length !== 32) {
+          Alert.alert('Error', 'No se pudo generar la clave pública correctamente');
+          return;
+        }if (!publicKey || publicKey.length !== 32) {
+        Alert.alert('Error', 'No se pudo generar la clave pública correctamente');
+        return;
+      }
+      // Guardar la clave privada (protegida) en el dispositivo
+      await SecureStore.setItemAsync(alias, encodeBase64(secretKey));
+ 
+      console.log('Clave biométrica generada:', publicKey);
+  
       const user = {
         ...pendingUser,
         role_id: selectedRole,
-        ...(selectedArea !== null && selectedRole === 2 ? { areas_operator_id: selectedArea } : {})
-      }
-      const response = await register(user)
-      const data = await response.data;
+        ...(selectedRole === 2 && selectedArea !== null
+          ? { areas_operator_id: selectedArea }
+          : {}),
+      };
+      console.log(user);
+  
+      const response = await register(user);
+      const data = response.data;
+      
+      await biometricRegister({
+        username: pendingUser.username,
+        publicKey: encodeBase64(publicKey),
+      });
+  
       if (response.status === 201) {
         Alert.alert('Registro exitoso', 'Ahora puedes iniciar sesión.');
-
         navigation.navigate('Login');
       } else {
         Alert.alert('Error', data.message || 'Error en el registro');
       }
-    } catch (error) {
-      Alert.alert('Error', 'No se pudo completar el registro');
+    } catch (error: any) {
+      console.error('Error al registrar usuario:', JSON.stringify(error?.response?.data, null, 2));
+      Alert.alert(
+        'Error',
+        error?.response?.data?.message || error?.message || 'No se pudo completar el registro'
+      );
     }
   };
 

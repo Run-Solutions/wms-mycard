@@ -253,7 +253,7 @@ const OrdenesDeTrabajoScreen: React.FC = () => {
         <Button
           title="Crear Orden"
           onPress={handleSubmit}
-          color={Platform.OS === 'ios' ? '#fff' : '#007BFF'} // color texto para Android
+          color={Platform.OS === 'ios' ? '#fff' : '#0038A8'} // color texto para Android
         />
       </View>
     </ScrollView>

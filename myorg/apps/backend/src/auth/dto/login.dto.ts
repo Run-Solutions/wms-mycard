@@ -9,3 +9,7 @@ export class LoginDto {
   @IsString()
   password: string;
 }
+export class UpdateBiometricKeyDto {
+  username: string;
+  publicKey: string;
+}

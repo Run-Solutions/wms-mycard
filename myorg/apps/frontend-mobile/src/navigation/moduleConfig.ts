@@ -1,7 +1,7 @@
 // moduleConfig.ts
 import OrdenesScreen from '../app/protected/ordenesDeTrabajo/page';
 import SeguimientoScreen from '../app/protected/seguimientoDeOts/page';
-import FinalizacionScreen from '../app/protected/finalizacion/FinalizacionScreen';
+import FinalizacionScreen from '../app/protected/finalizacion/page';
 import PermisosScreen from '../app/protected/permisos/page';
 import UsuariosScreen from '../app/protected/usuarios/page';
 // Para operadores

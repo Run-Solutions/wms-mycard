@@ -1,13 +1,14 @@
-/*myorg\apps\backend\src\auth\auth.service.ts*/
 // myorg/apps/backend/src/auth/auth.service.ts
-import { Injectable, UnauthorizedException, BadRequestException } from '@nestjs/common';
+import { Injectable, UnauthorizedException, BadRequestException, NotFoundException } from '@nestjs/common';
 import { PrismaClient, Prisma } from '@prisma/client';
 import * as jwt from 'jsonwebtoken';
 import * as bcrypt from 'bcryptjs';
+import * as crypto from 'crypto';
 import { LoginDto } from './dto/login.dto';
 import { RegisterDto } from './dto/register.dto';
 import { ForgotPasswordDto } from './dto/forgot-password.dto';
 import { NotificationsService } from '../notifications/notifications.service';
+import * as nacl from 'tweetnacl';
 
 @Injectable()
 export class AuthService {
@@ -15,6 +16,111 @@ export class AuthService {
   private readonly jwtSecret = process.env.JWT_SECRET || 'your_jwt_secret';
 
   constructor(private readonly notificationsService: NotificationsService) {}
+
+  private biometricChallenges = new Map<string, string>();
+  generateBiometricChallenge(username: string): string {
+    const challenge = crypto.randomBytes(32).toString('base64');
+    this.biometricChallenges.set(username, challenge);
+
+    // Opcional: usar setTimeout para eliminarlo en 5 minutos
+    setTimeout(() => this.biometricChallenges.delete(username), 5 * 60 * 1000);
+
+    return challenge;
+  }
+
+  private convertToPem(base64Key: string): string {
+    const keyLines = base64Key.match(/.{1,64}/g)?.join('\n') || '';
+    return `-----BEGIN PUBLIC KEY-----\n${keyLines}\n-----END PUBLIC KEY-----`;
+  }
+
+  async biometricLogin(data: {
+    username: string;
+    challenge: string;
+    signature: string;
+    deviceId: string;
+  }): Promise<{ token: string; user: any }> {
+    const { username, challenge, signature} = data;
+  
+    // 1. Verificar que el challenge sea válido
+    const expectedChallenge = this.biometricChallenges.get(username);
+    if (!expectedChallenge || expectedChallenge !== challenge) {
+      throw new UnauthorizedException('Challenge inválido o expirado');
+    }
+  
+    // 2. Buscar al usuario
+    const user = await this.prisma.user.findUnique({
+      where: { username },
+      include: {
+        role: {
+          include: {
+            permissions: {
+              include: { module: true },
+            },
+          },
+        },
+        areasOperator: true,
+      },
+    });
+  
+    if (!user) {
+      throw new UnauthorizedException('Usuario no encontrado');
+    }
+  
+    // 3. Buscar la clave biométrica asociada al usuario y deviceId
+    const alias = `biometric_${username}`;
+    const biometricKey = await this.prisma.userBiometricKey.findUnique({
+      where: {
+        userId_alias: {
+          userId: user.id,
+          alias,
+        },
+      },
+    });
+  
+    if (!biometricKey) {
+      throw new UnauthorizedException('No hay clave biométrica registrada en este dispositivo');
+    }
+  
+    // 4. Convertir la clave pública a formato PEM
+    if (typeof biometricKey.publicKey !== 'string') {
+      throw new UnauthorizedException('Clave pública inválida');
+    }
+    
+    function decodeBase64(base64: string): Uint8Array {
+      return Uint8Array.from(Buffer.from(base64, 'base64'));
+    }
+    if (typeof signature !== 'string') {
+      throw new UnauthorizedException('Firma inválida');
+    }
+    
+    const publicKey: Uint8Array = decodeBase64(biometricKey.publicKey);
+    const signatureBytes: Uint8Array = decodeBase64(signature);
+    const messageBytes: Uint8Array = new TextEncoder().encode(challenge);
+    
+    const isValid: boolean = nacl.sign.detached.verify(
+      messageBytes,
+      signatureBytes,
+      publicKey
+    );
+  
+    if (!isValid) {
+      throw new UnauthorizedException('Firma biométrica inválida');
+    }
+  
+    // 6. Generar el token
+    const tokenPayload: Record<string, unknown> = {
+      sub: user.id,
+      username: user.username,
+      role: user.role?.name,
+      role_id: user.role?.id,
+      areas_operator_id: user.areasOperator?.id,
+      modules: user.role?.permissions?.map((p) => p.module?.name) || [],
+    };
+  
+    const token = jwt.sign(tokenPayload, this.jwtSecret, { expiresIn: '1h' });
+  
+    return { token, user };
+  }
 
   async login(loginDto: LoginDto): Promise<{ token: string; user: any }> {
     const { username, password } = loginDto;
@@ -142,6 +248,30 @@ export class AuthService {
       }
       throw new BadRequestException('Error al registrar el usuario');
     }
+  }
+
+  async registerBiometricKey(username: string, publicKey: string) {
+    const user = await this.prisma.user.findUnique({ where: { username } });
+    if (!user) throw new NotFoundException('Usuario no encontrado');
+  
+    await this.prisma.userBiometricKey.upsert({
+      where: {
+        userId_alias: {
+          userId: user.id,
+          alias: `biometric_${username}`,
+        },
+      },
+      update: {
+        publicKey,
+      },
+      create: {
+        userId: user.id,
+        alias: `biometric_${username}`,
+        publicKey,
+      },
+    });
+  
+    return { message: 'Clave biométrica registrada correctamente' };
   }
 
   async forgotPassword(forgotPasswordDto: ForgotPasswordDto): Promise<{ message: string }> {

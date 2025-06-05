@@ -6,7 +6,7 @@ import { View, Text, StyleSheet } from 'react-native';
 const ProductosScreen: React.FC = () => {
   return (
     <View style={styles.container}>
-      <Text>ProductosScreen</Text>
+      <Text>No hay ordenes finalizadas</Text>
     </View>
   );
 };

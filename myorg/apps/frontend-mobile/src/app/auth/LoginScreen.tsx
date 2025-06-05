@@ -1,39 +1,99 @@
 "use client";
 
-import React, { useState, useEffect, useContext } from "react";
+import React, { useState, useContext } from "react";
 import { View, StyleSheet, Alert, ImageBackground } from "react-native";
 import { TextInput, Button, Text, Title } from "react-native-paper";
-import * as LocalAuthentication from "expo-local-authentication";
 import { NavigationProp, useNavigation } from "@react-navigation/native";
 import { RootStackParamList } from "../../navigation/types";
 import { AuthContext } from "../../contexts/AuthContext";
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { login } from '../../api/auth'; 
+import { biometricLogin, getBiometricChallenge, login } from '../../api/auth'; 
 import { decodeJwtClean } from "../../utils/jwt";
 
+import ReactNativeBiometrics from "react-native-biometrics";
+import nacl from 'tweetnacl';
+import { decodeBase64, encodeBase64 } from 'tweetnacl-util';
+import * as SecureStore from 'expo-secure-store';
 
 type LoginScreenNavigationProp = NavigationProp<RootStackParamList, "Login">;
 interface User {
-  username: String,
-  role: String,
-  role_id: number,
-  modules: Array<String>,
+  username: string;
+  role: string;
+  role_id: number;
+  modules: string[];
 }
+
 const LoginScreen: React.FC = () => {
   const navigation = useNavigation<LoginScreenNavigationProp>();
   const { setIsAuthenticated, setUser } = useContext(AuthContext);
 
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
-  const [biometricSupported, setBiometricSupported] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const rnBiometrics = new ReactNativeBiometrics();
 
-  useEffect(() => {
-    (async () => {
-      const compatible = await LocalAuthentication.hasHardwareAsync();
-      setBiometricSupported(compatible);
-    })();
-  }, []);
+  const handleBiometricLogin = async () => {
+    try {
+      if (!username.trim()) {
+        Alert.alert("Error", "Debes ingresar tu nombre de usuario");
+        return;
+      }
+
+      // Paso 1: pedir challenge al backend
+      const challengeResponse = await getBiometricChallenge(username.trim());
+      const challenge = challengeResponse.data.challenge;
+
+      if (!challenge) throw new Error("Challenge inválido");
+
+      // Paso 2: verificar huella
+      const result = await rnBiometrics.simplePrompt({
+        promptMessage: 'Confirma con biometría',
+      });
+
+      if (!result.success) {
+        Alert.alert("Autenticación cancelada", "No se confirmó la identidad biométrica");
+        return;
+      }
+
+      // Paso 3: recuperar clave privada del alias
+      const alias = `biometric_${username.trim()}`;
+      const storedPrivateKey = await SecureStore.getItemAsync(alias);
+
+      if (!storedPrivateKey) {
+        Alert.alert("Clave no encontrada", "Este usuario no tiene clave biométrica registrada en este dispositivo.");
+        return;
+      }
+
+      const secretKey = decodeBase64(storedPrivateKey);
+      const messageBytes = new TextEncoder().encode(challenge);
+      const signature = nacl.sign.detached(messageBytes, secretKey);
+      const signatureBase64 = encodeBase64(signature);
+
+      // Paso 4: enviar firma al backend
+      const biometricResponse = await biometricLogin({
+        username: username.trim(),
+        challenge,
+        signature: signatureBase64,
+      });
+
+      const { token } = biometricResponse.data;
+      if (!token) throw new Error("Token no recibido");
+
+      await AsyncStorage.setItem('token', token);
+      const user = decodeJwtClean<User>(token);
+
+      if (user) {
+        setUser(user);
+        setIsAuthenticated(true);
+      } else {
+        throw new Error("No se pudo decodificar el usuario");
+      }
+
+    } catch (err: any) {
+      const msg = err?.response?.data?.message || err?.message || 'Error desconocido';
+      Alert.alert("Error al iniciar sesión con biometría", msg);
+    }
+  };
 
   const handleLogin = async () => {
     try {
@@ -42,16 +102,12 @@ const LoginScreen: React.FC = () => {
         return;
       }
       const response = await login(username.trim(), password.trim());
-      if (response.status === 500) {
-        setError(error || "Error al iniciar sesión");
-        return;
-      }
-
       const data = await response.data;
+
       if (data.token) {
-        // Marcar usuario como autenticado y navegar al flujo principal
         await AsyncStorage.setItem('token', data.token);
-        const user = decodeJwtClean<User>(data.token)
+        const user = decodeJwtClean<User>(data.token);
+
         if (user) {
           setUser(user);
           setIsAuthenticated(true);
@@ -62,23 +118,7 @@ const LoginScreen: React.FC = () => {
         setError("Respuesta inválida de la API");
       }
     } catch (err: any) {
-      if (err.response) {
-        setError(err.response.data.message);
-      }else {
-        console.error("Error de conexión:", err);
-        setError("Error de conexión");
-      }
-    }
-  };
-
-  const handleBiometricAuth = async () => {
-    const result = await LocalAuthentication.authenticateAsync({
-      promptMessage: "Autenticación biométrica",
-    });
-    if (result.success) {
-      setIsAuthenticated(true);
-    } else {
-      Alert.alert("Autenticación fallida");
+      setError(err?.response?.data?.message || "Error al iniciar sesión");
     }
   };
 
@@ -113,10 +153,9 @@ const LoginScreen: React.FC = () => {
           theme={{ roundness: 30 }}
         />
         {error && <Text style={styles.error}>{error}</Text>}
-        <Button mode="contained" onPress={handleLogin} style={styles.button}>
+        <Button mode="contained" onPress={handleBiometricLogin} style={styles.button}>
           Iniciar Sesión
         </Button>
-
         <Button
           mode="outlined"
           onPress={() => navigation.navigate("Register")}
@@ -125,11 +164,6 @@ const LoginScreen: React.FC = () => {
         >
           Registrarse
         </Button>
-        {biometricSupported && (
-          <Text onPress={handleBiometricAuth} style={ {fontSize: 14, textAlign: "center", marginTop: 16, color: "#0139a8"} }>
-            Autenticación Biométrica
-          </Text>
-        )}
       </View>
     </View>
   );

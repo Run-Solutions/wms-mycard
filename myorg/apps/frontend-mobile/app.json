@@ -13,13 +13,15 @@
       "backgroundColor": "#ffffff"
     },
     "ios": {
-      "supportsTablet": true
+      "supportsTablet": true,
+      "bundleIdentifier": "com.anonymous.RunSolutions"
     },
     "android": {
       "adaptiveIcon": {
         "foregroundImage": "./assets/images/card.svg",
         "backgroundColor": "#ffffff"
-      }
+      },
+      "package": "com.anonymous.RunSolutions"
     },
     "web": {
       "favicon": "./assets/favicon.png"

@@ -2,7 +2,7 @@
 
 import { Body, Controller, Post, Get, UsePipes, ValidationPipe, Param } from '@nestjs/common';
 import { AuthService } from './auth.service';
-import { LoginDto } from './dto/login.dto';
+import { LoginDto} from './dto/login.dto';
 import { RegisterDto } from './dto/register.dto';
 import { ForgotPasswordDto } from './dto/forgot-password.dto';
 
@@ -32,6 +32,32 @@ export class AuthController {
   async login(@Body() loginDto: LoginDto) {
     return this.authService.login(loginDto);
   }
+
+  @Post('biometric-challenge')
+  generateChallenge(@Body('username') username: string) {
+    const challenge = this.authService.generateBiometricChallenge(username);
+    return { challenge };
+  }
+
+  @Post('login/biometric')
+  async biometricLogin(@Body() body: {
+    username: string;
+    challenge: string;
+    signature: string;
+    deviceId: string;
+  }) {
+    return this.authService.biometricLogin(body);
+  }
+
+  @Post('biometric/register')
+  async registerBiometricKey(@Body() body: { username: string, publicKey: string, deviceId: string }) {
+    return this.authService.registerBiometricKey(body.username, body.publicKey);
+  }
+
+  /*@Patch('biometric-key')
+  async updateBiometricKey(@Body() body: UpdateBiometricKeyDto) {
+    return this.authService.updateBiometricKey(body.username, body.publicKey);
+  }*/
 
   @Post('register')
   @UsePipes(new ValidationPipe({ whitelist: true }))
