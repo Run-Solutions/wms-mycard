@@ -13,7 +13,7 @@ import {
 import { useNavigation } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { RootStackParamList } from '../../navigation/types';
-import { acceptImpressionInconformity } from '../../api/inconformidades';
+import { acceptLaminacionInconformity } from '../../api/inconformidades';
 
 interface PartialRelease {
   quantity: string;
@@ -23,7 +23,7 @@ interface PartialRelease {
   inconformities: any[];
 }
 
-const ImpresionComponent: React.FC<{ workOrder: any }> = ({ workOrder }) => {
+const LaminacionComponent: React.FC<{ workOrder: any }> = ({ workOrder }) => {
   const navigation = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
   const [showModal, setShowModal] = useState(false);
 
@@ -38,12 +38,12 @@ const ImpresionComponent: React.FC<{ workOrder: any }> = ({ workOrder }) => {
   // Para los valores mostrados
   const releaseQuantity = lastPartialRelease
     ? lastPartialRelease.quantity
-    : workOrder.areaResponse?.impression.release_quantity;
+    : workOrder.areaResponse?.empalme.release_quantity;
   console.log(releaseQuantity);
 
   const releaseComments = lastPartialRelease
     ? lastPartialRelease.observation
-    : workOrder.areaResponse?.impression.comments;
+    : workOrder.areaResponse?.empalme.comments;
 
   const inconformityUser = lastPartialRelease
     ? lastPartialRelease.inconformities[0]?.user.username
@@ -64,7 +64,7 @@ const ImpresionComponent: React.FC<{ workOrder: any }> = ({ workOrder }) => {
     console.log(areaResponseFlowId);
     try {
   
-      await acceptImpressionInconformity(areaResponseFlowId);
+      await acceptLaminacionInconformity(areaResponseFlowId);
       setShowModal(false);
       Alert.alert('Inconformidad aceptada');
       navigation.navigate('liberarProducto');
@@ -78,11 +78,10 @@ const ImpresionComponent: React.FC<{ workOrder: any }> = ({ workOrder }) => {
   return (
     <View>
       <ScrollView contentContainerStyle={[styles.container, { paddingBottom: 100 }]}>
-        <Text style={styles.title}>Área: Impresión</Text>
+        <Text style={styles.title}>Área: Serigrafia</Text>
 
         <View style={styles.card}>
           <Text style={styles.subtitle}>Entregaste:</Text>
-          <Text style={styles.label}>Placas</Text>
           <TextInput style={styles.input} editable={false} value={String(releaseQuantity)} />
 
           <Text style={styles.label}>Comentarios</Text>
@@ -141,7 +140,7 @@ const ImpresionComponent: React.FC<{ workOrder: any }> = ({ workOrder }) => {
   );
 };
 
-export default ImpresionComponent;
+export default LaminacionComponent;
 
 const styles = StyleSheet.create({
   container: { 

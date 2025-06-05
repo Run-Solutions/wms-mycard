@@ -15,6 +15,7 @@ import { getWorkOrderInconformidadById } from '../../../../api/inconformidades';
 import PreprensaComponent from '../../../../components/Inconformidades/PreprensaComponent';
 import ImpresionComponent from '../../../../components/Inconformidades/ImpresionComponent';
 import ImpresionComponentCQM from '../../../../components/Inconformidades/ImpresionComponentCQM';
+import SerigrafiaComponentCQM from '../../../../components/Inconformidades/SerigrafiaComponentCQM';
 
 // ...otros componentes
 
@@ -68,6 +69,8 @@ const InconformidadesAuxScreen: React.FC = () => {
       switch (areaInconformidadCQM.area_id) {
         case 2:
           return <ImpresionComponentCQM workOrder={areaInconformidadCQM} />;
+        case 3: 
+          return <SerigrafiaComponentCQM workOrder={areaInconformidadCQM} />;
         default:
           return <Text style={styles.title}>Área CQM no reconocida</Text>;
       }

@@ -45,3 +45,27 @@ export const acceptImpressionInconformity = async (areaResponseFlowId: number): 
     throw new Error('No se pudo aceptar la inconformidad de impresion.');
   }
 };
+export const acceptSerigrafiaInconformity = async (areaResponseFlowId: number): Promise<void> => {
+  try {
+    await API.patch(`/inconformities/${areaResponseFlowId}/serigrafia`);
+  } catch (error: any) {
+    console.error('Error en acceptSerigrafiaInconformity:', error?.response?.data || error.message);
+    throw new Error('No se pudo aceptar la inconformidad de serigrafia.');
+  }
+};
+export const acceptEmpalmeInconformity = async (areaResponseFlowId: number): Promise<void> => {
+  try {
+    await API.patch(`/inconformities/${areaResponseFlowId}/empalme`);
+  } catch (error: any) {
+    console.error('Error en acceptSerigrafiaInconformity:', error?.response?.data || error.message);
+    throw new Error('No se pudo aceptar la inconformidad de empalme.');
+  }
+};
+export const acceptLaminacionInconformity = async (areaResponseFlowId: number): Promise<void> => {
+  try {
+    await API.patch(`/inconformities/${areaResponseFlowId}/laminacion`);
+  } catch (error: any) {
+    console.error('Error en acceptLaminacionInconformity:', error?.response?.data || error.message);
+    throw new Error('No se pudo aceptar la inconformidad de laminacion.');
+  }
+};

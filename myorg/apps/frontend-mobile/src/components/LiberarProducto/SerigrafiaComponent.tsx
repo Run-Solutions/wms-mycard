@@ -10,12 +10,15 @@ import {
   Platform,
   Modal,
 } from 'react-native';
-import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useNavigation } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { RootStackParamList } from '../../navigation/types';
 import { submitToCQMSerigrafia, releaseProductFromSerigrafia } from '../../api/liberarProducto';
 
+interface PartialRelease {
+  validated: boolean;
+  quantity: number;
+}
 const SerigrafiaComponent = ({ workOrder }: { workOrder: any }) => {
   console.log('Order', workOrder);
   const navigation = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
@@ -28,14 +31,70 @@ const SerigrafiaComponent = ({ workOrder }: { workOrder: any }) => {
 
   const questions = workOrder.area.formQuestions?.filter((q: any) => q.role_id === null) || [];
   const qualityQuestions = workOrder.area.formQuestions?.filter((q: any) => q.role_id === 3) || [];
-
-  const currentFlow = [...workOrder.workOrder.flow].find((f: any) => f.id === workOrder.id);
-
   const isDisabled =
   workOrder.status === 'En proceso';
+  
+  console.log("El mismo workOrder (workOrder)", workOrder);
+  const flowList = [...workOrder.workOrder.flow];
+  // Índice del flow actual basado en su id
+  const currentIndex = flowList.findIndex((item) => item.id === workOrder.id);
+  console.log('el currentIndex', currentIndex);
+  // Flow actual
+  const currentFlow = currentIndex !== -1 ? flowList[currentIndex] : null;
+  // Anterior (si hay)
+  const lastCompletedOrPartial = currentIndex > 0 ? flowList[currentIndex - 1] : null;
+  // Siguiente (si hay)
+  const nextFlow = currentIndex !== -1 && currentIndex < flowList.length - 1
+    ? flowList[currentIndex + 1]
+    : null;
+  console.log("El flujo actual (currentFlow)", currentFlow);
+  console.log("El siguiente flujo (nextFlow)", nextFlow);
+  console.log("Ultimo parcial o completado", lastCompletedOrPartial);
 
-  const nextFlowIndex = workOrder.workOrder.flow.findIndex((f: any) => f.id === workOrder.id) + 1;
-  const nextFlow = workOrder.workOrder.flow[nextFlowIndex] ?? null;
+  const cantidadEntregadaLabel = lastCompletedOrPartial.areaResponse && lastCompletedOrPartial.partialReleases.lenght > 0
+  ? 'Cantidad entregada:'
+  : lastCompletedOrPartial.partialReleases?.some((r: PartialRelease) => r.validated)
+    ? 'Cantidad entregada validada:'
+    : 'Cantidad faltante por liberar:';
+
+  const cantidadEntregadaValue = lastCompletedOrPartial.areaResponse && lastCompletedOrPartial.partialReleases.lenght > 0
+    ? (
+      lastCompletedOrPartial.areaResponse.prepress?.plates ??
+      lastCompletedOrPartial.areaResponse.impression?.quantity ??
+      lastCompletedOrPartial.areaResponse.serigrafia?.quantity ??
+      lastCompletedOrPartial.areaResponse.empalme?.quantity ??
+      lastCompletedOrPartial.areaResponse.laminacion?.quantity ??
+      lastCompletedOrPartial.areaResponse.corte?.quantity ??
+      lastCompletedOrPartial.areaResponse.colorEdge?.quantity ??
+      lastCompletedOrPartial.areaResponse.hotStamping?.quantity ??
+      lastCompletedOrPartial.areaResponse.millingChip?.quantity ??
+      lastCompletedOrPartial.areaResponse.personalizacion?.quantity ??
+      'Sin cantidad'
+    )
+    : lastCompletedOrPartial.partialReleases?.some((r: PartialRelease) => r.validated)
+      ? lastCompletedOrPartial.partialReleases
+          .filter((r: PartialRelease) => r.validated)
+          .reduce((sum: number, r: { quantity: number }) => sum + r.quantity, 0)
+      : (lastCompletedOrPartial.workOrder?.quantity ?? 0) -
+        (lastCompletedOrPartial.partialReleases?.reduce((sum: number, r: { quantity: number }) => sum + r.quantity, 0) ?? 0);
+
+  const mostrarCantidadPorLiberar =
+    (workOrder?.partialReleases?.length ?? 0) > 0;
+
+  let cantidadPorLiberar = 0;
+  if (mostrarCantidadPorLiberar) {
+    if (lastCompletedOrPartial.area.name === 'preprensa') {
+      cantidadPorLiberar = workOrder.workOrder.quantity -
+        workOrder.partialReleases.reduce((sum: number, r: {quantity: number}) => sum + r.quantity, 0);
+    } else {
+      const validadas = lastCompletedOrPartial.partialReleases?.filter((release: { validated: boolean, quantity: number }) => release.validated) ?? [];
+      const sumaValidadas = validadas.reduce((sum: number, r: {quantity: number}) => sum + r.quantity, 0);
+      const sumaParciales = workOrder.partialReleases.reduce((sum: number, r: {quantity: number}) => sum + r.quantity, 0);
+      cantidadPorLiberar = validadas.length > 0
+        ? (sumaValidadas - sumaParciales)
+        : sumaParciales;
+    }
+  }
 
   const allParcialsValidated = workOrder.partialReleases?.every(
     (r: { validated: boolean }) => r.validated
@@ -121,6 +180,26 @@ const SerigrafiaComponent = ({ workOrder }: { workOrder: any }) => {
   return (
     <ScrollView style={styles.container}>
       <Text style={styles.title}>Área: Serigrafia</Text>
+
+      <View style={styles.cardDetail}>
+        <Text style={styles.labelDetail}>Área que lo envía: 
+          <Text style={styles.valueDetail}> {lastCompletedOrPartial.area.name}</Text>
+        </Text>
+        <Text style={styles.labelDetail}>
+          Usuario del área previa: <Text style={styles.valueDetail}>{lastCompletedOrPartial.user.username}</Text>
+        </Text>
+        <Text style={styles.labelDetail}>
+          {cantidadEntregadaLabel}
+        <Text style={styles.valueDetail}> {cantidadEntregadaValue}</Text>
+        </Text>
+      
+        {mostrarCantidadPorLiberar && (
+          <Text style={styles.labelDetail}>
+            Cantidad por Liberar:
+            <Text style={styles.valueDetail}> {cantidadPorLiberar}</Text>
+          </Text>
+        )}
+      </View>
 
       <Text style={styles.label}>Cantidad a liberar:</Text>
       <TextInput
@@ -219,13 +298,6 @@ const SerigrafiaComponent = ({ workOrder }: { workOrder: any }) => {
                   <Text style={styles.qualityQuestion}>{q.title}</Text>
                 </View>
               ))}
-
-              <Text style={styles.subtitle}>Tipo de Prueba</Text>
-              {['color', 'perfil', 'fisica'].map(type => (
-                <View key={type} style={styles.radioDisabled}>
-                  <Text>{`Prueba ${type}`}</Text>
-                </View>
-              ))}
             </>
           )}
 
@@ -274,7 +346,7 @@ const styles = StyleSheet.create({
   container: { 
     flex: 1,
     paddingTop: 16,
-    paddingBottom: 32,
+    paddingBottom: 2,
     paddingHorizontal: 8, 
     backgroundColor: '#fdfaf6', 
   },
@@ -293,7 +365,15 @@ const styles = StyleSheet.create({
     marginBottom: 12,
   },
   label: { fontWeight: '600', marginTop: 12, fontSize: 16, marginBottom: 8 },
+  labelDetail: {
+    fontWeight: 'bold',
+    fontSize: 16,
+  },
   value: { marginBottom: 8 },
+  valueDetail: {
+    fontWeight: 'normal',
+    fontSize: 16,
+  },
   input: {
     borderWidth: 1,
     borderColor: '#ccc',
@@ -319,6 +399,13 @@ const styles = StyleSheet.create({
     borderRadius: 18,
     marginBottom: 24,
     elevation: 3,
+  },
+  cardDetail: {
+    backgroundColor: '#fff',
+    padding: 12,
+    borderRadius: 8,
+    marginBottom: 16,
+    elevation: 2,
   },
   button: {
     backgroundColor: '#0038A8',

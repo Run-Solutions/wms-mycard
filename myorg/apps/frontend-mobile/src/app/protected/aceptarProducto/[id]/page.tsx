@@ -10,8 +10,6 @@ import {
   Alert,
 } from 'react-native';
 import { useRoute, RouteProp } from '@react-navigation/native';
-import AsyncStorage from '@react-native-async-storage/async-storage';
-import { RootStackParamList } from '../../../../navigation/types';
 import { getWorkOrderByFlowId } from '../../../../api/aceptarProducto';
 
 // Componentes por área
@@ -21,7 +19,9 @@ import SerigrafiaComponentAccept from '../../../../components/AceptarProducto/Se
 import EmpalmeComponentAccept from '../../../../components/AceptarProducto/EmpalmeComponentAccept';
 import LaminacionComponentAccept from '../../../../components/AceptarProducto/LaminacionComponentAccept';
 
-type RouteParams = RouteProp<RootStackParamList, 'AceptarProductoAuxScreen'>;
+import { InternalStackParamList } from '../../../../navigation/types';
+
+type RouteParams = RouteProp<InternalStackParamList, 'AceptarProductoAuxScreen'>;
 
 const AceptarProductoAuxScreen: React.FC = () => {
   const route = useRoute<RouteParams>();
@@ -59,9 +59,10 @@ const AceptarProductoAuxScreen: React.FC = () => {
       );
     } else if (workOrder.status === 'Pendiente parcial') {
       lastStep = [...workOrder.workOrder.flow].reverse().find((step) =>
-        ['Listo', 'Enviado a CQM', 'En calidad', 'Parcial'].includes(step.status)
+        ['Listo', 'Enviado a CQM', 'En calidad', 'Parcial', 'En proceso'].includes(step.status)
       );
     }
+    console.log(lastStep);
 
     switch (lastStep?.area_id) {
       case 1:

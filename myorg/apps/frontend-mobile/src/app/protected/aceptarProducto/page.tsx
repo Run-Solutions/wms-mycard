@@ -1,11 +1,13 @@
 import React, { useEffect, useState } from 'react';
 import { View, Text, FlatList, TouchableOpacity, StyleSheet, ActivityIndicator, Alert, Modal, Pressable } from 'react-native';
 import { getPendingOrders } from '../../../api/aceptarProducto'; 
-import { NavigationProp, useNavigation } from '@react-navigation/native';
+import { NavigationProp } from '@react-navigation/native';
 import { RootStackParamList } from '../../../navigation/types';
 import { acceptWorkOrderFlow } from '../../../api/aceptarProducto';
 import { useFocusEffect } from '@react-navigation/native';
 import { useCallback } from 'react';
+import { CompositeNavigationProp, useNavigation } from '@react-navigation/native';
+import { DrawerNavigationProp } from '@react-navigation/drawer';
 
 interface WorkOrder {
   id: number;
@@ -29,13 +31,18 @@ interface WorkOrder {
   };
 }
 
+type NavigationType = CompositeNavigationProp<
+  DrawerNavigationProp<RootStackParamList>,
+  NavigationProp<RootStackParamList>
+>;
+
 const AceptarProductoScreen = () => {
   const [orders, setOrders] = useState<WorkOrder[]>([]);
   const [loading, setLoading] = useState(true);
   const [modalVisible, setModalVisible] = useState(false);
   const [selectedOrder, setSelectedOrder] = useState<WorkOrder | null>(null);
 
-  const navigation = useNavigation<NavigationProp<RootStackParamList>>();
+  const navigation = useNavigation<NavigationType>();
   const aceptarOT = async () => {
     console.log("Aceptar OT");
     if (!selectedOrder) return;
@@ -49,7 +56,10 @@ const AceptarProductoScreen = () => {
     }
     if (selectedOrder.area_id >= 2 && selectedOrder.area_id <= 6) {
       closeModal();
-      navigation.navigate('AceptarProductoAuxScreen', { flowId });
+      navigation.navigate('Principal', {
+        screen: 'AceptarProductoAuxScreen',
+        params: { flowId },
+      });
       return;
     }
     try {

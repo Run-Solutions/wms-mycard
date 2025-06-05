@@ -7,6 +7,7 @@ import {
   StyleSheet,
   ActivityIndicator,
   ScrollView,
+  Platform
 } from 'react-native';
 import { useRoute, RouteProp } from '@react-navigation/native';
 import { RootStackParamList } from '../../../../navigation/types';
@@ -73,24 +74,65 @@ const LiberarProductoAuxScreen: React.FC = () => {
       {loading ? (
         <ActivityIndicator size="large" color="#2563EB" />
       ) : (
-        renderComponentByArea()
+        <>
+          <Text style={styles.header}>Información de la OT</Text>
+          <View style={styles.card}>
+            <Text style={styles.label}>
+              OT: <Text style={styles.value}>{workOrder.workOrder.ot_id}</Text>
+            </Text>
+            <Text style={styles.label}>
+              Presupuesto: <Text style={styles.value}>{workOrder.workOrder.mycard_id}</Text>
+            </Text>
+            <Text style={styles.label}>
+              Cantidad: <Text style={styles.value}>{workOrder.workOrder.quantity}</Text>
+            </Text>
+            <Text style={styles.label}>
+              Comentarios: <Text style={styles.value}>{workOrder.workOrder.comments}</Text>
+            </Text>
+          </View>
+          {renderComponentByArea()}
+        </>
       )}
     </ScrollView>
   );
 };
-
 export default LiberarProductoAuxScreen;
 
 const styles = StyleSheet.create({
-  container: {
-    padding: 16,
-    backgroundColor: '#fdfaf6',
-    flexGrow: 1,
+  container: { 
+    flex: 1,
+    paddingTop: 16,
+    paddingBottom: 2,
+    paddingHorizontal: 8, 
+    backgroundColor: '#fdfaf6', 
   },
   title: {
     fontSize: 20,
     fontWeight: 'bold',
     marginVertical: 16,
     textAlign: 'center',
+  },
+  header: {
+    fontSize: 20,
+    fontWeight: 'bold',
+    marginBottom: 16,
+    textAlign: 'center',
+    color: 'black',
+    padding: Platform.OS === 'ios' ? 10 : 0,
+  },
+  card: {
+    backgroundColor: '#fff',
+    padding: 12,
+    borderRadius: 8,
+    marginBottom: 16,
+    elevation: 2,
+  },
+  label: {
+    fontWeight: 'bold',
+    fontSize: 16,
+  },
+  value: {
+    fontWeight: 'normal',
+    fontSize: 16,
   },
 });

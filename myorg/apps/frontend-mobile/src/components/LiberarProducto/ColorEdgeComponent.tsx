@@ -13,28 +13,30 @@ import {
 import { useNavigation } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { RootStackParamList } from '../../navigation/types';
-import { submitToCQMImpression, releaseProductFromImpress } from '../../api/liberarProducto';
+import { submitToCQMColorEdge, releaseProductFromColorEdge } from '../../api/liberarProducto';
 
 interface PartialRelease {
   validated: boolean;
   quantity: number;
 }
-const ImpresionComponent = ({ workOrder }: { workOrder: any }) => {
+const ColorEdgeComponent = ({ workOrder }: { workOrder: any }) => {
   console.log('Order', workOrder);
   const navigation = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
   const [sampleQuantity, setSampleQuantity] = useState('');
+  const [goodQuantity, setGoodQuantity] = useState('');
+  const [badQuantity, setBadQuantity] = useState('');
+  const [excessQuantity, setExcessQuantity] = useState('');
   const [comments, setComments] = useState('');
   const [showCqmModal, setShowCqmModal] = useState(false);
   const [showConfirm, setShowConfirm] = useState(false);
-  const [checkedFrente, setCheckedFrente] = useState<number[]>([]);
-  const [checkedVuelta, setCheckedVuelta] = useState<number[]>([]);
+  const [checkedQuestion, setCheckedQuestion] = useState<number[]>([]);
   const [showQuality, setShowQuality] = useState<boolean>(false);
 
   const questions = workOrder.area.formQuestions?.filter((q: any) => q.role_id === null) || [];
   const qualityQuestions = workOrder.area.formQuestions?.filter((q: any) => q.role_id === 3) || [];
   const isDisabled =
   workOrder.status === 'En proceso';
-
+  
   console.log("El mismo workOrder (workOrder)", workOrder);
   const flowList = [...workOrder.workOrder.flow];
   // Índice del flow actual basado en su id
@@ -119,7 +121,7 @@ const ImpresionComponent = ({ workOrder }: { workOrder: any }) => {
   };
 
   const enviarACQM = async () => {
-    const isFrenteVueltaValid = checkedFrente.length > 0 || checkedVuelta.length > 0;
+    const isFrenteVueltaValid = checkedQuestion.length > 0 || checkedQuestion.length > 0;
     const isSampleValid = Number(sampleQuantity) > 0;
   
     if (!questions.length || !isFrenteVueltaValid || !isSampleValid) {
@@ -127,20 +129,23 @@ const ImpresionComponent = ({ workOrder }: { workOrder: any }) => {
       return;
     }
   
+    const answeredQuestions = questions.filter((q: any) =>
+      checkedQuestion.includes(q.id)
+    );
+    
     const payload = {
-      question_id: questions.map((q: any) => q.id),
+      question_id: answeredQuestions.map((q: any) => q.id),
       work_order_flow_id: workOrder.id,
       work_order_id: workOrder.workOrder.id,
       area_id: workOrder.area.id,
-      frente: questions.map((q: any) => checkedFrente.includes(q.id)),
-      vuelta: questions.map((q: any) => checkedVuelta.includes(q.id)),
+      response: answeredQuestions.map(() => true), // todas las marcadas son true
       reviewed: false,
       user_id: workOrder.assigned_user,
       sample_quantity: Number(sampleQuantity),
     };
   
     try {
-      await submitToCQMImpression(payload);
+      await submitToCQMColorEdge(payload);
       Alert.alert('Formulario enviado a CQM');
       navigation.navigate('liberarProducto');
       setShowCqmModal(false);
@@ -160,13 +165,15 @@ const ImpresionComponent = ({ workOrder }: { workOrder: any }) => {
       workOrderFlowId: currentFlow.id,
       areaId: workOrder.area.id,
       assignedUser: currentFlow.assigned_user,
-      releaseQuantity: Number(sampleQuantity),
+      goodQuantity: Number(goodQuantity),
+      badQuantity: Number(badQuantity),
+      excessQuantity: Number(excessQuantity),
       comments,
       formAnswerId: currentFlow.answers?.[0]?.id,
     };
   
     try {
-      await releaseProductFromImpress(payload);
+      await releaseProductFromColorEdge(payload);
       setShowConfirm(false);
       Alert.alert('Producto liberado correctamente');
       navigation.navigate('liberarProducto')
@@ -177,7 +184,7 @@ const ImpresionComponent = ({ workOrder }: { workOrder: any }) => {
 
   return (
     <ScrollView style={styles.container}>
-      <Text style={styles.title}>Área: Impresión</Text>
+      <Text style={styles.title}>Área: Color Edge</Text>
 
       <View style={styles.cardDetail}>
         <Text style={styles.labelDetail}>Área que lo envía: 
@@ -188,9 +195,9 @@ const ImpresionComponent = ({ workOrder }: { workOrder: any }) => {
         </Text>
         <Text style={styles.labelDetail}>
           {cantidadEntregadaLabel}
-          <Text style={styles.valueDetail}> {cantidadEntregadaValue}</Text>
+        <Text style={styles.valueDetail}> {cantidadEntregadaValue}</Text>
         </Text>
-
+      
         {mostrarCantidadPorLiberar && (
           <Text style={styles.labelDetail}>
             Cantidad por Liberar:
@@ -199,13 +206,30 @@ const ImpresionComponent = ({ workOrder }: { workOrder: any }) => {
         )}
       </View>
 
-      <Text style={styles.label}>Cantidad a liberar:</Text>
+      <Text style={styles.label}>Cantidad a liberar</Text>
+      <Text style={styles.label}>Buenas:</Text>
       <TextInput
         style={styles.input}
         keyboardType="numeric"
         placeholder="Ej: 100"
-        value={sampleQuantity}
-        onChangeText={setSampleQuantity}
+        value={goodQuantity}
+        onChangeText={setGoodQuantity}
+      />
+      <Text style={styles.label}>Malas:</Text>
+      <TextInput
+        style={styles.input}
+        keyboardType="numeric"
+        placeholder="Ej: 100"
+        value={badQuantity}
+        onChangeText={setBadQuantity}
+      />
+      <Text style={styles.label}>Excedente:</Text>
+      <TextInput
+        style={styles.input}
+        keyboardType="numeric"
+        placeholder="Ej: 100"
+        value={excessQuantity}
+        onChangeText={setExcessQuantity}
       />
 
       <Text style={styles.label}>Comentarios:</Text>
@@ -249,8 +273,7 @@ const ImpresionComponent = ({ workOrder }: { workOrder: any }) => {
           {/* Encabezado estilo tabla */}
           <View style={styles.tableHeader}>
             <Text style={[styles.tableCell, { flex: 2 }]}>Pregunta</Text>
-            <Text style={styles.tableCell}>Frente</Text>
-            <Text style={styles.tableCell}>Vuelta</Text>
+            <Text style={styles.tableCell}>Respuesta</Text>
           </View>
 
           {/* Preguntas normales */}
@@ -261,23 +284,13 @@ const ImpresionComponent = ({ workOrder }: { workOrder: any }) => {
               <Text style={styles.questionText}>{q.title}</Text>
             </View>
           
-            {/* Frente */}
+           {/* Respuesta */}
             <View style={[styles.tableCell, { flex: 1, alignItems: 'center' }]}>
               <TouchableOpacity
-                onPress={() => toggleCheckbox(q.id, checkedFrente, setCheckedFrente)}
+                onPress={() => toggleCheckbox(q.id, checkedQuestion, setCheckedQuestion)}
                 style={styles.radioCircle}
               >
-                {checkedFrente.includes(q.id) && <View style={styles.radioDot} />}
-              </TouchableOpacity>
-            </View>
-          
-            {/* Vuelta */}
-            <View style={[styles.tableCell, { flex: 1, alignItems: 'center' }]}>
-              <TouchableOpacity
-                onPress={() => toggleCheckbox(q.id, checkedVuelta, setCheckedVuelta)}
-                style={styles.radioCircle}
-              >
-                {checkedVuelta.includes(q.id) && <View style={styles.radioDot} />}
+                {checkedQuestion.includes(q.id) && <View style={styles.radioDot} />}
               </TouchableOpacity>
             </View>
           </View>
@@ -305,13 +318,6 @@ const ImpresionComponent = ({ workOrder }: { workOrder: any }) => {
               {qualityQuestions.map((q: any) => (
                 <View key={q.id} style={styles.qualityRow}>
                   <Text style={styles.qualityQuestion}>{q.title}</Text>
-                </View>
-              ))}
-
-              <Text style={styles.subtitle}>Tipo de Prueba</Text>
-              {['color', 'perfil', 'fisica'].map(type => (
-                <View key={type} style={styles.radioDisabled}>
-                  <Text>{`Prueba ${type}`}</Text>
                 </View>
               ))}
             </>
@@ -356,7 +362,7 @@ const ImpresionComponent = ({ workOrder }: { workOrder: any }) => {
   );
 };
 
-export default ImpresionComponent;
+export default ColorEdgeComponent;
 
 const styles = StyleSheet.create({
   container: { 
