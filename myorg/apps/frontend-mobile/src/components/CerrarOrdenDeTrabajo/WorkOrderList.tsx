@@ -48,7 +48,7 @@ const WorkOrderList: React.FC<Props> = ({ orders, onSelectOrder }) => {
       onPress={() =>
           navigation.navigate('Principal', {
           screen: 'CerrarOrdenDeTrabajoAuxScreen',
-          params: { id: item.id },
+          params: { id: item.ot_id },
         })
       }
     >

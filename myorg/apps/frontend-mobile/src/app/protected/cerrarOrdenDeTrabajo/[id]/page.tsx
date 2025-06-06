@@ -23,7 +23,7 @@ import PersonalizacionComponent from '../../../../components/CerrarOrdenDeTrabaj
 type RouteParams = RouteProp<InternalStackParamList, 'CerrarOrdenDeTrabajoAuxScreen'>;
 
 const CerrarOrdenDeTrabajoAuxScreen: React.FC = () => {
-  const route = useRoute<RouteParams>();
+  const route = useRoute<any>();
   const { id } = route.params;
 
   const [loading, setLoading] = useState(true);
@@ -48,7 +48,7 @@ const CerrarOrdenDeTrabajoAuxScreen: React.FC = () => {
   const renderComponentByArea = () => {
     if (!workOrder) return null;
     console.log('WorkOrder', workOrder)
-    const flowEnAuditoria = workOrder.flow.find((flow: any) => flow.status === 'En auditoria');
+    const flowEnAuditoria = workOrder?.flow.find((flow: any) => flow.status === 'En auditoria');
 
     switch (flowEnAuditoria.area_id) {
       case 6: 

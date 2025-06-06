@@ -67,9 +67,10 @@ const CerrarOrdenDeTrabajoScreen: React.FC = () => {
     }, [])
   );
 
-  const filterOrdersByStatus = (statuses: string[]) => {
-    return orders.filter((o) => statuses.includes(o.status));
-  };
+  const filteredOrders = orders.filter(order =>
+    order.flow.some(flowItem => flowItem.status === 'En auditoria')
+  );
+
 
   return (
     <View style={styles.container}>
@@ -83,8 +84,8 @@ const CerrarOrdenDeTrabajoScreen: React.FC = () => {
       ) : (
         <>
           <WorkOrderList
-            orders={filterOrdersByStatus(['En auditoria'])}
-            title="Órdenes en Proceso"
+            orders={filteredOrders}
+            title="Órdenes en Auditoría"
           />
         </>
       )}
