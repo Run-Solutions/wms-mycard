@@ -102,7 +102,7 @@ export default function ColorEdgeComponent({ workOrder }: Props) {
         </NewDataWrapper>
         <InputGroup>
           <Label>Comentarios</Label>
-          <Textarea value={workOrder.areaResponse.colorEdge.comments} disabled/>
+          <Textarea value={releaseComments} disabled/>
         </InputGroup>
       </NewData>
     </Container>

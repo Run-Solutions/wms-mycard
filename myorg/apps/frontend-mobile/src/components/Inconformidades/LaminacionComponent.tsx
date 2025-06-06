@@ -38,12 +38,12 @@ const LaminacionComponent: React.FC<{ workOrder: any }> = ({ workOrder }) => {
   // Para los valores mostrados
   const releaseQuantity = lastPartialRelease
     ? lastPartialRelease.quantity
-    : workOrder.areaResponse?.empalme.release_quantity;
+    : workOrder.areaResponse?.laminacion.release_quantity;
   console.log(releaseQuantity);
 
   const releaseComments = lastPartialRelease
     ? lastPartialRelease.observation
-    : workOrder.areaResponse?.empalme.comments;
+    : workOrder.areaResponse?.laminacion.comments;
 
   const inconformityUser = lastPartialRelease
     ? lastPartialRelease.inconformities[0]?.user.username

@@ -275,7 +275,7 @@ export default function ColorEdgeComponent({ workOrder }: Props) {
           <Textarea placeholder="Agrega un comentario adicional..." disabled={isDisabled}/>
         </InputGroup>
       </NewData>
-      <LiberarButton disabled={isDisabled || ['Enviado a CQM', 'En Calidad'].includes(workOrder.status) || ['En calidad', 'Parcial', 'Pendiente parcial', 'En auditoria', 'Enviado a auditoria'].includes(nextFlow.status) && !allParcialsValidated} onClick={handleLiberarClick}>Liberar Producto</LiberarButton>
+      <LiberarButton disabled={isDisabled || ['Enviado a CQM', 'En Calidad'].includes(workOrder.status) || ['En calidad', 'Parcial', 'Pendiente parcial', 'En auditoria', 'Enviado a auditoria'].includes(nextFlow?.status) && !allParcialsValidated} onClick={handleLiberarClick}>Liberar Producto</LiberarButton>
     </Container>
 
     {/* Modal para enviar a liberacion */}

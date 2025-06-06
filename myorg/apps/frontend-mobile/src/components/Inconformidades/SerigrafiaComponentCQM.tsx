@@ -40,45 +40,47 @@ const SerigrafiaComponentCQM = ({ workOrder }: { workOrder: any }) => {
           {/* Encabezado estilo tabla */}
           <View style={styles.tableHeader}>
             <Text style={[styles.tableCell, { flex: 2 }]}>Pregunta</Text>
-            <Text style={styles.tableCell}>Frente</Text>
-            <Text style={styles.tableCell}>Vuelta</Text>
+            <Text style={styles.tableCell}>Respuesta</Text>
           </View>
           {/* Preguntas normales */}
           {questions.map((q: any) => {
-          const responses = workOrder.answers[index]?.FormAnswerResponse?.filter(
-            (resp: any) => resp.question_id === q.id
+            const responses = workOrder.answers[index]?.FormAnswerResponse?.find(
+              (resp: any) => resp.question_id === q.id
             );
             console.log(responses);
             // Encuentra la respuesta del operador por pregunta_id
-            const frontAnswer = responses[0]?.response_operator;
-            const vueltaAnswer = responses[1]?.response_operator;
+            const operatorResponse = responses?.response_operator;
             return (
               <View key={q.id} style={styles.tableRow}>
                 {/* Pregunta */}
                 <View style={[styles.tableCell, { flex: 2 }]}>
                   <Text style={styles.questionText}>{q.title}</Text>
                 </View>
-                {/* Frente */}
+                {/* Respuesta */}
                 <View style={[styles.tableCell, { flex: 1, alignItems: 'center' }]}>
-                  <View style={[styles.radioCircle, frontAnswer && styles.radioDisabled]}>
-                    {frontAnswer && <View style={styles.radioDot} />}
+                  <View style={[styles.radioCircle, operatorResponse && styles.radioDisabled]}>
+                    {operatorResponse && <View style={styles.radioDot} />}
                   </View>
                 </View>
-                {/* Vuelta */}
-                <View style={[styles.tableCell, { flex: 1, alignItems: 'center' }]}>
-                  <View style={[styles.radioCircle, vueltaAnswer && styles.radioDisabled]}>
-                    {vueltaAnswer && <View style={styles.radioDot} />}
-                  </View>
-                </View>
-            </View>
+              </View>
             );
           })}
           <Text style={styles.label}>Muestras entregadas:</Text>
           <TextInput
-            value={String(workOrder.answers[index]?.sample_quantity ?? 'No se reconoce la muestra enviada')}
-            editable={false}
             style={styles.input}
+            value={
+              typeof workOrder?.answers?.[index]?.sample_quantity === 'number'
+              ? workOrder.answers[index].sample_quantity.toString()
+              : ''
+            }
+            editable={false}
           />
+
+          {typeof workOrder?.answers?.[index]?.sample_quantity !== 'number' && (
+          <Text style={{ color: '#b91c1c', marginTop: 8, textAlign: 'center' }}>
+            No se reconoce la muestra enviada
+          </Text>
+          )}
         </View>
 
         <Text style={styles.sectionTitle}>Inconformidad</Text>

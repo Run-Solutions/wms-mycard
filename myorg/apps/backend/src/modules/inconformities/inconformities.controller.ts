@@ -98,6 +98,16 @@ export class InconformitiesController {
       }
       return await this.InconformitiesService.inconformityHotStamping(areaResponseId);
   };
+
+  @Patch(':areaResponse/milling-chip')
+  async inconformityMillingChip(@Req() req: AuthenticatedRequest, @Param('areaResponse') areaResponseId: number,) {
+    console.log('LLOEGA');
+    const user = req.user;
+      if(!user){
+        throw new ForbiddenException('Usuario no autenticado.');
+      }
+      return await this.InconformitiesService.inconformityMillingChip(areaResponseId);
+  };
   
   @Patch(':areaResponse/personalizacion')
   async inconformityPersonalizacion(@Req() req: AuthenticatedRequest, @Param('areaResponse') areaResponseId: number,) {

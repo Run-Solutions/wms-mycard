@@ -69,3 +69,43 @@ export const acceptLaminacionInconformity = async (areaResponseFlowId: number): 
     throw new Error('No se pudo aceptar la inconformidad de laminacion.');
   }
 };
+export const acceptCorteInconformity = async (areaResponseFlowId: number): Promise<void> => {
+  try {
+    await API.patch(`/inconformities/${areaResponseFlowId}/corte`);
+  } catch (error: any) {
+    console.error('Error en acceptCorteInconformity:', error?.response?.data || error.message);
+    throw new Error('No se pudo aceptar la inconformidad de corte.');
+  }
+};
+export const acceptColorEdgeInconformity = async (areaResponseFlowId: number): Promise<void> => {
+  try {
+    await API.patch(`/inconformities/${areaResponseFlowId}/color-edge`);
+  } catch (error: any) {
+    console.error('Error en acceptColorEdgeInconformity:', error?.response?.data || error.message);
+    throw new Error('No se pudo aceptar la inconformidad de color edge.');
+  }
+};
+export const acceptHotStampingInconformity = async (areaResponseFlowId: number): Promise<void> => {
+  try {
+    await API.patch(`/inconformities/${areaResponseFlowId}/hot-stamping`);
+  } catch (error: any) {
+    console.error('Error en acceptHotStampingInconformity:', error?.response?.data || error.message);
+    throw new Error('No se pudo aceptar la inconformidad de hot stamping.');
+  }
+};
+export const acceptMillingChipInconformity = async (areaResponseFlowId: number): Promise<void> => {
+  try {
+    await API.patch(`/inconformities/${areaResponseFlowId}/milling-chip`);
+  } catch (error: any) {
+    console.error('Error en acceptMillingChipInconformity:', error?.response?.data || error.message);
+    throw new Error('No se pudo aceptar la inconformidad de hot stamping.');
+  }
+};
+export const acceptPersonalizacionInconformity = async (areaResponseFlowId: number): Promise<void> => {
+  try {
+    await API.patch(`/inconformities/${areaResponseFlowId}/personalizacion`);
+  } catch (error: any) {
+    console.error('Error en acceptPersonalizacionInconformity:', error?.response?.data || error.message);
+    throw new Error('No se pudo aceptar la inconformidad de hot stamping.');
+  }
+};

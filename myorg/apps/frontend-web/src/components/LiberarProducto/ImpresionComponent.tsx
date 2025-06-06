@@ -361,7 +361,7 @@ export default function ImpresionComponent({ workOrder }: Props) {
           <Textarea placeholder="Agrega un comentario adicional..." disabled={isDisabled}/>
         </InputGroup>
       </NewData>
-      <LiberarButton disabled={isDisabled || ['Enviado a CQM', 'En Calidad', 'Parcial'].includes(workOrder.status) || ['Listo', 'Enviado a CQM', 'En calidad', 'Parcial', 'Pendiente parcial'].includes(nextFlow.status) && !allParcialsValidated} onClick={handleLiberarClick}>Liberar Producto</LiberarButton>
+      <LiberarButton disabled={isDisabled || ['Enviado a CQM', 'En Calidad', 'Parcial'].includes(workOrder.status) || ['Listo', 'Enviado a CQM', 'En calidad', 'Parcial', 'Pendiente parcial'].includes(nextFlow?.status) && !allParcialsValidated} onClick={handleLiberarClick}>Liberar Producto</LiberarButton>
     </Container>
 
     {/* Modal para enviar a liberacion */}

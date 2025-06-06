@@ -531,6 +531,85 @@ export class InconformitiesService {
     });
   }
   
+  async inconformityMillingChip(areaResponseId: number) {
+    return this.prisma.$transaction(async (tx) => {
+      const areaResponse = await tx.areasResponse.findFirst({
+        where: {
+          work_order_flow_id: Number(areaResponseId),
+        },
+      });
+      const flow = await tx.workOrderFlow.findUnique({
+        where: {
+          id: Number(areaResponseId),
+        },
+      });
+      const flowParcial = await tx.partialRelease.findMany({
+        where: {
+          work_order_flow_id: flow?.id,
+        },
+      });
+      if (!areaResponse || areaResponse && flowParcial) {
+        if (flowParcial) {
+          await tx.partialRelease.deleteMany({
+            where: {
+              work_order_flow_id: flow?.id,
+              validated: false,
+            },
+          });
+          await tx.areasResponse.deleteMany({
+            where: {
+              work_order_flow_id: flow?.id,
+            },
+          });
+          await tx.workOrderFlow.update({
+            where: {
+              id: flow?.id,
+            },
+            data: {
+              status: 'Listo'
+            }
+          });
+        }
+        return { message: 'Respuesta guardada con exito'};
+      }
+      const millingChipResponse = await tx.millingChipResponse.findUnique({
+        where: {
+          areas_response_id: areaResponse.id,
+        },
+      });
+      if (millingChipResponse) {
+        // Si existe un form_auditory_id, eliminar el FormAuditory
+        if (millingChipResponse.form_auditory_id) {
+          await tx.formAuditory.deleteMany({
+            where: {
+              id: millingChipResponse.form_auditory_id,
+            },
+          });
+        }
+      // Eliminar el registro empalme asociado a ese AreasResponse
+      await tx.millingChipResponse.deleteMany({
+        where: {
+          areas_response_id: areaResponse.id,
+        },
+      });
+      }
+      await tx.areasResponse.deleteMany({
+        where: {
+          id: areaResponse.id,
+        },
+      });
+      await tx.workOrderFlow.update({
+        where: {
+          id: flow?.id,
+        },
+        data: {
+          status: 'Listo'
+        }
+      })
+      return { message: 'Respuesta guardada con exito'};
+    });
+  }
+  
   async inconformityPersonalizacion(areaResponseId: number) {
     return this.prisma.$transaction(async (tx) => {
       const areaResponse = await tx.areasResponse.findFirst({

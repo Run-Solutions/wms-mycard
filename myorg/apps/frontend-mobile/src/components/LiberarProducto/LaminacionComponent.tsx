@@ -107,7 +107,7 @@ const LaminacionComponent = ({ workOrder }: { workOrder: any }) => {
     isDisabled ||
     ['Enviado a CQM', 'En Calidad', 'Parcial', ].includes(workOrder.status) ||
     (nextFlow && 
-      ['Listo', 'Enviado a CQM', 'En calidad', 'Parcial', 'Pendiente parcial'].includes(nextFlow.status) &&
+      ['Listo', 'Enviado a CQM', 'En calidad', 'Parcial', 'Pendiente parcial'].includes(nextFlow?.status) &&
       !allParcialsValidated);
     const disableLiberarCQM = ['Enviado a CQM', 'En Calidad', 'Listo'].includes(workOrder.status);
     const isListo = workOrder.status === 'Listo';

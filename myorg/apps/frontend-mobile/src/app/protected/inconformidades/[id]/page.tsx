@@ -8,7 +8,7 @@ import {
   ActivityIndicator,
 } from 'react-native';
 import { useRoute, RouteProp } from '@react-navigation/native';
-import { RootStackParamList } from '../../../../navigation/types';
+import { InternalStackParamList } from '../../../../navigation/types';
 import { getWorkOrderInconformidadById } from '../../../../api/inconformidades';
 
 // Componentes por área (ajusta según los que tengas)
@@ -16,10 +16,25 @@ import PreprensaComponent from '../../../../components/Inconformidades/Preprensa
 import ImpresionComponent from '../../../../components/Inconformidades/ImpresionComponent';
 import ImpresionComponentCQM from '../../../../components/Inconformidades/ImpresionComponentCQM';
 import SerigrafiaComponentCQM from '../../../../components/Inconformidades/SerigrafiaComponentCQM';
+import SerigrafiaComponent from '../../../../components/Inconformidades/SerigrafiaComponent';
+import EmpalmeComponent from '../../../../components/Inconformidades/EmpalmeComponent';
+import LaminacionComponent from '../../../../components/Inconformidades/LaminacionComponent';
+import CorteComponent from '../../../../components/Inconformidades/CorteComponent';
+import ColorEdgeComponent from '../../../../components/Inconformidades/ColorEdgeComponent';
+import HotStampingComponent from '../../../../components/Inconformidades/HotStampingComponent';
+import MillingChipComponent from '../../../../components/Inconformidades/MillingChipComponent';
+import PersonalizacionComponent from '../../../../components/Inconformidades/PersonalizacionComponent';
+import EmpalmeComponentCQM from '../../../../components/Inconformidades/EmpalmeComponentCQM';
+import LaminacionComponentCQM from '../../../../components/Inconformidades/LaminacionComponentCQM';
+import CorteComponentCQM from '../../../../components/Inconformidades/CorteComponentCQM';
+import ColorEdgeComponentCQM from '../../../../components/Inconformidades/ColorEdgeComponentCQM';
+import HotStampingComponentCQM from '../../../../components/Inconformidades/HotStampingComponentCQM';
+import MillingChipComponentCQM from '../../../../components/Inconformidades/MillingChipComponentCQM';
+import PersonalizacionComponentCQM from '../../../../components/Inconformidades/PersonalizacionComponentCQM';
 
 // ...otros componentes
 
-type RouteParams = RouteProp<RootStackParamList, 'InconformidadesAuxScreen'>;
+type RouteParams = RouteProp<InternalStackParamList, 'InconformidadesAuxScreen'>;
 
 const InconformidadesAuxScreen: React.FC = () => {
   const route = useRoute<RouteParams>();
@@ -60,7 +75,22 @@ const InconformidadesAuxScreen: React.FC = () => {
           return <PreprensaComponent workOrder={lastCompleted} />;
         case 2:
           return <ImpresionComponent workOrder={lastCompleted} />;
-        // Agrega tus otros componentes aquí como en la web
+        case 3:
+          return <SerigrafiaComponent workOrder={lastCompleted} />;
+        case 4:
+          return <EmpalmeComponent workOrder={lastCompleted} />;
+        case 5:
+          return <LaminacionComponent workOrder={lastCompleted} />;
+        case 6:
+          return <CorteComponent workOrder={lastCompleted} />;
+        case 7:
+          return <ColorEdgeComponent workOrder={lastCompleted} />;
+        case 8:
+          return <HotStampingComponent workOrder={lastCompleted} />;
+        case 9:
+          return <MillingChipComponent workOrder={lastCompleted} />;
+        case 10:
+          return <PersonalizacionComponent workOrder={lastCompleted} />;
         default:
           return <Text style={styles.title}>Área no reconocida</Text>;
       }
@@ -71,6 +101,20 @@ const InconformidadesAuxScreen: React.FC = () => {
           return <ImpresionComponentCQM workOrder={areaInconformidadCQM} />;
         case 3: 
           return <SerigrafiaComponentCQM workOrder={areaInconformidadCQM} />;
+        case 4: 
+          return <EmpalmeComponentCQM workOrder={areaInconformidadCQM} />;
+        case 5: 
+          return <LaminacionComponentCQM workOrder={areaInconformidadCQM} />;
+        case 6: 
+          return <CorteComponentCQM workOrder={areaInconformidadCQM} />;
+        case 7: 
+          return <ColorEdgeComponentCQM workOrder={areaInconformidadCQM} />;
+        case 8: 
+          return <HotStampingComponentCQM workOrder={areaInconformidadCQM} />;
+        case 9: 
+          return <MillingChipComponentCQM workOrder={areaInconformidadCQM} />;
+        case 10: 
+          return <PersonalizacionComponentCQM workOrder={areaInconformidadCQM} />;
         default:
           return <Text style={styles.title}>Área CQM no reconocida</Text>;
       }

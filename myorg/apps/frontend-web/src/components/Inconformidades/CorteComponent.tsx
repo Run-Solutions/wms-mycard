@@ -96,13 +96,13 @@ export default function CorteComponent({ workOrder }: Props) {
               <Input type="number" name="good_quantity" value={releaseQuantity} disabled/>
               <Label>Malas:</Label>
               <Input type="number" name="bad_quantity" value={releaseBad} disabled/>
-              <Label>Exceso:</Label>
+              <Label>Excedente:</Label>
               <Input type="number" name="excess_quantity" value={releaseExcess} disabled/>
           </InputGroup>
         </NewDataWrapper>
         <InputGroup>
           <Label>Comentarios</Label>
-          <Textarea value={workOrder.areaResponse.corte.comments} disabled/>
+          <Textarea value={releaseComments} disabled/>
         </InputGroup>
       </NewData>
     </Container>

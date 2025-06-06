@@ -21,6 +21,8 @@ import HotStampingComponent from "@/components/Inconformidades/HotStampingCompon
 import HotStampingComponentCQM from "@/components/Inconformidades/HotStampingComponentCQM";
 import PersonalizacionComponent from "@/components/Inconformidades/PersonalizacionComponent";
 import PersonalizacionComponentCQM from "@/components/Inconformidades/PersonalizacionComponentCQM";
+import MillingChipComponent from "@/components/Inconformidades/MillingChipComponent";
+import MillingChipComponentCQM from "@/components/Inconformidades/MillingChipComponentCQM";
 
 interface Props {
   params: Promise<{ id: string }>;
@@ -90,6 +92,8 @@ export default function InconformidadesAuxPage({ params }: Props) {
           return <ColorEdgeComponent workOrder={lastCompleted}/>
         case 8:
           return <HotStampingComponent workOrder={lastCompleted}/>
+        case 9:
+          return <MillingChipComponent workOrder={lastCompleted}/>
         case 10:
           return <PersonalizacionComponent workOrder={lastCompleted}/>
         default: 
@@ -115,6 +119,8 @@ export default function InconformidadesAuxPage({ params }: Props) {
           return <ColorEdgeComponentCQM workOrder={areaInconformidadCQM}/>
         case 8:
           return <HotStampingComponentCQM workOrder={areaInconformidadCQM}/>
+        case 9:
+          return <MillingChipComponentCQM workOrder={areaInconformidadCQM}/>
         case 10:
             return <PersonalizacionComponentCQM workOrder={areaInconformidadCQM}/>
         default: 

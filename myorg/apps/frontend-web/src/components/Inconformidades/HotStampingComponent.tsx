@@ -102,7 +102,7 @@ export default function HotStampingComponent({ workOrder }: Props) {
         </NewDataWrapper>
         <InputGroup>
           <Label>Comentarios</Label>
-          <Textarea value={workOrder.areaResponse.hotStamping.comments} disabled/>
+          <Textarea value={releaseComments} disabled/>
         </InputGroup>
       </NewData>
     </Container>
