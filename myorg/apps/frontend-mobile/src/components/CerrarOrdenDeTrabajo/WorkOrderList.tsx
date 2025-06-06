@@ -7,7 +7,7 @@ import { useNavigation } from '@react-navigation/native';
 import { NavigationProp } from '@react-navigation/native';
 import { InternalStackParamList } from '../../navigation/types';
 
-type Navigation = NavigationProp<InternalStackParamList, 'LiberarProductoAuxScreen'>;
+type Navigation = NavigationProp<InternalStackParamList, 'CerrarOrdenDeTrabajoAuxScreen'>;
 import {
   View,
   Text,
@@ -47,7 +47,7 @@ const WorkOrderList: React.FC<Props> = ({ orders, onSelectOrder }) => {
     <TouchableOpacity
     onPress={() =>
       navigation.navigate('Principal', {
-        screen: 'LiberarProductoAuxScreen',
+        screen: 'CerrarOrdenDeTrabajoAuxScreen',
         params: { id: item.ot_id },
       })
     }

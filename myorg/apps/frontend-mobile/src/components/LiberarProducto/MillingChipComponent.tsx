@@ -31,6 +31,8 @@ const MillingChipComponent = ({ workOrder }: { workOrder: any }) => {
   const [showConfirm, setShowConfirm] = useState(false);
   const [checkedQuestion, setCheckedQuestion] = useState<number[]>([]);
   const [showQuality, setShowQuality] = useState<boolean>(false);
+  const [revisarTecnologia, setRevisarTecnologia] = useState('');
+  const [validarKVC, setValidarKVC] = useState('');
 
   const questions = workOrder.area.formQuestions?.filter((q: any) => q.role_id === null) || [];
   const qualityQuestions = workOrder.area.formQuestions?.filter((q: any) => q.role_id === 3) || [];
@@ -155,7 +157,7 @@ const MillingChipComponent = ({ workOrder }: { workOrder: any }) => {
   };
 
   const liberarProducto = async () => {
-    if (Number(sampleQuantity) <= 0) {
+    if (Number(goodQuantity) <= 0) {
       Alert.alert('Cantidad de muestra inválida');
       return;
     }
@@ -184,7 +186,7 @@ const MillingChipComponent = ({ workOrder }: { workOrder: any }) => {
 
   return (
     <ScrollView style={styles.container}>
-      <Text style={styles.title}>Área: Color Edge</Text>
+      <Text style={styles.title}>Área: Milling Chip</Text>
 
       <View style={styles.cardDetail}>
         <Text style={styles.labelDetail}>Área que lo envía: 
@@ -264,6 +266,8 @@ const MillingChipComponent = ({ workOrder }: { workOrder: any }) => {
         <Text style={styles.buttonText}>Liberar Producto</Text>
       </TouchableOpacity>
 
+      <View style={{ marginBottom: 60}}></View>
+
       {/* Modal CQM */}
       <Modal visible={showCqmModal} animationType="slide">
         <View style={{ flex: 1, backgroundColor: '#fdfaf6' }}>
@@ -295,6 +299,28 @@ const MillingChipComponent = ({ workOrder }: { workOrder: any }) => {
             </View>
           </View>
           ))}
+
+            <View style={styles.inputGroup}>
+              <Text style={styles.label}>Revisar Tecnología De Chip y Color Vs Ot:</Text>
+              <TextInput
+                style={styles.input}
+                placeholder="Ej: "
+                value={revisarTecnologia}
+                onChangeText={setRevisarTecnologia}
+              />
+            </View>
+
+            <View style={styles.inputGroup}>
+              <Text style={styles.label}>
+                Validar y Anotar KCV (Intercambio De Llaves), Carga De Aplicación o Prehabilitación (Si Aplica):
+              </Text>
+              <TextInput
+                style={styles.input}
+                placeholder="Ej: "
+                value={validarKVC}
+                onChangeText={setValidarKVC}
+              />
+            </View>
 
           {/* Muestras */}
           <Text style={styles.label}>Muestras:</Text>
@@ -452,6 +478,10 @@ const styles = StyleSheet.create({
     height: 12,
     borderRadius: 6,
     backgroundColor: '#2563eb',
+  },
+  inputGroup: {
+    width: '70%',
+    paddingTop: 20,
   },
   buttonSecondary: {
     backgroundColor: '#0038A8',

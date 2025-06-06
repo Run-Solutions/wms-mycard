@@ -11,11 +11,10 @@ import {
   Alert,
 } from 'react-native';
 import { useRoute, RouteProp, useNavigation } from '@react-navigation/native';
-import AsyncStorage from '@react-native-async-storage/async-storage';
-import { RootStackParamList } from '../../../../navigation/types';
+import { InternalStackParamList } from '../../../../navigation/types';
 import { fetchWorkOrderById, closeWorkOrder } from '../../../../api/seguimientoDeOts';
 
-type WorkOrderDetailRouteProp = RouteProp<RootStackParamList, 'WorkOrderDetailScreen'>;
+type WorkOrderDetailRouteProp = RouteProp<InternalStackParamList, 'WorkOrderDetailScreen'>;
 
 const WorkOrderDetailScreen: React.FC = () => {
   const route = useRoute<WorkOrderDetailRouteProp>();

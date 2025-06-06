@@ -1,12 +1,14 @@
+"use client";
+
 import React, { useState } from 'react';
+import { getPendingOrders } from '../../../api/aceptarAuditoria'; 
 import { View, Text, FlatList, TouchableOpacity, StyleSheet, ActivityIndicator, Alert, Modal, Pressable } from 'react-native';
-import { getPendingOrders, acceptWorkOrderFlow } from '../../../api/aceptarProducto'; 
-import { NavigationProp } from '@react-navigation/native';
-import { RootStackParamList } from '../../../navigation/types';
-import { useFocusEffect } from '@react-navigation/native';
-import { useCallback } from 'react';
 import { CompositeNavigationProp, useNavigation } from '@react-navigation/native';
 import { DrawerNavigationProp } from '@react-navigation/drawer';
+import { NavigationProp } from '@react-navigation/native';
+import { useFocusEffect } from '@react-navigation/native';
+import { useCallback } from 'react';
+import { RootStackParamList } from '../../../navigation/types';
 
 interface WorkOrder {
   id: number;
@@ -35,13 +37,14 @@ type NavigationType = CompositeNavigationProp<
   NavigationProp<RootStackParamList>
 >;
 
-const AceptarProductoScreen = () => {
+const AceptarAuditoriaScreen: React.FC = () => {
   const [orders, setOrders] = useState<WorkOrder[]>([]);
   const [loading, setLoading] = useState(true);
   const [modalVisible, setModalVisible] = useState(false);
   const [selectedOrder, setSelectedOrder] = useState<WorkOrder | null>(null);
 
   const navigation = useNavigation<NavigationType>();
+
   const aceptarOT = async () => {
     console.log("Aceptar OT");
     if (!selectedOrder) return;
@@ -53,25 +56,13 @@ const AceptarProductoScreen = () => {
       Alert.alert("Error", "No se pudo encontrar el flujo de trabajo para esta orden.");
       return;
     }
-    if (selectedOrder.area_id >= 2 && selectedOrder.area_id <= 6) {
+    if (selectedOrder.area_id !== 1) {
       closeModal();
       navigation.navigate('Principal', {
-        screen: 'AceptarProductoAuxScreen',
+        screen: 'AceptarAuditoriaAuxScreen',
         params: { flowId },
       });
       return;
-    }
-    try {
-      await acceptWorkOrderFlow(flowId);
-      Alert.alert("OT aceptada", "La orden fue aceptada exitosamente.");
-      closeModal();
-      fetchOrders(); // recargar lista
-    } catch (error: any) {
-      console.error(error);
-      Alert.alert(
-        "Error",
-        error?.response?.data?.message || "Error al conectar con el servidor."
-      );
     }
   };
 
@@ -112,73 +103,72 @@ const AceptarProductoScreen = () => {
     setSelectedOrder(null);
     setModalVisible(false);
   };
-
   const renderItem = ({ item }: { item: WorkOrder }) => {
-    const fecha = new Date(item.workOrder.createdAt).toLocaleDateString('es-ES');
-    return (
-      <TouchableOpacity style={styles.card} onPress={() => openModal(item)}>
-        {item.workOrder.priority && <View style={styles.priorityBadge} />}
-        <View style={styles.cardContent}>
-          <Text style={styles.otId}>{item.workOrder.ot_id}</Text>
-          <View style={styles.row}>
-            <Text style={styles.bold}>{item.workOrder.mycard_id}</Text>
-            <Text style={[styles.bold, { marginLeft: 'auto' }]}>
-              Cantidad: {item.workOrder.quantity}
-            </Text>
+      const fecha = new Date(item.workOrder.createdAt).toLocaleDateString('es-ES');
+      return (
+        <TouchableOpacity style={styles.card} onPress={() => openModal(item)}>
+          {item.workOrder.priority && <View style={styles.priorityBadge} />}
+          <View style={styles.cardContent}>
+            <Text style={styles.otId}>{item.workOrder.ot_id}</Text>
+            <View style={styles.row}>
+              <Text style={styles.bold}>{item.workOrder.mycard_id}</Text>
+              <Text style={[styles.bold, { marginLeft: 'auto' }]}>
+                Cantidad: {item.workOrder.quantity}
+              </Text>
+            </View>
+            <Text style={styles.text}>Creado por: {item.workOrder.user.username}</Text>
+            <Text style={styles.text}>Fecha de creación: {fecha}</Text>
           </View>
-          <Text style={styles.text}>Creado por: {item.workOrder.user.username}</Text>
-          <Text style={styles.text}>Fecha de creación: {fecha}</Text>
-        </View>
-      </TouchableOpacity>
-    );
-  };
+        </TouchableOpacity>
+      );
+    };
 
   return (
     <View style={styles.container}>
-      {loading ? (
-        <ActivityIndicator size="large" />
-      ) : orders.length === 0 ? (
-        <View style={styles.emptyState}>
-          <Text style={styles.emptyText}>No hay órdenes pendientes.</Text>
+          {loading ? (
+            <ActivityIndicator size="large" />
+          ) : orders.length === 0 ? (
+            <View style={styles.emptyState}>
+              <Text style={styles.emptyText}>No hay órdenes pendientes.</Text>
+            </View>
+          ) : (
+            <FlatList
+              data={orders}
+              keyExtractor={(item) => item.id.toString()}
+              renderItem={renderItem}
+            />
+          )}
+    
+          <Modal
+            animationType="slide"
+            transparent={true}
+            visible={modalVisible}
+            onRequestClose={closeModal}
+          >
+            <View style={styles.modalOverlay}>
+              <View style={styles.modalContent}>
+                {selectedOrder && (
+                  <>
+                    <Text style={styles.modalTitle}>Orden: {selectedOrder.workOrder.ot_id}</Text>
+                    <Text style={styles.modalText}>ID MyCard: {selectedOrder.workOrder.mycard_id}</Text>
+                    <Text style={styles.modalText}>Cantidad: {selectedOrder.workOrder.quantity}</Text>
+                    <Text style={styles.modalText}>Prioridad: {selectedOrder.workOrder.priority ? 'Alta' : 'Normal'}</Text>
+                    <Text style={styles.modalText}>Creado por: {selectedOrder.workOrder.user.username}</Text>
+                    <Text style={styles.modalText}>Fecha: {new Date(selectedOrder.workOrder.createdAt).toLocaleDateString('es-ES')}</Text>
+                    <View style={styles.rowButtons}>
+                    <Pressable style={styles.modalButtonReject} onPress={closeModal}>
+                      <Text style={styles.modalButtonText}>Cerrar</Text>
+                    </Pressable>
+                    <Pressable style={styles.modalButton} onPress={aceptarOT}>
+                      <Text style={styles.modalButtonText}>Aceptar OT</Text>
+                    </Pressable>
+                    </View>
+                  </>
+                )}
+              </View>
+            </View>
+          </Modal>
         </View>
-      ) : (
-        <FlatList
-          data={orders}
-          keyExtractor={(item) => item.id.toString()}
-          renderItem={renderItem}
-        />
-      )}
-
-      <Modal
-        animationType="slide"
-        transparent={true}
-        visible={modalVisible}
-        onRequestClose={closeModal}
-      >
-        <View style={styles.modalOverlay}>
-          <View style={styles.modalContent}>
-            {selectedOrder && (
-              <>
-                <Text style={styles.modalTitle}>Orden: {selectedOrder.workOrder.ot_id}</Text>
-                <Text style={styles.modalText}>ID MyCard: {selectedOrder.workOrder.mycard_id}</Text>
-                <Text style={styles.modalText}>Cantidad: {selectedOrder.workOrder.quantity}</Text>
-                <Text style={styles.modalText}>Prioridad: {selectedOrder.workOrder.priority ? 'Alta' : 'Normal'}</Text>
-                <Text style={styles.modalText}>Creado por: {selectedOrder.workOrder.user.username}</Text>
-                <Text style={styles.modalText}>Fecha: {new Date(selectedOrder.workOrder.createdAt).toLocaleDateString('es-ES')}</Text>
-                <View style={styles.rowButtons}>
-                <Pressable style={styles.modalButtonReject} onPress={closeModal}>
-                  <Text style={styles.modalButtonText}>Cerrar</Text>
-                </Pressable>
-                <Pressable style={styles.modalButton} onPress={aceptarOT}>
-                  <Text style={styles.modalButtonText}>Aceptar OT</Text>
-                </Pressable>
-                </View>
-              </>
-            )}
-          </View>
-        </View>
-      </Modal>
-    </View>
   );
 };
 
@@ -303,4 +293,5 @@ const styles = StyleSheet.create({
   },
 });
 
-export default AceptarProductoScreen;
+export default AceptarAuditoriaScreen;
+

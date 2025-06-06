@@ -49,7 +49,7 @@ export class AcceptWorkOrderService {
   }
   
   // Para obtener los WorkOrderFlowPendientes
-  async getInconformidadWorkOrders(areasOperatorIds: number, statuses: string[]) {
+  async getInconformidadWorkOrders(areasOperatorIds: number, statuses: string[], userId:number) {
     console.log('Buscando ordenes pendientes...');
     if(!areasOperatorIds) {
       throw new Error('No se proporcionaron areas validas');
@@ -60,6 +60,7 @@ export class AcceptWorkOrderService {
           in: statuses,
         },
         area_id: areasOperatorIds,
+        assigned_user: userId
       },
       include: {
         workOrder: {

@@ -1,4 +1,4 @@
-// myorg/apps/frontend-mobile/src/components/RecepcionCQM/ImpresionComponent.tsx
+// myorg/apps/frontend-mobile/src/components/RecepcionCQM/ColorEdgeComponent.tsx
 
 import React, { useState } from 'react';
 import {
@@ -15,7 +15,7 @@ import {
 import { useNavigation } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { RootStackParamList } from '../../navigation/types';
-import { submitExtraImpresion, sendInconformidadCQM } from '../../api/recepcionCQM';
+import { submitExtraColor, sendInconformidadCQM } from '../../api/recepcionCQM';
 
 // Tipos y constantes globales
 
@@ -24,19 +24,11 @@ type Answer = {
   sample_quantity: number;
 };
 
-const radioOptions = [
-  { label: 'Prueba de color', value: 'color' },
-  { label: 'VoBo Perfil', value: 'perfil' },
-  { label: 'Prueba digital', value: 'fisica' },
-];
-
-const ImpresionComponent = ({ workOrder }: { workOrder: any }) => {
+const ColorEdgeComponent = ({ workOrder }: { workOrder: any }) => {
   // Hooks y estados
   const navigation = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
 
-  const [checkedQuestionsFrente, setCheckedQuestionsFrente] = useState<number[]>([]);
-  const [checkedQuestionsVuelta, setCheckedQuestionsVuelta] = useState<number[]>([]);
-  const [testTypes, setTestTypes] = useState<string>('');
+  const [checkedQuestions, setCheckedQuestions] = useState<number[]>([]);
   const [showConfirmModal, setShowConfirmModal] = useState(false);
   const [showInconformidad, setShowInconformidad] = useState(false);
   const [inconformidad, setInconformidad] = useState('');
@@ -69,29 +61,18 @@ const ImpresionComponent = ({ workOrder }: { workOrder: any }) => {
   
     const questions = workOrder.area.formQuestions.filter((q: any) => q.role_id === 3);
   
-    const isFrenteVueltaValid = questions.some((q: any) =>
-      checkedQuestionsFrente.includes(q.id) || checkedQuestionsVuelta.includes(q.id)
+    const isCheckedQuestionsValid = questions.some((q: any) =>
+      checkedQuestions.includes(q.id)
     );
   
-    if (!questions.length || !isFrenteVueltaValid) {
-      Alert.alert('Por favor, completa las preguntas, selecciona al menos un Frente o Vuelta y la cantidad de muestra.');
-      return;
-    }
-  
-    const frentePayload = checkedQuestionsFrente.map((questionId: number) => ({ question_id: questionId }));
-    const vueltaPayload = checkedQuestionsVuelta.map((questionId: number) => ({ question_id: questionId }));
+    const checkboxPayload = checkedQuestions.map((questionId: number) => ({ question_id: questionId }));
   
     const payload = {
       form_answer_id: formAnswerId,
-      frente: frentePayload,
-      vuelta: vueltaPayload,
-      radio: {
-        value: testTypes,
-      },
     };
   
     try {
-      const success = await submitExtraImpresion(payload);
+      const success = await submitExtraColor(payload);
       setShowConfirmModal(false);
       Alert.alert('Producto evaluado correctamente');
       navigation.navigate('recepcionCQM');
@@ -118,7 +99,7 @@ const ImpresionComponent = ({ workOrder }: { workOrder: any }) => {
 
   return (
     <ScrollView style={styles.container}>
-      <Text style={styles.title}>Área a evaluar: Impresión</Text>
+      <Text style={styles.title}>Área a evaluar: Color Edge</Text>
       <View style={styles.card}>
         <Text style={styles.label}>OT:</Text>
         <Text style={styles.value}>{workOrder.workOrder.ot_id}</Text>
@@ -140,19 +121,17 @@ const ImpresionComponent = ({ workOrder }: { workOrder: any }) => {
       {/* Encabezado estilo tabla */}
       <View style={styles.tableHeader}>
         <Text style={[styles.tableCell, { flex: 2 }]}>Pregunta</Text>
-        <Text style={styles.tableCell}>Hoja Frente</Text>
-        <Text style={styles.tableCell}>Hoja Vuelta</Text>
+        <Text style={styles.tableCell}>Respuesta</Text>
       </View>
 
       {/* Preguntas normales */}
       {questions.map((q: any) => {
-        const responses = workOrder.answers[index]?.FormAnswerResponse?.filter(
+        const responses = workOrder.answers[index]?.FormAnswerResponse?.find(
           (resp: any) => resp.question_id === q.id
         );
         console.log(responses);
         // Encuentra la respuesta del operador por pregunta_id
-        const frontAnswer = responses[0]?.response_operator;
-        const vueltaAnswer = responses[1]?.response_operator;
+        const operatorResponse = responses?.response_operator;
 
         return (
           <View key={q.id} style={styles.tableRow}>
@@ -161,24 +140,27 @@ const ImpresionComponent = ({ workOrder }: { workOrder: any }) => {
               <Text style={styles.questionText}>{q.title}</Text>
             </View>
 
-            {/* Frente */}
+            {/* Respuesta */}
             <View style={[styles.tableCell, { flex: 1, alignItems: 'center' }]}>
-              <View style={[styles.radioCircle, frontAnswer && styles.radioDisabled]}>
-                {frontAnswer && <View style={styles.radioDot} />}
-              </View>
-            </View>
-
-            {/* Vuelta */}
-            <View style={[styles.tableCell, { flex: 1, alignItems: 'center' }]}>
-              <View style={[styles.radioCircle, vueltaAnswer && styles.radioDisabled]}>
-                {vueltaAnswer && <View style={styles.radioDot} />}
+              <View style={[styles.radioCircle, operatorResponse && styles.radioDisabled]}>
+                {operatorResponse && <View style={styles.radioDot} />}
               </View>
             </View>
           </View>
         );
       })}
-
       {/* Muestras */}
+      <Text style={styles.label}>Color Edge:</Text>
+      <TextInput
+        style={styles.input}
+        keyboardType="numeric"
+        value={
+          typeof workOrder?.answers?.[index]?.color_edge === 'number'
+          ? workOrder.answers[index].sample_quantity.toString()
+          : ''
+        }
+        editable={false}
+      />
       <Text style={styles.label}>Muestras entregadas:</Text>
       <TextInput
         style={styles.input}
@@ -198,107 +180,32 @@ const ImpresionComponent = ({ workOrder }: { workOrder: any }) => {
       )}
 
       <Text style={[styles.modalTitle, { marginTop: 40 }]}>Mis respuestas</Text>
-      {/* Encabezado estilo tabla */}
-      <View style={styles.tableHeader}>
-        <Text style={[styles.tableCell, { flex: 2 }]}>Pregunta</Text>
-        <Text style={styles.tableCell}>Hoja Frente</Text>
-        <Text style={styles.tableCell}>Hoja Vuelta</Text>
-      </View>
-      {/* Preguntas normales */}
-      {qualityQuestions.map((q: any) => (
-        <View key={q.id} style={styles.tableRow}>
-          {/* Pregunta */}
-          <View style={[styles.tableCell, { flex: 2 }]}>
-            <Text style={styles.questionText}>{q.title}</Text>
-          </View>
-
-          {/* Frente */}
-          <View style={[styles.tableCell, { flex: 1, alignItems: 'center' }]}>
-            <TouchableOpacity
-              onPress={() =>
-                setCheckedQuestionsFrente((prev) =>
-                  prev.includes(q.id)
-                    ? prev.filter((id) => id !== q.id)
-                    : [...prev, q.id]
-                )
-              }
-              style={[
-                styles.radioCircle,
-                checkedQuestionsFrente.includes(q.id) && styles.checkedBox,
-              ]}
-            >
-              {checkedQuestionsFrente.includes(q.id) && (
-                <View style={styles.radioDot} />
-              )}
-            </TouchableOpacity>
-          </View>
-
-          {/* Vuelta */}
-          <View style={[styles.tableCell, { flex: 1, alignItems: 'center' }]}>
-            <TouchableOpacity
-              onPress={() =>
-                setCheckedQuestionsVuelta((prev) =>
-                  prev.includes(q.id)
-                    ? prev.filter((id) => id !== q.id)
-                    : [...prev, q.id]
-                )
-              }
-              style={[
-                styles.radioCircle,
-                checkedQuestionsVuelta.includes(q.id) && styles.checkedBox,
-              ]}
-            >
-              {checkedQuestionsVuelta.includes(q.id) && (
-                <View style={styles.radioDot} />
-              )}
-            </TouchableOpacity>
-          </View>
-        </View>
-      ))}
-
-      <Text style={styles.label}>Tipo de prueba:</Text>
-      <View style={styles.radioGroup}>
-        {radioOptions.map((option) => (
-          <TouchableOpacity
-            key={option.value}
-            style={styles.radioLabel}
-            onPress={() => setTestTypes(option.value)}
-          >
-            <View style={styles.radioCircle}>
-              {testTypes === option.value && <View style={styles.radioDot} />}
+      <Text style={styles.label}>No hay preguntas por parte de calidad.</Text>
+      {showQuality && (
+        <>
+          {qualityQuestions.map((q: any) => (
+            <View key={q.id} style={styles.qualityRow}>
+              <Text style={styles.qualityQuestion}>{q.title}</Text>
             </View>
-            <Text style={styles.radioText}>{option.label}</Text>
-          </TouchableOpacity>
-        ))}
+          ))}
+          <Text style={styles.subtitle}>Tipo de Prueba</Text>
+            {['color', 'perfil', 'fisica'].map(type => (
+              <View key={type} style={styles.radioDisabled}>
+                <Text>{`Prueba ${type}`}</Text>
+              </View>
+            ))}
+        </>
+      )}
+
+      {/* Botones */}
+      <View style={styles.modalButtonRow}>
+        <TouchableOpacity style={styles.cancelButton} onPress={() => setShowInconformidad(true)}>
+          <Text style={styles.modalButtonText}>Rechazar</Text>
+        </TouchableOpacity>
+        <TouchableOpacity style={styles.confirmButton} onPress={() => setShowConfirmModal(true)}>
+          <Text style={styles.modalButtonText}>Aprobado</Text>
+        </TouchableOpacity>
       </View>
-
-          {showQuality && (
-            <>
-              {qualityQuestions.map((q: any) => (
-                <View key={q.id} style={styles.qualityRow}>
-                  <Text style={styles.qualityQuestion}>{q.title}</Text>
-                </View>
-              ))}
-
-              <Text style={styles.subtitle}>Tipo de Prueba</Text>
-              {['color', 'perfil', 'fisica'].map(type => (
-                <View key={type} style={styles.radioDisabled}>
-                  <Text>{`Prueba ${type}`}</Text>
-                </View>
-              ))}
-            </>
-          )}
-
-          {/* Botones */}
-          <View style={styles.modalButtonRow}>
-            <TouchableOpacity style={styles.cancelButton} onPress={() => setShowInconformidad(true)}>
-              <Text style={styles.modalButtonText}>Rechazar</Text>
-            </TouchableOpacity>
-            <TouchableOpacity style={styles.confirmButton} onPress={() => setShowConfirmModal(true)}>
-              <Text style={styles.modalButtonText}>Aprobado</Text>
-            </TouchableOpacity>
-          </View>
-
 
       {/* Modal confirmación de liberación */}
       <Modal visible={showConfirmModal} transparent animationType="fade">
@@ -349,7 +256,7 @@ const ImpresionComponent = ({ workOrder }: { workOrder: any }) => {
   );
 };
 
-export default ImpresionComponent;
+export default ColorEdgeComponent;
 
 const styles = StyleSheet.create({
   container: { 
@@ -373,8 +280,8 @@ const styles = StyleSheet.create({
     marginTop: 20,
     marginBottom: 12,
   },
-  label: { fontWeight: '600', marginTop: 12, fontSize: 16, marginBottom: 8 },
-  value: { marginBottom: 8 },
+  label: { fontWeight: '600', marginTop: 12, fontSize: 16 },
+  value: { marginBottom: 0 },
   input: {
     borderWidth: 1,
     borderColor: '#ccc',
@@ -585,7 +492,6 @@ const styles = StyleSheet.create({
   },
   radioGroup: {
     marginTop: 12,
-    marginBottom: 20,
     alignItems: 'flex-start',
   },
   

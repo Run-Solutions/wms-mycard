@@ -31,6 +31,9 @@ const HotStampingComponent = ({ workOrder }: { workOrder: any }) => {
   const [showConfirm, setShowConfirm] = useState(false);
   const [checkedQuestion, setCheckedQuestion] = useState<number[]>([]);
   const [showQuality, setShowQuality] = useState<boolean>(false);
+  const [colorFoil, setColorFoil] = React.useState('');
+  const [revisarPosicion, setRevisarPosicion] = React.useState('');
+  const [imagenHolograma, setImagenHolograma] = React.useState('');
 
   const questions = workOrder.area.formQuestions?.filter((q: any) => q.role_id === null) || [];
   const qualityQuestions = workOrder.area.formQuestions?.filter((q: any) => q.role_id === 3) || [];
@@ -155,7 +158,7 @@ const HotStampingComponent = ({ workOrder }: { workOrder: any }) => {
   };
 
   const liberarProducto = async () => {
-    if (Number(sampleQuantity) <= 0) {
+    if (Number(goodQuantity) <= 0) {
       Alert.alert('Cantidad de muestra inválida');
       return;
     }
@@ -264,6 +267,8 @@ const HotStampingComponent = ({ workOrder }: { workOrder: any }) => {
         <Text style={styles.buttonText}>Liberar Producto</Text>
       </TouchableOpacity>
 
+      <View style={{ marginBottom: 60}}></View>
+
       {/* Modal CQM */}
       <Modal visible={showCqmModal} animationType="slide">
         <View style={{ flex: 1, backgroundColor: '#fdfaf6' }}>
@@ -295,6 +300,52 @@ const HotStampingComponent = ({ workOrder }: { workOrder: any }) => {
             </View>
           </View>
           ))}
+
+            <View style={styles.inputGroup}>
+              <Text style={styles.label}>Color Foil:</Text>
+              <TextInput
+                style={styles.input}
+                placeholder="Ej: "
+                value={colorFoil}
+                onChangeText={setColorFoil}
+              />
+            </View>
+
+            <View style={styles.inputGroup}>
+              <Text style={styles.label}>Revisar Posición Vs Ot:</Text>
+              <View style={styles.radioGroup}>
+                {['holograma', 'foil'].map((value) => (
+                  <TouchableOpacity
+                    key={value}
+                    style={styles.radioOption}
+                    onPress={() => setRevisarPosicion(value)}
+                  >
+                    <View style={styles.radioCircle}>
+                      {revisarPosicion === value && <View style={styles.radioDot} />}
+                    </View>
+                    <Text style={styles.radioLabel}>{value.charAt(0).toUpperCase() + value.slice(1)}</Text>
+                  </TouchableOpacity>
+                ))}
+              </View>
+            </View>
+
+            <View style={styles.inputGroup}>
+              <Text style={styles.label}>Imagen de Holograma Vs Ot:</Text>
+              <View style={styles.radioGroup}>
+                {['holograma', 'foil'].map((value) => (
+                  <TouchableOpacity
+                    key={value}
+                    style={styles.radioOption}
+                    onPress={() => setImagenHolograma(value)}
+                  >
+                    <View style={styles.radioCircle}>
+                      {imagenHolograma === value && <View style={styles.radioDot} />}
+                    </View>
+                    <Text style={styles.radioLabel}>{value.charAt(0).toUpperCase() + value.slice(1)}</Text>
+                  </TouchableOpacity>
+                ))}
+              </View>
+            </View>
 
           {/* Muestras */}
           <Text style={styles.label}>Muestras:</Text>
@@ -613,5 +664,21 @@ const styles = StyleSheet.create({
   greenDisabledButton: {
     backgroundColor: '#4CAF50', 
     opacity: 1, 
+  },
+  inputGroup: {
+    paddingTop: 20,
+  },
+  radioGroup: {
+    flexDirection: 'row',
+    justifyContent: 'space-around',
+    marginTop: 7,
+  },
+  radioOption: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 10,
+  },
+  radioLabel: {
+    fontSize: 16,
   },
 });

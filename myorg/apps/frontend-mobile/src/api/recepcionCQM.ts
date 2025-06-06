@@ -51,24 +51,44 @@ export const getOrdersInCalidad = async (): Promise<WorkOrder[]> => {
 };
 
 export const getWorkOrderById = async (id: string): Promise<WorkOrder | null> => {
-    try {
-      const res = await API.get(`/free-order-cqm/${id}`);
-      const data = res.data;
-      console.log('Orden:', data);
-      return data;
-    } catch (error: any) {
-      console.error('Error al obtener la orden por ID:', error?.message || error);
-      return null;
-    }
+  try {
+    const res = await API.get(`/free-order-cqm/${id}`);
+    const data = res.data;
+    console.log('Orden:', data);
+    return data;
+  } catch (error: any) {
+    console.error('Error al obtener la orden por ID:', error?.message || error);
+    return null;
+  }
 };
 
 export interface ImpresionPayload {
-    form_answer_id: number;
-    frente: { question_id: number }[];
-    vuelta: { question_id: number }[];
-    radio: {
-      value: string; // o el tipo que uses para testTypes
-    };
+  form_answer_id: number;
+  frente: { question_id: number }[];
+  vuelta: { question_id: number }[];
+  radio: {
+    value: string; // o el tipo que uses para testTypes
+  };
+}
+export interface CQMPayload {
+  form_answer_id: number;
+  checkboxes: { question_id: number }[];
+}
+export interface CQMPayloadColor {
+  form_answer_id: number;
+}
+export interface EmpalmePayload {
+  form_answer_id: number;
+  checkboxes: { question_id: number }[];
+  radio: {
+    magnetic_band: string;
+    track_type: string;
+  };
+  extra_data: {
+    color: string;
+    holographic_type: string;
+    validar_inlays: string;
+  };
 }
   
 export const submitExtraImpresion = async (payload: ImpresionPayload): Promise<boolean> => {
@@ -77,6 +97,78 @@ export const submitExtraImpresion = async (payload: ImpresionPayload): Promise<b
       return res.status === 200;
     } catch (error: any) {
       console.error('Error en submitExtraImpresion:', error?.response?.data || error.message);
+      throw new Error('Error al liberar el producto.');
+    }
+};
+export const submitExtraSerigrafia = async (payload: CQMPayload): Promise<boolean> => {
+    try {
+      const res = await API.post('/free-order-cqm/form-extra-seri', payload);
+      return res.status === 200;
+    } catch (error: any) {
+      console.error('Error en submitExtraSerigrafia:', error?.response?.data || error.message);
+      throw new Error('Error al liberar el producto.');
+    }
+};
+export const submitExtraEmpalme = async (payload: EmpalmePayload): Promise<boolean> => {
+    try {
+      const res = await API.post('/free-order-cqm/form-extra-empal', payload);
+      return res.status === 200;
+    } catch (error: any) {
+      console.error('Error en submitExtraEmpalme:', error?.response?.data || error.message);
+      throw new Error('Error al liberar el producto.');
+    }
+};
+export const submitExtraLaminacion = async (payload: CQMPayload): Promise<boolean> => {
+    try {
+      const res = await API.post('/free-order-cqm/form-extra-seri', payload);
+      return res.status === 200;
+    } catch (error: any) {
+      console.error('Error en submitExtraLaminacion:', error?.response?.data || error.message);
+      throw new Error('Error al liberar el producto.');
+    }
+};
+export const submitExtraCorte = async (payload: CQMPayload): Promise<boolean> => {
+    try {
+      const res = await API.post('/free-order-cqm/form-extra-seri', payload);
+      return res.status === 200;
+    } catch (error: any) {
+      console.error('Error en submitExtraCorte:', error?.response?.data || error.message);
+      throw new Error('Error al liberar el producto.');
+    }
+};
+export const submitExtraColor = async (payload: CQMPayloadColor): Promise<boolean> => {
+    try {
+      const res = await API.post('/free-order-cqm/form-extra-color', payload);
+      return res.status === 200;
+    } catch (error: any) {
+      console.error('Error en submitExtraColor:', error?.response?.data || error.message);
+      throw new Error('Error al liberar el producto.');
+    }
+};
+export const submitExtraHotStamping = async (payload: CQMPayload): Promise<boolean> => {
+    try {
+      const res = await API.post('/free-order-cqm/form-extra-seri', payload);
+      return res.status === 200;
+    } catch (error: any) {
+      console.error('Error en submitExtraHotStamping:', error?.response?.data || error.message);
+      throw new Error('Error al liberar el producto.');
+    }
+};
+export const submitExtraMilling = async (payload: CQMPayload): Promise<boolean> => {
+    try {
+      const res = await API.post('/free-order-cqm/form-extra-milling', payload);
+      return res.status === 200;
+    } catch (error: any) {
+      console.error('Error en submitExtraHotStamping:', error?.response?.data || error.message);
+      throw new Error('Error al liberar el producto.');
+    }
+};
+export const submitExtraPersonalizacion = async (payload: any): Promise<boolean> => {
+    try {
+      const res = await API.post('/free-order-cqm/form-extra-personalizacion', payload);
+      return res.status === 200;
+    } catch (error: any) {
+      console.error('Error en submitExtraHotStamping:', error?.response?.data || error.message);
       throw new Error('Error al liberar el producto.');
     }
 };

@@ -52,21 +52,18 @@ export default function HotStampingComponentAcceptAuditory({ workOrder }: Props)
       cqm_quantity: "",
       comments: "",
     });
-    const revisada = workOrder?.answers
-    ?.map((a: Answer, i: number) => ({ ...a, index: i }))
-    .reverse().find((a: Answer) => a.reviewed === true)?.index;
-    const index = revisada?.length >= 1 ? revisada[revisada.length - 1].index : undefined;
-    console.log('el index', index);
-
+    const currentFLow = [...workOrder.workOrder.flow]
+    .reverse()
+    .find((item) => item.status === "Enviado a Auditoria");
 
     useEffect(() => {
-      if (workOrder?.areaResponse?.corte && workOrder?.partialReleases?.length === 0) {
+      if (workOrder?.areaResponse?.hotStamping && currentFLow?.partialReleases?.length === 0) {
         const vals: HotStampingData = {
-          good_quantity: workOrder.areaResponse.hotStamping.good_quantity || "0",
-          bad_quantity: workOrder.areaResponse.hotStamping.bad_quantity || "0",
-          excess_quantity: workOrder.areaResponse.hotStamping.excess_quantity || "0",
-          cqm_quantity: workOrder.answers[index].sample_quantity || "0",
-          comments: workOrder.areaResponse.hotStamping.comments || "",
+          good_quantity: currentFLow.areaResponse.hotStamping.good_quantity || "0",
+          bad_quantity: currentFLow.areaResponse.hotStamping.bad_quantity || "0",
+          excess_quantity: currentFLow.areaResponse.hotStamping.excess_quantity || "0",
+          cqm_quantity: currentFLow.answers[0].sample_quantity || "0",
+          comments: currentFLow.areaResponse.hotStamping.comments || "",
         };
         setDefaultValues(vals);
       } else {
@@ -77,7 +74,7 @@ export default function HotStampingComponentAcceptAuditory({ workOrder }: Props)
           good_quantity: firstUnvalidatedPartial.quantity || '',
           bad_quantity: firstUnvalidatedPartial.bad_quantity || '',
           excess_quantity: firstUnvalidatedPartial.excess_quantity || '',
-          cqm_quantity: workOrder.answers[index].sample_quantity || '',
+          cqm_quantity: workOrder.answers[0].sample_quantity || '',
           comments: firstUnvalidatedPartial.observation || '',
         };
         setDefaultValues(vals);

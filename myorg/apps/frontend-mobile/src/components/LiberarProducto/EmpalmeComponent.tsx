@@ -298,6 +298,25 @@ const EmpalmeComponent = ({ workOrder }: { workOrder: any }) => {
                   <Text style={styles.qualityQuestion}>{q.title}</Text>
                 </View>
               ))}
+              <Text style={styles.label}>Validar Inlays Vs OT:</Text>
+                <TextInput style={styles.input} editable={false} />
+
+                <Text style={styles.label}>Tipo de banda magnética:</Text>
+                <View style={styles.radioGroup}>
+                  <View>
+                    <Text>◯ Hico</Text>
+                    <Text>◯ Loco</Text>
+                  </View>
+                  <View>
+                    <Text>◯ 2 Tracks</Text>
+                    <Text>◯ 3 Tracks</Text>
+                  </View>
+                </View>
+                <Text style={styles.label}>Color:</Text>
+                <TextInput style={styles.input} editable={false} />
+
+                <Text style={styles.label}>Tipo de Holográfico:</Text>
+                <TextInput style={styles.input} editable={false} />
             </>
           )}
 
@@ -350,6 +369,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 8, 
     backgroundColor: '#fdfaf6', 
   },
+  radioGroup: { width: '65%', flexDirection: 'row', justifyContent: 'space-between' },
   title: { 
     fontSize: 20, 
     fontWeight: 'bold', 

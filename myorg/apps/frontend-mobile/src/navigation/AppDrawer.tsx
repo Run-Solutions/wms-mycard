@@ -6,7 +6,9 @@ import DashboardScreen from '../screens/DashboardScreen';
 import CustomDrawerContent from './CustomDrawerContent';
 import WorkOrderDetailScreen from '../app/protected/seguimientoDeOts/[id]/page';
 import AceptarProductoAuxScreen from '../app/protected/aceptarProducto/[id]/page';
+import AceptarAuditoriaAuxScreen from '../app/protected/aceptarAuditoria/[id]/page';
 import LiberarProductoAuxPage from '../app/protected/liberarProducto/[id]/page';
+import CerrarOrdenDeTrabajoAuxScreen from '../app/protected/cerrarOrdenDeTrabajo/[id]/page';
 import RecepcionCQMAuxScreen from '../app/protected/recepcionCqm/[id]/page';
 import InconformidadesAuxScreen from '../app/protected/inconformidades/[id]/page';
 import { useModules } from '../api/navigation';
@@ -36,6 +38,22 @@ const AppDrawer: React.FC = () => {
         options={({ route }) => ({
           headerShown: false,
           title: `Flujo #${(route.params as { flowId: string }).flowId}`,
+        })}
+      />
+      <Stack.Screen
+        name="AceptarAuditoriaAuxScreen"
+        component={AceptarAuditoriaAuxScreen}
+        options={({ route }) => ({
+          headerShown: false,
+          title: `Flujo #${(route.params as { flowId: string }).flowId}`,
+        })}
+      />
+      <Stack.Screen
+        name="CerrarOrdenDeTrabajoAuxScreen"
+        component={CerrarOrdenDeTrabajoAuxScreen}
+        options={({ route }) => ({
+          headerShown: false,
+          title: `OT #${(route.params as { id: number }).id}`,
         })}
       />
       <Stack.Screen

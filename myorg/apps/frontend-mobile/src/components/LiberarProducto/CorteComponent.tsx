@@ -155,7 +155,7 @@ const CorteComponent = ({ workOrder }: { workOrder: any }) => {
   };
 
   const liberarProducto = async () => {
-    if (Number(sampleQuantity) <= 0) {
+    if (Number(goodQuantity) <= 0) {
       Alert.alert('Cantidad de muestra inválida');
       return;
     }
@@ -263,6 +263,8 @@ const CorteComponent = ({ workOrder }: { workOrder: any }) => {
       >
         <Text style={styles.buttonText}>Liberar Producto</Text>
       </TouchableOpacity>
+
+      <View style={{ marginBottom: 60}}></View>
 
       {/* Modal CQM */}
       <Modal visible={showCqmModal} animationType="slide">

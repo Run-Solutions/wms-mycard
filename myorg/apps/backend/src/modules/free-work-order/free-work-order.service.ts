@@ -855,7 +855,7 @@ export class FreeWorkOrderService {
           return { message: 'Liberación parcial registrada con éxito' };
         }
       }
-      if (partials.length === 0 && totalLiberadoPrevio < workOrder.quantity) {
+      if (partials.length === 0 && totalLiberadoActual < workOrder.quantity) {
         await tx.partialRelease.create({
           data: {
             work_order_flow_id: dto.workOrderFlowId,
@@ -1008,7 +1008,7 @@ export class FreeWorkOrderService {
           return { message: 'Liberación parcial registrada con éxito' };
         }
       }
-      if(partials.length === 0 && totalLiberadoPrevio < workOrder.quantity){
+      if(partials.length === 0 && totalLiberadoActual < workOrder.quantity){
         await tx.partialRelease.create({
           data: {
             work_order_flow_id: dto.workOrderFlowId,
@@ -1163,7 +1163,7 @@ export class FreeWorkOrderService {
           return { message: 'Liberación parcial registrada con éxito' };
         }
       }
-      if (partials.length === 0 && totalLiberadoPrevio < workOrder.quantity) {
+      if (partials.length === 0 && totalLiberadoActual < workOrder.quantity) {
         await tx.partialRelease.create({
           data: {
             work_order_flow_id: dto.workOrderFlowId,

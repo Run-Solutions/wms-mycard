@@ -23,6 +23,7 @@ const ColorEdgeComponent = ({ workOrder }: { workOrder: any }) => {
   console.log('Order', workOrder);
   const navigation = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
   const [sampleQuantity, setSampleQuantity] = useState('');
+  const [colorEdge, setColorEdge] = useState('');
   const [goodQuantity, setGoodQuantity] = useState('');
   const [badQuantity, setBadQuantity] = useState('');
   const [excessQuantity, setExcessQuantity] = useState('');
@@ -142,6 +143,7 @@ const ColorEdgeComponent = ({ workOrder }: { workOrder: any }) => {
       reviewed: false,
       user_id: workOrder.assigned_user,
       sample_quantity: Number(sampleQuantity),
+      color_edge: colorEdge,
     };
   
     try {
@@ -155,7 +157,7 @@ const ColorEdgeComponent = ({ workOrder }: { workOrder: any }) => {
   };
 
   const liberarProducto = async () => {
-    if (Number(sampleQuantity) <= 0) {
+    if (Number(goodQuantity) <= 0) {
       Alert.alert('Cantidad de muestra inválida');
       return;
     }
@@ -264,6 +266,8 @@ const ColorEdgeComponent = ({ workOrder }: { workOrder: any }) => {
         <Text style={styles.buttonText}>Liberar Producto</Text>
       </TouchableOpacity>
 
+      <View style={{ marginBottom: 60}}></View>
+
       {/* Modal CQM */}
       <Modal visible={showCqmModal} animationType="slide">
         <View style={{ flex: 1, backgroundColor: '#fdfaf6' }}>
@@ -297,6 +301,14 @@ const ColorEdgeComponent = ({ workOrder }: { workOrder: any }) => {
           ))}
 
           {/* Muestras */}
+          <Text style={styles.label}>Color Edge:</Text>
+          <TextInput
+            style={styles.input}
+            keyboardType="numeric"
+            placeholder="Ej: 2"
+            value={colorEdge}
+            onChangeText={setColorEdge}
+          />
           <Text style={styles.label}>Muestras:</Text>
           <TextInput
             style={styles.input}
@@ -315,11 +327,7 @@ const ColorEdgeComponent = ({ workOrder }: { workOrder: any }) => {
 
           {showQuality && (
             <>
-              {qualityQuestions.map((q: any) => (
-                <View key={q.id} style={styles.qualityRow}>
-                  <Text style={styles.qualityQuestion}>{q.title}</Text>
-                </View>
-              ))}
+              <Text style={styles.label}>No hay preguntas por parte de calidad</Text>
             </>
           )}
 

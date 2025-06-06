@@ -57,7 +57,7 @@ export class AcceptWorkOrderController {
       throw new ForbiddenException('No tienes permiso para acceder a las ordenes.');
     };
     const statuses = statusesRaw ? statusesRaw.split(',').map(status => decodeURIComponent(status.trim())) : ['En inconformidad'];
-    return await this.AcceptWorkOrderService.getInconformidadWorkOrders(user.areas_operator_id, statuses);
+    return await this.AcceptWorkOrderService.getInconformidadWorkOrders(user.areas_operator_id, statuses, user.id);
   
   }
   

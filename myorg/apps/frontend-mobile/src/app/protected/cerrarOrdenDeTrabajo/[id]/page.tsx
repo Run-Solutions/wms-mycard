@@ -25,9 +25,9 @@ import HotStampingComponent from '../../../../components/LiberarProducto/HotStam
 import MillingChipComponent from '../../../../components/LiberarProducto/MillingChipComponent';
 import PersonalizacionComponent from '../../../../components/LiberarProducto/PersonalizacionComponent';
 
-type RouteParams = RouteProp<InternalStackParamList, 'LiberarProductoAuxScreen'>;
+type RouteParams = RouteProp<InternalStackParamList, 'CerrarOrdenDeTrabajoAuxScreen'>;
 
-const LiberarProductoAuxScreen: React.FC = () => {
+const CerrarOrdenDeTrabajoAuxScreen: React.FC = () => {
   const route = useRoute<RouteParams>();
   const { id } = route.params;
 
@@ -105,7 +105,7 @@ const LiberarProductoAuxScreen: React.FC = () => {
     </ScrollView>
   );
 };
-export default LiberarProductoAuxScreen;
+export default CerrarOrdenDeTrabajoAuxScreen;
 
 const styles = StyleSheet.create({
   container: { 

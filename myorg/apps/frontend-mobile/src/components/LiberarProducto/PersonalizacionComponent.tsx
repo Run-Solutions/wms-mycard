@@ -9,6 +9,7 @@ import {
   Alert,
   Platform,
   Modal,
+  Switch,
 } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
@@ -31,12 +32,17 @@ const PersonalizacionComponent = ({ workOrder }: { workOrder: any }) => {
   const [showConfirm, setShowConfirm] = useState(false);
   const [checkedQuestion, setCheckedQuestion] = useState<number[]>([]);
   const [showQuality, setShowQuality] = useState<boolean>(false);
+  const [selectedOption, setSelectedOption] = useState('etiquetadora');
+  const [verificarEtiqueta, setVerificarEtiqueta] = useState('');
+  const [colorPersonalizacion, setColorPersonalizacion] = useState('');
+  const [codigoBarras, setCodigoBarras] = useState('');
+
 
   const questions = workOrder.area.formQuestions?.filter((q: any) => q.role_id === null) || [];
   const qualityQuestions = workOrder.area.formQuestions?.filter((q: any) => q.role_id === 3) || [];
   const isDisabled =
-  workOrder.status === 'En proceso';
-  
+    workOrder.status === 'En proceso';
+
   console.log("El mismo workOrder (workOrder)", workOrder);
   const flowList = [...workOrder.workOrder.flow];
   // Índice del flow actual basado en su id
@@ -55,10 +61,10 @@ const PersonalizacionComponent = ({ workOrder }: { workOrder: any }) => {
   console.log("Ultimo parcial o completado", lastCompletedOrPartial);
 
   const cantidadEntregadaLabel = lastCompletedOrPartial.areaResponse
-  ? 'Cantidad entregada:'
-  : lastCompletedOrPartial.partialReleases?.some((r: PartialRelease) => r.validated)
-    ? 'Cantidad entregada validada:'
-    : 'Cantidad faltante por liberar:';
+    ? 'Cantidad entregada:'
+    : lastCompletedOrPartial.partialReleases?.some((r: PartialRelease) => r.validated)
+      ? 'Cantidad entregada validada:'
+      : 'Cantidad faltante por liberar:';
 
   const cantidadEntregadaValue = lastCompletedOrPartial.areaResponse
     ? (
@@ -76,10 +82,10 @@ const PersonalizacionComponent = ({ workOrder }: { workOrder: any }) => {
     )
     : lastCompletedOrPartial.partialReleases?.some((r: PartialRelease) => r.validated)
       ? lastCompletedOrPartial.partialReleases
-          .filter((r: PartialRelease) => r.validated)
-          .reduce((sum: number, r: { quantity: number }) => sum + r.quantity, 0)
+        .filter((r: PartialRelease) => r.validated)
+        .reduce((sum: number, r: { quantity: number }) => sum + r.quantity, 0)
       : (lastCompletedOrPartial.workOrder?.quantity ?? 0) -
-        (lastCompletedOrPartial.partialReleases?.reduce((sum: number, r: { quantity: number }) => sum + r.quantity, 0) ?? 0);
+      (lastCompletedOrPartial.partialReleases?.reduce((sum: number, r: { quantity: number }) => sum + r.quantity, 0) ?? 0);
 
   const mostrarCantidadPorLiberar =
     (workOrder?.partialReleases?.length ?? 0) > 0;
@@ -88,11 +94,11 @@ const PersonalizacionComponent = ({ workOrder }: { workOrder: any }) => {
   if (mostrarCantidadPorLiberar) {
     if (lastCompletedOrPartial.area.name === 'preprensa') {
       cantidadPorLiberar = workOrder.workOrder.quantity -
-        workOrder.partialReleases.reduce((sum: number, r: {quantity: number}) => sum + r.quantity, 0);
+        workOrder.partialReleases.reduce((sum: number, r: { quantity: number }) => sum + r.quantity, 0);
     } else {
       const validadas = lastCompletedOrPartial.partialReleases?.filter((release: { validated: boolean, quantity: number }) => release.validated) ?? [];
-      const sumaValidadas = validadas.reduce((sum: number, r: {quantity: number}) => sum + r.quantity, 0);
-      const sumaParciales = workOrder.partialReleases.reduce((sum: number, r: {quantity: number}) => sum + r.quantity, 0);
+      const sumaValidadas = validadas.reduce((sum: number, r: { quantity: number }) => sum + r.quantity, 0);
+      const sumaParciales = workOrder.partialReleases.reduce((sum: number, r: { quantity: number }) => sum + r.quantity, 0);
       cantidadPorLiberar = validadas.length > 0
         ? (sumaValidadas - sumaParciales)
         : sumaParciales;
@@ -103,14 +109,14 @@ const PersonalizacionComponent = ({ workOrder }: { workOrder: any }) => {
     (r: { validated: boolean }) => r.validated
   );
 
-  const disableLiberarButton = 
+  const disableLiberarButton =
     isDisabled ||
-    ['Enviado a CQM', 'En Calidad', 'Parcial', ].includes(workOrder.status) ||
-    (nextFlow && 
+    ['Enviado a CQM', 'En Calidad', 'Parcial',].includes(workOrder.status) ||
+    (nextFlow &&
       ['Listo', 'Enviado a CQM', 'En calidad', 'Parcial', 'Pendiente parcial'].includes(nextFlow.status) &&
       !allParcialsValidated);
-    const disableLiberarCQM = ['Enviado a CQM', 'En Calidad', 'Listo'].includes(workOrder.status);
-    const isListo = workOrder.status === 'Listo';
+  const disableLiberarCQM = ['Enviado a CQM', 'En Calidad', 'Listo'].includes(workOrder.status);
+  const isListo = workOrder.status === 'Listo';
 
   const toggleCheckbox = (
     id: number,
@@ -123,17 +129,17 @@ const PersonalizacionComponent = ({ workOrder }: { workOrder: any }) => {
   const enviarACQM = async () => {
     const isFrenteVueltaValid = checkedQuestion.length > 0 || checkedQuestion.length > 0;
     const isSampleValid = Number(sampleQuantity) > 0;
-  
+
     if (!questions.length || !isFrenteVueltaValid || !isSampleValid) {
       Alert.alert('Completa todas las preguntas y cantidad de muestra.');
       return;
     }
-  
+
     const answeredQuestions = questions.filter((q: any) =>
       checkedQuestion.includes(q.id)
     );
-    
-    const payload = {
+
+    const basePayload = {
       question_id: answeredQuestions.map((q: any) => q.id),
       work_order_flow_id: workOrder.id,
       work_order_id: workOrder.workOrder.id,
@@ -143,7 +149,25 @@ const PersonalizacionComponent = ({ workOrder }: { workOrder: any }) => {
       user_id: workOrder.assigned_user,
       sample_quantity: Number(sampleQuantity),
     };
-  
+    let aditionalFields = {};
+    if (selectedOption === 'etiquetadora') {
+      aditionalFields = {
+        verificar_etiqueta: verificarEtiqueta,
+      };
+    } else if (selectedOption === 'persos') {
+      aditionalFields = {
+        color_personalizacion: colorPersonalizacion,
+        codigo_barras: codigoBarras,
+      };
+    } else if (selectedOption === 'laser') {
+      aditionalFields = {
+      }
+    }
+    const payload = {
+      ...basePayload,
+      ...aditionalFields,
+    };
+
     try {
       await submitToCQMPersonalizacion(payload);
       Alert.alert('Formulario enviado a CQM');
@@ -155,11 +179,7 @@ const PersonalizacionComponent = ({ workOrder }: { workOrder: any }) => {
   };
 
   const liberarProducto = async () => {
-    if (Number(sampleQuantity) <= 0) {
-      Alert.alert('Cantidad de muestra inválida');
-      return;
-    }
-  
+
     const payload = {
       workOrderId: workOrder.workOrder.id,
       workOrderFlowId: currentFlow.id,
@@ -171,7 +191,7 @@ const PersonalizacionComponent = ({ workOrder }: { workOrder: any }) => {
       comments,
       formAnswerId: currentFlow.answers?.[0]?.id,
     };
-  
+
     try {
       await releaseProductFromPersonalizacion(payload);
       setShowConfirm(false);
@@ -182,12 +202,14 @@ const PersonalizacionComponent = ({ workOrder }: { workOrder: any }) => {
     }
   };
 
+  const firstQuestion = workOrder.area.formQuestions?.[0];
+
   return (
     <ScrollView style={styles.container}>
       <Text style={styles.title}>Área: Color Edge</Text>
 
       <View style={styles.cardDetail}>
-        <Text style={styles.labelDetail}>Área que lo envía: 
+        <Text style={styles.labelDetail}>Área que lo envía:
           <Text style={styles.valueDetail}> {lastCompletedOrPartial.area.name}</Text>
         </Text>
         <Text style={styles.labelDetail}>
@@ -195,9 +217,9 @@ const PersonalizacionComponent = ({ workOrder }: { workOrder: any }) => {
         </Text>
         <Text style={styles.labelDetail}>
           {cantidadEntregadaLabel}
-        <Text style={styles.valueDetail}> {cantidadEntregadaValue}</Text>
+          <Text style={styles.valueDetail}> {cantidadEntregadaValue}</Text>
         </Text>
-      
+
         {mostrarCantidadPorLiberar && (
           <Text style={styles.labelDetail}>
             Cantidad por Liberar:
@@ -266,74 +288,193 @@ const PersonalizacionComponent = ({ workOrder }: { workOrder: any }) => {
 
       {/* Modal CQM */}
       <Modal visible={showCqmModal} animationType="slide">
-        <View style={{ flex: 1, backgroundColor: '#fdfaf6' }}>
-        <ScrollView contentContainerStyle={styles.modalScrollContent}>
-          <Text style={styles.modalTitle}>Preguntas del Área: {workOrder.area.name}</Text>
+        <ScrollView contentContainerStyle={styles.modalContainer}>
+          <Text style={styles.title}>Preguntas del Área: {workOrder.area.name}</Text>
 
-          {/* Encabezado estilo tabla */}
-          <View style={styles.tableHeader}>
-            <Text style={[styles.tableCell, { flex: 2 }]}>Pregunta</Text>
-            <Text style={styles.tableCell}>Respuesta</Text>
-          </View>
-
-          {/* Preguntas normales */}
-          {questions.map((q: any) => (
-            <View key={q.id} style={styles.tableRow}>
-            {/* Pregunta */}
-            <View style={[styles.tableCell, { flex: 2 }]}>
-              <Text style={styles.questionText}>{q.title}</Text>
-            </View>
-          
-           {/* Respuesta */}
-            <View style={[styles.tableCell, { flex: 1, alignItems: 'center' }]}>
+          {/* Tabs */}
+          <View style={styles.tabs}>
+            {['etiquetadora', 'persos', 'laser'].map((opt) => (
               <TouchableOpacity
-                onPress={() => toggleCheckbox(q.id, checkedQuestion, setCheckedQuestion)}
-                style={styles.radioCircle}
+                key={opt}
+                style={[
+                  styles.tab,
+                  selectedOption === opt && styles.tabSelected
+                ]}
+                onPress={() => setSelectedOption(opt)}
               >
-                {checkedQuestion.includes(q.id) && <View style={styles.radioDot} />}
+                <Text
+                  style={[
+                    styles.tabText,
+                    selectedOption === opt && styles.tabTextSelected
+                  ]}
+                >
+                  {opt === 'persos' ? "Persos's" : opt.charAt(0).toUpperCase() + opt.slice(1)}
+                </Text>
               </TouchableOpacity>
-            </View>
+            ))}
           </View>
-          ))}
 
-          {/* Muestras */}
+          {/* Tabla de preguntas */}
+          {selectedOption === 'etiquetadora' && firstQuestion && (
+            <>
+              {/* Encabezado estilo tabla */}
+              <View style={styles.tableHeader}>
+                <Text style={[styles.tableCell, { flex: 2 }]}>Pregunta</Text>
+                <Text style={styles.tableCell}>Respuesta</Text>
+              </View>
+
+              {/* Preguntas normales */}
+              {
+                <View key={firstQuestion.id} style={styles.tableRow}>
+                  {/* Pregunta */}
+                  <View style={[styles.tableCell, { flex: 2 }]}>
+                    <Text style={styles.questionText}>{firstQuestion.title}</Text>
+                  </View>
+
+                  {/* Respuesta */}
+                  <View style={[styles.tableCell, { flex: 1, alignItems: 'center' }]}>
+                    <TouchableOpacity
+                      onPress={() => toggleCheckbox(firstQuestion.id, checkedQuestion, setCheckedQuestion)}
+                      style={styles.radioCircle}
+                    >
+                      {checkedQuestion.includes(firstQuestion.id) && <View style={styles.radioDot} />}
+                    </TouchableOpacity>
+                  </View>
+                </View>
+              }
+
+              {/* Inputs */}
+              <Text style={styles.label}>Verificar Tipo De Etiqueta Vs Ot Y Pegar Utilizada:</Text>
+              <TextInput
+                placeholder="Ej:"
+                value={verificarEtiqueta}
+                onChangeText={setVerificarEtiqueta}
+                style={styles.input}
+              />
+            </>
+          )}
+          {selectedOption === 'persos' && (
+            <>
+              <ScrollView style={styles.scrollArea}>
+                {/* Encabezado estilo tabla */}
+                <View style={styles.tableHeader}>
+                  <Text style={[styles.tableCell, { flex: 2 }]}>Pregunta</Text>
+                  <Text style={styles.tableCell}>Respuesta</Text>
+                </View>
+
+                {/* Preguntas normales */}
+                {workOrder.area.formQuestions
+                  .slice(1, 10).map((q: any) => (
+                    <View key={q.id} style={styles.tableRow}>
+                      {/* Pregunta */}
+                      <View style={[styles.tableCell, { flex: 2 }]}>
+                        <Text style={styles.questionText}>{q.title}</Text>
+                      </View>
+
+                      {/* Respuesta */}
+                      <View style={[styles.tableCell, { flex: 1, alignItems: 'center' }]}>
+                        <TouchableOpacity
+                          onPress={() => toggleCheckbox(q.id, checkedQuestion, setCheckedQuestion)}
+                          style={styles.radioCircle}
+                        >
+                          {checkedQuestion.includes(q.id) && <View style={styles.radioDot} />}
+                        </TouchableOpacity>
+                      </View>
+                    </View>
+                  ))}
+              </ScrollView>
+              {/* Campo de muestras */}
+              <Text style={styles.label}>Color De Personalización:</Text>
+              <TextInput
+                placeholder="Ej: "
+                value={colorPersonalizacion}
+                onChangeText={setColorPersonalizacion}
+                style={styles.input}
+              />
+              {/* Campo de muestras */}
+              <Text style={styles.label}>Tipo de Código de Barras Que Se Personaliza:</Text>
+              <TextInput
+                placeholder="Ej: "
+                value={codigoBarras}
+                onChangeText={setCodigoBarras}
+                style={styles.input}
+              />
+            </>
+          )
+          }
+
+          {/* Campo de muestras */}
           <Text style={styles.label}>Muestras:</Text>
           <TextInput
-            style={styles.input}
-            keyboardType="numeric"
             placeholder="Ej: 2"
             value={sampleQuantity}
             onChangeText={setSampleQuantity}
+            style={styles.input}
+            keyboardType="numeric"
           />
 
-          {/* Sección expandible de calidad */}
-          <TouchableOpacity onPress={() => setShowQuality(prev => !prev)} style={styles.toggleSection}>
-            <Text style={styles.subtitle}>
-              Preguntas de Calidad {showQuality ? '▼' : '▶'}
+          {/* Preguntas de calidad */}
+          <TouchableOpacity onPress={() => setShowQuality(!showQuality)}>
+            <Text style={styles.qualityTitle}>
+              Preguntas de Calidad {showQuality ? '▼' : '▶️'}
             </Text>
           </TouchableOpacity>
-
-          {showQuality && (
-            <>
-              {qualityQuestions.map((q: any) => (
-                <View key={q.id} style={styles.qualityRow}>
-                  <Text style={styles.qualityQuestion}>{q.title}</Text>
-                </View>
-              ))}
-            </>
+          {selectedOption === 'persos' && showQuality && (
+            <ScrollView style={styles.scrollArea}>
+              {workOrder.area.formQuestions
+                .slice(13, 16).map((q: any) => (
+                  <View key={q.id} style={styles.qualityRow}>
+                    <Text style={styles.qualityQuestion}>{q.title}</Text>
+                  </View>
+                ))}
+              <Text style={styles.label}>Validar Carga De Aplicación (PersoMaster):</Text>
+              <TextInput
+                placeholder="Ej:"
+                style={styles.input}
+                editable={false}
+              />
+            </ScrollView>
+          )}
+          {selectedOption === 'laser' && showQuality && (
+            <ScrollView style={styles.scrollArea}>
+              {workOrder.area.formQuestions
+                .slice(9, 13)
+                .filter((question: { role_id: number | null }) => question.role_id === 3).map((q: any) => (
+                  <View key={q.id} style={styles.qualityRow}>
+                    <Text style={styles.qualityQuestion}>{q.title}</Text>
+                  </View>
+                ))}
+              <Text style={styles.label}>Verificar Script / Layout Vs Ot / Autorizacion:</Text>
+              <TextInput
+                placeholder="Ej:"
+                style={styles.input}
+                editable={false}
+              />
+              <Text style={styles.label}>Validar, Anotar KVC (Llaves), Carga de Aplicación o Prehabilitación:</Text>
+              <TextInput
+                placeholder="Ej:"
+                style={styles.input}
+                editable={false}
+              />
+              <Text style={styles.label}>Describir Apariencia Del Quemado Del Laser (Color):</Text>
+              <TextInput
+                placeholder="Ej:"
+                style={styles.input}
+                editable={false}
+              />
+            </ScrollView>
           )}
 
           {/* Botones */}
-          <View style={styles.modalButtonRow}>
-            <TouchableOpacity style={styles.cancelButton} onPress={() => setShowCqmModal(false)}>
-              <Text style={styles.modalButtonText}>Cerrar</Text>
+          <View style={styles.footerButtons}>
+            <TouchableOpacity style={styles.cancelBtn} onPress={() => setShowCqmModal(false)}>
+              <Text style={styles.cancelText}>Cerrar</Text>
             </TouchableOpacity>
-            <TouchableOpacity style={styles.confirmButton} onPress={enviarACQM}>
-              <Text style={styles.modalButtonText}>Enviar Respuestas</Text>
+            <TouchableOpacity style={styles.submitBtn} onPress={enviarACQM}>
+              <Text style={styles.submitText}>Enviar Respuestas</Text>
             </TouchableOpacity>
           </View>
         </ScrollView>
-        </View>
       </Modal>
 
       {/* Modal confirmación de liberación */}
@@ -365,28 +506,28 @@ const PersonalizacionComponent = ({ workOrder }: { workOrder: any }) => {
 export default PersonalizacionComponent;
 
 const styles = StyleSheet.create({
-  container: { 
+  container: {
     flex: 1,
     paddingTop: 16,
     paddingBottom: 2,
-    paddingHorizontal: 8, 
-    backgroundColor: '#fdfaf6', 
+    paddingHorizontal: 8,
+    backgroundColor: '#fdfaf6',
   },
-  title: { 
-    fontSize: 20, 
-    fontWeight: 'bold', 
+  title: {
+    fontSize: 20,
+    fontWeight: 'bold',
     marginBottom: 16,
     textAlign: 'center',
     color: 'black',
     padding: Platform.OS === 'ios' ? 10 : 0,
   },
-  subtitle: { 
-    fontSize: 16, 
-    fontWeight: 'bold', 
+  subtitle: {
+    fontSize: 16,
+    fontWeight: 'bold',
     marginTop: 20,
     marginBottom: 12,
   },
-  label: { fontWeight: '600', marginTop: 12, fontSize: 16, marginBottom: 8 },
+  label: { fontWeight: '600', marginTop: 12, fontSize: 12, marginBottom: 8 },
   labelDetail: {
     fontWeight: 'bold',
     fontSize: 16,
@@ -402,8 +543,8 @@ const styles = StyleSheet.create({
     borderRadius: 18,
     padding: 10,
     backgroundColor: '#fff',
-    height: 50,
-    fontSize: 16,
+    height: 40,
+    fontSize: 12,
   },
   textarea: {
     backgroundColor: '#fff',
@@ -611,7 +752,76 @@ const styles = StyleSheet.create({
     marginTop: 20,
   },
   greenDisabledButton: {
-    backgroundColor: '#4CAF50', 
-    opacity: 1, 
+    backgroundColor: '#4CAF50',
+    opacity: 1,
   },
+  tabs: {
+    flexDirection: 'row',
+    justifyContent: 'center',
+    marginBottom: 24,
+    gap: 8
+  },
+  tab: {
+    paddingVertical: 8,
+    paddingHorizontal: 16,
+    borderRadius: 20,
+    borderWidth: 1,
+    borderColor: '#ccc'
+  },
+  tabSelected: {
+    backgroundColor: '#2563eb',
+    borderColor: '#2563eb'
+  },
+  tabText: {
+    color: '#1f2937',
+    fontWeight: '600'
+  },
+  tabTextSelected: {
+    color: '#fff'
+  },
+  table: {
+    borderWidth: 1,
+    borderColor: '#e5e7eb',
+    borderRadius: 12,
+    overflow: 'hidden',
+    marginBottom: 16
+  },
+  tableCellBold: {
+    fontWeight: 'bold'
+  },
+
+  qualityTitle: {
+    fontSize: 16,
+    fontWeight: 'bold',
+    textAlign: 'center',
+    marginVertical: 20
+  },
+  footerButtons: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    marginTop: 20
+  },
+  cancelBtn: {
+    backgroundColor: '#d1d5db',
+    padding: 12,
+    borderRadius: 10,
+    flex: 1,
+    marginRight: 10
+  },
+  cancelText: {
+    textAlign: 'center',
+    color: '#333',
+    fontWeight: '600'
+  },
+  submitBtn: {
+    backgroundColor: '#2563eb',
+    padding: 12,
+    borderRadius: 10,
+    flex: 1
+  },
+  submitText: {
+    textAlign: 'center',
+    color: '#fff',
+    fontWeight: '600'
+  }
 });

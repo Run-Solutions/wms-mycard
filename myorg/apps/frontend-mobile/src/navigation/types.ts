@@ -2,6 +2,8 @@ export type InternalStackParamList = {
   DashboardScreen: undefined;
   WorkOrderDetailScreen: { id: number };
   AceptarProductoAuxScreen: { flowId: string };
+  AceptarAuditoriaAuxScreen: { flowId: string };
+  CerrarOrdenDeTrabajoAuxScreen: { id: string };
   LiberarProductoAuxScreen: { id: string };
   RecepcionCQMAuxScreen: { id: string };
   InconformidadesAuxScreen: { id: string };

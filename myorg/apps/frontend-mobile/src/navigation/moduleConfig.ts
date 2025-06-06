@@ -13,8 +13,8 @@ import VistosBuenosScreen from '../app/protected/vistosBuenos/page';
 import RecepcionCQMScreen from '../app/protected/recepcionCqm/page';
 import ConfiguracionVistosBuenosScreen from '../app/protected/configuracionVistosBuenos/index';
 // Para auditor
-import AceptarAuditoriaScreen from '../app/protected/aceptarAuditoria/index';
-import CerrarOrdenDeTrabajoScreen from '../app/protected/cerrarOrdenDeTrabajo/index';
+import AceptarAuditoriaScreen from '../app/protected/aceptarAuditoria/page';
+import CerrarOrdenDeTrabajoScreen from '../app/protected/cerrarOrdenDeTrabajo/page';
 
 export type ModuleFromApi = {
   id: number;

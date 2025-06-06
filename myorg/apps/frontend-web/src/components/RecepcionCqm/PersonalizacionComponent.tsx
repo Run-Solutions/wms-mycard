@@ -108,7 +108,6 @@ export default function PersonalizacionComponent({ workOrder }: Props) {
     }
     const basePayload = {
       form_answer_id: formAnswerId,
-      
     }
     let aditionalFields = {};
     if(workOrder?.answers[index].tipo_personalizacion === 'laser'){

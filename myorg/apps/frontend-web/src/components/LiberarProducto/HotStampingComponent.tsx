@@ -132,7 +132,7 @@ export default function HotStampingComponent({ workOrder }: Props) {
   // Para Liberar el producto cuando ya ha pasado por CQM
   const [showConfirm, setShowConfirm] = useState(false); 
   const handleLiberarClick = () => {
-    if (Number(sampleQuantity) <= 0) {
+    if (Number(goodQuantity) <= 0) {
       alert('Por favor, ingresa una cantidad de muestra válida.');
       return;
     }
@@ -282,7 +282,7 @@ export default function HotStampingComponent({ workOrder }: Props) {
           <Textarea placeholder="Agrega un comentario adicional..." disabled={isDisabled}/>
         </InputGroup>
       </NewData>
-      <LiberarButton disabled={isDisabled || ['Enviado a CQM', 'En Calidad'].includes(workOrder.status) || ['En calidad', 'Parcial', 'Pendiente parcial', 'En auditoria', 'Enviado a auditoria'].includes(nextFlow.status) && !allParcialsValidated} onClick={handleLiberarClick}>Liberar Producto</LiberarButton>
+      <LiberarButton disabled={isDisabled || ['Enviado a CQM', 'En Calidad'].includes(workOrder.status) || ['En calidad', 'Parcial', 'Pendiente parcial', 'En auditoria', 'Enviado a auditoria'].includes(nextFlow?.status) && !allParcialsValidated} onClick={handleLiberarClick}>Liberar Producto</LiberarButton>
     </Container>
 
     {/* Modal para enviar a liberacion */}
