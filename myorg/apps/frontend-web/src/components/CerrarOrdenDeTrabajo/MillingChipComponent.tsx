@@ -211,8 +211,9 @@ export default function MillingChipComponent({ workOrder }: Props) {
                 const buenas = Number(area.buenas) || 0;
                 const malas = Number(area.malas) || 0;
                 const excedente = Number(area.excedente) || 0;
-                const muestras = Number(area.muestras) || 0;
-                const total = buenas + malas + excedente + muestras;
+                const cqm = Number(area.cqm) || 0;
+                const muestras = Number(area.muestras) ?? 0;
+                const total = buenas + malas + excedente + muestras + cqm;
                 return <td key={index}>{total}</td>;
               })}
             </tr>
