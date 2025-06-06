@@ -1,11 +1,10 @@
-// src/app/protected/seguimientoOts/page.tsx
 'use client';
 
-import React, { useEffect, useState } from 'react';
-import { View, Text, ActivityIndicator, StyleSheet } from 'react-native';
-import WorkOrderList from '../../../components/SeguimientoDeOts/WorkOrderList'; // importa el componente
-import { Platform } from 'react-native';
+import React, { useState, useCallback } from 'react';
+import { View, Text, ActivityIndicator, StyleSheet, Platform } from 'react-native';
+import WorkOrderList from '../../../components/SeguimientoDeOts/WorkOrderList';
 import { fetchWorkOrdersInProgress } from '../../../api/seguimientoDeOts';
+import { useFocusEffect } from '@react-navigation/native';
 
 interface WorkOrder {
   id: number;
@@ -21,25 +20,36 @@ interface WorkOrder {
     status: string;
     area?: { name?: string };
   }[];
+  files: File[];
+}
+
+interface File {
+  id: number;
+  type: string;
+  file_path: string;
 }
 
 const SeguimientoDeOtsPage: React.FC = () => {
   const [orders, setOrders] = useState<WorkOrder[]>([]);
   const [loading, setLoading] = useState(true);
 
-  useEffect(() => {
-    const fetchData = async () => {
-      try {
-        const data = await fetchWorkOrdersInProgress();
-        setOrders(data);
-      } catch (error) {
-        console.error('Error al obtener las órdenes:', error);
-      } finally {
-        setLoading(false);
-      }
-    };
-    fetchData();
-  }, []);
+  const fetchData = async () => {
+    setLoading(true);
+    try {
+      const data = await fetchWorkOrdersInProgress();
+      setOrders(data);
+    } catch (error) {
+      console.error('Error al obtener las órdenes:', error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useFocusEffect(
+    useCallback(() => {
+      fetchData();
+    }, [])
+  );
 
   return (
     <View style={styles.container}>
@@ -52,6 +62,7 @@ const SeguimientoDeOtsPage: React.FC = () => {
     </View>
   );
 };
+
 export default SeguimientoDeOtsPage;
 
 const styles = StyleSheet.create({

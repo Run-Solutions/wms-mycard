@@ -45,13 +45,13 @@ const WorkOrderList: React.FC<Props> = ({ orders, onSelectOrder }) => {
   const navigation = useNavigation<any>();
   const renderItem = ({ item }: { item: WorkOrder }) => (
     <TouchableOpacity
-    onPress={() =>
-      navigation.navigate('Principal', {
-        screen: 'CerrarOrdenDeTrabajoAuxScreen',
-        params: { id: item.ot_id },
-      })
-    }
-  >
+      onPress={() =>
+          navigation.navigate('Principal', {
+          screen: 'CerrarOrdenDeTrabajoAuxScreen',
+          params: { id: item.id },
+        })
+      }
+    >
       <View style={styles.card}>
         <Text style={styles.title}>OT: {item.ot_id}</Text>
         <Text>Id del presupuesto: {item.mycard_id}</Text>

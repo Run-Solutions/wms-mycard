@@ -23,4 +23,5 @@ export type RootStackParamList = {
   liberarProducto: undefined;
   aceptarProducto: undefined;
   recepcionCQM: undefined;
+  cerrarOrdenDeTrabajo: undefined;
 };

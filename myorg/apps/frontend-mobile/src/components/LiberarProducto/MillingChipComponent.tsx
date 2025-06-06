@@ -346,6 +346,18 @@ const MillingChipComponent = ({ workOrder }: { workOrder: any }) => {
                   <Text style={styles.qualityQuestion}>{q.title}</Text>
                 </View>
               ))}
+              <Text style={styles.label}>Localización de Contactos:</Text>
+                <TextInput
+                  placeholder=""
+                  style={styles.input}
+                  editable={false}
+                />
+              <Text style={styles.label}>Altura Chip Centro:</Text>
+                <TextInput
+                  placeholder=""
+                  style={styles.input}
+                  editable={false}
+                />
             </>
           )}
 

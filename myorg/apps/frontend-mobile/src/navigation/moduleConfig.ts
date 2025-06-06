@@ -11,7 +11,7 @@ import InconformidadesScreen from '../app/protected/inconformidades/page';
 // Para calidad
 import VistosBuenosScreen from '../app/protected/vistosBuenos/page';
 import RecepcionCQMScreen from '../app/protected/recepcionCqm/page';
-import ConfiguracionVistosBuenosScreen from '../app/protected/configuracionVistosBuenos/index';
+import ConfiguracionVistosBuenosScreen from '../app/protected/configuracionVistosBuenos/page';
 // Para auditor
 import AceptarAuditoriaScreen from '../app/protected/aceptarAuditoria/page';
 import CerrarOrdenDeTrabajoScreen from '../app/protected/cerrarOrdenDeTrabajo/page';

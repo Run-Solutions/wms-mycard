@@ -14,6 +14,7 @@ import { useNavigation } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { RootStackParamList } from '../../navigation/types';
 import { submitToCQMLaminacion, releaseProductFromLaminacion } from '../../api/liberarProducto';
+import { RadioButton } from 'react-native-paper';
 
 interface PartialRelease {
   validated: boolean;
@@ -28,6 +29,8 @@ const LaminacionComponent = ({ workOrder }: { workOrder: any }) => {
   const [showConfirm, setShowConfirm] = useState(false);
   const [checkedQuestion, setCheckedQuestion] = useState<number[]>([]);
   const [showQuality, setShowQuality] = useState<boolean>(false);
+  const [value, setValue] = useState('');
+  const [otherValue, setOtherValue] = useState('');
 
   const questions = workOrder.area.formQuestions?.filter((q: any) => q.role_id === null) || [];
   const qualityQuestions = workOrder.area.formQuestions?.filter((q: any) => q.role_id === 3) || [];
@@ -139,6 +142,7 @@ const LaminacionComponent = ({ workOrder }: { workOrder: any }) => {
       reviewed: false,
       user_id: workOrder.assigned_user,
       sample_quantity: Number(sampleQuantity),
+      finish_validation: value === 'otro' ? otherValue : value,
     };
   
     try {
@@ -273,6 +277,33 @@ const LaminacionComponent = ({ workOrder }: { workOrder: any }) => {
             </View>
           </View>
           ))}
+
+          <Text style={styles.label}>Validar Acabado Vs Orden De Trabajo</Text>
+
+          <RadioButton.Group onValueChange={newValue => setValue(newValue)} value={value}>
+            <View style={styles.radioRow}>
+              <View style={styles.radioItem}>
+                <RadioButton value="B/B" />
+                <Text style={styles.radioLabel}>B/B</Text>
+              </View>
+              <View style={styles.radioItem}>
+                <RadioButton value="M/M" />
+                <Text style={styles.radioLabel}>M/M</Text>
+              </View>
+              <View style={styles.radioItem}>
+                <RadioButton value="Otro" />
+                <Text style={styles.radioLabel}>Otro</Text>
+              </View>
+            </View>
+          </RadioButton.Group>
+          {value === 'Otro' && (
+            <TextInput
+              style={styles.input}
+              placeholder="Ej: "
+              value={otherValue}
+              onChangeText={setOtherValue}
+            />
+          )}
 
           {/* Muestras */}
           <Text style={styles.label}>Muestras:</Text>
@@ -591,5 +622,18 @@ const styles = StyleSheet.create({
   greenDisabledButton: {
     backgroundColor: '#4CAF50', 
     opacity: 1, 
+  },
+  radioRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  radioItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginRight: 20,
+  },
+  radioLabel: {
+    fontSize: 16,
+    color: '#2d3748',
   },
 });

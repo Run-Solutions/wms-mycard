@@ -47,6 +47,9 @@ interface WorkOrder {
 const FinalizacionScreen: React.FC = () => {
   const [workOrders, setWorkOrders] = useState<WorkOrder[]>([]);
   const [loading, setLoading] = useState<boolean>(true);
+  const filteredOrders = (statusFilter: string) => workOrders.filter(order =>
+    (order.status.toLowerCase().includes(statusFilter.toLowerCase()) ||
+      order.flow.some(flow => flow.status.toLowerCase().includes(statusFilter.toLowerCase()))))
 
   useEffect(() => {
     async function fetchAllWorkOrders() {
@@ -92,7 +95,7 @@ const FinalizacionScreen: React.FC = () => {
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>{item.title}</Text>
           <WorkOrderList
-            orders={workOrders}
+            orders={filteredOrders(item.filter)}
             isTouchable={false}
           />
         </View>

@@ -11,19 +11,14 @@ import {
 } from 'react-native';
 import { useRoute, RouteProp } from '@react-navigation/native';
 import { InternalStackParamList } from '../../../../navigation/types';
-import { fetchWorkOrderById } from '../../../../api/liberarProducto';
+import { fetchWorkOrderById } from '../../../../api/cerrarOrdenDeTrabajo';
 
 // Componentes por área (similares a los de la web)
-import PrePrensaComponent from '../../../../components/LiberarProducto/PrePrensaComponent';
-import ImpresionComponent from '../../../../components/LiberarProducto/ImpresionComponent';
-import SerigrafiaComponent from '../../../../components/LiberarProducto/SerigrafiaComponent';
-import EmpalmeComponent from '../../../../components/LiberarProducto/EmpalmeComponent';
-import LaminacionComponent from '../../../../components/LiberarProducto/LaminacionComponent';
-import CorteComponent from '../../../../components/LiberarProducto/CorteComponent';
-import ColorEdgeComponent from '../../../../components/LiberarProducto/ColorEdgeComponent';
-import HotStampingComponent from '../../../../components/LiberarProducto/HotStampingComponent';
-import MillingChipComponent from '../../../../components/LiberarProducto/MillingChipComponent';
-import PersonalizacionComponent from '../../../../components/LiberarProducto/PersonalizacionComponent';
+import CorteComponent from '../../../../components/CerrarOrdenDeTrabajo/CorteComponent';
+import ColorEdgeComponent from '../../../../components/CerrarOrdenDeTrabajo/ColorEdgeComponent';
+import HotStampingComponent from '../../../../components/CerrarOrdenDeTrabajo/HotStampingComponent';
+import MillingChipComponent from '../../../../components/CerrarOrdenDeTrabajo/MillingChipComponent';
+import PersonalizacionComponent from '../../../../components/CerrarOrdenDeTrabajo/PersonalizacionComponent';
 
 type RouteParams = RouteProp<InternalStackParamList, 'CerrarOrdenDeTrabajoAuxScreen'>;
 
@@ -38,6 +33,7 @@ const CerrarOrdenDeTrabajoAuxScreen: React.FC = () => {
   useEffect(() => {
     const fetchData = async () => {
       try {
+        console.log(id);
         const response = await fetchWorkOrderById(id);
         setWorkOrder(response); // ya no es array
       } catch (error) {
@@ -51,18 +47,10 @@ const CerrarOrdenDeTrabajoAuxScreen: React.FC = () => {
 
   const renderComponentByArea = () => {
     if (!workOrder) return null;
+    console.log('WorkOrder', workOrder)
+    const flowEnAuditoria = workOrder.flow.find((flow: any) => flow.status === 'En auditoria');
 
-    switch (workOrder.area_id) {
-      case 1: 
-        return <PrePrensaComponent workOrder={workOrder} />;
-      case 2: 
-        return <ImpresionComponent workOrder={workOrder} />;
-      case 3: 
-        return <SerigrafiaComponent workOrder={workOrder} />;
-      case 4: 
-        return <EmpalmeComponent workOrder={workOrder} />;
-      case 5: 
-        return <LaminacionComponent workOrder={workOrder} />;
+    switch (flowEnAuditoria.area_id) {
       case 6: 
         return <CorteComponent workOrder={workOrder} />;
       case 7: 
@@ -87,16 +75,16 @@ const CerrarOrdenDeTrabajoAuxScreen: React.FC = () => {
           <Text style={styles.header}>Información de la OT</Text>
           <View style={styles.card}>
             <Text style={styles.label}>
-              OT: <Text style={styles.value}>{workOrder.workOrder.ot_id}</Text>
+              OT: <Text style={styles.value}>{workOrder.ot_id}</Text>
             </Text>
             <Text style={styles.label}>
-              Presupuesto: <Text style={styles.value}>{workOrder.workOrder.mycard_id}</Text>
+              Presupuesto: <Text style={styles.value}>{workOrder.mycard_id}</Text>
             </Text>
             <Text style={styles.label}>
-              Cantidad: <Text style={styles.value}>{workOrder.workOrder.quantity}</Text>
+              Cantidad: <Text style={styles.value}>{workOrder.quantity}</Text>
             </Text>
             <Text style={styles.label}>
-              Comentarios: <Text style={styles.value}>{workOrder.workOrder.comments}</Text>
+              Comentarios: <Text style={styles.value}>{workOrder.comments}</Text>
             </Text>
           </View>
           {renderComponentByArea()}
