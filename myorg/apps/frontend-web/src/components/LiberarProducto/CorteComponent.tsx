@@ -3,6 +3,7 @@
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 import styled from "styled-components";
+import { submitToCQMCorte, releaseProductFromCorte } from "@/api/liberarProducto";
 
 interface Props {
   workOrder: any;
@@ -128,25 +129,7 @@ export default function CorteComponent({ workOrder }: Props) {
       sample_quantity: Number(sampleQuantity),
     };
     try {
-      const token = localStorage.getItem('token');
-      if(!token) {
-        alert('No hay token de autenticación');
-        return;
-      }
-      console.log('Datos a enviar', payload);
-      const res = await fetch('http://localhost:3000/free-order-flow/cqm-corte', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}`,
-        },
-        body: JSON.stringify(payload),
-      });
-      const data = await res.json();
-      if (!res.ok) {
-        console.error("Error en el servidor:", data);
-        return;
-      }
+      await submitToCQMCorte(payload);
       router.push('/liberarProducto');
     } catch (error) {
       console.log('Error al guardar la respuesta: ', error);
@@ -171,7 +154,7 @@ export default function CorteComponent({ workOrder }: Props) {
   
     setShowConfirm(true); // Si pasa todas las validaciones, ahora sí abre el modal
   };
-  const handleImpressSubmit = async () => {
+  const handleCorteSubmit = async () => {
     const payload = {
       workOrderId: workOrder.workOrder.id,
       workOrderFlowId: currentFlow.id,
@@ -188,27 +171,7 @@ export default function CorteComponent({ workOrder }: Props) {
     console.log('datos a enviar',payload);
   
     try {
-      const token = localStorage.getItem('token');
-      if (!token) {
-        alert('No hay token de autenticación');
-        return;
-      }
-  
-      const res = await fetch('http://localhost:3000/free-order-flow/corte', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}`,
-        },
-        body: JSON.stringify(payload),
-      });
-  
-      const data = await res.json();
-      if (!res.ok) {
-        console.error('Error en el servidor:', data);
-        return;
-      }
-  
+      await releaseProductFromCorte(payload);
       router.push('/liberarProducto');
     } catch (error) {
       console.log('Error al enviar datos:', error);
@@ -317,7 +280,7 @@ export default function CorteComponent({ workOrder }: Props) {
             <h4>¿Estás segura/o que deseas liberar este producto?</h4>
             <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '1rem', marginTop: '1rem' }}>
               <CancelButton onClick={() => setShowConfirm(false)}>Cancelar</CancelButton>
-              <ConfirmButton onClick={handleImpressSubmit}>Confirmar</ConfirmButton>
+              <ConfirmButton onClick={handleCorteSubmit}>Confirmar</ConfirmButton>
             </div>
           </ModalBox>
         </ModalOverlay>

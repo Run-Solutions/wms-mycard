@@ -69,7 +69,10 @@ const PersonalizacionComponentCQM = ({ workOrder }: { workOrder: any }) => {
           <TextInput
             style={styles.inputDetail}
             keyboardType="numeric"
-            value={workOrder?.answers[index].sample_quantity ?? 'No se reconoce la muestra enviada' }
+            value={workOrder?.answers[index].sample_quantity !== null
+              ? String(workOrder?.answers[index].sample_quantity)
+              : 'No se reconoce la muestra enviada'
+            }
             editable={false}
           />
         </>

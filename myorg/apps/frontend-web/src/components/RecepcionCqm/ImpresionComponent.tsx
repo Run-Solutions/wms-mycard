@@ -3,6 +3,7 @@
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 import styled from "styled-components";
+import { submitExtraImpresion, sendInconformidadCQM } from "@/api/recepcionCQM";
 
 interface Props {
   workOrder: any;
@@ -24,18 +25,7 @@ export default function ImpresionComponent({ workOrder }: Props) {
   ?.map((a: Answer, i: number) => ({ ...a, index: i }))
   .reverse().find((a: Answer) => a.reviewed === false)?.index;
   console.log('el index', index);
-  /*const noRevisadas = workOrder?.answers
-  ?.map((a: Answer, i: number) => ({ ...a, index: i }))
-  .filter((a: Answer) => a.reviewed === false);
 
-  // Obtener los dos últimos (penúltimo y último)
-  const index = noRevisadas?.length >= 2 ? noRevisadas[noRevisadas.length - 2].index : undefined;
-  const indexVuelta = noRevisadas?.length >= 1 ? noRevisadas[noRevisadas.length - 1].index : undefined;
-
-  console.log('Index Frente:', index);
-  console.log('Index Vuelta:', indexVuelta);*/
-
-  // Para mostrar formulario de CQM y enviarlo
   const [showConfirmModal, setShowConfirmModal] = useState(false);
 
   //Para guardar las respuestas 
@@ -170,29 +160,7 @@ export default function ImpresionComponent({ workOrder }: Props) {
       },
     };
     try {
-      const token = localStorage.getItem("token");
-      if (!token) {
-        alert("No hay token de autenticación");
-        return;
-      }
-  
-      console.log("Datos a enviar:", payload);
-  
-      const res = await fetch("http://localhost:3000/free-order-cqm/form-extra-impresion", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${token}`,
-        },
-        body: JSON.stringify(payload),
-      });
-  
-      const data = await res.json();
-      if (!res.ok) {
-        console.error("Error en el servidor:", data);
-        return;
-      }
-  
+      const res = await submitExtraImpresion(payload);
       router.push("/recepcionCqm");
     } catch (error) {
       console.log("Error al guardar la respuesta: ", error);
@@ -200,30 +168,15 @@ export default function ImpresionComponent({ workOrder }: Props) {
   };
 
   const handleSubmitInconformidad = async () => {
-    const token = localStorage.getItem('token');
-    console.log(inconformidad);
-    const formAnswer = workOrder.id;
-    console.log('el form answer', formAnswer);
     try {
-      const res = await fetch(`http://localhost:3000/work-order-flow/${formAnswer}/inconformidad-cqm`, {
-        method: 'PATCH',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}`,
-        },
-        body: JSON.stringify({inconformidad}),
-      });
-      const data = await res.json();
-      if (res.ok) {
-        router.push('/recepcionCqm');
-      }
+      const res = await sendInconformidadCQM(workOrder.id, inconformidad);
+      router.push('/recepcionCqm');
     } catch (error) {
       console.error(error);
       alert('Error al conectar con el servidor');
     }
   }
   
-
   return (
     <Container>
       <Title>Área a evaluar: Impresion</Title>

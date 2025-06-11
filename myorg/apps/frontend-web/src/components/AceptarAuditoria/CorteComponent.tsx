@@ -3,6 +3,7 @@
 import { useRouter } from "next/navigation";
 import { useState, useEffect } from "react";
 import styled from "styled-components";
+import { acceptWorkOrderFlowAuditory, registrarInconformidadAuditory } from "@/api/aceptarAuditoria";
 
 // Define un tipo para los valores del formulario
 type CorteData = {
@@ -84,31 +85,15 @@ export default function CorteComponentAcceptAuditory({ workOrder }: Props) {
         alert('Por favor, asegurate de ingresar muestras.');
         return;
       }
-      const token = localStorage.getItem('token');
       let CorteId  = null;
       if (workOrder?.partialReleases?.length > 0) {
         CorteId = workOrder.id;
       } else {
         CorteId = workOrder?.areaResponse?.corte?.id;
       }
-      const payload = {
-        sample_auditory: Number(sampleAuditory),
-      };
-      console.log(CorteId);
-      console.log(payload);
       try {
-        const res = await fetch(`http://localhost:3000/work-order-flow-auditory/${CorteId}`, {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'Authorization': `Bearer ${token}`,
-          },
-          body: JSON.stringify(payload),
-        });
-        const data = await res.json();
-        if (res.ok) {
-          router.push('/aceptarAuditoria');
-        }
+        await acceptWorkOrderFlowAuditory(CorteId, sampleAuditory);
+        router.push('/aceptarAuditoria'); 
       } catch (error) {
         console.error(error);
         alert('Error al conectar con el servidor');
@@ -116,22 +101,9 @@ export default function CorteComponentAcceptAuditory({ workOrder }: Props) {
     }
 
     const handleSubmitInconformidad = async () => {
-      const token = localStorage.getItem('token');
-      console.log(workOrder.id);
-      console.log(inconformidad);
       try {
-        const res = await fetch(`http://localhost:3000/work-order-flow/${workOrder.id}/inconformidad`, {
-          method: 'PATCH',
-          headers: {
-            'Content-Type': 'application/json',
-            'Authorization': `Bearer ${token}`,
-          },
-          body: JSON.stringify({inconformidad}),
-        });
-        const data = await res.json();
-        if (res.ok) {
-          router.push('/aceptarAuditoria');
-        }
+        await registrarInconformidadAuditory(workOrder?.id, inconformidad);
+        router.push('/aceptarAuditoria');
       } catch (error) {
         console.error(error);
         alert('Error al conectar con el servidor');

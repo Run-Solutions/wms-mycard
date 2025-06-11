@@ -4,6 +4,7 @@
 import React, { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import styled, { useTheme } from 'styled-components';
+import { getConfigVistosBuenos } from '@/api/configVistosBuenos';
 
 // Se define el tipo de datos
 interface FormQuestion {
@@ -26,25 +27,7 @@ const ConfigVistosBuenosPage: React.FC = () => {
   useEffect(() => {
     async function fetchFormQuestions() {
       try {
-        // Se verifica token
-        const token = localStorage.getItem('token');
-        if(!token) {
-          console.error('No se encontró el token en localStorage');
-          return;
-        }
-        console.log('Token enviado a headers: ', token)
-    
-        const res = await fetch('http://localhost:3000/work-order-cqm/form-questions', {
-          method: 'GET',
-          headers: {
-            'Content-Type': 'application/json',
-            'Authorization': `Bearer ${token}`
-          },
-        });
-        if(!res.ok){
-          throw new Error(`Error al obtener las ordenes: ${res.status} ${res.statusText}`);
-        }
-        const data = await res.json();
+        const data = await getConfigVistosBuenos();
         console.log('Datos obtenidos: ', data);
         setFormQuestions(data);
       } catch (err) {

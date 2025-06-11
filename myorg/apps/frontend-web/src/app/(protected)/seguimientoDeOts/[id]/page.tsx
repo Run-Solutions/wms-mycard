@@ -4,6 +4,7 @@
 import { use, useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import styled from "styled-components";
+import { fetchWorkOrderById, closeWorkOrder } from "@/api/seguimientoDeOts";
 
 interface Props {
   params: Promise<{ id: string }>;
@@ -28,44 +29,16 @@ export default function SeguimientoDeOtsAuxPage({ params }: Props) {
   const [showConfirm, setShowConfirm] = useState(false); 
 
   useEffect(() => {
-    async function fetchWorkOrder() {
-      const token = localStorage.getItem('token');
-      const res = await fetch(`http://localhost:3000/work-orders/${id}`, {
-        headers: {
-          'Authorization': `Bearer ${token}`,
-        },
-      });
-      const data = await res.json()
-      console.log('Orden:', data)
-      setWorkOrder(data)
-    }
-    fetchWorkOrder()
+    const loadData = async () => {
+      const data = await fetchWorkOrderById(id);
+      setWorkOrder(data);
+    };
+    loadData();
   }, [id]);
 
   const handleCloseOrder = async () => {
-    const payload = {
-      ot_id: workOrder?.ot_id,
-    }
-    console.log(payload);
     try {
-      const token = localStorage.getItem('token');
-      if (!token) {
-        alert('No hay token de autenticación');
-        return;
-      }
-      const res = await fetch('http://localhost:3000/work-orders/cerrar-work-order', {
-        method: 'PATCH',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}`,
-        },
-        body: JSON.stringify(payload),
-      });
-      const data = await res.json();
-      if (!res.ok) {
-        console.error('Error en el servidor:', data);
-        return;
-      }
+      await closeWorkOrder(workOrder?.ot_id);
       router.push('/seguimientoDeOts');
     } catch (error) {
       console.log('Error al enviar datos:', error);
@@ -244,9 +217,7 @@ export default function SeguimientoDeOtsAuxPage({ params }: Props) {
                 <tr>
                   <td>CQM</td>
                   {areas.map((area, index) => (
-                    <td key={index}>
-                      {area.cqm}
-                    </td>
+                    <td key={index}>{area.cqm}</td>
                   ))}
                 </tr>
                 <tr>
@@ -261,8 +232,9 @@ export default function SeguimientoDeOtsAuxPage({ params }: Props) {
                     const buenas = Number(area.buenas) || 0;
                     const malas = Number(area.malas) || 0;
                     const excedente = Number(area.excedente) || 0;
+                    const cqm = Number(area.cqm) || 0;
                     const muestras = Number(area.muestras) || 0;
-                    const total = buenas + malas + excedente + muestras;
+                    const total = buenas + malas + excedente + cqm + muestras;
                     return <td key={index}>{total}</td>;
                 })}
                 </tr>

@@ -10,6 +10,12 @@ import { useFocusEffect } from '@react-navigation/native';
 import { getOrdersInCalidad } from '../../../api/recepcionCQM';
 import WorkOrderList from '../../../components/RecepcionCQM/WorkOrderList';
 
+interface File {
+  id: number;
+  type: string;
+  file_path: string;
+}
+
 interface WorkOrder {
   id: number;
   ot_id: string;
@@ -26,6 +32,7 @@ interface WorkOrder {
     status: string;
     area?: { name?: string };
   }[];
+  files: File[];
 }
 
 const RecepcionCQMScreen: React.FC = () => {
@@ -67,7 +74,7 @@ const RecepcionCQMScreen: React.FC = () => {
           </Text>
         </View>
       ) : (
-        <WorkOrderList orders={orders} title="Órdenes en Calidad" />
+        <WorkOrderList orders={orders} />
       )}
     </View>
   );

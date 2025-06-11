@@ -70,6 +70,15 @@ export class FreeWorkOrderService {
                 areaResponse: {
                   include: {
                     prepress: true,
+                    impression: true,
+                    serigrafia: true, 
+                    empalme: true,
+                    laminacion: true, 
+                    corte: true,
+                    colorEdge: true,
+                    hotStamping: true,
+                    millingChip: true,
+                    personalizacion: true,
                   },
                 },
                 answers: true,

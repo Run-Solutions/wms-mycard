@@ -8,6 +8,7 @@ import IconButton from '@mui/material/IconButton';
 import DeleteIcon from '@mui/icons-material/Delete';
 import UploadFileIcon from '@mui/icons-material/UploadFile';
 import Typography from '@mui/material/Typography';
+import { getAreasOperator, createWorkOrder } from '@/api/ordenesDeTrabajo';
 
 const WorkOrdersPage: React.FC = () => {
   const theme = useTheme();
@@ -15,35 +16,25 @@ const WorkOrdersPage: React.FC = () => {
   // Formulacion de los estados
   const [formData, setFormData] = useState({ ot_id: '', mycard_id: '', quantity: '', comments: '', areasOperatorIds: [] as string[], priority: false, files: [] as File[], });
   const [message, setMessage] = useState('');
-  const [areasOperator, setAreasOperator] = useState<{ id: number; name: string }[]>([]);
+  const [areasOperator, setAreasOperator] = useState<{ label: string; value: string }[]>([]);
   const [dropdownCount, setDropdownCount] = useState(4);
   const [files, setFiles] = useState<{ ot: File | null; sku: File | null; op: File | null }>({ ot: null, sku: null, op: null, });
   
   // Para obtener las areas de operacion
   useEffect(() => {
-    fetch('http://localhost:3000/auth/areas_operator')
-      .then((res) => res.json())
-      .then((data) => setAreasOperator(data || []))
-      .catch((err) => console.log('Error al obtener las areas de operacion', err));
+    getAreasOperator()
+      .then(setAreasOperator)
+      .catch(() => alert('Error: No se pudieron cargar las áreas'));
   }, []);
-  console.log("areasOperator:", areasOperator);
 
   // Para manejar los cambios de los campos del formulario
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>, areaIndex?: number) => {
     const target = e.target;
     const name = target.name;
     const value = target.type === 'checkbox' ? (target as HTMLInputElement).checked : target.value;
-    
     if (areaIndex !== undefined) {
       setFormData((prev) => {
         const updatedFlows = [...prev.areasOperatorIds];
-    
-        // Evita valores duplicados 
-        /*if (updatedFlows.includes(value as string)) {
-          const duplicateIndex = updatedFlows.indexOf(value as string);
-          updatedFlows[duplicateIndex] = ""; // Si hay duplicado
-        }*/
-    
         updatedFlows[areaIndex] = value as string || "";  // Asignamos el valor al índice correspondiente
         //const filteredFlows = updatedFlows.filter(area => area !== "");
         return { ...prev, areasOperatorIds: updatedFlows };
@@ -55,16 +46,12 @@ const WorkOrdersPage: React.FC = () => {
 
   // Para obtener solo las areas disponibles
   const getAvailableAreas = (index: number) => {
-    return areasOperator
-    .sort((a, b) => Number(a.id) - Number(b.id)) // Ordena por ID
-    .slice(0, 10); // Toma las primeras 10
+    return areasOperator.slice(0, 10);
   };
-  
   // Agregar un nuevo dropdown para las areas en el flujo asignado
   const addDropdown = () => {
     setDropdownCount((prev) => prev + 1);
   };
-
   // Elimina el ultimo dropdown de areas en el flujo asignado
   const removeLastDropdown = () => {
     setFormData((prev) => {
@@ -72,7 +59,6 @@ const WorkOrdersPage: React.FC = () => {
       updatedAreas.pop(); // elimina el último valor seleccionado
       return { ...prev, areasOperatorIds: updatedAreas };
     });
-  
     setDropdownCount((prev) => prev - 1);
   };
 
@@ -80,7 +66,6 @@ const WorkOrdersPage: React.FC = () => {
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>, type: 'ot' | 'sku' | 'op') => {
     const file = e.target.files?.[0]; // Obtener solo el primer file
     if (!file) return; // Si no hay archivos, salimos de la función
-  
     setFiles((prevFiles) => ({
       ...prevFiles,
       [type]: file, // Asignar el archivo al tipo correspondiente
@@ -98,69 +83,64 @@ const WorkOrdersPage: React.FC = () => {
   // Para el envío de la informacion
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-
     if (!files.ot || !files.sku || !files.op) {
       alert('Todos los archivos (OT, SKU, OP) son obligatorios.');
       return;
     }
-
-    const formDataToSend = new FormData();
-
-    formDataToSend.append('ot', files.ot);  // Envia el archivo 'ot'
-    formDataToSend.append('sku', files.sku); // Envia el archivo 'sku'
-    formDataToSend.append('op', files.op);  // Envia el archivo 'op'
-
-    // Limpiar areasOperatorIds quitando vacíos o nulos antes de enviar
-    const cleanedAreasOperatorIds = formData.areasOperatorIds.filter((id) => id !== "" && id !== undefined && id !== null);
-
-    // Agregar otros datos del formulario
-    Object.entries({ ...formData, areasOperatorIds: cleanedAreasOperatorIds }).forEach(([key, value]) => {
-      if (Array.isArray(value)) {
-        value.forEach((v) => formDataToSend.append(key, v));
-      } else {
-        formDataToSend.append(key, value.toString());
-      }
-    });
-    console.log('Enviando archivos: ', { ot: files.ot.name, sku: files.sku.name, op: files.op.name });
-    console.log("Datos enviados:", formData.areasOperatorIds);
-    console.log('formDataToSend', formDataToSend);
-
+    if (
+      !formData.ot_id.trim() ||
+      !formData.mycard_id.trim() ||
+      !formData.quantity.trim() ||
+      !formData.comments.trim()
+    ) {
+      alert('Todos los campos son obligatorios excepto la prioridad.');
+      return;
+    }
+    
+    if (formData.areasOperatorIds.length < 3) {
+      alert('Debes seleccionar al menos 3 áreas.');
+      return;
+    }
+    
+    if (formData.areasOperatorIds[0] !== '1') {
+      alert('La primera área debe ser la de Preprensa (ID: 1).');
+      return;
+    }
+  
+    if (!files.ot || !files.sku || !files.op) {
+      alert('Debes subir OT, SKU y OP.');
+      return;
+    }
+    const cleanedAreasOperatorIds = formData.areasOperatorIds.filter(
+      (id) => id !== "" && id !== undefined && id !== null
+    );
+    const payload = {
+      ...formData,
+      areasOperatorIds: cleanedAreasOperatorIds,
+    };
     try {
-      // se verifica token
-      const token = localStorage.getItem('token');
-      if(!token) {
-        console.error('No se encontro el token en localStorage');
-        return;
-      }
-      const response = await fetch('http://localhost:3000/work-orders', {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${token}`
-        },
-        body: formDataToSend,
+      const result = await createWorkOrder(payload, {
+        ot: files.ot!,
+        sku: files.sku!,
+        op: files.op!
       });
-      if (!response.ok) {
-        const errorText = await response.text();
-        alert('Orden de trabajo ya existe')
-        console.error(`Error del servidor: ${response.status}`, errorText);
-        return;
-      }
-      const result = await response.json();
-      setMessage(result.message);
-      // 👉 Reseteamos el formulario y archivos
-      setFormData({ 
-        ot_id: '', 
-        mycard_id: '', 
-        quantity: '', 
-        comments: '', 
-        areasOperatorIds: [], 
-        priority: false, 
-        files: [] 
+      setMessage(result.message || 'Orden de trabajo creada correctamente');
+      // Reseteamos
+      setFormData({
+        ot_id: '',
+        mycard_id: '',
+        quantity: '',
+        comments: '',
+        areasOperatorIds: [],
+        priority: false,
+        files: [],
       });
       setFiles({ ot: null, sku: null, op: null });
       setDropdownCount(4);
-    } catch (error) {
+    } catch (error: any) {
+      console.error(error);
       setMessage('Error al crear la orden de trabajo');
+      alert('La OT es duplicada');
     }
   };
 
@@ -200,7 +180,7 @@ const WorkOrdersPage: React.FC = () => {
                         <Select name={`area-${index}`} onChange={(e) => handleChange(e, index)} value={formData.areasOperatorIds[index] || ''} style={{ height: '100%' }}>
                           <option value=''>Selecciona un área</option>
                           {getAvailableAreas(index).map((area) => (
-                              <option key={area.id} value={area.id}>{area.name}</option>
+                              <option key={area.value} value={area.value}>{area.label}</option>
                             ))
                           }
                         </Select>

@@ -66,7 +66,7 @@ export default function HotStampingComponent({ formQuestion }: Props) {
         onDelete={(e) => setDeletingId(e)}
       />
 
-      <Portal>
+
         {/* Edit Modal */}
         <Modal visible={editingId !== null} transparent animationType="fade">
           <View style={styles.modalOverlay}>
@@ -99,7 +99,6 @@ export default function HotStampingComponent({ formQuestion }: Props) {
             </View>
           </View>
         </Modal>
-      </Portal>
     </View>
   );
 }

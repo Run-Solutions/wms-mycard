@@ -9,6 +9,8 @@ import ToggleSwitch from './ToggleSwitch';
 import { useAuthContext } from '../../context/AuthContext';
 import { useRouter } from 'next/navigation';
 import { toast } from 'react-toastify';
+import { login } from '@/api/auth';
+import { verifyUsername } from '@/api/auth';
 
 const AuthFlipCard: React.FC = () => {
   const router = useRouter();
@@ -29,57 +31,83 @@ const AuthFlipCard: React.FC = () => {
   const handleLoginSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     try {
-      const res = await fetch('http://localhost:3000/auth/login', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ username: loginEmail, password: loginPassword }),
-      });
-      
-      const data = await res.json();
+      const res = await login(loginEmail, loginPassword); // usa el método de auth.ts
+      const data = res.data; // axios guarda el payload aquí
+  
       console.log('Respuesta de data desde el back:', data);
-      
-      if (res.ok) {
-        // Se espera que la respuesta contenga { token, user }
-        
-        // Guardar el token en localStorage para modulos por rol
-        if (data.token) {
-          localStorage.setItem('token', data.token);
-          setToken(data.token);
-          console.log('Token almacenado:', data.token)
-        } else {
-          console.error('⛔ No se ha recibido el token')
-        }
-        // Guardar el usuario en localStorage
-        if (data.user) {
-          setUser(data.user);
-          localStorage.setItem('user', JSON.stringify(data.user));
-        }
-        
-        router.push('/dashboard');
+  
+      if (data.token) {
+        localStorage.setItem('token', data.token);
+        setToken(data.token);
+        console.log('Token almacenado:', data.token);
       } else {
-        toast.error(data.message || 'Error en login');
-        console.error('Error en login:', data.message || 'Error en login');
+        console.error('⛔ No se ha recibido el token');
       }
-    } catch (err) {
-      toast.error('Error en login');
+  
+      if (data.user) {
+        setUser(data.user);
+        localStorage.setItem('user', JSON.stringify(data.user));
+      }
+  
+      router.push('/dashboard');
+    } catch (err: any) {
+      toast.error(err.response?.data?.message || 'Error en login');
       console.error('Error en login:', err);
     }
   };
   
   const handleRegisterSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
-    if (regPassword !== regConfirmPassword) {
-      toast.error('Las contraseñas no coinciden');
+  
+    const safeUsername = regUsername.trim();
+  
+    // Validar campos vacíos
+    if (!safeUsername || !regEmail || !regPassword || !regConfirmPassword) {
+      toast.error('Todos los campos son obligatorios');
       return;
     }
-    // Guardar los datos en localstorage
-    const pendingUser = {
-      username: regUsername,
-      email: regEmail,
-      password: regPassword,
-    };
-    localStorage.setItem('pendingUser', JSON.stringify(pendingUser));
-    router.push('/auth/roleSelection');
+  
+    // Validar caracteres válidos para el nombre de usuario
+    const isValidUsername = /^[a-zA-Z0-9._-]+$/.test(safeUsername);
+    if (!isValidUsername) {
+      toast.error('El nombre de usuario solo puede contener letras, números, ".", "-", y "_" (sin espacios)');
+      return;
+    }
+  
+    try {
+      const response = await verifyUsername(safeUsername);
+      const exists = await response.data;
+      if (exists) {
+        toast.error(`El nombre de usuario "${safeUsername}" ya está en uso`);
+        return;
+      }
+  
+      if (regPassword !== regConfirmPassword) {
+        toast.error('Las contraseñas no coinciden');
+        return;
+      }
+  
+      const pendingUser = {
+        username: safeUsername,
+        email: regEmail,
+        password: regPassword,
+      };
+  
+      // Guardar en sessionStorage para recuperar luego en roleSelection
+      sessionStorage.setItem('username', safeUsername);
+      sessionStorage.setItem('email', regEmail);
+      sessionStorage.setItem('password', regPassword);
+  
+      // También en localStorage si quieres persistencia
+      localStorage.setItem('pendingUser', JSON.stringify(pendingUser));
+      localStorage.setItem('user', JSON.stringify({ ...pendingUser, role: 'pending', id: Date.now().toString() }));
+  
+      // Opcional: despachar al authSlice
+ 
+      router.push('/auth/roleSelection');
+    } catch (err: any) {
+      toast.error('Error al verificar el nombre de usuario');
+    }
   };
   
   return (

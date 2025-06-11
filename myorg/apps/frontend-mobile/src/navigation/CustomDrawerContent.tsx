@@ -37,7 +37,7 @@ const CustomDrawerContent: React.FC<any> = (props) => {
         <DrawerItem
           label={typeof user?.username === "string" ? user.username : "Perfil"}
           onPress={() => console.log('Profile pressed')}
-          icon={() => <Image source={require('../../assets/logos/users.webp')} style={{ width: 40, height: 40 }} />}
+          icon={() => <Image source={require('../../assets/logos/profile.png')} style={{ width: 40, height: 40 }} />}
         />
       </View>
       <View style={styles.logoutContainer}>

@@ -3,6 +3,7 @@
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 import styled from "styled-components";
+import { releaseProductFromImpress, submitToCQMImpression } from "@/api/liberarProducto";
 
 interface Props {
   workOrder: any;
@@ -167,25 +168,7 @@ export default function ImpresionComponent({ workOrder }: Props) {
       return; // Evitamos el envío si los datos no son válidos
     }
     try {
-      const token = localStorage.getItem('token');
-      if(!token) {
-        alert('No hay token de autenticación');
-        return;
-      }
-      console.log('Datos a enviar', payload);
-      const res = await fetch('http://localhost:3000/free-order-flow/cqm-impression', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}`,
-        },
-        body: JSON.stringify(payload),
-      });
-      const data = await res.json();
-      if (!res.ok) {
-        console.error("Error en el servidor:", data);
-        return;
-      }
+      await submitToCQMImpression(payload);
       router.push('/liberarProducto');
     } catch (error) {
       console.log('Error al guardar la respuesta: ', error);
@@ -224,27 +207,7 @@ export default function ImpresionComponent({ workOrder }: Props) {
     console.log('datos a enviar',payload);
   
     try {
-      const token = localStorage.getItem('token');
-      if (!token) {
-        alert('No hay token de autenticación');
-        return;
-      }
-  
-      const res = await fetch('http://localhost:3000/free-order-flow/impress', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}`,
-        },
-        body: JSON.stringify(payload),
-      });
-  
-      const data = await res.json();
-      if (!res.ok) {
-        console.error('Error en el servidor:', data);
-        return;
-      }
-  
+      await releaseProductFromImpress(payload);
       router.push('/liberarProducto');
     } catch (error) {
       console.log('Error al enviar datos:', error);

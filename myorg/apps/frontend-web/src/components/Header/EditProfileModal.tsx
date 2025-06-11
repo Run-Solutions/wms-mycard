@@ -4,6 +4,8 @@
 import React, { useRef, useState } from 'react';
 import styled, { useTheme } from 'styled-components';
 import EditIcon from '@mui/icons-material/Edit';
+import { updateUserProfile } from '@/api/navigation';
+import { BASE_URL } from '@/api/http';
 
 interface User {
   id: string;
@@ -41,18 +43,10 @@ const EditProfileModal: React.FC<EditProfileModalProps> = ({ user, onClose }) =>
     if (profile_image) formData.append('profile_image', profile_image);
 
     try {
-      const res = await fetch(`http://localhost:3000/users/${user.id}`, {
-        method: 'PATCH',
-        body: formData,
-      });
-      const data = await res.json();
-      if (res.ok) {
-        localStorage.setItem('user', JSON.stringify(data));
-        onClose();
-        window.location.reload();
-      } else {
-        console.error('Error actualizando perfil:', res.status, data);
-      }
+      const data = await updateUserProfile(user.id, formData);
+      localStorage.setItem('user', JSON.stringify(data));
+      onClose();
+      window.location.reload();
     } catch (error) {
       console.error('Error en la petición:', error);
     }
@@ -77,7 +71,7 @@ const EditProfileModal: React.FC<EditProfileModalProps> = ({ user, onClose }) =>
             <ProfileLogo
               src={
                 user.profile_image
-                  ? `http://localhost:3000/uploads/${user.profile_image}`
+                  ? `${BASE_URL}/uploads/${user.profile_image}`
                   : '/logos/users.webp'
               }
               alt={user.username}

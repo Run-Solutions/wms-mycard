@@ -1,5 +1,3 @@
-"use client";
-
 import React, { useState, useContext } from "react";
 import { View, StyleSheet, Alert, ImageBackground } from "react-native";
 import { TextInput, Button, Text, Title } from "react-native-paper";
@@ -153,7 +151,7 @@ const LoginScreen: React.FC = () => {
           theme={{ roundness: 30 }}
         />
         {error && <Text style={styles.error}>{error}</Text>}
-        <Button mode="contained" onPress={handleBiometricLogin} style={styles.button}>
+        <Button mode="contained" onPress={handleLogin} style={styles.button}>
           Iniciar Sesión
         </Button>
         <Button

@@ -60,15 +60,15 @@ const SerigrafiaComponent = ({ workOrder }: { workOrder: any }) => {
   const cantidadEntregadaValue = lastCompletedOrPartial.areaResponse && lastCompletedOrPartial.partialReleases.lenght > 0
     ? (
       lastCompletedOrPartial.areaResponse.prepress?.plates ??
-      lastCompletedOrPartial.areaResponse.impression?.quantity ??
-      lastCompletedOrPartial.areaResponse.serigrafia?.quantity ??
-      lastCompletedOrPartial.areaResponse.empalme?.quantity ??
-      lastCompletedOrPartial.areaResponse.laminacion?.quantity ??
-      lastCompletedOrPartial.areaResponse.corte?.quantity ??
-      lastCompletedOrPartial.areaResponse.colorEdge?.quantity ??
-      lastCompletedOrPartial.areaResponse.hotStamping?.quantity ??
-      lastCompletedOrPartial.areaResponse.millingChip?.quantity ??
-      lastCompletedOrPartial.areaResponse.personalizacion?.quantity ??
+      lastCompletedOrPartial.areaResponse.impression?.release_quantity ??
+      lastCompletedOrPartial.areaResponse.serigrafia?.release_quantity ??
+      lastCompletedOrPartial.areaResponse.empalme?.release_quantity ??
+      lastCompletedOrPartial.areaResponse.laminacion?.release_quantity ??
+      lastCompletedOrPartial.areaResponse.corte?.good_quantity ??
+      lastCompletedOrPartial.areaResponse.colorEdge?.good_quantity ??
+      lastCompletedOrPartial.areaResponse.hotStamping?.good_quantity ??
+      lastCompletedOrPartial.areaResponse.millingChip?.good_quantity ??
+      lastCompletedOrPartial.areaResponse.personalizacion?.good_quantity ??
       'Sin cantidad'
     )
     : lastCompletedOrPartial.partialReleases?.some((r: PartialRelease) => r.validated)

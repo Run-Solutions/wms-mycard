@@ -4,7 +4,7 @@
 import React, { useEffect, useState } from 'react';
 import styled, { useTheme } from 'styled-components';
 import WorkOrderTable from '@/components/CerrarOrdenDeTrabajo/WorkOrderTable';
-
+import { fetchWorkOrdersInProgress } from '@/api/cerrarOrdenDeTrabajo';
 // Se define el tipo de datos
 interface WorkOrder {
   id: number;
@@ -40,25 +40,7 @@ const CloseWorkOrderPage: React.FC = () => {
   useEffect (() => {
     async function fetchWorkOrdersInAuditory() {
       try {
-        const token = localStorage.getItem('token');
-        if(!token){
-          console.error('No hay token');
-          return;
-        }
-        const estados = ['En auditoria']
-        const query = estados.map(estado => encodeURIComponent(estado)).join(',');
-
-        const res = await fetch(`http://localhost:3000/free-work-order-auditory/in-auditory?statuses=${query}`, {
-          method: 'GET',
-          headers: {
-            'Content-Type': 'application/json',
-            'Authorization': `Bearer ${token}`
-          },
-        });
-        if(!res.ok){
-          throw new Error(`Error al obtener las ordenes: ${res.status} ${res.statusText}`);
-        }
-        const data = await res.json();
+        const data = await fetchWorkOrdersInProgress();
         console.log('Datos obtenidos de las Ordenes en Proceso: ', data);
         const orders = data.map((item: any) => item.workOrder); 
         console.log('Datos obtenidos de las Ordenes en Proceso: ', data);

@@ -12,6 +12,7 @@ import { Switch, SwitchProps } from '@mui/material';
 import { useThemeContext } from '@/components/ThemeContext';
 import { useRouter } from 'next/navigation';
 import { Theme } from '@mui/material/styles';
+import { BASE_URL } from '@/api/http';
 
 interface DashboardHeaderProps {
   toggleDrawer: () => void;
@@ -119,7 +120,7 @@ const DashboardHeader: React.FC<DashboardHeaderProps> = ({
             <UserAvatar
               src={
                 user?.profile_image
-                ? `http://localhost:3000/uploads/${user.profile_image}`
+                ? `${BASE_URL}/uploads/${user.profile_image}`
                 : '/logos/users.webp'
               }
               alt={user?.username}

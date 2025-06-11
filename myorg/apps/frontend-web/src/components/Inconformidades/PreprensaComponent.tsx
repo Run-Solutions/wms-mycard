@@ -2,6 +2,7 @@
 import styled from "styled-components";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
+import { acceptPrepressInconformity } from "@/api/inconformidades";
 
 interface Props {
   workOrder: any;
@@ -21,20 +22,11 @@ export default function PreprensaComponent({ workOrder }: Props) {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     const token = localStorage.getItem('token');
-    const areaResponse = workOrder.areaResponse.id;
-    console.log(areaResponse);
+    const areaResponseId = workOrder.areaResponse.id;
+    console.log(areaResponseId);
     try {
-      const res = await fetch(`http://localhost:3000/inconformities/${areaResponse}/prepress`, {
-        method: 'PATCH',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}`,
-        },
-      });
-      const data = await res.json();
-      if (res.ok) {
-        router.push('/liberarProducto');
-      }
+      await acceptPrepressInconformity(areaResponseId);
+      router.push('/liberarProducto');
     } catch (error) {
       console.error(error);
       alert('Error al conectar con el servidor');

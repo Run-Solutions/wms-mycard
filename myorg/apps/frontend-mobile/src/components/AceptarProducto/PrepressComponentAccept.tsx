@@ -4,7 +4,6 @@ import {
   View, Text, TextInput, StyleSheet, TouchableOpacity,
   Modal, Alert, ScrollView, Platform
 } from 'react-native';
-import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useNavigation } from '@react-navigation/native';
 import { acceptWorkOrderFlow } from '../../api/aceptarProducto';
 import { registrarInconformidad } from '../../api/aceptarProducto';

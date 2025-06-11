@@ -2,6 +2,7 @@
 import styled from "styled-components";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
+import { acceptCorteInconformity } from "@/api/inconformidades";
 
 interface Props {
   workOrder: any;
@@ -39,17 +40,8 @@ export default function CorteComponent({ workOrder }: Props) {
 
     console.log(areaResponseFlowId);
     try {
-      const res = await fetch(`http://localhost:3000/inconformities/${areaResponseFlowId}/corte`, {
-        method: 'PATCH',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}`,
-        },
-      });
-      const data = await res.json();
-      if (res.ok) {
-        router.push('/liberarProducto');
-      }
+      await acceptCorteInconformity(areaResponseFlowId);
+      router.push('/liberarProducto');
     } catch (error) {
       console.error(error);
       alert('Error al conectar con el servidor');

@@ -4,72 +4,45 @@
 import React, { useEffect, useState } from 'react';
 import styled, { useTheme } from 'styled-components';
 import WorkOrderTable from '@/components/RecepcionCqm/WorkOrderTable';
+import { getOrdersInCalidad } from '@/api/recepcionCQM';
 
 // Se define el tipo de datos
-interface CQMWorkOrder {
+interface File {
   id: number;
-  work_order_id: number;
-  area_id: number;
+  type: string;
+  file_path: string;
+}
+
+interface WorkOrder {
+  id: number;
+  ot_id: string;
+  mycard_id: string;
+  quantity: number;
   status: string;
-  assigned_at: string;
-  created_at: string;
-  updated_at: string;
-  workOrder: {   
-    id: number;
-    ot_id: string;
-    mycard_id: string;
-    quantity: number;
-    created_by: number;  
-    validated: boolean;
-    createdAt: string;
-    updatedAt: string;
-    user: {
-      id: number;
-      username: string;
-    };
-    files: {
-      id: number;
-      type: string;
-      file_path: string;
-    }[];
-    flow: {
-      id: number;
-      area: {
-        name: string;
-      }
-      status: 'Pendiente' | 'En Proceso' | 'En Calidad' ;
-    }[];
+  validated: boolean;
+  createdAt: string;
+  user: {
+    username: string;
   };
+  flow: {
+    area_id: number;
+    status: string;
+    area?: { name?: string };
+  }[];
+  files: File[];
 }
 
 const RecepcionCQMPage: React.FC = () => {
   const theme = useTheme();
 
   // Para obtener Ordenes En Calidad
-  const [CQMWorkOrders, setCQMWorkOrders] = useState<CQMWorkOrder[]>([]);
+  const [CQMWorkOrders, setCQMWorkOrders] = useState<WorkOrder[]>([]);
 
   // Cargar las OTs en calidad con reviewer logeado
   useEffect(() => {
     async function fetchWorkOrdersInCQM() {
       try {
-        const token = localStorage.getItem('token');
-        if(!token){
-          console.error('No se encontró el token en localStorage');
-          return;
-        }
-        const estados = ['En calidad'];
-        const query = estados.map(estado => encodeURIComponent(estado)).join(',');
-        const res = await fetch(`http://localhost:3000/free-order-cqm/in-progress?statuses=${query}`, {
-          method: 'GET',
-          headers: {
-            'Content-Type': 'application/json',
-            'Authorization': `Bearer ${token}`
-          },
-        });
-        if(!res.ok){
-          throw new Error(`Error al obtener las ordenes: ${res.status} ${res.statusText}`);
-        }
-        const data = await res.json();
+        const data = await getOrdersInCalidad();
         console.log('Datos obtenidos de las Ordenes en Calidad: ', data);
         setCQMWorkOrders(data);
       } catch (error) {

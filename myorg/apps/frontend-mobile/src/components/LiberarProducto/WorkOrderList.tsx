@@ -6,6 +6,9 @@ import { TouchableOpacity } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
 import { NavigationProp } from '@react-navigation/native';
 import { InternalStackParamList } from '../../navigation/types';
+import * as FileSystem from 'expo-file-system';
+import { Buffer } from 'buffer';
+import FileViewer from 'react-native-file-viewer';
 
 type Navigation = NavigationProp<InternalStackParamList, 'LiberarProductoAuxScreen'>;
 import {
@@ -16,6 +19,14 @@ import {
   Platform,
   ScrollView,
 } from 'react-native';
+import { getFileByName } from '../../api/finalizacion';
+
+
+interface File {
+  id: number;
+  type: string;
+  file_path: string;
+}
 
 interface WorkOrder {
   id: number;
@@ -33,33 +44,88 @@ interface WorkOrder {
     status: string;
     area?: { name?: string };
   }[];
+  files: File[];
 }
 
 interface Props {
   orders: WorkOrder[];
-  title?: string; 
+  title?: string;
   onSelectOrder?: (id: number) => void;
+  isTouchable?: boolean;
 }
 
 const WorkOrderList: React.FC<Props> = ({ orders, onSelectOrder }) => {
   const navigation = useNavigation<any>();
-  const renderItem = ({ item }: { item: WorkOrder }) => (
-    <TouchableOpacity
-    onPress={() =>
-      navigation.navigate('Principal', {
-        screen: 'LiberarProductoAuxScreen',
-        params: { id: item.ot_id },
-      })
+  const downloadFile = async (filename: string) => {
+    try {
+      const res = await getFileByName(filename);
+      if (!res) {
+        console.error('❌ Error desde el backend');
+        return;
+      }
+  
+      const base64Data = Buffer.from(res, 'binary').toString('base64');
+      const fileUri = FileSystem.documentDirectory + filename;
+  
+      await FileSystem.writeAsStringAsync(fileUri, base64Data, {
+        encoding: FileSystem.EncodingType.Base64,
+      });
+  
+      await FileViewer.open(fileUri, {
+        showOpenWithDialog: true,
+        displayName: filename,
+      });
+    } catch (error) {
+      console.error('Error al abrir el archivo:', error);
     }
-  >
+  };
+  const renderItem = ({ item }: { item: WorkOrder }) => {
+    return (
       <View style={styles.card}>
-        <Text style={styles.title}>OT: {item.ot_id}</Text>
-        <Text>Id del presupuesto: {item.mycard_id}</Text>
-        <Text>Cantidad: {item.quantity}</Text>
-        <Text>Estado: {item.status}</Text>
-        <Text>Creado por: {item.user?.username}</Text>
+        <TouchableOpacity
+          onPress={() =>
+            navigation.navigate('Principal', {
+              screen: 'LiberarProductoAuxScreen',
+              params: { id: item.ot_id },
+            })
+          }
+        >
+          <View style={styles.infoRow}>
+            <View style={styles.infoBlock}>
+              <Text style={styles.title}>OT: {item.ot_id}</Text>
+              <Text>Id del presupuesto: {item.mycard_id}</Text>
+              <Text>Cantidad: {item.quantity}</Text>
+              <Text>Estado: {item.status}</Text>
+              <Text>Creado por: {item.user?.username}</Text>
+            </View>
+          
+            <View style={styles.filesBlock}>
+              {item.files.length > 0 ? (
+                item.files.map(file => {
+                  const label = file.file_path.toLowerCase().includes('ot')
+                    ? 'Ver OT'
+                    : file.file_path.toLowerCase().includes('sku')
+                      ? 'Ver SKU'
+                      : file.file_path.toLowerCase().includes('op')
+                        ? 'Ver OP'
+                        : 'Ver Archivo';
+                  return (
+                    <TouchableOpacity
+                      key={file.id}
+                      onPress={() => downloadFile(file.file_path)}
+                      style={styles.fileButton}
+                    >
+                      <Text style={styles.fileText}>{label}</Text>
+                    </TouchableOpacity>
+                  );
+                })
+              ) : (
+                <Text style={styles.noFiles}>No hay archivos</Text>
+              )}
+            </View>
+          </View>
+        </TouchableOpacity>
 
-        <Text style={styles.flowLine}>Áreas:</Text>
         <ScrollView
           horizontal
           showsHorizontalScrollIndicator={false}
@@ -67,7 +133,7 @@ const WorkOrderList: React.FC<Props> = ({ orders, onSelectOrder }) => {
           contentContainerStyle={styles.timelineContainer}
         >
           {item.flow.map((step, index) => {
-            const isActive = ['proceso', 'listo'].some(word => step.status.toLowerCase().includes(word));
+            const isActive = step.status.toLowerCase().includes('proceso');
             const isCompleted = step.status.toLowerCase().includes('completado');
             const isParcial = step.status.toLowerCase() === 'parcial';
             const isCalidad = ['calidad', 'cqm'].some(word => step.status.toLowerCase().includes(word));
@@ -93,12 +159,12 @@ const WorkOrderList: React.FC<Props> = ({ orders, onSelectOrder }) => {
                       color: isCompleted
                         ? '#22c55e'
                         : isCalidad
-                        ? '#facc15'
-                        : isActive
-                        ? '#4a90e2'
-                        : isParcial
-                        ? '#f5945c'
-                        : '#6b7280',
+                          ? '#facc15'
+                          : isActive
+                            ? '#4a90e2'
+                            : isParcial
+                              ? '#f5945c'
+                              : '#6b7280',
                       fontWeight: isActive ? 'bold' : 'normal',
                     },
                   ]}
@@ -111,8 +177,8 @@ const WorkOrderList: React.FC<Props> = ({ orders, onSelectOrder }) => {
           })}
         </ScrollView>
       </View>
-    </TouchableOpacity>
-  );
+    );
+  };
 
   return (
     <FlatList
@@ -142,6 +208,7 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.1,
     shadowRadius: 6,
     elevation: 3,
+    flexDirection: 'column',
   },
   title: {
     fontWeight: 'bold',
@@ -196,5 +263,36 @@ const styles = StyleSheet.create({
     backgroundColor: '#d1d5db',
     width: 90,
     zIndex: 1,
+  },
+  fileButton: {
+    borderColor: '#c2c2c2',
+    borderWidth: 1,
+    borderRadius: 20,
+    paddingVertical: 4,
+    paddingHorizontal: 12,
+    backgroundColor: '#f7f7f7',
+    alignSelf: 'flex-start',
+    marginVertical: 4,
+  },
+  fileText: {
+    fontSize: 12,
+    color: '#000',
+  },
+  noFiles: {
+    color: '#888',
+  },
+  infoRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    gap: 12,
+    marginBottom: 10,
+  },
+  infoBlock: {
+    flex: 1,
+  },
+  filesBlock: {
+    flexShrink: 0,
+    justifyContent: 'flex-start',
+    alignItems: 'flex-end',
   },
 });

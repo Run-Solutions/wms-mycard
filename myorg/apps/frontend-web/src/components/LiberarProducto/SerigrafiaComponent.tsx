@@ -3,6 +3,7 @@
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 import styled from "styled-components";
+import { submitToCQMSerigrafia, releaseProductFromSerigrafia } from "@/api/liberarProducto";
 
 interface Props {
   workOrder: any;
@@ -128,25 +129,7 @@ export default function SerigrafiaComponent({ workOrder }: Props) {
       sample_quantity: Number(sampleQuantity),
     };
     try {
-      const token = localStorage.getItem('token');
-      if(!token) {
-        alert('No hay token de autenticación');
-        return;
-      }
-      console.log('Datos a enviar', payload);
-      const res = await fetch('http://localhost:3000/free-order-flow/cqm-serigrafia', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}`,
-        },
-        body: JSON.stringify(payload),
-      });
-      const data = await res.json();
-      if (!res.ok) {
-        console.error("Error en el servidor:", data);
-        return;
-      }
+      await submitToCQMSerigrafia(payload);
       router.push('/liberarProducto');
     } catch (error) {
       console.log('Error al guardar la respuesta: ', error);
@@ -185,27 +168,7 @@ export default function SerigrafiaComponent({ workOrder }: Props) {
     console.log('datos a enviar',payload);
   
     try {
-      const token = localStorage.getItem('token');
-      if (!token) {
-        alert('No hay token de autenticación');
-        return;
-      }
-  
-      const res = await fetch('http://localhost:3000/free-order-flow/serigrafia', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}`,
-        },
-        body: JSON.stringify(payload),
-      });
-  
-      const data = await res.json();
-      if (!res.ok) {
-        console.error('Error en el servidor:', data);
-        return;
-      }
-  
+      await releaseProductFromSerigrafia(payload);
       router.push('/liberarProducto');
     } catch (error) {
       console.log('Error al enviar datos:', error);

@@ -4,7 +4,7 @@ import { useRouter } from "next/navigation";
 import { FaEdit, FaTrash } from 'react-icons/fa';
 import { useState } from "react";
 import styled from "styled-components";
-import { title } from "process";
+import { deleteFormQuestion, updateFormQuestion } from "@/api/configVistosBuenos";
 
 interface Props {
   formQuestion: any;
@@ -41,19 +41,7 @@ export default function ColorEdgeComponent({ formQuestion }: Props) {
         id,
         title: updatedTitle,
       });
-      // Luego enviamos la petición al backend
-      const token = localStorage.getItem('token');
-      const res = await fetch(`http://localhost:3000/work-order-cqm/${id}/new-question`, {
-        method: 'PATCH',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}`,
-        },
-        body: JSON.stringify({ title: updatedTitle })
-      })
-      if(res.ok){
-        console.log("Pregunta actualizada correctamente");
-      }
+      await updateFormQuestion(id, updatedTitle);
     } catch (error) {
       console.error("Error actualizando la pregunta:", error);
     }
@@ -61,13 +49,7 @@ export default function ColorEdgeComponent({ formQuestion }: Props) {
 
   const handleDeleteQuestion = async (id: number) => {
     try {
-      const token = localStorage.getItem('token');
-      const res = await fetch(`http://localhost:3000/work-order-cqm/${id}/delete`, {
-        method: 'DELETE',
-        headers: {
-          'Authorization': `Bearer ${token}`,
-        },
-      });
+      const res = await deleteFormQuestion(id);
       if (res.ok) {
         // Quitamos del estado local
         const updatedQuestions = formQuestions.filter((q: Question) => q.id !== id);

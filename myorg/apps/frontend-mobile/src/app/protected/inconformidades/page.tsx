@@ -3,6 +3,11 @@ import { View, Text, StyleSheet, ActivityIndicator, Platform, ScrollView } from 
 import { getWorkOrdersWithInconformidad } from '../../../api/inconformidades';
 import WorkOrderList from '../../../components/Inconformidades/WorkOrderList';
 
+interface File {
+  id: number;
+  type: string;
+  file_path: string;
+}
 interface WorkOrder {
   id: number;
   ot_id: string;
@@ -19,6 +24,7 @@ interface WorkOrder {
     status: string;
     area?: { name?: string };
   }[];
+  files: File[];
 }
 
 const InconformidadesScreen: React.FC = () => {
@@ -41,10 +47,11 @@ const InconformidadesScreen: React.FC = () => {
           ot_id: item.workOrder.ot_id,
           mycard_id: item.workOrder.mycard_id,
           quantity: item.workOrder.quantity,
-          status: item.status ?? '',
+          status: item.status, 
           validated: item.workOrder.validated,
           createdAt: item.workOrder.createdAt,
           user: item.workOrder.user,
+          files: item.workOrder.files, 
           flow: item.workOrder.flow.map((f: any) => ({
             area_id: f.area.id,
             status: f.status,

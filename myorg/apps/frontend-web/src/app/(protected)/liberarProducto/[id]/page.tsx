@@ -3,6 +3,8 @@
 
 import { use, useEffect, useState } from "react";
 import styled from "styled-components";
+import { fetchWorkOrderById } from "@/api/liberarProducto";
+
 import PrePrensaComponent from "@/components/LiberarProducto/PrePrensaComponent";
 import ImpresionComponent from "@/components/LiberarProducto/ImpresionComponent";
 import EmpalmeComponent from "@/components/LiberarProducto/EmpalmeComponent";
@@ -24,13 +26,7 @@ export default function LiberarProductoPage({ params }: Props) {
 
   useEffect(() => {
     async function fetchWorkOrder() {
-      const token = localStorage.getItem('token');
-      const res = await fetch(`http://localhost:3000/free-order-flow/${id}`, {
-        headers: {
-          'Authorization': `Bearer ${token}`,
-        },
-      })
-      const data = await res.json()
+      const data = await fetchWorkOrderById(id);
       console.log('Orden:', data)
       setWorkOrder(data)
     }

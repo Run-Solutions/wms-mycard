@@ -2,6 +2,7 @@
 import styled from "styled-components";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
+import { acceptCQMInconformity } from "@/api/inconformidades";
 
 interface Props {
   workOrder: any;
@@ -30,21 +31,11 @@ export default function ColorEdgeComponentCQM({ workOrder }: Props) {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    const token = localStorage.getItem('token');
     const areaResponse = workOrder.answers[index].id;
     console.log(areaResponse);
     try {
-      const res = await fetch(`http://localhost:3000/inconformities/${areaResponse}/cqm`, {
-        method: 'PATCH',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}`,
-        },
-      });
-      const data = await res.json();
-      if (res.ok) {
-        router.push('/liberarProducto');
-      }
+      await acceptCQMInconformity(areaResponse);
+      router.push('/liberarProducto');
     } catch (error) {
       console.error(error);
       alert('Error al conectar con el servidor');

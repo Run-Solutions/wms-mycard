@@ -82,7 +82,6 @@ const ImpresionComponent: React.FC<{ workOrder: any }> = ({ workOrder }) => {
 
         <View style={styles.card}>
           <Text style={styles.subtitle}>Entregaste:</Text>
-          <Text style={styles.label}>Placas</Text>
           <TextInput style={styles.input} editable={false} value={String(releaseQuantity)} />
 
           <Text style={styles.label}>Comentarios</Text>

@@ -5,6 +5,7 @@ import React, { useEffect, useState } from 'react';
 import styled, { useTheme } from 'styled-components';
 import { useRouter } from 'next/navigation';
 import WorkOrderTable from '@/components/LiberarProducto/WorkOrderTable';
+import { fetchWorkOrdersInProgress } from '@/api/liberarProducto';
 
 // Se define el tipo de datos
 interface WorkOrder {
@@ -52,42 +53,16 @@ const FreeProductPage: React.FC = () => {
   const [currentAreaId, setCurrentAreaId] = useState<number | null>(null);
 
   useEffect (() => {
-    async function fetchWorkOrdersInProgress() {
+    async function fetchWorkOrders() {
       try {
-        // Se verifica token
-        const token = localStorage.getItem('token');
-        if(!token) {
-          console.error('No se encontró el token en localStorage');
-          return;
-        }
-        const estados = ['En proceso', 'Enviado a CQM', 'Listo', 'En Calidad', 'Parcial', 'Enviado a Auditoria parcial'];
-        const query = estados.map(estado => encodeURIComponent(estado)).join(',');
-
-        const res = await fetch(`http://localhost:3000/free-order-flow/in-progress?statuses=${query}`, {
-          method: 'GET',
-          headers: {
-            'Content-Type': 'application/json',
-            'Authorization': `Bearer ${token}`
-          },
-        });
-        if(!res.ok){
-          throw new Error(`Error al obtener las ordenes: ${res.status} ${res.statusText}`);
-        }
-        const data = await res.json();
-        console.log('Datos obtenidos de las Ordenes en Proceso: ', data);
+        const data = await fetchWorkOrdersInProgress();
         setWorkOrders(data);
-
-        // Si hay órdenes, obtenemos el area_id de la primera (todas serán del mismo área)
-        if (data.length > 0) {
-          setCurrentAreaId(data[0].area_id);
-        }
-
       } catch (err) {
         console.error(err);
         console.error('Error en fetchWorkOrdersInProgress', err);
       }
     }
-    fetchWorkOrdersInProgress();
+    fetchWorkOrders();
   },[]);
 
   return (

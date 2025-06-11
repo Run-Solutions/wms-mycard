@@ -2,6 +2,7 @@
 import styled from "styled-components";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
+import { acceptCQMInconformity } from "@/api/inconformidades";
 
 interface Props {
   workOrder: any;
@@ -30,21 +31,11 @@ export default function MillingChipComponentCQM({ workOrder }: Props) {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    const token = localStorage.getItem('token');
     const areaResponse = workOrder.answers[index].id;
     console.log(areaResponse);
     try {
-      const res = await fetch(`http://localhost:3000/inconformities/${areaResponse}/cqm`, {
-        method: 'PATCH',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}`,
-        },
-      });
-      const data = await res.json();
-      if (res.ok) {
-        router.push('/liberarProducto');
-      }
+      await acceptCQMInconformity(areaResponse);
+      router.push('/liberarProducto');
     } catch (error) {
       console.error(error);
       alert('Error al conectar con el servidor');
@@ -102,6 +93,14 @@ export default function MillingChipComponentCQM({ workOrder }: Props) {
               })}
             </tbody>
           </Table>
+          <InputGroup style={{ marginTop: '-7rem'}}>
+              <Label>Revisar Tecnología De Chip y Color Vs Ot:</Label>
+              <Input type="number" value={workOrder?.answers[index].revisar_tecnologia ?? 'No se reconoce la muestra enviada' } readOnly />
+          </InputGroup>
+          <InputGroup style={{ marginTop: '-7rem'}}>
+              <Label>Validar y Anotar KCV (Intercambio De Llaves), Carga De Aplicación o Prehabilitación (Si Aplica):</Label>
+              <Input type="number" value={workOrder?.answers[index].validar_kvc ?? 'No se reconoce la muestra enviada' } readOnly />
+          </InputGroup>
           <InputGroup style={{ marginTop: '-7rem'}}>
               <Label>Muestras entregadas:</Label>
               <Input type="number" value={workOrder?.answers[index].sample_quantity ?? 'No se reconoce la muestra enviada' } readOnly />

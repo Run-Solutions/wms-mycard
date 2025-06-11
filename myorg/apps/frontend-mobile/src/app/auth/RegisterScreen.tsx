@@ -31,23 +31,40 @@ const RegisterScreen: React.FC = () => {
         setError('Todos los campos son obligatorios');
         return;
       }
-      const response = await verifyUsername(username.trim());
+  
+      // Validar caracteres del nombre de usuario
+      const safeUsername = username.trim();
+      const isValidUsername = /^[a-zA-Z0-9._-]+$/.test(safeUsername);
+      if (!isValidUsername) {
+        setError('El nombre de usuario solo puede contener letras, números, ".", "-", y "_"');
+        return;
+      }
+  
+      const response = await verifyUsername(safeUsername);
       if (response.status === 200) {
         const data = await response.data;
         if (data) {
-          setError(`El nombre de usuario "${username}" ya está en uso`);
+          setError(`El nombre de usuario "${safeUsername}" ya está en uso`);
           return;
         }
       }
+  
       if (password !== confirmPassword) {
         setError('Las contraseñas no coinciden');
         return;
       }
+  
       if (!validateEmail(email)) {
         setError('El correo electrónico no es válido');
         return;
       }
-      const pendingUser = { username, email, password };
+  
+      const pendingUser = {
+        username: safeUsername,
+        email,
+        password,
+      };
+  
       navigation.navigate('RoleSelection', { pendingUser });
       setLoading(true);
     } catch (error) {

@@ -8,47 +8,9 @@ import { useDispatch } from 'react-redux';
 import { registerUser } from '../../../store/slices/authSlice';
 import { AppDispatch } from '../../../store';
 import { useRouter } from 'next/navigation';
-
-const fadeIn = keyframes`
-  from {
-    opacity: 0;
-    transform: translateY(20px);
-  }
-  to {
-    opacity: 1;
-    transform: translateY(0);
-  }
-`;
-
-const GlobalStyle = createGlobalStyle`
-  html, body, #__next {
-    height: 100%;
-    margin: 0;
-    padding: 0;
-  }
-  *, *::before, *::after {
-    box-sizing: border-box;
-  }
-`;
-
-const BackgroundWrapper = styled.div`
-  background: url('/images/server.jpg') no-repeat center center fixed;
-  background-size: cover;
-  min-height: 100vh;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-`;
-
-const FormContainer = styled.div`
-  background-color: rgba(255, 255, 255, 0.95);
-  padding: 2rem;
-  border-radius: 12px;
-  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.2);
-  animation: ${fadeIn} 1s ease-out;
-  max-width: 400px;
-  width: 100%;
-`;
+import { verifyUsername } from '@/api/auth';
+import { toast } from 'react-toastify';
+import 'react-toastify/dist/ReactToastify.css';
 
 const RegisterPage: React.FC = () => {
   const dispatch = useDispatch<AppDispatch>();
@@ -62,30 +24,48 @@ const RegisterPage: React.FC = () => {
 
   const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
-    if (password !== confirmPassword) {
-      setError('Las contraseñas no coinciden');
+    if (!username || !email || !password || !confirmPassword) {
+      alert('Todos los campos son obligatorios');
       return;
     }
+  
+    // Validar caracteres del nombre de usuario
+    const safeUsername = username.trim();
+    const isValidUsername = /^[a-zA-Z0-9._-]+$/.test(safeUsername);
+    if (!isValidUsername) {
+      setError('El nombre de usuario solo puede contener letras, números, ".", "-", y "_"');
+      return;
+    }
+  
     try {
-      // Crear el objeto de usuario
-      const newUser = { id: Date.now().toString(), username, email, role: 'pending' };
-      
-      // Guardar los datos para llevarlos a la siguiente pagina: roleSelection
-      sessionStorage.setItem('username', username);
+      const response = await verifyUsername(safeUsername);
+      if (response.status === 200) {
+        const data = await response.data;
+        if (data) {
+          alert(`El nombre de usuario "${safeUsername}" ya está en uso`);
+          return;
+        }
+      }
+      if (password !== confirmPassword) {
+        alert('Las contraseñas no coinciden');
+        return;
+      }
+      const newUser = {
+        id: Date.now().toString(),
+        username: safeUsername, // ¡USA este!
+        email,
+        role: 'pending',
+      };
+  
+      sessionStorage.setItem('username', safeUsername); // ¡No uses el anterior!
       sessionStorage.setItem('email', email);
       sessionStorage.setItem('password', password);
-
-      // Guardar en localStorage para persistencia en el contexto
       localStorage.setItem('user', JSON.stringify(newUser));
-
-      // Actualizar contexto de autenticación
-      dispatch(registerUser({ username, email, password })); // <-- Asegúrate de importar useAuth y setUser
-
-      // await dispatch(registerUser({ username, email, password })).unwrap();
-      // Redirige a la ruta configurada (backend ya la tiene configurada)
-      router.push('/auth/roleSelection'); // se cambia la ruta a elegir rol
+  
+      dispatch(registerUser({ username: safeUsername, email, password }));
+      router.push('/auth/roleSelection');
     } catch (err: any) {
-      setError(err.message || 'Error al registrarse');
+      toast.error('Error al verificar el nombre de usuario');
     }
   };
 
@@ -181,6 +161,47 @@ const RegisterPage: React.FC = () => {
 };
 
 export default RegisterPage;
+
+const fadeIn = keyframes`
+  from {
+    opacity: 0;
+    transform: translateY(20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+`;
+
+const GlobalStyle = createGlobalStyle`
+  html, body, #__next {
+    height: 100%;
+    margin: 0;
+    padding: 0;
+  }
+  *, *::before, *::after {
+    box-sizing: border-box;
+  }
+`;
+
+const BackgroundWrapper = styled.div`
+  background: url('/images/server.jpg') no-repeat center center fixed;
+  background-size: cover;
+  min-height: 100vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+`;
+
+const FormContainer = styled.div`
+  background-color: rgba(255, 255, 255, 0.95);
+  padding: 2rem;
+  border-radius: 12px;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.2);
+  animation: ${fadeIn} 1s ease-out;
+  max-width: 400px;
+  width: 100%;
+`;
 
 
 

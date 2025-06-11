@@ -43,78 +43,78 @@ const PreprensaComponent: React.FC<{ workOrder: any }> = ({ workOrder }) => {
   };
 
   return (
-    <ScrollView contentContainerStyle={styles.container}>
-      <Text style={styles.title}>Área: Preprensa</Text>
+    <View>
+      <ScrollView contentContainerStyle={[styles.container, { paddingBottom: 100 }]}>
+        <Text style={styles.title}>Área: Preprensa</Text>
+        <View style={styles.card}>
+          <Text style={styles.subtitle}>Entregaste:</Text>
+          <Text style={styles.label}>Placas</Text>
+          <TextInput style={styles.input} editable={false} value={String(workOrder.areaResponse.prepress.plates)} />
 
-      <View style={styles.card}>
-        <Text style={styles.subtitle}>Entregaste:</Text>
-        <Text style={styles.label}>Placas</Text>
-        <TextInput style={styles.input} editable={false} value={String(workOrder.areaResponse.prepress.plates)} />
+          <Text style={styles.label}>Positivos</Text>
+          <TextInput style={styles.input} editable={false} value={String(workOrder.areaResponse.prepress.positives)} />
 
-        <Text style={styles.label}>Positivos</Text>
-        <TextInput style={styles.input} editable={false} value={String(workOrder.areaResponse.prepress.positives)} />
-
-        <Text style={[styles.subtitle, { marginTop: 12 }]}>Tipo de Prueba</Text>
-        <View style={styles.radioGroup}>
-          {['color', 'fisica', 'digital'].map((type) => (
+          <Text style={[styles.subtitle, { marginTop: 12 }]}>Tipo de Prueba</Text>
+          <View style={styles.radioGroup}>
+            {['color', 'fisica', 'digital'].map((type) => (
             <View key={type} style={styles.radioItem}>
               <Text style={styles.radioText}>
                 {type === workOrder.areaResponse.prepress.testType ? '🔘' : '⚪'} Prueba {type}
               </Text>
             </View>
-          ))}
+            ))}
+          </View>
+
+          <Text style={styles.label}>Comentarios</Text>
+          <TextInput
+            style={styles.textarea}
+            multiline
+            editable={false}
+            value={workOrder.areaResponse.prepress.comments}
+          />
         </View>
 
-        <Text style={styles.label}>Comentarios</Text>
-        <TextInput
-          style={styles.textarea}
-          multiline
-          editable={false}
-          value={workOrder.areaResponse.prepress.comments}
-        />
-      </View>
+        <View style={styles.card}>
+          <Text style={styles.subtitle}>Inconformidad:</Text>
 
-      <View style={styles.card}>
-        <Text style={styles.subtitle}>Inconformidad:</Text>
+          <Text style={styles.label}>Respuesta de Usuario</Text>
+          <TextInput
+            style={styles.input}
+            editable={false}
+            value={workOrder.areaResponse.inconformities[lastIndex]?.user?.username}
+          />
+          <Text style={styles.label}>Comentarios</Text>
+          <TextInput
+            style={styles.textarea}
+            multiline
+            editable={false}
+            value={workOrder.areaResponse.inconformities[lastIndex]?.comments}
+          />
+        </View>
 
-        <Text style={styles.label}>Respuesta de Usuario</Text>
-        <TextInput
-          style={styles.input}
-          editable={false}
-          value={workOrder.areaResponse.inconformities[lastIndex]?.user?.username}
-        />
+        <TouchableOpacity style={styles.button} onPress={openModal}>
+          <Text style={styles.buttonText}>Aceptar Inconformidad</Text>
+        </TouchableOpacity>
 
-        <Text style={styles.label}>Comentarios</Text>
-        <TextInput
-          style={styles.textarea}
-          multiline
-          editable={false}
-          value={workOrder.areaResponse.inconformities[lastIndex]?.comments}
-        />
-      </View>
-
-      <TouchableOpacity style={styles.button} onPress={openModal}>
-        <Text style={styles.buttonText}>Aceptar Inconformidad</Text>
-      </TouchableOpacity>
-
-      <Modal visible={showModal} transparent animationType="fade">
-        <View style={styles.modalOverlay}>
-          <View style={styles.modalBox}>
-            <Text style={styles.modalText}>
-              ¿Estás segura/o que deseas aceptar la inconformidad? Deberás liberar nuevamente.
-            </Text>
-            <View style={styles.modalActions}>
-              <TouchableOpacity style={styles.cancelButton} onPress={closeModal}>
-                <Text style={styles.modalButtonText}>Cancelar</Text>
-              </TouchableOpacity>
-              <TouchableOpacity style={styles.confirmButton} onPress={handleSubmit}>
-                <Text style={styles.modalButtonText}>Confirmar</Text>
-              </TouchableOpacity>
+        <Modal visible={showModal} transparent animationType="fade">
+          <View style={styles.modalOverlay}>
+            <View style={styles.modalBox}>
+              <Text style={styles.modalText}>
+                ¿Estás segura/o que deseas aceptar la inconformidad? Deberás liberar nuevamente.
+              </Text>
+              <View style={styles.modalActions}>
+                <TouchableOpacity style={styles.cancelButton} onPress={closeModal}>
+                  <Text style={styles.modalButtonText}>Cancelar</Text>
+                </TouchableOpacity>
+                <TouchableOpacity style={styles.confirmButton} onPress={handleSubmit}>
+                  <Text style={styles.modalButtonText}>Confirmar</Text>
+                </TouchableOpacity>
+              </View>
             </View>
           </View>
-        </View>
-      </Modal>
-    </ScrollView>
+        </Modal>
+      </ScrollView>
+    </View>
   );
 };
 
@@ -122,7 +122,6 @@ export default PreprensaComponent;
 
 const styles = StyleSheet.create({
   container: { 
-    flex: 1,
     paddingTop: 16,
     paddingBottom: 32,
     paddingHorizontal: 8, 

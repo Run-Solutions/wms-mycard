@@ -4,6 +4,7 @@
 import WorkOrderTable from '@/components/Inconformidades/WorkOrderTable';
 import React, { useEffect, useState } from 'react';
 import styled, { useTheme } from 'styled-components';
+import { getWorkOrdersWithInconformidad } from '@/api/inconformidades';
 
 // Se define el tipo de datos
 interface WorkOrder {
@@ -42,24 +43,7 @@ const InconformidadesPage: React.FC = () => {
   useEffect(() => {
     async function fetchAllWorkOrders() {
       try {
-        const token = localStorage.getItem('token');
-        if(!token){
-          console.error('No se encontro el token en el localStorage');
-          return;
-        }
-        const estados = ['En inconformidad', 'En inconformidad CQM']
-        const query = estados.map(estado => encodeURIComponent(estado)).join(',');
-        const res = await fetch(`http://localhost:3000/work-order-flow/inconformidad?statuses=${query}`, {
-          method: 'GET',
-          headers: {
-            'Content-Type': 'application/json',
-            'Authorization': `Bearer ${token}`
-          },
-        });
-        if(!res.ok){
-          throw new Error(`Error al obtener las ordenes: ${res.status} ${res.statusText}`);
-        }
-        const data = await res.json();
+        const data = await getWorkOrdersWithInconformidad();
         console.log('Datos de Ordenes: ', data);
         if (!Array.isArray(data)) {
           return;

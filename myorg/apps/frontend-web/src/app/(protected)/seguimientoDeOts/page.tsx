@@ -4,6 +4,7 @@
 import React, { useEffect, useState } from 'react';
 import styled, { useTheme } from 'styled-components';
 import WorkOrderTable from '@/components/SeguimientoDeOts/WorkOrderTable';
+import { fetchWorkOrdersInProgress } from '@/api/seguimientoDeOts';
 
 // Se define el tipo de datos
 interface WorkOrder {
@@ -11,30 +12,22 @@ interface WorkOrder {
   ot_id: string;
   mycard_id: string;
   quantity: number;
-  created_by: number;
-  status: string; // Cambiado a string genérico
+  status: string;
   validated: boolean;
   createdAt: string;
-  updatedAt: string;
-  user: {
-    username: string
-  };
-  files: {
-    id: number;
-    type: string;
-    file_path: string;
-  }[];
+  user: { username: string };
   flow: {
-    id: number;
-    area_id: number; // Cambiado de area.name a area_id
-    status: string; // Cambiado a string genérico
-    assigned_user?: number;
-    area?: {
-      name?: string;
-    }
-    // otros campos que necesites
+    area_id: number;
+    status: string;
+    area?: { name?: string };
   }[];
-  formAnswers?: any[]; // Añadir si es necesario
+  files: File[];
+}
+
+interface File {
+  id: number;
+  type: string;
+  file_path: string;
 }
 
 const SeguimientoDeOtsPage: React.FC = () => {
@@ -44,25 +37,7 @@ const SeguimientoDeOtsPage: React.FC = () => {
   useEffect(() => {
     async function fetchAllWorkOrdersInProgress(){
       try {
-        const token = localStorage.getItem('token');
-        if(!token){
-          console.error('No se encontro el token en localStorage');
-          return;
-        }
-        const estados = ['En proceso'];
-        const query = estados.map(estado => encodeURIComponent(estado)).join(',');
-        const res = await fetch(`http://localhost:3000/work-orders/in-progress?statuses=${query}`, {
-          method: 'GET',
-          headers: {
-            'Content-Type': 'application/json',
-            'Authorization': `Bearer ${token}`
-          },
-        });
-        if(!res.ok){
-          throw new Error(`Error al obtener las ordenes: ${res.status} ${res.statusText}`);
-        }
-        const data = await res.json();
-        console.log('Datos obtenidos de las Ordenes en Proceso: ', data);
+        const data = await fetchWorkOrdersInProgress();
         setWorkOrders(data);
       } catch (err) {
         console.error(err);

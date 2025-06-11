@@ -3,7 +3,7 @@
 import { useRouter } from "next/navigation";
 import { useState, useEffect } from "react";
 import styled from "styled-components";
-
+import { acceptWorkOrderFlowColorEdgeAuditory, registrarInconformidadAuditory } from "@/api/aceptarAuditoria";
 // Define un tipo para los valores del formulario
 type ColorEdgeData = {
   good_quantity: string;
@@ -66,25 +66,15 @@ export default function ColorEdgeComponentAcceptAuditory({ workOrder }: Props) {
         alert('Por favor, asegurate de que no haya inconformidades con las cantidades entregadas.');
         return;
       }
-      const token = localStorage.getItem('token');
-      const colorEdgeId = currentFLow.areaResponse.colorEdge.id;
-      const payload = {
-        sample_auditory: Number(sampleAuditory),
-      };
-      console.log(colorEdgeId);
+      let ColorEdgeId  = null;
+      if (workOrder?.partialReleases?.length > 0) {
+        ColorEdgeId = workOrder.id;
+      } else {
+        ColorEdgeId = workOrder?.areaResponse?.colorEdge?.id;
+      }
       try {
-        const res = await fetch(`http://localhost:3000/work-order-flow-auditory/color-edge/${colorEdgeId}`, {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'Authorization': `Bearer ${token}`,
-          },
-          body: JSON.stringify(payload),
-        });
-        const data = await res.json();
-        if (res.ok) {
-          router.push('/aceptarAuditoria');
-        }
+        await acceptWorkOrderFlowColorEdgeAuditory(ColorEdgeId, sampleAuditory);
+        router.push('/aceptarAuditoria');
       } catch (error) {
         console.error(error);
         alert('Error al conectar con el servidor');
@@ -92,22 +82,9 @@ export default function ColorEdgeComponentAcceptAuditory({ workOrder }: Props) {
     }
 
     const handleSubmitInconformidad = async () => {
-      const token = localStorage.getItem('token');
-      console.log(currentFLow.id);
-      console.log(inconformidad);
       try {
-        const res = await fetch(`http://localhost:3000/work-order-flow/${currentFLow.id}/inconformidad`, {
-          method: 'PATCH',
-          headers: {
-            'Content-Type': 'application/json',
-            'Authorization': `Bearer ${token}`,
-          },
-          body: JSON.stringify({inconformidad}),
-        });
-        const data = await res.json();
-        if (res.ok) {
-          router.push('/aceptarAuditoria');
-        }
+        await registrarInconformidadAuditory(workOrder?.id, inconformidad);
+        router.push('/aceptarAuditoria');
       } catch (error) {
         console.error(error);
         alert('Error al conectar con el servidor');

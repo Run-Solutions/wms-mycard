@@ -57,7 +57,7 @@ const SeguimientoDeOtsPage: React.FC = () => {
       {loading ? (
         <ActivityIndicator size="large" color="#0038A8" />
       ) : (
-        <WorkOrderList orders={orders} />
+        <WorkOrderList orders={orders} filter='En proceso' />
       )}
     </View>
   );

@@ -83,7 +83,7 @@ const MillingChipComponent: React.FC<{ workOrder: any }> = ({ workOrder }) => {
   return (
     <View>
       <ScrollView contentContainerStyle={[styles.container, { paddingBottom: 100 }]}>
-        <Text style={styles.title}>Área: Hot Stamping</Text>
+        <Text style={styles.title}>Área: Milling Chip</Text>
 
         <View style={styles.card}>
           <Text style={styles.subtitle}>Buenas:</Text>

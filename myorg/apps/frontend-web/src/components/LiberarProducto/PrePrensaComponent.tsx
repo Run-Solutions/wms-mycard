@@ -4,6 +4,7 @@ import axios from "axios";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 import styled from "styled-components";
+import { submitPrepressForm } from "@/api/liberarProducto";
 
 interface Props {
   workOrder: any;
@@ -47,26 +48,7 @@ export default function PrePrensaComponent({ workOrder }: Props) {
     };
 
     try {
-      const token = localStorage.getItem('token');
-      if(!token) {
-        alert('No hay token de autenticacion');
-        return;
-      }
-      const res = await fetch('http://localhost:3000/free-order-flow/prepress', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}`,
-        },
-        body: JSON.stringify(payload),
-      });
-      const data = await res.json();
-
-      if (!res.ok) {
-        console.error("Error en el servidor:", data);
-        return;
-      }
-
+      await submitPrepressForm(payload);
       router.push('/liberarProducto');
     } catch (error) {
       console.error('Error al enviar respuesta', error);

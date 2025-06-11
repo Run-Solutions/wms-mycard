@@ -1,120 +1,54 @@
-import React, { useEffect, useState } from 'react';
-import { createDrawerNavigator } from '@react-navigation/drawer';
-import { createNativeStackNavigator } from '@react-navigation/native-stack';
-import { MODULE_CONFIG, ModuleFromApi } from '../navigation/moduleConfig';
-import DashboardScreen from '../screens/DashboardScreen';
-import CustomDrawerContent from './CustomDrawerContent';
-import WorkOrderDetailScreen from '../app/protected/seguimientoDeOts/[id]/page';
-import AceptarProductoAuxScreen from '../app/protected/aceptarProducto/[id]/page';
-import AceptarAuditoriaAuxScreen from '../app/protected/aceptarAuditoria/[id]/page';
-import LiberarProductoAuxPage from '../app/protected/liberarProducto/[id]/page';
-import CerrarOrdenDeTrabajoAuxScreen from '../app/protected/cerrarOrdenDeTrabajo/[id]/page';
-import RecepcionCQMAuxScreen from '../app/protected/recepcionCqm/[id]/page';
-import InconformidadesAuxScreen from '../app/protected/inconformidades/[id]/page';
-import { useModules } from '../api/navigation';
+// src/navigation/AppDrawer.tsx
 
+import React, { useMemo } from 'react';
+import { createDrawerNavigator } from '@react-navigation/drawer';
+import CustomDrawerContent from './CustomDrawerContent';
+import { useModules, ModuleFromApi } from '../api/navigation';
+import { MODULE_CONFIG, type ModuleConfig } from './moduleConfig';
+import { InternalStack } from './InternalStack';
+
+
+import { stripAccents } from '../utils/stringUtils';
 
 const Drawer = createDrawerNavigator();
-const Stack = createNativeStackNavigator();
 
 const AppDrawer: React.FC = () => {
-  const modules = useModules();
-
-  // Stack privado que incluye las pantallas que NO quiero en el menú
-  const InternalStack = () => (
-    <Stack.Navigator initialRouteName="DashboardScreen" screenOptions={{ headerShown: false }}>
-      <Stack.Screen name="DashboardScreen" component={DashboardScreen}/>
-      <Stack.Screen
-        name="WorkOrderDetailScreen"
-        component={WorkOrderDetailScreen}
-        options={({ route }) => ({
-          headerShown: false,
-          title: `OT #${(route.params as { id: number }).id}`,
-        })}
-      />
-      <Stack.Screen
-        name="AceptarProductoAuxScreen"
-        component={AceptarProductoAuxScreen}
-        options={({ route }) => ({
-          headerShown: false,
-          title: `Flujo #${(route.params as { flowId: string }).flowId}`,
-        })}
-      />
-      <Stack.Screen
-        name="AceptarAuditoriaAuxScreen"
-        component={AceptarAuditoriaAuxScreen}
-        options={({ route }) => ({
-          headerShown: false,
-          title: `Flujo #${(route.params as { flowId: string }).flowId}`,
-        })}
-      />
-      <Stack.Screen
-        name="CerrarOrdenDeTrabajoAuxScreen"
-        component={CerrarOrdenDeTrabajoAuxScreen}
-        options={({ route }) => ({
-          headerShown: false,
-          title: `OT #${(route.params as { id: number }).id}`,
-        })}
-      />
-      <Stack.Screen
-        name="LiberarProductoAuxScreen"
-        component={LiberarProductoAuxPage}
-        options={({ route }) => ({
-          headerShown: false,
-          title: `OT #${(route.params as { id: number }).id}`,
-        })}
-      />
-      <Stack.Screen
-        name="RecepcionCQMAuxScreen"
-        component={RecepcionCQMAuxScreen}
-        options={({ route }) => ({
-          headerShown: false,
-          title: `OT #${(route.params as { id: number }).id}`,
-        })}
-      />
-      <Stack.Screen
-        name="InconformidadesAuxScreen"
-        component={InconformidadesAuxScreen}
-        options={({ route }) => ({
-          headerShown: false,
-          title: `OT #${(route.params as { id: number }).id}`,
-        })}
-      />
-      {modules.map((mod) => {
-        const config = MODULE_CONFIG.find(c => c.name === mod.name);
-        if (!config) return null;
-        return (
-          <Stack.Screen options={({ headerShown: false})}
-            key={mod.id}
-            name={config.route}
-            component={config.component}
-          />
-        );
-      })}
-    </Stack.Navigator>
+  const rawModules = useModules();
+  const modules: ModuleFromApi[] = useMemo(
+    () => (Array.isArray(rawModules) ? rawModules : []),
+    [rawModules]
   );
+
+  const drawerScreens = useMemo(() => {
+    return MODULE_CONFIG
+      // Ahora comparamos sin tildes ni mayúsculas:
+      .filter((cfg: ModuleConfig) =>
+        modules.some(
+          mod => stripAccents(mod.name) === stripAccents(cfg.name)
+        )
+      )
+      .map((cfg: ModuleConfig) => (
+        <Drawer.Screen
+          key={cfg.route}
+          name={cfg.route}
+          component={cfg.component}
+        />
+      ));
+  }, [modules]);
 
   return (
     <Drawer.Navigator
       initialRouteName="Principal"
-      drawerContent={(props) => <CustomDrawerContent {...props} />}
+      drawerContent={props => <CustomDrawerContent {...props} />}
     >
       <Drawer.Screen
         name="Principal"
-        component={InternalStack}
         options={{ drawerItemStyle: { display: 'none' } }}
-      />
-      {modules.map((mod) => {
-        const config = MODULE_CONFIG.find(c => c.name === mod.name);
-        if (!config) return null;
-        return (
-          <Stack.Screen
-            key={mod.id}
-            name={config.route}
-            component={config.component}
-          />
-        );
-      })}
+      >
+        {() => <InternalStack modules={modules} />}
+      </Drawer.Screen>
+
+      {drawerScreens}
     </Drawer.Navigator>
   );
 };

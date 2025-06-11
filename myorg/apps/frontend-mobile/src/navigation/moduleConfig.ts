@@ -1,4 +1,6 @@
-// moduleConfig.ts
+// src/navigation/moduleConfig.ts
+
+import React from 'react';
 import OrdenesScreen from '../app/protected/ordenesDeTrabajo/page';
 import SeguimientoScreen from '../app/protected/seguimientoDeOts/page';
 import FinalizacionScreen from '../app/protected/finalizacion/page';
@@ -27,7 +29,7 @@ export type ModuleFromApi = {
 export type ModuleConfig = {
   name: string;
   route: string;
-  component: React.FC;
+  component: React.FC<any>;
 };
 
 export const MODULE_CONFIG: ModuleConfig[] = [

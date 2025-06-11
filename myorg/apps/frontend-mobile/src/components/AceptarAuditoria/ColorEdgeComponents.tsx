@@ -104,7 +104,7 @@ const ColorEdgeComponentAcceptAuditory: React.FC<{ workOrder: any }> = ({ workOr
       await registrarInconformidadAuditory(workOrder?.id, inconformidad);
       Alert.alert("Inconformidad registrada");
       setShowInconformidad(false);
-      navigation.navigate('aceptarProducto');
+      navigation.navigate('aceptarAuditoria');
     } catch (err) {
       console.error(err);
       Alert.alert("Error al enviar inconformidad");
@@ -127,6 +127,9 @@ const ColorEdgeComponentAcceptAuditory: React.FC<{ workOrder: any }> = ({ workOr
 
         <Text style={styles.label}>Área que lo envía:</Text>
         <Text style={styles.value}>{workOrder?.area?.name || 'No definida'}</Text>
+
+        <Text style={styles.label}>Usuario:</Text>
+        <Text style={styles.value}>{workOrder?.user?.username || 'No definido'}</Text>
         
         <Text style={styles.label}>Comentarios:</Text>
         <Text style={styles.value}>{workOrder.workOrder.comments}</Text>

@@ -65,15 +65,15 @@ const MillingChipComponent = ({ workOrder }: { workOrder: any }) => {
   const cantidadEntregadaValue = lastCompletedOrPartial.areaResponse
     ? (
       lastCompletedOrPartial.areaResponse.prepress?.plates ??
-      lastCompletedOrPartial.areaResponse.impression?.quantity ??
-      lastCompletedOrPartial.areaResponse.serigrafia?.quantity ??
-      lastCompletedOrPartial.areaResponse.empalme?.quantity ??
-      lastCompletedOrPartial.areaResponse.laminacion?.quantity ??
-      lastCompletedOrPartial.areaResponse.corte?.quantity ??
-      lastCompletedOrPartial.areaResponse.colorEdge?.quantity ??
-      lastCompletedOrPartial.areaResponse.hotStamping?.quantity ??
-      lastCompletedOrPartial.areaResponse.millingChip?.quantity ??
-      lastCompletedOrPartial.areaResponse.personalizacion?.quantity ??
+      lastCompletedOrPartial.areaResponse.impression?.release_quantity ??
+      lastCompletedOrPartial.areaResponse.serigrafia?.release_quantity ??
+      lastCompletedOrPartial.areaResponse.empalme?.release_quantity ??
+      lastCompletedOrPartial.areaResponse.laminacion?.release_quantity ??
+      lastCompletedOrPartial.areaResponse.corte?.good_quantity ??
+      lastCompletedOrPartial.areaResponse.colorEdge?.good_quantity ??
+      lastCompletedOrPartial.areaResponse.hotStamping?.good_quantity ??
+      lastCompletedOrPartial.areaResponse.millingChip?.good_quantity ??
+      lastCompletedOrPartial.areaResponse.personalizacion?.good_quantity ??
       'Sin cantidad'
     )
     : lastCompletedOrPartial.partialReleases?.some((r: PartialRelease) => r.validated)
@@ -144,6 +144,8 @@ const MillingChipComponent = ({ workOrder }: { workOrder: any }) => {
       reviewed: false,
       user_id: workOrder.assigned_user,
       sample_quantity: Number(sampleQuantity),
+      revisar_tecnologia: revisarTecnologia,
+      validar_kvc: validarKVC
     };
   
     try {
@@ -492,8 +494,7 @@ const styles = StyleSheet.create({
     backgroundColor: '#2563eb',
   },
   inputGroup: {
-    width: '70%',
-    paddingTop: 20,
+    width: '100%',
   },
   buttonSecondary: {
     backgroundColor: '#0038A8',

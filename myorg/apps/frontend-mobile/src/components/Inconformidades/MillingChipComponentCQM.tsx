@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import { View, Text, TextInput, Button, Alert, Modal, TouchableOpacity, ScrollView, StyleSheet, Platform } from 'react-native';
 import { acceptCQMInconformity } from '../../api/inconformidades';
 import { useNavigation } from '@react-navigation/native';
@@ -35,35 +35,16 @@ const MillingChipComponentCQM = ({ workOrder }: { workOrder: any }) => {
     <View>
       <ScrollView contentContainerStyle={[styles.container, { paddingBottom: 100 }]}>
         <Text style={styles.sectionTitle}>Entregaste</Text>
-        <Text style={styles.label}>Tipo de Personalizacion:</Text>
-        <TextInput
-          style={styles.inputDetail}
-          keyboardType="numeric"
-          value={workOrder?.answers[index].tipo_personalizacion ?? 'No se reconoce la muestra enviada' }
-          editable={false}
-        />
 
-      {workOrder?.answers[index].tipo_personalizacion === 'laser' && (
-        <>
-          <Text style={styles.label}>Muestras entregadas:</Text>
-          <TextInput
-            style={styles.inputDetail}
-            keyboardType="numeric"
-            value={workOrder?.answers[index].sample_quantity ?? 'No se reconoce la muestra enviada' }
-            editable={false}
-          />
-        </>
-      )}
-      {workOrder?.answers[index].tipo_personalizacion === 'persos' && (
-        <>
-          {/* Encabezado estilo tabla */}
+        <View style={styles.card}>
+      {/* Encabezado estilo tabla */}
       <View style={styles.tableHeader}>
         <Text style={[styles.tableCell, { flex: 2 }]}>Pregunta</Text>
         <Text style={styles.tableCell}>Respuesta</Text>
       </View>
 
       {/* Preguntas normales */}
-      {questions.slice(1, 10).map((q: any) => {
+      {questions.map((q: any) => {
         const responses = workOrder.answers[index]?.FormAnswerResponse?.find(
           (resp: any) => resp.question_id === q.id
         );
@@ -87,73 +68,20 @@ const MillingChipComponentCQM = ({ workOrder }: { workOrder: any }) => {
           </View>
         );
       })}
-      <Text style={styles.label}>Color De Personalización:</Text>
-      <TextInput
-        style={styles.input}
-        keyboardType="numeric"
-        value={workOrder?.answers[index].color_personalizacion ?? 'No se reconoce la muestra enviada' }
-        editable={false}
-      />
-      <Text style={styles.label}>Tipo de Código de Barras Que Se Personaliza:</Text>
-      <TextInput
-        style={styles.input}
-        keyboardType="numeric"
-        value={workOrder?.answers[index].codigo_barras ?? 'No se reconoce la muestra enviada' }
-        editable={false}
-      />
+
       {/* Muestras */}
-      <Text style={styles.label}>Muestras entregadas:</Text>
+      <Text style={[styles.label, { marginTop: 20 }]}>Revisar Tecnología De Chip y Color Vs Ot:</Text>
       <TextInput
         style={styles.input}
         keyboardType="numeric"
-        value={
-          typeof workOrder?.answers?.[index]?.sample_quantity === 'number'
-          ? workOrder.answers[index].sample_quantity.toString()
-          : ''
-        }
+        value={workOrder?.answers[index].revisar_tecnologia ?? 'No se reconoce la muestra enviada' }
         editable={false}
       />
-        </>
-      )}
-
-      {workOrder?.answers[index].tipo_personalizacion === 'etiquetadora' && (
-        <>
-        {/* Encabezado estilo tabla */}
-      <View style={styles.tableHeader}>
-        <Text style={[styles.tableCell, { flex: 2 }]}>Pregunta</Text>
-        <Text style={styles.tableCell}>Respuesta</Text>
-      </View>
-
-      {/* Preguntas normales */}
-      {questions.slice(0, 1).map((q: any) => {
-        const responses = workOrder.answers[index]?.FormAnswerResponse?.find(
-          (resp: any) => resp.question_id === q.id
-        );
-        console.log(responses);
-        // Encuentra la respuesta del operador por pregunta_id
-        const operatorResponse = responses?.response_operator;
-
-        return (
-          <View key={q.id} style={styles.tableRow}>
-            {/* Pregunta */}
-            <View style={[styles.tableCell, { flex: 2 }]}>
-              <Text style={styles.questionText}>{q.title}</Text>
-            </View>
-
-            {/* Respuesta */}
-            <View style={[styles.tableCell, { flex: 1, alignItems: 'center' }]}>
-              <View style={[styles.radioCircle, operatorResponse && styles.radioDisabled]}>
-                {operatorResponse && <View style={styles.radioDot} />}
-              </View>
-            </View>
-          </View>
-        );
-      })}
-      <Text style={styles.label}>Verificar Tipo De Etiqueta Vs Ot Y Pegar Utilizada:</Text>
+      <Text style={styles.label}>Validar y Anotar KCV (Intercambio De Llaves), Carga De Aplicación o Prehabilitación (Si Aplica):</Text>
       <TextInput
         style={styles.input}
         keyboardType="numeric"
-        value={workOrder?.answers[index].verificar_etiqueta ?? 'No se reconoce la muestra enviada' }
+        value={workOrder?.answers[index].validar_kvc ?? 'No se reconoce la muestra enviada' }
         editable={false}
       />
       <Text style={styles.label}>Muestras entregadas:</Text>
@@ -167,8 +95,13 @@ const MillingChipComponentCQM = ({ workOrder }: { workOrder: any }) => {
         }
         editable={false}
       />
-        </>
+
+      {typeof workOrder?.answers?.[index]?.sample_quantity !== 'number' && (
+      <Text style={{ color: '#b91c1c', marginTop: 8, textAlign: 'center' }}>
+        No se reconoce la muestra enviada
+      </Text>
       )}
+        </View>
 
         <Text style={styles.sectionTitle}>Inconformidad</Text>
         <View style={styles.card}>
@@ -229,17 +162,6 @@ const styles = StyleSheet.create({
     marginBottom: 16,
     textAlign: 'left',
     color: '#1f2937',
-  },
-  inputDetail: {
-    borderWidth: 1,
-    borderColor: '#ccc',
-    borderRadius: 18,
-    padding: 10,
-    backgroundColor: '#fff',
-    height: 50,
-    fontSize: 16,
-    marginTop: 7,
-    marginBottom: 15
   },
   tableHeader: {
     flexDirection: 'row',
@@ -307,7 +229,6 @@ const styles = StyleSheet.create({
   },
   label: {
     fontWeight: '600',
-    marginTop: 12,
     fontSize: 16,
     marginBottom: 8,
   },

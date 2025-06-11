@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import API from './http';
 
-interface ModuleFromApi {
+export interface ModuleFromApi {
   id: number;
   name: string;
   logoName: string;

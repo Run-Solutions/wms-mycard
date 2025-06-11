@@ -69,15 +69,15 @@ const PersonalizacionComponent = ({ workOrder }: { workOrder: any }) => {
   const cantidadEntregadaValue = lastCompletedOrPartial.areaResponse
     ? (
       lastCompletedOrPartial.areaResponse.prepress?.plates ??
-      lastCompletedOrPartial.areaResponse.impression?.quantity ??
-      lastCompletedOrPartial.areaResponse.serigrafia?.quantity ??
-      lastCompletedOrPartial.areaResponse.empalme?.quantity ??
-      lastCompletedOrPartial.areaResponse.laminacion?.quantity ??
-      lastCompletedOrPartial.areaResponse.corte?.quantity ??
-      lastCompletedOrPartial.areaResponse.colorEdge?.quantity ??
-      lastCompletedOrPartial.areaResponse.hotStamping?.quantity ??
-      lastCompletedOrPartial.areaResponse.millingChip?.quantity ??
-      lastCompletedOrPartial.areaResponse.personalizacion?.quantity ??
+      lastCompletedOrPartial.areaResponse.impression?.release_quantity ??
+      lastCompletedOrPartial.areaResponse.serigrafia?.release_quantity ??
+      lastCompletedOrPartial.areaResponse.empalme?.release_quantity ??
+      lastCompletedOrPartial.areaResponse.laminacion?.release_quantity ??
+      lastCompletedOrPartial.areaResponse.corte?.good_quantity ??
+      lastCompletedOrPartial.areaResponse.colorEdge?.good_quantity ??
+      lastCompletedOrPartial.areaResponse.hotStamping?.good_quantity ??
+      lastCompletedOrPartial.areaResponse.millingChip?.good_quantity ??
+      lastCompletedOrPartial.areaResponse.personalizacion?.good_quantity ??
       'Sin cantidad'
     )
     : lastCompletedOrPartial.partialReleases?.some((r: PartialRelease) => r.validated)
@@ -127,10 +127,9 @@ const PersonalizacionComponent = ({ workOrder }: { workOrder: any }) => {
   };
 
   const enviarACQM = async () => {
-    const isFrenteVueltaValid = checkedQuestion.length > 0 || checkedQuestion.length > 0;
     const isSampleValid = Number(sampleQuantity) > 0;
 
-    if (!questions.length || !isFrenteVueltaValid || !isSampleValid) {
+    if (!questions.length || !isSampleValid) {
       Alert.alert('Completa todas las preguntas y cantidad de muestra.');
       return;
     }
@@ -148,6 +147,7 @@ const PersonalizacionComponent = ({ workOrder }: { workOrder: any }) => {
       reviewed: false,
       user_id: workOrder.assigned_user,
       sample_quantity: Number(sampleQuantity),
+      tipo_personalizacion: selectedOption,
     };
     let aditionalFields = {};
     if (selectedOption === 'etiquetadora') {
@@ -206,7 +206,7 @@ const PersonalizacionComponent = ({ workOrder }: { workOrder: any }) => {
 
   return (
     <ScrollView style={styles.container}>
-      <Text style={styles.title}>Área: Color Edge</Text>
+      <Text style={styles.title}>Área: Personalización</Text>
 
       <View style={styles.cardDetail}>
         <Text style={styles.labelDetail}>Área que lo envía:
@@ -285,6 +285,8 @@ const PersonalizacionComponent = ({ workOrder }: { workOrder: any }) => {
       >
         <Text style={styles.buttonText}>Liberar Producto</Text>
       </TouchableOpacity>
+
+      <View style={{ marginBottom: 60}}></View>
 
       {/* Modal CQM */}
       <Modal visible={showCqmModal} animationType="slide">
@@ -416,7 +418,7 @@ const PersonalizacionComponent = ({ workOrder }: { workOrder: any }) => {
           {/* Preguntas de calidad */}
           <TouchableOpacity onPress={() => setShowQuality(!showQuality)}>
             <Text style={styles.qualityTitle}>
-              Preguntas de Calidad {showQuality ? '▼' : '▶️'}
+              Preguntas de Calidad {showQuality ? '▼' : '▶'}
             </Text>
           </TouchableOpacity>
           {selectedOption === 'persos' && showQuality && (
@@ -527,7 +529,7 @@ const styles = StyleSheet.create({
     marginTop: 20,
     marginBottom: 12,
   },
-  label: { fontWeight: '600', marginTop: 12, fontSize: 12, marginBottom: 8 },
+  label: { fontWeight: '600', marginTop: 12, fontSize: 16, marginBottom: 8 },
   labelDetail: {
     fontWeight: 'bold',
     fontSize: 16,
@@ -543,8 +545,8 @@ const styles = StyleSheet.create({
     borderRadius: 18,
     padding: 10,
     backgroundColor: '#fff',
-    height: 40,
-    fontSize: 12,
+    height: 50,
+    fontSize: 16,
   },
   textarea: {
     backgroundColor: '#fff',
@@ -568,7 +570,7 @@ const styles = StyleSheet.create({
     padding: 12,
     borderRadius: 8,
     marginBottom: 16,
-    elevation: 2,
+    elevation: 3,
   },
   button: {
     backgroundColor: '#0038A8',
@@ -655,7 +657,7 @@ const styles = StyleSheet.create({
   modalContainer: {
     flex: 1,
     padding: 20,
-    marginTop: 60,
+    marginTop: 20,
     backgroundColor: '#fdfaf6',
   },
   modalTitle: {

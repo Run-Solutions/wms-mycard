@@ -9,6 +9,8 @@ import { sidebarItems } from '@/config/sidebarItems';
 import { useAuthContext } from '@/context/AuthContext';
 import { useDispatch } from 'react-redux';
 import { logout } from '../../store/slices/authSlice';
+import { getModules } from '@/api/navigation';
+import { ModuleFromApi } from '@/api/navigation';
 
 const drawerOpenWidth = 200;
 const collapsedWidth = 60;
@@ -19,61 +21,34 @@ export interface SidebarProps {
   onLogout: () => void;
 }
 
-interface Module {
-  id: number;
-  name: string;
-  Description: string;
-  imageName: string;
-  logoName: string;
-}
-
 export const Sidebar: React.FC<SidebarProps> = ({ open, onLogout }) => {
   const router = useRouter();
   const { user, setUser, setToken } = useAuthContext();
-  const [modules, setModules] = useState<Module[]>([]);
+  const [modules, setModules] = useState<ModuleFromApi[]>([]);
   const [loading, setLoading] = useState(true);
   const dispatch = useDispatch();
 
   useEffect(() => {
     const fetchModules = async () => {
       try {
-        // Se recupera el token del user logeado
-        const token = localStorage.getItem('token');
-        if (!token) {
-          throw new Error('⛔ No se la leído el token');
-        }
-        const response = await fetch('http://localhost:3000/dashboard/modules', {
-          method: 'GET',
-          headers: {
-            'Authorization': `Bearer ${token}`,
-            'Content-Type': 'application/json',
-          },
-        });
-        if (response.status === 401) {
+        const data = await getModules();
+        setModules(data);
+      } catch (error: any) {
+        if (error.response?.status === 401) {
           localStorage.removeItem('token');
           localStorage.removeItem('user');
           router.push('/auth/login');
-          return; // salir del fetchModules
+        } else {
+          console.error('⛔ Error al obtener módulos:', error);
         }
-        if (!response.ok) {
-          throw new Error('⛔ Error al obtener módulos');
-        }
-
-        const data = await response.json();
-        console.log('Modulos:', data.modules);
-
-        // Actualizar el estado con los modulos obtenidos
-        setModules(data.modules)
-      } catch (error) {
-        console.error(error);
       } finally {
-        // Cerrar la carga de los modulos cuando finalice
         setLoading(false);
       }
     };
 
     fetchModules();
-  }, []);
+  }, [router]);
+
 
   // Para redireccionar correctamente
   const toCamelCase = (str: string) =>

@@ -73,11 +73,7 @@ const ColorEdgeComponentCQM = ({ workOrder }: { workOrder: any }) => {
           <TextInput
             style={styles.input}
             keyboardType="numeric"
-            value={
-              typeof workOrder?.answers?.[index]?.color_edge === 'number'
-              ? workOrder.answers[index].sample_quantity.toString()
-              : ''
-            }
+            value={workOrder?.answers?.[index]?.color_edge}
             editable={false}
           />
           <Text style={styles.label}>Muestras entregadas:</Text>

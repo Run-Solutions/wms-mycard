@@ -4,6 +4,8 @@
 import { useRouter } from 'next/navigation';
 import React, { useEffect, useState } from 'react';
 import styled, { useTheme } from 'styled-components';
+import { getFileByName } from "@/api/seguimientoDeOts";
+import { fetchPendingOrders, acceptWorkOrder } from '@/api/vistosBuenos';
 
 // Se define el tipo de datos
 interface CQMWorkOrder {
@@ -91,22 +93,7 @@ const UsersPage: React.FC = () => {
   useEffect(() => {
     async function fetchCQMWorkOrders() {
       try {
-        const token = localStorage.getItem('token');
-        if(!token){
-          console.error('No se encontró el token en localStorage');
-          return;
-        }
-        const res = await fetch('http://localhost:3000/work-order-cqm/pending', {
-          method: 'GET',
-          headers: {
-            'Content-Type': 'application/json',
-            'Authorization': `Bearer ${token}`
-          },
-        });
-        if(!res.ok){
-          throw new Error(`Error al obtener las ordenes enviadas a calidad: ${res.status} ${res.statusText}`);
-        }
-        const data = await res.json();
+        const data = await fetchPendingOrders();
         console.log('Ordenes de trabajo pendientes por revisar y asignar', data);
         // Ordenar las OTs: primero las marcadas como prioridad, luego por fecha
         if (data && Array.isArray(data)){
@@ -131,63 +118,32 @@ const UsersPage: React.FC = () => {
   }, []);
 
   const downloadFile = async (filename: string) => {
-    const token = localStorage.getItem('token');  
-    const res = await fetch(`http://localhost:3000/work-order-cqm/file/${filename}`, {
-      headers: {
-        'Authorization': `Bearer ${token}`
-      }
-    });
-    if (!res.ok) {
-      const errorText = await res.text();
-      console.error("❌ Error desde el backend:", errorText);
-      throw new Error('Error al cargar el file');
+    try {
+      const arrayBuffer = await getFileByName(filename);
+      const blob = new Blob([arrayBuffer], { type: 'application/pdf' });
+      const url = window.URL.createObjectURL(blob);
+      window.open(url, '_blank');
+      setTimeout(() => window.URL.revokeObjectURL(url), 5000);
+    } catch (error) {
+      console.error('Error al abrir el archivo:', error);
     }
-    const blob = await res.blob();
-    const url = window.URL.createObjectURL(blob);
-    window.open(url, '_blank');
-
-    // Limpieza opcional después de unos segundos
-    setTimeout(() => window.URL.revokeObjectURL(url), 5000);
-  }
+  };
 
   const aceptarOT = async () => {
     console.log("Se hizo clic en Aceptar OT");
-    const token = localStorage.getItem('token');
-    //const flowId = selectedOrder?.workOrder.flow[0].id;
-    let index: number = 0;
-    if (selectedOrder?.answers?.length) {
-      for (let i = selectedOrder.answers.length - 1; i >= 0; i--) {
-        if (selectedOrder.answers[i].accepted === false) {
-          index = i;
-          break;
-        }
-      }
+  
+    if (!selectedOrder || !selectedOrder.answers || selectedOrder.answers.length === 0) {
+      console.error('No hay respuestas disponibles en la orden.');
+      return;
     }
-    const flowId = index !== -1 ? selectedOrder?.answers[index]?.id : null; // Validamos el índice
-    if (!flowId) {
-      console.error('No se encontró un ID válido para FormAnswer.');
-      return; // Salimos de la función si no hay un ID válido
-    }
-    console.log('ID del FormAnswer:', flowId);
-
     try {
-      const res = await fetch(`http://localhost:3000/work-order-cqm/${flowId}/accept`, {
-        method: 'PATCH',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}`,
-        },
-      });
-      const data = await res.json();
-      if (res.ok) {
-        closeModal();
-        window.location.reload();
-      }
+      await acceptWorkOrder(selectedOrder);
+      window.location.reload();
     } catch (error) {
-      console.error(error);
+      console.error('Error al aceptar la OT:', error);
       alert('Error al conectar con el servidor');
     }
-  }
+  };
 
   return (
     <>

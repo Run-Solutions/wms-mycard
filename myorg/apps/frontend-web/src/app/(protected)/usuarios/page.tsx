@@ -5,9 +5,10 @@ import React, { useEffect, useState } from 'react';
 import { useRouter } from "next/navigation";
 import { Table, TableBody, TableCell, TableContainer, TableHead, TableRow, Paper, Typography, Button, Avatar, TextField, Box } from '@mui/material';
 import styled, { useTheme } from 'styled-components';
+import { getUsers, updateUser, deleteUser as deleteUserApi } from '@/api/usuarios';
 
 interface User {
-  id: string;
+  id: number;
   username: string;
   email: string;
   phone?: string;
@@ -26,15 +27,9 @@ const UsersPage: React.FC = () => {
 
   const fetchUsers = async () => {
     try {
-      const res = await fetch('http://localhost:3000/users');
-      const data = await res.json();
-  
-      if (Array.isArray(data)) {
-        setUsers(data);
-      } else if (Array.isArray(data.users)) {
-        setUsers(data.users);
-      } else {
-        console.error('Formato de datos inesperado:', data);
+      const res = await getUsers();
+      if (res) {
+        setUsers(res);
       }
     } catch (err) {
       console.error(err);
@@ -63,22 +58,20 @@ const UsersPage: React.FC = () => {
 
   const handleFormSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    const formData = new FormData();
-    formData.append('username', editingUser?.username || '');
-    formData.append('email', editingUser?.email || '');
-    formData.append('phone', editingUser?.phone || '');
-    formData.append('role', editingUser?.role?.name || '');
-
+    if (!editingUser?.id) {
+      console.error('No hay usuario válido para editar');
+      return;
+    }
+    const updateUserDto = {
+      username: editingUser.username,
+      email: editingUser.email,
+      phone: editingUser.phone,
+    };
     try {
-      const response = await fetch(`http://localhost:3000/users/${editingUser?.id}`, {
-        method: 'PATCH', // Cambié a PATCH para que coincida con tu controlador
-        body: formData,
-      });
-
-      const data = await response.json();
-      if (response.ok) {
-        await fetchUsers();  // recarga toda la lista desde el backend
-        setEditingUser(null);
+      const updatedUser = await updateUser(editingUser.id, updateUserDto);
+      if (updatedUser) {
+        await fetchUsers();  // Recargar usuarios desde el backend
+        setEditingUser(null); // Salir del modo de edición
       }
     } catch (error) {
       console.error('Error al actualizar el usuario:', error);
@@ -87,15 +80,11 @@ const UsersPage: React.FC = () => {
   
   const handleFormDelete = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (deleteUser?.id == null) return;
     try {
-      const response = await fetch(`http://localhost:3000/users/${deleteUser?.id}`, {
-        method: 'DELETE',
-      });
-  
-      if (response.ok) {
-        await fetchUsers();
-        setDeleteUser(null);
-      }
+      await deleteUserApi(deleteUser.id);
+      await fetchUsers();
+      setDeleteUser(null); // opcional: cerrar el modal después de borrar
     } catch (error) {
       console.error('Error al eliminar el usuario:', error);
     }

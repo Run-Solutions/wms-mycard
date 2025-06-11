@@ -66,15 +66,15 @@ const HotStampingComponent = ({ workOrder }: { workOrder: any }) => {
   const cantidadEntregadaValue = lastCompletedOrPartial.areaResponse
     ? (
       lastCompletedOrPartial.areaResponse.prepress?.plates ??
-      lastCompletedOrPartial.areaResponse.impression?.quantity ??
-      lastCompletedOrPartial.areaResponse.serigrafia?.quantity ??
-      lastCompletedOrPartial.areaResponse.empalme?.quantity ??
-      lastCompletedOrPartial.areaResponse.laminacion?.quantity ??
-      lastCompletedOrPartial.areaResponse.corte?.quantity ??
-      lastCompletedOrPartial.areaResponse.colorEdge?.quantity ??
-      lastCompletedOrPartial.areaResponse.hotStamping?.quantity ??
-      lastCompletedOrPartial.areaResponse.millingChip?.quantity ??
-      lastCompletedOrPartial.areaResponse.personalizacion?.quantity ??
+      lastCompletedOrPartial.areaResponse.impression?.release_quantity ??
+      lastCompletedOrPartial.areaResponse.serigrafia?.release_quantity ??
+      lastCompletedOrPartial.areaResponse.empalme?.release_quantity ??
+      lastCompletedOrPartial.areaResponse.laminacion?.release_quantity ??
+      lastCompletedOrPartial.areaResponse.corte?.good_quantity ??
+      lastCompletedOrPartial.areaResponse.colorEdge?.good_quantity ??
+      lastCompletedOrPartial.areaResponse.hotStamping?.good_quantity ??
+      lastCompletedOrPartial.areaResponse.millingChip?.good_quantity ??
+      lastCompletedOrPartial.areaResponse.personalizacion?.good_quantity ??
       'Sin cantidad'
     )
     : lastCompletedOrPartial.partialReleases?.some((r: PartialRelease) => r.validated)
@@ -145,6 +145,9 @@ const HotStampingComponent = ({ workOrder }: { workOrder: any }) => {
       reviewed: false,
       user_id: workOrder.assigned_user,
       sample_quantity: Number(sampleQuantity),
+      color_foil: colorFoil,
+      revisar_posicion: revisarPosicion,
+      imagen_holograma: imagenHolograma
     };
   
     try {
@@ -187,7 +190,7 @@ const HotStampingComponent = ({ workOrder }: { workOrder: any }) => {
 
   return (
     <ScrollView style={styles.container}>
-      <Text style={styles.title}>Área: Color Edge</Text>
+      <Text style={styles.title}>Área: Hot Stamping</Text>
 
       <View style={styles.cardDetail}>
         <Text style={styles.labelDetail}>Área que lo envía: 
@@ -670,15 +673,16 @@ const styles = StyleSheet.create({
   },
   radioGroup: {
     flexDirection: 'row',
-    justifyContent: 'space-around',
+    justifyContent: 'flex-start',
+    gap: 12,
     marginTop: 7,
   },
   radioOption: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginBottom: 10,
   },
   radioLabel: {
     fontSize: 16,
+    marginLeft: 4,
   },
 });

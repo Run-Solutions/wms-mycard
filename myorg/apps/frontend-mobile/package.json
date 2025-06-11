@@ -24,6 +24,7 @@
     "expo-document-picker": "~13.1.5",
     "expo-local-authentication": "~16.0.4",
     "expo-secure-store": "^14.2.3",
+    "expo-sharing": "~13.1.5",
     "expo-status-bar": "~2.2.3",
     "react": "19.0.0",
     "react-dom": "19.0.0",
@@ -31,6 +32,7 @@
     "react-native-biometrics": "^3.0.1",
     "react-native-device-info": "^14.0.4",
     "react-native-dropdown-picker": "^5.4.6",
+    "react-native-file-viewer": "^2.1.5",
     "react-native-gesture-handler": "~2.24.0",
     "react-native-get-random-values": "^1.11.0",
     "react-native-keyboard-aware-scroll-view": "^0.9.5",
@@ -43,8 +45,7 @@
     "redux": "^5.0.1",
     "styled-components": "^6.1.15",
     "tweetnacl": "^1.0.3",
-    "tweetnacl-util": "^0.15.1",
-    "expo-sharing": "~13.1.5"
+    "tweetnacl-util": "^0.15.1"
   },
   "devDependencies": {
     "@babel/core": "^7.25.2",

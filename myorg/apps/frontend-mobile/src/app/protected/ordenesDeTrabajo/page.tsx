@@ -97,7 +97,7 @@ const OrdenesDeTrabajoScreen: React.FC = () => {
       setFiles({});
       setDropdowns(1);
     } catch (err: any) {
-      Alert.alert('Error', err.message || 'Error al enviar la orden');
+      Alert.alert('La OT es duplicada');
     }
   };
 

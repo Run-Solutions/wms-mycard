@@ -3,6 +3,8 @@
 
 import { use, useEffect, useState } from "react";
 import styled from "styled-components";
+import { getWorkOrderByFlowId } from "@/api/aceptarProducto";
+
 import PrepressComponentAccept from "@/components/AceptarProducto/PrepressComponent";
 import ImpresionComponentAccept from "@/components/AceptarProducto/ImpresionComponent";
 import SerigrafiaComponentAccept from "@/components/AceptarProducto/SerigrafiaComponent";
@@ -19,13 +21,7 @@ export default function AceptarProductoAuxPage({ params }: Props) {
 
     useEffect(() => {
       async function fetchWorkOrder() {
-        const token = localStorage.getItem('token');
-        const res = await fetch(`http://localhost:3000/work-order-flow/${id}`, {
-          headers: {
-            'Authorization': `Bearer ${token}`,
-          },
-        })
-        const data = await res.json()
+        const data = await getWorkOrderByFlowId(id);
         console.log('Orden:', data)
         setWorkOrder(data)
       }

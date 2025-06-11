@@ -16,6 +16,14 @@ import { fetchWorkOrderById, closeWorkOrder } from '../../../../api/seguimientoD
 
 type WorkOrderDetailRouteProp = RouteProp<InternalStackParamList, 'WorkOrderDetailScreen'>;
 
+type AreaTotals = {
+  buenas: number;
+  malas: number;
+  excedente: number;
+  cqm: number;
+  muestras: number;
+};
+
 const WorkOrderDetailScreen: React.FC = () => {
   const route = useRoute<WorkOrderDetailRouteProp>();
   const { id } = route.params;
@@ -33,7 +41,8 @@ const WorkOrderDetailScreen: React.FC = () => {
 
   // Función para obtener los datos específicos de cada área
   const getAreaData = (areaId: number, areaResponse: any) => {
-    switch(areaId) {
+    console.log("user",areaResponse?.user?.username);
+    switch (areaId) {
       case 1: // preprensa
         return {
           buenas: areaResponse?.prepress?.plates || 0,
@@ -41,6 +50,7 @@ const WorkOrderDetailScreen: React.FC = () => {
           excedente: areaResponse?.prepress?.excess_quantity || '',
           cqm: '',
           muestras: '',
+          usuario: areaResponse?.user?.username || '',
         };
       case 2: // impresión
         return {
@@ -49,6 +59,7 @@ const WorkOrderDetailScreen: React.FC = () => {
           excedente: areaResponse?.impression?.excess_quantity || '',
           cqm: areaResponse?.impression?.form_answer?.sample_quantity ?? '',
           muestras: '',
+          usuario: areaResponse?.user?.username || '',
         };
       case 3: // serigrafía
         return {
@@ -57,6 +68,7 @@ const WorkOrderDetailScreen: React.FC = () => {
           excedente: areaResponse?.serigrafia?.excess_quantity || '',
           cqm: areaResponse?.serigrafia?.form_answer?.sample_quantity ?? '',
           muestras: '',
+          usuario: areaResponse?.user?.username || '',
         };
       case 4: // empalme
         return {
@@ -65,6 +77,7 @@ const WorkOrderDetailScreen: React.FC = () => {
           excedente: areaResponse?.empalme?.excess_quantity || '',
           cqm: areaResponse?.empalme?.form_answer?.sample_quantity ?? '',
           muestras: '',
+          usuario: areaResponse?.user?.username || '',
         };
       case 5: // empalme
         return {
@@ -73,14 +86,16 @@ const WorkOrderDetailScreen: React.FC = () => {
           excedente: areaResponse?.laminacion?.excess_quantity || '',
           cqm: areaResponse?.laminacion?.form_answer?.sample_quantity ?? '',
           muestras: '',
+          usuario: areaResponse?.user?.username || '',
         };
-        case 6: // corte
+      case 6: // corte
         return {
           buenas: areaResponse?.corte?.good_quantity || 0,
           malas: areaResponse?.corte?.bad_quantity || 0,
           excedente: areaResponse?.corte?.excess_quantity || 0,
           cqm: areaResponse?.corte?.form_answer?.sample_quantity ?? 0,
-          muestras: areaResponse?.corte?.formAuditory?.sample_auditory ?? ''
+          muestras: areaResponse?.corte?.formAuditory?.sample_auditory ?? '',
+          usuario: areaResponse?.user?.username || '',
         };
       case 7: // color-edge
         return {
@@ -88,7 +103,8 @@ const WorkOrderDetailScreen: React.FC = () => {
           malas: areaResponse?.colorEdge?.bad_quantity || 0,
           excedente: areaResponse?.colorEdge?.excess_quantity || 0,
           cqm: areaResponse?.colorEdge?.form_answer?.sample_quantity || 0,
-          muestras: areaResponse?.colorEdge?.formAuditory?.sample_auditory ?? ''
+          muestras: areaResponse?.colorEdge?.formAuditory?.sample_auditory ?? '',
+          usuario: areaResponse?.user?.username || '',
         };
       case 8: // hot-stamping
         return {
@@ -96,15 +112,19 @@ const WorkOrderDetailScreen: React.FC = () => {
           malas: areaResponse?.hotStamping?.bad_quantity || 0,
           excedente: areaResponse?.hotStamping?.excess_quantity || 0,
           cqm: areaResponse?.hotStamping?.form_answer?.sample_quantity || 0,
-          muestras: areaResponse?.hotStamping?.formAuditory?.sample_auditory ?? ''
+          muestras: areaResponse?.hotStamping?.formAuditory?.sample_auditory ?? '',
+          usuario: areaResponse?.user?.username || '',
+
         };
       case 9: // milling-chip
+        console.log(areaResponse?.millingChip);
         return {
           buenas: areaResponse?.millingChip?.good_quantity || 0,
           malas: areaResponse?.millingChip?.bad_quantity || 0,
           excedente: areaResponse?.millingChip?.excess_quantity || 0,
           cqm: areaResponse?.millingChip?.form_answer?.sample_quantity || 0,
-          muestras: areaResponse?.millingChip?.formAuditory?.sample_auditory ?? ''
+          muestras: areaResponse?.millingChip?.formAuditory?.sample_auditory ?? '',
+          usuario: areaResponse?.user?.username || '',
         };
       case 10: // personalizacion
         return {
@@ -112,7 +132,8 @@ const WorkOrderDetailScreen: React.FC = () => {
           malas: areaResponse?.personalizacion?.bad_quantity || 0,
           excedente: areaResponse?.personalizacion?.excess_quantity || 0,
           cqm: areaResponse?.personalizacion?.form_answer?.sample_quantity || 0,
-          muestras: areaResponse?.personalizacion?.formAuditory?.sample_auditory ?? ''
+          muestras: areaResponse?.personalizacion?.formAuditory?.sample_auditory ?? '',
+          usuario: areaResponse?.user?.username || '',
         };
       default:
         return {
@@ -120,13 +141,15 @@ const WorkOrderDetailScreen: React.FC = () => {
           malas: 0,
           excedente: 0,
           muestras: 0,
-          cqm: 0
+          cqm: 0,
+          usuario: ''
         };
     }
   };
 
   const areas = workOrder?.flow?.map((item: any) => {
     const areaData = getAreaData(item.area_id, item.areaResponse);
+    console.log('areaData', areaData.usuario);
     return {
       id: item.area_id,
       name: item.area?.name || 'Sin nombre',
@@ -137,7 +160,19 @@ const WorkOrderDetailScreen: React.FC = () => {
     };
   }) || [];
 
-  
+
+  const totals = areas.reduce(
+    (acc: AreaTotals, area: any): AreaTotals => {
+      acc.buenas += Number(area.buenas) || 0;
+      acc.malas += Number(area.malas) || 0;
+      acc.excedente += Number(area.excedente) || 0;
+      acc.cqm += Number(area.cqm) || 0;
+      acc.muestras += Number(area.muestras) || 0;
+      return acc;
+    },
+    { buenas: 0, malas: 0, excedente: 0, cqm: 0, muestras: 0 }
+  );
+
   const handleCloseOrder = async () => {
     try {
       await closeWorkOrder(workOrder?.ot_id);
@@ -168,26 +203,39 @@ const WorkOrderDetailScreen: React.FC = () => {
       </View>
 
       <Text style={styles.subtitle}>Datos de Producción por Área</Text>
-      <View style={styles.table}>
-        <View style={styles.row}>
-          <Text style={styles.cell}>Área</Text>
-          <Text style={styles.cell}>Buenas</Text>
-          <Text style={styles.cell}>Malas</Text>
-          <Text style={styles.cell}>Excedente</Text>
-          <Text style={styles.cell}>CQM</Text>
-          <Text style={styles.cell}>Muestras</Text>
-        </View>
-        {areas.map((area: any, index: number) => (
-          <View key={index} style={styles.row}>
-            <Text style={styles.cell}>{area.name}</Text>
-            <Text style={styles.cell}>{area.buenas}</Text>
-            <Text style={styles.cell}>{area.malas}</Text>
-            <Text style={styles.cell}>{area.excedente}</Text>
-            <Text style={styles.cell}>{area.cqm}</Text>
-            <Text style={styles.cell}>{area.muestras}</Text>
+      <ScrollView horizontal>
+        <View style={styles.table}>
+          <View style={styles.headerRow}>
+            <Text style={styles.cellUser}>Área</Text>
+            <Text style={styles.cell}>Buenas</Text>
+            <Text style={styles.cell}>Malas</Text>
+            <Text style={styles.cell}>Excedente</Text>
+            <Text style={styles.cell}>CQM</Text>
+            <Text style={styles.cell}>Muestras</Text>
+            <Text style={styles.cellUser}>Usuario</Text>
           </View>
-        ))}
-      </View>
+          {areas.map((area: any, index: number) => (
+            <View key={index} style={styles.row}>
+              <Text style={styles.cellUser}>{area.name}</Text>
+              <Text style={styles.cell}>{area.buenas}</Text>
+              <Text style={styles.cell}>{area.malas}</Text>
+              <Text style={styles.cell}>{area.excedente}</Text>
+              <Text style={styles.cell}>{area.cqm}</Text>
+              <Text style={styles.cell}>{area.muestras}</Text>
+              <Text style={styles.cellUser}>{area?.usuario || 'N/A'}</Text>
+            </View>
+          ))}
+          <View style={[styles.row, { backgroundColor: '#f0f0f0' }]}>
+            <Text style={styles.cellUser}>Totales</Text>
+            <Text style={styles.cell}>{totals.buenas}</Text>
+            <Text style={styles.cell}>{totals.malas}</Text>
+            <Text style={styles.cell}>{totals.excedente}</Text>
+            <Text style={styles.cell}>{totals.cqm}</Text>
+            <Text style={styles.cell}>{totals.muestras}</Text>
+            <Text style={styles.cellUser}>—</Text>
+          </View>
+        </View>
+      </ScrollView>
 
       {workOrder?.status !== 'Cerrado' && (
         <TouchableOpacity style={styles.button} onPress={() => setShowConfirm(true)}>
@@ -247,22 +295,28 @@ const styles = StyleSheet.create({
     marginBottom: 12,
   },
   table: {
+    padding: 10,
     backgroundColor: '#fff',
-    borderRadius: 18,
-    overflow: 'hidden',
-    marginBottom: 24,
+  },
+  headerRow: {
+    flexDirection: 'row',
+    backgroundColor: '#fff',
+    paddingVertical: 8,
   },
   row: {
     flexDirection: 'row',
-    justifyContent: 'space-between',
-    padding: 8,
-    borderBottomColor: '#eee',
     borderBottomWidth: 1,
+    borderBottomColor: '#ccc',
+    paddingVertical: 6,
   },
   cell: {
-    flex: 1,
-    fontSize: 12,
+    width: 85,
+    paddingHorizontal: 10,
     textAlign: 'center',
+  },
+  cellUser:{
+    width: 120,
+    paddingHorizontal: 10
   },
   button: {
     backgroundColor: '#0038A8',

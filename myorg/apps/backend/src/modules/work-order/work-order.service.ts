@@ -142,6 +142,7 @@ export class WorkOrderService {
             },
             areaResponse: {
               include: {
+                user: true,
                 prepress: true,
                 inconformities: {
                   include: {

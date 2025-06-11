@@ -4,6 +4,7 @@
 import { Switch } from '@mui/material';
 import React, { useEffect, useState } from 'react';
 import styled, { useTheme } from 'styled-components';
+import { changeEnabledPermission, getAllPermissions } from '@/api/permisos';
 
 interface Permission {
   id: number;
@@ -22,43 +23,43 @@ interface Permission {
   };
 }
 
+interface RoleWithModules {
+  id: number;
+  name: string;
+  modules: { id: number; name: string; enabled: boolean }[];
+}
+
 const PermissionsPage: React.FC = () => {
-  const [permissions, setPermissions] = useState<Permission[]>([]);
+  const [permissions, setPermissions] = useState<RoleWithModules[]>([]);
   const theme = useTheme();
 
   useEffect(() => {
     async function fetchPermissions() {
       try {
-        // se verifica token
-        const token = localStorage.getItem('token');
-        if(!token) {
-          console.error('No se encontro el token en localStorage');
-          return;
-        }
-        console.log('Token enviado a headers: ', token)
-
-        const res = await fetch('http://localhost:3000/permissions', {
-          method: 'GET',
-          headers: {
-            'Content-Type': 'application/json',
-            'Authorization': `Bearer ${token}`
-          },
-        });
-
-        if(!res.ok) {
-          throw new Error(`Error al obtener permisos: ${res.status} ${res.statusText}`);
-        }
-
-        const data = await res.json();
-        console.log('Datos obtenidos: ', data);
-
-        if(Array.isArray(data)) {
-          setPermissions(data);
-        } else {
-          console.error('Formato de datos inesperado: ', data);
-        }
+        const permissions = await getAllPermissions();
+        const groupedPermissions = permissions.data.reduce((acc, perm: any) => {
+          const roleId = perm.role_id;
+          const roleName = perm.role?.name || `Role ${roleId}`;
+          const moduleName = perm.module?.name || `Module ${perm.module_id}`;
+    
+          if (!acc[roleId]) {
+            acc[roleId] = {
+              id: roleId,
+              name: roleName,
+              modules: [],
+            };
+          }
+    
+          acc[roleId].modules.push({
+            id: perm.module_id,
+            name: moduleName,
+            enabled: perm.enabled ?? false,
+          });
+          return acc;
+        }, {} as Record<number, RoleWithModules>);
+    
+        setPermissions(Object.values(groupedPermissions));
       } catch (err) {
-        console.error(err);
         console.error('Error en fetchPermissions:', err);
       }
     }
@@ -68,82 +69,52 @@ const PermissionsPage: React.FC = () => {
   console.log('Ejemplo de primer permiso:', permissions[0]);
 
   // transformar la estructura de datos · agrupar permisos por rol
-  const groupedPermissions = permissions.reduce((acc, perm) => {
-    const roleId = perm.role_id;
-    const roleName = perm.role?.name || `Role ${roleId}`;
-    const moduleName = perm.module?.name || `Module ${perm.module_id}`;
 
-    console.log(`Procesando permiso: ${roleName} -> ${moduleName}`);
-    
-    if(!acc[roleId]) {
-      acc[roleId] = {
-        id: roleId,
-        name: roleName,
-        modules: [],
-      };
-    }
-    
-    acc[roleId].modules.push({
-      id: perm.module_id,
-      name: moduleName,
-      enabled: perm.enabled ?? false,
-    });
-    return acc;
-  }, {} as Record<number, { id: number; name: string; modules: { id: number; name: string; enabled: boolean }[] }>);
-  
-  const formattedPermissions = Object.values(groupedPermissions)
+  const formattedPermissions = permissions;
   console.log('Formatted permissions', formattedPermissions);
 
   const toggleModule = async (roleId: number, moduleId: number) => {
     try {
-      // se verifica token
       const token = localStorage.getItem('token');
-      if(!token) {
-        console.error('No se encontro el token en localStorage');
+      if (!token) {
+        console.error('No se encontró el token en localStorage');
         return;
       }
-
-      // encuentra el permiso especifico
-      const togglePermission = permissions.find(
-        (perm) => perm.role_id === roleId && perm.module_id === moduleId
-      );
-
-      if(!togglePermission) {
+  
+      const togglePermission = permissions
+        .find((role) => role.id === roleId)
+        ?.modules.find((mod) => mod.id === moduleId);
+  
+      if (!togglePermission) {
         console.error('No se encontró el permiso para actualizar');
         return;
       }
-
-      // Nuevo estado
+  
       const newEnabledState = !togglePermission.enabled;
-
-      console.log('Token enviado a headers: ', token)
-
-      // llamada al backend para actualizar el estado
-      const res = await fetch(`http://localhost:3000/permissions/${togglePermission.role_id}/${togglePermission.module_id}`, {
-        method: 'PATCH',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}`,
-        },
-        body: JSON.stringify({ enabled: newEnabledState }),
-      });
-
-      if(!res.ok) {
-        throw new Error (`Error al actualizar permiso: ${res.status} ${res.statusText}`);
+  
+      const res = await changeEnabledPermission(roleId, moduleId, newEnabledState);
+  
+      if (!res || res.status !== 200) {
+        throw new Error(`Error al actualizar permiso: ${res?.status ?? '??'} ${res?.statusText ?? ''}`);
       }
-
-      //Actualizar el estado local solo si se responde correctamente
+  
       setPermissions((prevPermissions) =>
-        prevPermissions.map((perm) =>
-          perm.role_id === togglePermission.role_id && perm.module_id === togglePermission.module_id
-            ? { ...perm, enabled: newEnabledState } 
-            : perm
-      )
-    );
-    console.log(`Permiso actualizado: ${togglePermission.id}, enabled ${newEnabledState}`);
-  } catch (error) {
-    console.log('Error al actualizar el permiso: ', error);
-    
+        prevPermissions.map((role) =>
+          role.id === roleId
+            ? {
+                ...role,
+                modules: role.modules.map((mod) =>
+                  mod.id === moduleId
+                    ? { ...mod, enabled: newEnabledState }
+                    : mod
+                ),
+              }
+            : role
+        )
+      );
+      console.log(`Permiso actualizado: role ${roleId}, módulo ${moduleId}, enabled: ${newEnabledState}`);
+    } catch (error) {
+      console.error('Error al actualizar el permiso: ', error);
     }
   };
   

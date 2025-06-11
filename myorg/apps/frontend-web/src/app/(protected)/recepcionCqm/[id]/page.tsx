@@ -3,6 +3,8 @@
 
 import { use, useEffect, useState } from "react";
 import styled from "styled-components";
+import { getWorkOrderById } from "@/api/recepcionCQM";
+
 import ImpresionComponent from "@/components/RecepcionCqm/ImpresionComponent";
 import SerigrafiaComponent from "@/components/RecepcionCqm/SerigrafiaComponent";
 import EmpalmeComponent from "@/components/RecepcionCqm/EmpalmeComponent";
@@ -25,13 +27,7 @@ export default function RecepcionCQMPage({ params }: Props) {
   
   useEffect(() => {
     async function fetchWorkOrder() {
-      const token = localStorage.getItem('token');
-      const res = await fetch(`http://localhost:3000/free-order-cqm/${id}`, {
-        headers: {
-          'Authorization': `Bearer ${token}`,
-        },
-      })
-      const data = await res.json()
+      const data = await getWorkOrderById(id);
       console.log('Orden:', data);
       setCQMWorkOrders(data)
     }

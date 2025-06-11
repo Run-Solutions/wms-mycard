@@ -200,7 +200,10 @@ const PersonalizacionComponent = ({ workOrder }: { workOrder: any }) => {
           <TextInput
             style={styles.inputDetail}
             keyboardType="numeric"
-            value={workOrder?.answers[index].sample_quantity ?? 'No se reconoce la muestra enviada' }
+            value={workOrder?.answers[index].sample_quantity !== null
+              ? String(workOrder?.answers[index].sample_quantity)
+              : 'No se reconoce la muestra enviada'
+            }
             editable={false}
           />
         </>
@@ -332,7 +335,10 @@ const PersonalizacionComponent = ({ workOrder }: { workOrder: any }) => {
           <Text style={styles.tableCell}>Respuesta</Text>
         </View>
         {/* Preguntas normales */}
-        {qualityQuestions.slice(9, 13).map((q: any) => (
+        {workOrder.area.formQuestions
+          .slice(9, 13)
+          .filter((q: any) => q.role_id === 3)
+          .map((q: any) => (
           <View key={q.id} style={styles.tableRow}>
             {/* Pregunta */}
             <View style={[styles.tableCell, { flex: 2 }]}>

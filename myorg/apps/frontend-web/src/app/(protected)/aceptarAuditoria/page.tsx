@@ -4,6 +4,8 @@
 import React, { useEffect, useState } from 'react';
 import styled, { useTheme } from 'styled-components';
 import { useRouter } from "next/navigation";
+import { getFileByName } from "@/api/seguimientoDeOts";
+import { getPendingOrders } from '../../../api/aceptarAuditoria'; 
 
 
 // Se define el tipo de datos
@@ -96,59 +98,29 @@ const AcceptAuditoryPage: React.FC = () => {
   }
 
   const downloadFile = async (filename: string) => {
-    const token = localStorage.getItem('token');  
-    const res = await fetch(`http://localhost:3000/work-order-flow/file/${filename}`, {
-      headers: {
-        'Authorization': `Bearer ${token}`
-      }
-    });
-    if (!res.ok) {
-      const errorText = await res.text();
-      console.error("❌ Error desde el backend:", errorText);
-      throw new Error('Error al cargar el file');
+    try {
+      const arrayBuffer = await getFileByName(filename);
+      const blob = new Blob([arrayBuffer], { type: 'application/pdf' });
+      const url = window.URL.createObjectURL(blob);
+      window.open(url, '_blank');
+      setTimeout(() => window.URL.revokeObjectURL(url), 5000);
+    } catch (error) {
+      console.error('Error al abrir el archivo:', error);
     }
-    const blob = await res.blob();
-    const url = window.URL.createObjectURL(blob);
-    window.open(url, '_blank');
-
-    // Limpieza opcional después de unos segundos
-    setTimeout(() => window.URL.revokeObjectURL(url), 5000);
-  }
+  };
 
   useEffect(() => {
     async function fetchWorkOrders() {
       try {
-        // Se verifica token
-        const token = localStorage.getItem('token');
-        if(!token) {
-          console.error('No se encontró el token en localStorage');
-          return;
-        }
-  
-        const res = await fetch('http://localhost:3000/work-order-flow-auditory/pending-auditory', {
-          method: 'GET',
-          headers: {
-            'Content-Type': 'application/json',
-            'Authorization': `Bearer ${token}`
-          },
-        });
-  
-        if(!res.ok){
-          throw new Error(`Error al obtener las ordenes: ${res.status} ${res.statusText}`);
-        }
-        
-        const data = await res.json();
+        const data = await getPendingOrders();
         // Ordenar las OTs: primero las marcadas como prioridad, luego por fecha
-        if (data && Array.isArray(data)){
-          const sortedOrders = data.sort((a: WorkOrder, b: WorkOrder) => {
-            // Si a es prioritario y b no, a va primero
+        if (Array.isArray(data)) {
+          const sorted = data.sort((a, b) => {
             if (a.workOrder.priority && !b.workOrder.priority) return -1;
-            // Si b es prioritario y a no, b va primero
             if (!a.workOrder.priority && b.workOrder.priority) return 1;
-            // Si ambos tienen la misma prioridad, ordenar por fecha (más reciente primero)
             return new Date(a.workOrder.createdAt).getTime() - new Date(b.workOrder.createdAt).getTime();
           });
-          setWorkOrders(sortedOrders);
+          setWorkOrders(sorted);
         } else {
           setWorkOrders([]);
         }

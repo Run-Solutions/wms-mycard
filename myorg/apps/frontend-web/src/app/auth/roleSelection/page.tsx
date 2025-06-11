@@ -5,15 +5,15 @@ import { useRouter } from 'next/navigation';
 import styled, {keyframes, createGlobalStyle} from 'styled-components';
 import { toast } from 'react-toastify';
 import Header from '@/components/Header/Header';
+import { getRoles, getAreas, register } from '@/api/auth';
+import type { Role } from '@/api/auth';
 
 const RoleSelection = () => {
   const router = useRouter();
   const [userData, setUserData] = useState<{ username: string; email: string; password: string } | null>(null);
-  
-  const [roles, setRoles] = useState<{ id: string; name: string }[]>([]);
+  const [roles, setRoles] = useState<Role[]>([]);
   const [selectedRole, setSelectedRole] = useState('');
-  
-  const [areas_operator, setAreasOperator] = useState<{ id: string; name: string }[]>([]);
+  const [areas_operator, setAreasOperator] = useState<Role[]>([]);
   const [selectedAreasOperator, setSelectedAreasOperator] = useState('');
   
   // Cargar datos desde localStorage
@@ -34,28 +34,23 @@ const RoleSelection = () => {
   
   // Obtener los roles desde la BD
   useEffect(() => {
-    fetch('http://localhost:3000/auth/roles')
-    .then((res) => res.json())
-    .then((data) => setRoles(data || []))
-    .catch((err) => {
-      console.error('Error obteniendo roles', err);
-      setRoles([]); // Asegurar que roles no sea undefined en caso de error
-    });
+    getRoles()
+      .then((res) => setRoles(res.data || []))
+      .catch((err) => {
+        console.error('Error obteniendo roles', err);
+        setRoles([]);
+      });
   }, []);
   
   // Obtener las areas desde la BD
   useEffect(() => {
-    
     if (!selectedRole) return;
-    
-    // Verificar si el rol seleccionado es 'Operador'
+  
     const role = roles.find(role => String(role.id) === String(selectedRole));
-    
-    if (role?.name !== 'Operador'){
-      fetch('http://localhost:3000/auth/areas_operator')
-      .then((res) => res.json())
-      .then((data) => setAreasOperator(data || []))
-      .catch((err) => console.error('Error obteniendo áreas de operador', err));
+    if (role?.name !== 'Operador') {
+      getAreas()
+        .then((res) => setAreasOperator(res.data || []))
+        .catch((err) => console.error('Error obteniendo áreas de operador', err));
     } else {
       setAreasOperator([]);
     }
@@ -63,47 +58,31 @@ const RoleSelection = () => {
   
   const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
-    
     if (!selectedRole) {
       toast.error('Debes seleccionar un rol');
       return;
     }
-    
     const selectedRoleObject = roles.find(role => String(role.id) === String(selectedRole));
-    if(selectedRoleObject?.name === 'Operador' && !selectedAreasOperator){
+    if (selectedRoleObject?.name === 'Operador' && !selectedAreasOperator) {
       toast.error('Debes seleccionar un área');
       return;
     }
-    
     const payload: any = {
       ...userData,
       role_id: parseInt(selectedRole, 10),
     };
-    
-    if (selectedRole === '2'){
+    if (selectedRole === '2') {
       payload.areas_operator_id = Number(selectedAreasOperator);
     }
-    console.log('Enviando datos al backend:', payload); // Verificar que se envían los datos correctos
-    
+    console.log('Enviando datos al backend:', payload);
     try {
-      const res = await fetch('http://localhost:3000/auth/register', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(payload),
-      });
-      
-      const data = await res.json();
-      console.log('Respuesta del backend', data);
-      
-      if (res.ok) {
-        localStorage.removeItem('pendingUser');
-        toast.success('Registro exitoso');
-        router.push('/auth/login');
-      } else {
-        toast.error(data.message || 'Error en registro');
-      }
-    } catch (err) {
-      toast.error('Error al registrar');
+      const res = await register(payload);
+      console.log('Respuesta del backend', res.data);
+      localStorage.removeItem('pendingUser');
+      toast.success('Registro exitoso');
+      router.push('/auth/login');
+    } catch (err: any) {
+      toast.error(err.response?.data?.message || 'Error en registro');
       console.error('Error:', err);
     }
   };
@@ -175,9 +154,11 @@ const RoleSelection = () => {
               }}>
               <option value=''>Selecciona un área</option>
               {areas_operator
-              .sort((a, b) => Number(a.id) - Number(b.id))
-              .map((area: { id: string; name: string }) => (
-                <option key={area.id} value={area.id}>{area.name}</option>
+              .sort((a, b) => a.id - b.id) // id ya es number
+              .map((area) => (
+                <option key={area.id} value={String(area.id)}>
+                  {area.name}
+                </option>
               ))}
             </Select>
             </>

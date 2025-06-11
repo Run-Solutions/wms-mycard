@@ -300,6 +300,7 @@ export class AcceptWorkOrderService {
           }
         },
         answers: true,
+        user: true,
       },
     });
     if(!workOrderFlow) {

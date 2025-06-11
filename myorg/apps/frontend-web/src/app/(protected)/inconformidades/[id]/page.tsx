@@ -4,6 +4,8 @@
 import { use, useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import styled from "styled-components";
+import { getWorkOrderInconformidadById } from "@/api/inconformidades";
+
 import PreprensaComponent from "@/components/Inconformidades/PreprensaComponent";
 import ImpresionComponent from "@/components/Inconformidades/ImpresionComponent";
 import ImpresionComponentCQM from "@/components/Inconformidades/ImpresionComponentCQM";
@@ -48,12 +50,7 @@ export default function InconformidadesAuxPage({ params }: Props) {
 
   useEffect(() => {
     async function fetchWorkOrder() {
-      const token = localStorage.getItem('token');
-      const res = await fetch(`http://localhost:3000/work-orders/${id}`, {
-        headers: {
-        'Authorization': `Bearer ${token}`,
-        },
-      })
+      const res = await getWorkOrderInconformidadById(id);
       const data = await res.json()
       console.log('Orden:', data)
       setWorkOrder(data)

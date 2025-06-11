@@ -3,6 +3,7 @@
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 import styled from "styled-components";
+import { submitToCQMMillingChip, releaseProductFromMillingChip } from "@/api/liberarProducto";
 
 interface Props {
   workOrder: any;
@@ -96,25 +97,7 @@ export default function MillingChipComponent({ workOrder }: Props) {
       validar_kvc: validarKVC,
     };
     try {
-      const token = localStorage.getItem('token');
-      if(!token) {
-        alert('No hay token de autenticación');
-        return;
-      }
-      console.log('Datos a enviar', payload);
-      const res = await fetch('http://localhost:3000/free-order-flow/cqm-milling-chip', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}`,
-        },
-        body: JSON.stringify(payload),
-      });
-      const data = await res.json();
-      if (!res.ok) {
-        console.error("Error en el servidor:", data);
-        return;
-      }
+      await submitToCQMMillingChip(payload);
       router.push('/liberarProducto');
     } catch (error) {
       console.log('Error al guardar la respuesta: ', error);
@@ -139,7 +122,7 @@ export default function MillingChipComponent({ workOrder }: Props) {
   
     setShowConfirm(true); // Si pasa todas las validaciones, ahora sí abre el modal
   };
-  const handleImpressSubmit = async () => {
+  const handleMillingChipSubmit = async () => {
     const payload = {
       workOrderId: workOrder.workOrder.id,
       workOrderFlowId: currentFlow.id,
@@ -156,27 +139,7 @@ export default function MillingChipComponent({ workOrder }: Props) {
     console.log('datos a enviar',payload);
   
     try {
-      const token = localStorage.getItem('token');
-      if (!token) {
-        alert('No hay token de autenticación');
-        return;
-      }
-  
-      const res = await fetch('http://localhost:3000/free-order-flow/milling-chip', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}`,
-        },
-        body: JSON.stringify(payload),
-      });
-  
-      const data = await res.json();
-      if (!res.ok) {
-        console.error('Error en el servidor:', data);
-        return;
-      }
-  
+      await releaseProductFromMillingChip(payload);
       router.push('/liberarProducto');
     } catch (error) {
       console.log('Error al enviar datos:', error);
@@ -284,7 +247,7 @@ export default function MillingChipComponent({ workOrder }: Props) {
             <h4>¿Estás segura/o que deseas liberar este producto?</h4>
             <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '1rem', marginTop: '1rem' }}>
               <CancelButton onClick={() => setShowConfirm(false)}>Cancelar</CancelButton>
-              <ConfirmButton onClick={handleImpressSubmit}>Confirmar</ConfirmButton>
+              <ConfirmButton onClick={handleMillingChipSubmit}>Confirmar</ConfirmButton>
             </div>
           </ModalBox>
         </ModalOverlay>

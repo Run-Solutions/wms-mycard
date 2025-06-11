@@ -3,38 +3,42 @@
 
 import React, { useEffect, useState } from 'react';
 import styled, { useTheme } from 'styled-components';
-import WorkOrderTable from '@/components/Finalizacion/WorkOrderTable';
+import WorkOrderTable from '@/components/SeguimientoDeOts/WorkOrderTable';
+import { getWorkOrders } from '@/api/finalizacion';
 
 // Se define el tipo de datos
+interface File {
+  id: number;
+  type: string;
+  file_path: string;
+}
+
+interface Flow {
+  id: number;
+  area_id: number;
+  status: string;
+  assigned_user?: number;
+  area?: {
+    name?: string;
+  };
+}
+
 interface WorkOrder {
   id: number;
   ot_id: string;
   mycard_id: string;
   quantity: number;
   created_by: number;
-  status: string; 
+  status: string;
   validated: boolean;
   createdAt: string;
   updatedAt: string;
   user: {
-    username: string
+    username: string;
   };
-  files: {
-    id: number;
-    type: string;
-    file_path: string;
-  }[];
-  flow: {
-    id: number;
-    area_id: number; 
-    status: string; 
-    assigned_user?: number;
-    area?: {
-      name?: string;
-    }
-   
-  }[];
-  formAnswers?: any[]; 
+  files: File[];
+  flow: Flow[];
+  formAnswers?: any[];
 }
 
 const FinalizacionPage: React.FC = () => {
@@ -44,26 +48,8 @@ const FinalizacionPage: React.FC = () => {
   useEffect(() => {
     async function fetchAllWorkOrders() {
       try {
-        const token = localStorage.getItem('token');
-        if(!token){
-          console.error('No se encontro el token en el localStorage');
-          return;
-        }
-        const estados = ['Listo', 'Cerrado']
-        const query = estados.map(estado => encodeURIComponent(estado)).join(',');
-        const res = await fetch(`http://localhost:3000/work-orders/in-progress?statuses=${query}`, {
-          method: 'GET',
-          headers: {
-            'Content-Type': 'application/json',
-            'Authorization': `Bearer ${token}`
-          },
-        });
-        if(!res.ok){
-          throw new Error(`Error al obtener las ordenes: ${res.status} ${res.statusText}`);
-        }
-        const data = await res.json();
-        console.log('Datos de Ordenes: ', data);
-        setWorkOrders(data);
+        const res = await getWorkOrders();
+        setWorkOrders(res);
       } catch (err) {
         console.error(err);
         console.error('Error en fetchAllWorkOrders', err);
@@ -71,6 +57,7 @@ const FinalizacionPage: React.FC = () => {
     }
     fetchAllWorkOrders();
   }, []);
+
   return (
     <PageContainer>
       <TitleWrapper>

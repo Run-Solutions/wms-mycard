@@ -123,18 +123,18 @@ const InconformidadesAuxScreen: React.FC = () => {
   };
 
   return (
-    <View style={styles.container}>
-      {/* Información fija */}
-      <Text style={styles.header}>Información de la OT</Text>
-      <View style={styles.card}>
-        <Text style={styles.label}>OT: <Text style={styles.value}>{workOrder.ot_id}</Text></Text>
-        <Text style={styles.label}>Presupuesto: <Text style={styles.value}>{workOrder.mycard_id}</Text></Text>
-        <Text style={styles.label}>Cantidad: <Text style={styles.value}>{workOrder.quantity}</Text></Text>
-        <Text style={styles.label}>Comentarios: <Text style={styles.value}>{workOrder.comments}</Text></Text>
-      </View>
-    {/* Componente que podría contener listas */}
-    <View>{renderComponentByArea()}</View>
-  </View>
+    <ScrollView contentContainerStyle={styles.container}>
+        {/* Información fija */}
+        <Text style={styles.header}>Información de la OT</Text>
+        <View style={styles.card}>
+          <Text style={styles.label}>OT: <Text style={styles.value}>{workOrder.ot_id}</Text></Text>
+          <Text style={styles.label}>Presupuesto: <Text style={styles.value}>{workOrder.mycard_id}</Text></Text>
+          <Text style={styles.label}>Cantidad: <Text style={styles.value}>{workOrder.quantity}</Text></Text>
+          <Text style={styles.label}>Comentarios: <Text style={styles.value}>{workOrder.comments}</Text></Text>
+        </View>
+      {/* Componente que podría contener listas */}
+      {renderComponentByArea()}
+    </ScrollView>
   );
 };
 

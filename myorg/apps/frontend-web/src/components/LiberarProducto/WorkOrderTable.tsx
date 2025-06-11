@@ -6,6 +6,7 @@ import styled, { useTheme } from 'styled-components';
 import { Box, Table, TableBody, TableCell, TableContainer, TableHead, TableRow, Paper, Typography, IconButton } from "@mui/material";
 import KeyboardArrowDownIcon from '@mui/icons-material/KeyboardArrowDown';
 import KeyboardArrowUpIcon from '@mui/icons-material/KeyboardArrowUp';
+import { getFileByName } from "@/api/seguimientoDeOts";
 
 interface WorkOrder {
   id: number;
@@ -71,25 +72,17 @@ const WorkOrderTable: React.FC<Props> = ({ orders, title, statusFilter}) => {
 
     const displayedOrders = expanded ? filteredOrders : filteredOrders.slice(0, 2);
 
-    const downloadFile = async (filename: string) => {
-        const token = localStorage.getItem('token');
-        const res = await fetch(`http://localhost:3000/free-order-flow/file/${filename}`, {
-            headers: {
-                'Authorization': `Bearer ${token}`
-            }
-        });
-        if(!res.ok) {
-            const errorText = await res.text();
-            console.error('❌ Error desde el backend', errorText);
-            throw new Error('Error al cargar el file');
-        }
-        const blob = await res.blob();
-        const url = window.URL.createObjectURL(blob);
-        window.open(url, '_blank');
-
-        // Limpieza opcional después de unos segundos
-        setTimeout(() => window.URL.revokeObjectURL(url), 5000);
+  const downloadFile = async (filename: string) => {
+    try {
+      const arrayBuffer = await getFileByName(filename);
+      const blob = new Blob([arrayBuffer], { type: 'application/pdf' });
+      const url = window.URL.createObjectURL(blob);
+      window.open(url, '_blank');
+      setTimeout(() => window.URL.revokeObjectURL(url), 5000);
+    } catch (error) {
+      console.error('Error al abrir el archivo:', error);
     }
+  };
     return (
         <TableContainer component={Paper} sx={{ backgroundColor: 'white', padding: '2rem', mt: 4, borderRadius: '1rem', boxShadow: '0 4px 12px rgba(0,0,0,0.1)', maxWidth: '100%', minWidth: '800px', marginX: 'auto' }}>
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '10px'}}>

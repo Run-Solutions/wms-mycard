@@ -4,36 +4,29 @@ import React, { useState } from "react";
 import { useRouter } from "next/navigation";
 import styled, { useTheme } from 'styled-components';
 import { Box, Table, TableBody, TableCell, TableContainer, TableHead, TableRow, Paper, Typography, IconButton, TablePagination, TextField } from "@mui/material";
+import { getFileByName } from "@/api/seguimientoDeOts";
 
 interface WorkOrder {
   id: number;
   ot_id: string;
   mycard_id: string;
   quantity: number;
-  created_by: number;
-  status: string; // Cambiado a string genérico
+  status: string;
   validated: boolean;
   createdAt: string;
-  updatedAt: string;
-  user: {
-    username: string
-  };
-  files: {
-    id: number;
-    type: string;
-    file_path: string;
-  }[];
+  user: { username: string };
   flow: {
-    id: number;
-    area_id: number; // Cambiado de area.name a area_id
-    status: string; // Cambiado a string genérico
-    assigned_user?: number;
-    area?: {
-      name?: string;
-    }
-    // otros campos que necesites
+    area_id: number;
+    status: string;
+    area?: { name?: string };
   }[];
-  formAnswers?: any[]; // Añadir si es necesario
+  files: File[];
+}
+
+interface File {
+  id: number;
+  type: string;
+  file_path: string;
 }
 
 interface Props {
@@ -59,10 +52,10 @@ const WorkOrderTable: React.FC<Props> = ({ orders, title, statusFilter}) => {
   const validOrders = Array.isArray(orders) ? orders : [];
   const filteredOrders = validOrders.filter(order =>
     (order.status.toLowerCase().includes(statusFilter.toLowerCase()) ||
-    order.flow.some(flow => flow.status.toLowerCase().includes(statusFilter.toLowerCase())))
+    order.flow.some((flow: any) => flow.status.toLowerCase().includes(statusFilter.toLowerCase())))
     && order.ot_id.toLowerCase().includes(searchValue.toLowerCase())
     && (
-      !activeArea || order.flow.some(flow => flow.area?.name?.toLowerCase().includes(activeArea.toLowerCase()))
+      !activeArea || order.flow.some((flow: any) => flow.area?.name?.toLowerCase().includes(activeArea.toLowerCase()))
     )
   );
   const paginatedOrders = filteredOrders.slice(page * itemsPerPage, (page + 1) * itemsPerPage);
@@ -75,29 +68,22 @@ const WorkOrderTable: React.FC<Props> = ({ orders, title, statusFilter}) => {
   
 
   validOrders.forEach(order => {
-    order.flow?.forEach(flow => {
+    order.flow?.forEach((flow: any) => {
       console.log("status:", `"${flow.status}"`);
     });
   });
 
   const downloadFile = async (filename: string) => {
-    const token = localStorage.getItem('token');
-    const res = await fetch(`http://localhost:3000/free-order-flow/file/${filename}`, {
-      headers: {
-        'Authorization': `Bearer ${token}`
-      }
-    });
-    if(!res.ok) {
-      const errorText = await res.text();
-      console.error('❌ Error desde el backend', errorText);
-      throw new Error('Error al cargar el file');
+    try {
+      const arrayBuffer = await getFileByName(filename);
+      const blob = new Blob([arrayBuffer], { type: 'application/pdf' });
+      const url = window.URL.createObjectURL(blob);
+      window.open(url, '_blank');
+      setTimeout(() => window.URL.revokeObjectURL(url), 5000);
+    } catch (error) {
+      console.error('Error al abrir el archivo:', error);
     }
-    const blob = await res.blob();
-    const url = window.URL.createObjectURL(blob);
-    window.open(url, '_blank');
-    // Limpieza opcional después de unos segundos
-    setTimeout(() => window.URL.revokeObjectURL(url), 5000);
-  }
+  };
 
   return (
     <TableContainer component={Paper} sx={{ backgroundColor: 'white', padding: '2rem', mt: 4, borderRadius: '1rem', boxShadow: '0 4px 12px rgba(0,0,0,0.1)', maxWidth: '100%', minWidth: '800px', marginX: 'auto' }}>     
@@ -153,7 +139,7 @@ const WorkOrderTable: React.FC<Props> = ({ orders, title, statusFilter}) => {
                   <CustomTableCell>{orderFlow.user?.username}</CustomTableCell>
                   <CustomTableCell>
                     <Timeline>
-                      {orderFlow.flow?.map((flowStep, index) => {
+                      {orderFlow.flow?.map((flowStep: any, index: any) => {
                         const isActive = ['proceso'].some(word => flowStep.status?.toLowerCase().includes(word));
                         const isParcial = flowStep.status?.toLowerCase() === 'parcial';
                         const isCompleted = flowStep.status?.toLowerCase().includes('completado');
@@ -173,7 +159,7 @@ const WorkOrderTable: React.FC<Props> = ({ orders, title, statusFilter}) => {
                   <CustomTableCell>
                     {orderFlow.files.length > 0 ? (
                       <div style={{ display: 'flex', flexDirection: 'column',flexWrap: 'wrap', gap: '0.5rem' }}>
-                        {orderFlow.files.map((file) => {
+                        {orderFlow.files.map((file: any) => {
                           const fileName = file.file_path.toLowerCase();
                           const label = fileName.includes('ot')
                             ? 'Ver OT'

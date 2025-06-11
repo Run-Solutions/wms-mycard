@@ -7,8 +7,9 @@ import { useNavigation } from '@react-navigation/native';
 import { NavigationProp } from '@react-navigation/native';
 import { InternalStackParamList } from '../../navigation/types';
 import * as FileSystem from 'expo-file-system';
-import * as Sharing from 'expo-sharing';
 import { Buffer } from 'buffer';
+import FileViewer from 'react-native-file-viewer';
+
 
 type Navigation = NavigationProp<InternalStackParamList, 'RecepcionCQMAuxScreen'>;
 
@@ -63,17 +64,20 @@ const WorkOrderList: React.FC<Props> = ({ orders, onSelectOrder }) => {
         console.error('❌ Error desde el backend');
         return;
       }
-
+  
       const base64Data = Buffer.from(res, 'binary').toString('base64');
       const fileUri = FileSystem.documentDirectory + filename;
-
+  
       await FileSystem.writeAsStringAsync(fileUri, base64Data, {
         encoding: FileSystem.EncodingType.Base64,
       });
-
-      await Sharing.shareAsync(fileUri);
+  
+      await FileViewer.open(fileUri, {
+        showOpenWithDialog: true,
+        displayName: filename,
+      });
     } catch (error) {
-      console.error('Error al descargar el archivo:', error);
+      console.error('Error al abrir el archivo:', error);
     }
   };
   const renderItem = ({ item }: { item: WorkOrder }) => {

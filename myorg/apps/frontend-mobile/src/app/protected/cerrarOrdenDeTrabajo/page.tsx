@@ -4,6 +4,12 @@ import { fetchWorkOrdersInProgress } from '../../../api/cerrarOrdenDeTrabajo';
 import { useFocusEffect } from '@react-navigation/native';
 import WorkOrderList from '../../../components/CerrarOrdenDeTrabajo/WorkOrderList';
 
+interface File {
+  id: number;
+  type: string;
+  file_path: string;
+}
+
 interface WorkOrder {
   id: number;
   ot_id: string;
@@ -20,6 +26,7 @@ interface WorkOrder {
     status: string;
     area?: { name?: string };
   }[];
+  files: File[];
 }
 
 const CerrarOrdenDeTrabajoScreen: React.FC = () => {
@@ -51,6 +58,11 @@ const CerrarOrdenDeTrabajoScreen: React.FC = () => {
               area_id: f.area?.id,
               status: f.status,
               area: { name: f.area?.name }
+            })) ?? [],
+            files: item.files?.map((file: any) => ({
+              id: file.id,
+              type: file.type,
+              file_path: file.file_path
             })) ?? []
           }));
           setOrders(transformed);
@@ -85,7 +97,6 @@ const CerrarOrdenDeTrabajoScreen: React.FC = () => {
         <>
           <WorkOrderList
             orders={filteredOrders}
-            title="Órdenes en Auditoría"
           />
         </>
       )}

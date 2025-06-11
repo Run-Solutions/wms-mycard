@@ -3,6 +3,7 @@
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 import styled from "styled-components";
+import { submitToCQMHotStamping, releaseProductFromHotStamping } from "@/api/liberarProducto";
 
 interface Props {
   workOrder: any;
@@ -104,25 +105,7 @@ export default function HotStampingComponent({ workOrder }: Props) {
       imagen_holograma: imagenHolograma
     };
     try {
-      const token = localStorage.getItem('token');
-      if(!token) {
-        alert('No hay token de autenticación');
-        return;
-      }
-      console.log('Datos a enviar', payload);
-      const res = await fetch('http://localhost:3000/free-order-flow/cqm-hot-stamping', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}`,
-        },
-        body: JSON.stringify(payload),
-      });
-      const data = await res.json();
-      if (!res.ok) {
-        console.error("Error en el servidor:", data);
-        return;
-      }
+      await submitToCQMHotStamping(payload);
       router.push('/liberarProducto');
     } catch (error) {
       console.log('Error al guardar la respuesta: ', error);
@@ -147,7 +130,7 @@ export default function HotStampingComponent({ workOrder }: Props) {
   
     setShowConfirm(true); // Si pasa todas las validaciones, ahora sí abre el modal
   };
-  const handleImpressSubmit = async () => {
+  const handleHotStampingSubmit = async () => {
     const payload = {
       workOrderId: workOrder.workOrder.id,
       workOrderFlowId: currentFlow.id,
@@ -164,27 +147,7 @@ export default function HotStampingComponent({ workOrder }: Props) {
     console.log('datos a enviar',payload);
   
     try {
-      const token = localStorage.getItem('token');
-      if (!token) {
-        alert('No hay token de autenticación');
-        return;
-      }
-  
-      const res = await fetch('http://localhost:3000/free-order-flow/hot-stamping', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}`,
-        },
-        body: JSON.stringify(payload),
-      });
-  
-      const data = await res.json();
-      if (!res.ok) {
-        console.error('Error en el servidor:', data);
-        return;
-      }
-  
+      await releaseProductFromHotStamping(payload);
       router.push('/liberarProducto');
     } catch (error) {
       console.log('Error al enviar datos:', error);
@@ -292,7 +255,7 @@ export default function HotStampingComponent({ workOrder }: Props) {
             <h4>¿Estás segura/o que deseas liberar este producto?</h4>
             <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '1rem', marginTop: '1rem' }}>
               <CancelButton onClick={() => setShowConfirm(false)}>Cancelar</CancelButton>
-              <ConfirmButton onClick={handleImpressSubmit}>Confirmar</ConfirmButton>
+              <ConfirmButton onClick={handleHotStampingSubmit}>Confirmar</ConfirmButton>
             </div>
           </ModalBox>
         </ModalOverlay>

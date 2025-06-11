@@ -3,6 +3,8 @@
 
 import { use, useEffect, useState } from "react";
 import styled from "styled-components";
+import { getWorkOrderByFlowId } from "@/api/aceptarAuditoria";
+
 import CorteComponentAcceptAuditory from "@/components/AceptarAuditoria/CorteComponent";
 import ColorEdgeComponentAcceptAuditory from "@/components/AceptarAuditoria/ColorEdgeComponent";
 import HotStampingComponentAcceptAuditory from "@/components/AceptarAuditoria/HotStampingComponent";
@@ -19,13 +21,7 @@ export default function AcceptWorkOrderFlowAuditoryPage({ params }: Props) {
   const [workOrder, setWorkOrder] = useState<any>(null)
   useEffect(() => {
     async function fetchWorkOrder() {
-      const token = localStorage.getItem('token');
-      const res = await fetch(`http://localhost:3000/work-order-flow/${id}`, {
-        headers: {
-          'Authorization': `Bearer ${token}`,
-        },
-      })
-      const data = await res.json()
+      const data = await getWorkOrderByFlowId(id);
       console.log('Orden:', data)
       setWorkOrder(data)
     }

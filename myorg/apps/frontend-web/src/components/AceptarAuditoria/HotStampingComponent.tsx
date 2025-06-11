@@ -3,6 +3,7 @@
 import { useRouter } from "next/navigation";
 import { useState, useEffect } from "react";
 import styled from "styled-components";
+import { acceptWorkOrderFlowHotStampingAuditory, registrarInconformidadAuditory } from "@/api/aceptarAuditoria";
 
 // Define un tipo para los valores del formulario
 type HotStampingData = {
@@ -87,30 +88,15 @@ export default function HotStampingComponentAcceptAuditory({ workOrder }: Props)
         alert('Por favor, asegurate de que no haya inconformidades con las cantidades entregadas.');
         return;
       }
-      const token = localStorage.getItem('token');
-      let hotStampingId = null;
+      let HotStampingId = null;
       if(workOrder?.partialReleases?.length > 0) {
-        hotStampingId = workOrder.id;
+        HotStampingId = workOrder.id;
       } else {
-        hotStampingId = workOrder.areaResponse.hotStamping.id;
+        HotStampingId = workOrder.areaResponse.hotStamping.id;
       }
-      const payload = {
-        sample_auditory: Number(sampleAuditory),
-      };
-      console.log(hotStampingId);
       try {
-        const res = await fetch(`http://localhost:3000/work-order-flow-auditory/hot-stamping/${hotStampingId}`, {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'Authorization': `Bearer ${token}`,
-          },
-          body: JSON.stringify(payload),
-        });
-        const data = await res.json();
-        if (res.ok) {
-          router.push('/aceptarAuditoria');
-        }
+        await acceptWorkOrderFlowHotStampingAuditory(HotStampingId, sampleAuditory);
+        router.push('/aceptarAuditoria');
       } catch (error) {
         console.error(error);
         alert('Error al conectar con el servidor');
@@ -118,22 +104,9 @@ export default function HotStampingComponentAcceptAuditory({ workOrder }: Props)
     }
 
     const handleSubmitInconformidad = async () => {
-      const token = localStorage.getItem('token');
-      console.log(workOrder.id);
-      console.log(inconformidad);
       try {
-        const res = await fetch(`http://localhost:3000/work-order-flow/${workOrder.id}/inconformidad`, {
-          method: 'PATCH',
-          headers: {
-            'Content-Type': 'application/json',
-            'Authorization': `Bearer ${token}`,
-          },
-          body: JSON.stringify({inconformidad}),
-        });
-        const data = await res.json();
-        if (res.ok) {
-          router.push('/aceptarAuditoria');
-        }
+        await registrarInconformidadAuditory(workOrder?.id, inconformidad);
+        router.push('/aceptarAuditoria');
       } catch (error) {
         console.error(error);
         alert('Error al conectar con el servidor');

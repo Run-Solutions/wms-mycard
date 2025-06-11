@@ -4,6 +4,8 @@
 import React, { useEffect, useState } from 'react';
 import styled, { useTheme } from 'styled-components';
 import { useRouter } from "next/navigation";
+import { acceptWorkOrderFlow, getPendingOrders } from '@/api/aceptarProducto';
+import { getFileByName } from "@/api/seguimientoDeOts";
 
 // Se define el tipo de datos
 interface WorkOrder {
@@ -78,88 +80,50 @@ const AcceptProductPage: React.FC = () => {
 
   const aceptarOT = async () => {
     console.log("Se hizo clic en Aceptar OT");
-    const token = localStorage.getItem('token');
+    if (!selectedOrder) return;
     //const flowId = selectedOrder?.workOrder.flow[0].id;
     const flowItem = selectedOrder?.workOrder.flow.find(
       (f) => f.area.id === selectedOrder.area_id
     );
-    const flowId = flowItem?.id;
+    if (!flowItem) return;
+    const flowId = flowItem.id;
     console.log(flowId);
-    if (!selectedOrder) return;
     // Si el área no es 1, redirigir inmediatamente
     if (selectedOrder?.area_id >= 2 && selectedOrder?.area_id <= 6) {
       router.push(`/aceptarProducto/${flowId}`); 
       return;
     }
     try {
-      const res = await fetch(`http://localhost:3000/work-order-flow/${flowId}/accept`, {
-        method: 'PATCH',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}`,
-        },
-      });
-      const data = await res.json();
-      if (res.ok) {
-        closeModal();
-        window.location.reload();
-      }
+      await acceptWorkOrderFlow(flowId);
+      window.location.reload();
     } catch (error) {
       console.error(error);
       alert('Error al conectar con el servidor');
     }
   }
   const downloadFile = async (filename: string) => {
-    const token = localStorage.getItem('token');  
-    const res = await fetch(`http://localhost:3000/work-order-flow/file/${filename}`, {
-      headers: {
-        'Authorization': `Bearer ${token}`
-      }
-    });
-    if (!res.ok) {
-      const errorText = await res.text();
-      console.error("❌ Error desde el backend:", errorText);
-      throw new Error('Error al cargar el file');
+    try {
+      const arrayBuffer = await getFileByName(filename);
+      const blob = new Blob([arrayBuffer], { type: 'application/pdf' });
+      const url = window.URL.createObjectURL(blob);
+      window.open(url, '_blank');
+      setTimeout(() => window.URL.revokeObjectURL(url), 5000);
+    } catch (error) {
+      console.error('Error al abrir el archivo:', error);
     }
-    const blob = await res.blob();
-    const url = window.URL.createObjectURL(blob);
-    window.open(url, '_blank');
-    // Limpieza opcional después de unos segundos
-    setTimeout(() => window.URL.revokeObjectURL(url), 5000);
-  }
+  };
 
   useEffect(() => {
     async function fetchWorkOrders() {
       try {
-        // Se verifica token
-        const token = localStorage.getItem('token');
-        if(!token) {
-          console.error('No se encontró el token en localStorage');
-          return;
-        }
-        const res = await fetch('http://localhost:3000/work-order-flow/pending', {
-          method: 'GET',
-          headers: {
-            'Content-Type': 'application/json',
-            'Authorization': `Bearer ${token}`
-          },
-        });
-        if(!res.ok){
-          throw new Error(`Error al obtener las ordenes: ${res.status} ${res.statusText}`);
-        }
-        const data = await res.json();
-
-        // Ordenar las OTs: primero las marcadas como prioridad, luego por fecha
-        if (data && Array.isArray(data)){
-          const sortedOrders = data.sort((a: WorkOrder, b: WorkOrder) => {
-            // Si a es prioritario y b no, a va primero
+        const data = await getPendingOrders();
+        if (Array.isArray(data)) {
+          const sorted = data.sort((a, b) => {
             if (a.workOrder.priority && !b.workOrder.priority) return -1;
-            // Si b es prioritario y a no, b va primero
             if (!a.workOrder.priority && b.workOrder.priority) return 1;
-            // Si ambos tienen la misma prioridad, ordenar por fecha (más reciente primero)
             return new Date(a.workOrder.createdAt).getTime() - new Date(b.workOrder.createdAt).getTime();
           });
-          setWorkOrders(sortedOrders);
+          setWorkOrders(sorted);
         } else {
           setWorkOrders([]);
         }

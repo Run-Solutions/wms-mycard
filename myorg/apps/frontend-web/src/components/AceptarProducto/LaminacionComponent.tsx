@@ -3,6 +3,8 @@
 import { useRouter } from "next/navigation";
 import { useState, useEffect } from "react";
 import styled from "styled-components";
+import { acceptWorkOrderFlow, registrarInconformidad } from "@/api/aceptarProducto";
+
 
 type LaminacionData = {
   release_quantity: string;
@@ -78,22 +80,10 @@ export default function LaminacionComponentAccept({ workOrder }: Props) {
       alert('Por favor, asegurate de que no haya inconformidades con las cantidades entregadas.');
       return;
     }
-    const token = localStorage.getItem('token');
-
-    const flowId = workOrder.id;
-    console.log(flowId);
+    const flowId = workOrder?.id;
     try {
-      const res = await fetch(`http://localhost:3000/work-order-flow/${flowId}/accept`, {
-        method: 'PATCH',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}`,
-        },
-      });
-      const data = await res.json();
-      if (res.ok) {
-        router.push('/aceptarProducto');
-      }
+      await acceptWorkOrderFlow(flowId);
+      router.push('/aceptarProducto');
     } catch (error) {
       console.error(error);
       alert('Error al conectar con el servidor');
@@ -101,22 +91,11 @@ export default function LaminacionComponentAccept({ workOrder }: Props) {
   }
 
   const handleSubmitInconformidad = async () => {
-    const token = localStorage.getItem('token');
-    console.log(lastCompletedOrPartial?.id);
+    console.log(lastCompletedOrPartial.id);
     console.log(inconformidad);
     try {
-      const res = await fetch(`http://localhost:3000/work-order-flow/${lastCompletedOrPartial?.id}/inconformidad`, {
-        method: 'PATCH',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}`,
-        },
-        body: JSON.stringify({inconformidad}),
-      });
-      const data = await res.json();
-      if (res.ok) {
-        router.push('/aceptarProducto');
-      }
+      await registrarInconformidad(lastCompletedOrPartial?.id, inconformidad);
+      router.push('/aceptarProducto');
     } catch (error) {
       console.error(error);
       alert('Error al conectar con el servidor');
