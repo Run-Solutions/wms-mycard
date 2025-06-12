@@ -130,9 +130,26 @@ async function main() {
     { id: 61, title: "Verificar Fuente Y Tamaño De Textos Vs OT / Autorización", key: "verificacion_fuente", role_id: 3, areas: [10] },
     { id: 62, title: "Verificar Posición De Los Elementos (Textos / Folio)", key: "verificacion_posicion", role_id: 3, areas: [10] },
     { id: 65, title: "Verificar Anclaje de Tinta", key: "anclaje_tinta_perso", role_id: 3, areas: [10] },
-    { id: 66, title: "Validar Que Se Haya Revisado Y Autorizado Codificación De Cinta Magnética Y/O Chip", key: "cinta_magnetica", role_id: 3, areas: [10] },
-  ];
+    { id: 66, title: "Revisar Que La Tarjeta No Se Desprenda", key: "revisar_tarjeta", role_id: null, areas: [10] },
+    { id: 67, title: "Revisar La Posición Correcta De La Tarjeta", key: "revisar_posicion_tarjeta", role_id: null, areas: [10] },
+    { id: 68, title: "Verificar Que El Papel No Se Desgarre Al Desprender La Tarjeta", key: "verificar_papel", role_id: null, areas: [10] },
+    { id: 69, title: "Revisa La Cantidad De Pegamento Blanco", key: "verificar_pegamento", role_id: null, areas: [10] },
+    { id: 70, title: "Revisa Que Se Descargue El Papel Del Carrier Al Abrir", key: "verfificar_papel_carrier", role_id: null, areas: [10] },
+    { id: 71, title: "Revisar Doblado Del Carrier Correctamente", key: "verificar_doblado_carrier", role_id: null, areas: [10] },
+    { id: 72, title: "Revisar Caída Conforme Pdf Firmado (Datos Y Posición Correctos", key: "revisar_caida_conforme_pdf", role_id: null, areas: [10] },
+    { id: 73, title: "Sku Carrier Corresponde", key: "sku_corresponde", role_id: null, areas: [10] },
+    { id: 74, title: "Sku De Sobre Corresponde", key: "sku_de_sobre_corresponde", role_id: null, areas: [10] },
+    { id: 75, title: "Etiqueta No Cae Sobre Nip", key: "etiqueta_no_cae", role_id: null, areas: [10] },
+    { id: 76, title: "Lectura De Código De Barras O Qr (Si Aplica)", key: "lectura_barras_qr", role_id: null, areas: [10] },
+    { id: 77, title: "Revisar Tipo De Letra Si Está Especificado", key: "revisar_tipo_letra", role_id: null, areas: [10] },
+    { id: 78, title: "Doblez Correcto Carrier", key: "doblez_carrier", role_id: null, areas: [10] },
+    { id: 79, title: "Pegado Correcto Del Sobre", key: "pegado_correcto", role_id: null, areas: [10] },
+    { id: 80, title: "Se Encuentra Bien Sellado", key: "se_encuentra_sellado", role_id: null, areas: [10] },
+    { id: 81, title: "Posición Correcta De Sellado", key: "posicion_sellado", role_id: null, areas: [10] },
 
+
+  ];
+2
   for (const question of questionsData) {
     // Crear o actualizar la pregunta
     await prisma.formQuestion.upsert({

@@ -4,7 +4,6 @@ import React, { useState } from 'react';
 import {
   View,
   Text,
-  TextInput,
   TouchableOpacity,
   ScrollView,
   StyleSheet,
@@ -12,6 +11,7 @@ import {
   Platform,
   Modal,
 } from 'react-native';
+import { TextInput } from 'react-native-paper';
 import { useNavigation } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { RootStackParamList } from '../../navigation/types';
@@ -46,7 +46,6 @@ const PersonalizacionComponent = ({ workOrder }: { workOrder: any }) => {
   const questions = workOrder.area.formQuestions?.filter((q: any) => q.role_id === null) || [];
   const qualityQuestions = workOrder.area.formQuestions?.filter((q: any) => q.role_id === 3) || [];
   const currentFlow = [...workOrder.workOrder.flow].find((f: any) => f.id === workOrder.id);
-
   const isDisabled = workOrder.status === 'En proceso';
   const nextFlowIndex = workOrder.workOrder.flow.findIndex((f: any) => f.id === workOrder.id) + 1;
   const nextFlow = workOrder.workOrder.flow[nextFlowIndex] ?? null;
@@ -71,7 +70,7 @@ const PersonalizacionComponent = ({ workOrder }: { workOrder: any }) => {
         ? prev.filter((id) => id !== questionId)
         : [...prev, questionId]
     );
-  
+
     setResponses((prev) =>
       prev.map((resp) =>
         resp.questionId === questionId
@@ -87,48 +86,48 @@ const PersonalizacionComponent = ({ workOrder }: { workOrder: any }) => {
       Alert.alert('No se encontró el Id del formulario');
       return;
     }
-  
+
     const questions = workOrder.area.formQuestions.filter((q: any) => q.role_id === 3);
-  
+
     const isCheckedQuestionsValid = questions.some((q: any) =>
       checkedQuestions.includes(q.id)
     );
-  
+
     const checkboxPayload = checkedQuestions.map((questionId: number) => ({ question_id: questionId }));
-  
+
     const basePayload = {
       form_answer_id: formAnswerId,
     };
     let aditionalFields = {};
-    if(workOrder?.answers[index].tipo_personalizacion === 'laser'){
+    if (workOrder?.answers[index].tipo_personalizacion === 'laser') {
       const checkboxPayload = responses.map(({ questionId, answer }) => ({
         question_id: questionId,
-        answer: answer,     
+        answer: answer,
       }));
-      aditionalFields= {
+      aditionalFields = {
         verificar_script: verificarScript,
         validar_kvc_perso: validarKVC,
         apariencia_quemado: aparienciaQuemado,
         checkboxes: checkboxPayload,
       };
-    }else if(workOrder?.answers[index].tipo_personalizacion === 'persos'){
+    } else if (workOrder?.answers[index].tipo_personalizacion === 'persos') {
       const checkboxPayload = responses.map(({ questionId, answer }) => ({
         question_id: questionId,
-        answer: answer,     
+        answer: answer,
       }));
-      aditionalFields={
+      aditionalFields = {
         carga_aplicacion: cargaAplicacion,
         checkboxes: checkboxPayload,
       };
-    }else if(workOrder?.answers[index].tipo_personalizacion === 'etiquetadora'){
-      aditionalFields={
+    } else if (workOrder?.answers[index].tipo_personalizacion === 'etiquetadora') {
+      aditionalFields = {
       };
     }
     const payload = {
       ...basePayload,
       ...aditionalFields,
     };
-  
+
     try {
       const success = await submitExtraPersonalizacion(payload);
       setShowConfirmModal(false);
@@ -156,12 +155,12 @@ const PersonalizacionComponent = ({ workOrder }: { workOrder: any }) => {
   };
 
   //Para guardar las respuestas 
-  
-  let selectedQuestions : { id: number, role_id: number | null }[] = [];
 
-  if (tipoPersonalizacion === 'laser'){
+  let selectedQuestions: { id: number, role_id: number | null }[] = [];
+
+  if (tipoPersonalizacion === 'laser') {
     selectedQuestions = workOrder.area.formQuestions.slice(9, 13);
-  } else if (tipoPersonalizacion === 'persos'){
+  } else if (tipoPersonalizacion === 'persos') {
     selectedQuestions = workOrder.area.formQuestions.slice(13, 17);
   }
 
@@ -171,27 +170,30 @@ const PersonalizacionComponent = ({ workOrder }: { workOrder: any }) => {
       <View style={styles.card}>
         <Text style={styles.label}>OT:</Text>
         <Text style={styles.value}>{workOrder.workOrder.ot_id}</Text>
-      
+
         <Text style={styles.label}>Id del Presupuesto:</Text>
         <Text style={styles.value}>{workOrder.workOrder.mycard_id}</Text>
-      
+
         <Text style={styles.label}>Cantidad:</Text>
         <Text style={styles.value}>{workOrder.workOrder.quantity}</Text>
-      
+
         <Text style={styles.label}>Operador:</Text>
         <Text style={styles.value}>{workOrder.user.username}</Text>
-          
+
         <Text style={styles.label}>Comentarios:</Text>
         <Text style={styles.value}>{workOrder.workOrder.comments}</Text>
       </View>
-      
+
       <Text style={styles.modalTitle}>Respuestas del operador</Text>
       <Text style={styles.label}>Tipo de Personalizacion:</Text>
       <TextInput
         style={styles.inputDetail}
         keyboardType="numeric"
-        value={workOrder?.answers[index].tipo_personalizacion ?? 'No se reconoce la muestra enviada' }
+        value={workOrder?.answers[index].tipo_personalizacion ?? 'No se reconoce la muestra enviada'}
         editable={false}
+        mode="outlined"
+        activeOutlineColor="#000"
+        theme={{ roundness: 30 }}
       />
 
       {workOrder?.answers[index].tipo_personalizacion === 'laser' && (
@@ -205,238 +207,461 @@ const PersonalizacionComponent = ({ workOrder }: { workOrder: any }) => {
               : 'No se reconoce la muestra enviada'
             }
             editable={false}
+            mode="outlined"
+            activeOutlineColor="#000"
+            theme={{ roundness: 30 }}
           />
         </>
       )}
       {workOrder?.answers[index].tipo_personalizacion === 'persos' && (
         <>
           {/* Encabezado estilo tabla */}
-      <View style={styles.tableHeader}>
-        <Text style={[styles.tableCell, { flex: 2 }]}>Pregunta</Text>
-        <Text style={styles.tableCell}>Respuesta</Text>
-      </View>
-
-      {/* Preguntas normales */}
-      {questions.slice(1, 10).map((q: any) => {
-        const responses = workOrder.answers[index]?.FormAnswerResponse?.find(
-          (resp: any) => resp.question_id === q.id
-        );
-        console.log(responses);
-        // Encuentra la respuesta del operador por pregunta_id
-        const operatorResponse = responses?.response_operator;
-
-        return (
-          <View key={q.id} style={styles.tableRow}>
-            {/* Pregunta */}
-            <View style={[styles.tableCell, { flex: 2 }]}>
-              <Text style={styles.questionText}>{q.title}</Text>
-            </View>
-
-            {/* Respuesta */}
-            <View style={[styles.tableCell, { flex: 1, alignItems: 'center' }]}>
-              <View style={[styles.radioCircle, operatorResponse && styles.radioDisabled]}>
-                {operatorResponse && <View style={styles.radioDot} />}
-              </View>
-            </View>
+          <View style={styles.tableHeader}>
+            <Text style={[styles.tableCell, { flex: 2 }]}>Pregunta</Text>
+            <Text style={styles.tableCell}>Respuesta</Text>
           </View>
-        );
-      })}
-      <Text style={styles.label}>Color De Personalización:</Text>
-      <TextInput
-        style={styles.input}
-        keyboardType="numeric"
-        value={workOrder?.answers[index].color_personalizacion ?? 'No se reconoce la muestra enviada' }
-        editable={false}
-      />
-      <Text style={styles.label}>Tipo de Código de Barras Que Se Personaliza:</Text>
-      <TextInput
-        style={styles.input}
-        keyboardType="numeric"
-        value={workOrder?.answers[index].codigo_barras ?? 'No se reconoce la muestra enviada' }
-        editable={false}
-      />
-      {/* Muestras */}
-      <Text style={styles.label}>Muestras entregadas:</Text>
-      <TextInput
-        style={styles.input}
-        keyboardType="numeric"
-        value={
-          typeof workOrder?.answers?.[index]?.sample_quantity === 'number'
-          ? workOrder.answers[index].sample_quantity.toString()
-          : ''
-        }
-        editable={false}
-      />
+
+          {/* Preguntas normales */}
+          {questions.slice(1, 10).map((q: any) => {
+            const responses = workOrder.answers[index]?.FormAnswerResponse?.find(
+              (resp: any) => resp.question_id === q.id
+            );
+            console.log(responses);
+            // Encuentra la respuesta del operador por pregunta_id
+            const operatorResponse = responses?.response_operator;
+
+            return (
+              <View key={q.id} style={styles.tableRow}>
+                {/* Pregunta */}
+                <View style={[styles.tableCell, { flex: 2 }]}>
+                  <Text style={styles.questionText}>{q.title}</Text>
+                </View>
+
+                {/* Respuesta */}
+                <View style={[styles.tableCell, { flex: 1, alignItems: 'center' }]}>
+                  <View style={[styles.radioCircle, operatorResponse && styles.radioDisabled]}>
+                    {operatorResponse && <View style={styles.radioDot} />}
+                  </View>
+                </View>
+              </View>
+            );
+          })}
+          <Text style={styles.label}>Color De Personalización:</Text>
+          <TextInput
+            style={styles.input}
+            keyboardType="numeric"
+            value={workOrder?.answers[index].color_personalizacion ?? 'No se reconoce la muestra enviada'}
+            editable={false}
+            mode="outlined"
+            activeOutlineColor="#000"
+            theme={{ roundness: 30 }}
+          />
+          <Text style={styles.label}>Tipo de Código de Barras Que Se Personaliza:</Text>
+          <TextInput
+            style={styles.input}
+            keyboardType="numeric"
+            value={workOrder?.answers[index].codigo_barras ?? 'No se reconoce la muestra enviada'}
+            editable={false}
+            mode="outlined"
+            activeOutlineColor="#000"
+            theme={{ roundness: 30 }}
+          />
+          {/* Muestras */}
+          <Text style={styles.label}>Muestras entregadas:</Text>
+          <TextInput
+            style={styles.input}
+            keyboardType="numeric"
+            value={
+              typeof workOrder?.answers?.[index]?.sample_quantity === 'number'
+                ? workOrder.answers[index].sample_quantity.toString()
+                : ''
+            }
+            editable={false}
+            mode="outlined"
+            activeOutlineColor="#000"
+            theme={{ roundness: 30 }}
+          />
         </>
       )}
 
       {workOrder?.answers[index].tipo_personalizacion === 'etiquetadora' && (
         <>
-        {/* Encabezado estilo tabla */}
-      <View style={styles.tableHeader}>
-        <Text style={[styles.tableCell, { flex: 2 }]}>Pregunta</Text>
-        <Text style={styles.tableCell}>Respuesta</Text>
-      </View>
-
-      {/* Preguntas normales */}
-      {questions.slice(0, 1).map((q: any) => {
-        const responses = workOrder.answers[index]?.FormAnswerResponse?.find(
-          (resp: any) => resp.question_id === q.id
-        );
-        console.log(responses);
-        // Encuentra la respuesta del operador por pregunta_id
-        const operatorResponse = responses?.response_operator;
-
-        return (
-          <View key={q.id} style={styles.tableRow}>
-            {/* Pregunta */}
-            <View style={[styles.tableCell, { flex: 2 }]}>
-              <Text style={styles.questionText}>{q.title}</Text>
-            </View>
-
-            {/* Respuesta */}
-            <View style={[styles.tableCell, { flex: 1, alignItems: 'center' }]}>
-              <View style={[styles.radioCircle, operatorResponse && styles.radioDisabled]}>
-                {operatorResponse && <View style={styles.radioDot} />}
-              </View>
-            </View>
+          {/* Encabezado estilo tabla */}
+          <View style={styles.tableHeader}>
+            <Text style={[styles.tableCell, { flex: 2 }]}>Pregunta</Text>
+            <Text style={styles.tableCell}>Respuesta</Text>
           </View>
-        );
-      })}
-      <Text style={styles.label}>Verificar Tipo De Etiqueta Vs Ot Y Pegar Utilizada:</Text>
-      <TextInput
-        style={styles.input}
-        keyboardType="numeric"
-        value={workOrder?.answers[index].verificar_etiqueta ?? 'No se reconoce la muestra enviada' }
-        editable={false}
-      />
-      <Text style={styles.label}>Muestras entregadas:</Text>
-      <TextInput
-        style={styles.input}
-        keyboardType="numeric"
-        value={
-          typeof workOrder?.answers?.[index]?.sample_quantity === 'number'
-          ? workOrder.answers[index].sample_quantity.toString()
-          : ''
-        }
-        editable={false}
-      />
+
+          {/* Preguntas normales */}
+          {questions.slice(0, 1).map((q: any) => {
+            const responses = workOrder.answers[index]?.FormAnswerResponse?.find(
+              (resp: any) => resp.question_id === q.id
+            );
+            console.log(responses);
+            // Encuentra la respuesta del operador por pregunta_id
+            const operatorResponse = responses?.response_operator;
+
+            return (
+              <View key={q.id} style={styles.tableRow}>
+                {/* Pregunta */}
+                <View style={[styles.tableCell, { flex: 2 }]}>
+                  <Text style={styles.questionText}>{q.title}</Text>
+                </View>
+
+                {/* Respuesta */}
+                <View style={[styles.tableCell, { flex: 1, alignItems: 'center' }]}>
+                  <View style={[styles.radioCircle, operatorResponse && styles.radioDisabled]}>
+                    {operatorResponse && <View style={styles.radioDot} />}
+                  </View>
+                </View>
+              </View>
+            );
+          })}
+          <Text style={styles.label}>Verificar Tipo De Etiqueta Vs Ot Y Pegar Utilizada:</Text>
+          <TextInput
+            style={styles.input}
+            keyboardType="numeric"
+            value={workOrder?.answers[index].verificar_etiqueta ?? 'No se reconoce la muestra enviada'}
+            editable={false}
+            mode="outlined"
+            activeOutlineColor="#000"
+            theme={{ roundness: 30 }}
+          />
+          <Text style={styles.label}>Muestras entregadas:</Text>
+          <TextInput
+            style={styles.input}
+            keyboardType="numeric"
+            value={
+              typeof workOrder?.answers?.[index]?.sample_quantity === 'number'
+                ? workOrder.answers[index].sample_quantity.toString()
+                : ''
+            }
+            editable={false}
+            mode="outlined"
+            activeOutlineColor="#000"
+            theme={{ roundness: 30 }}
+          />
         </>
       )}
 
+      {workOrder?.answers[index].tipo_personalizacion === 'packsmart' && (
+        <>
+          {/* Encabezado estilo tabla */}
+          <View style={styles.tableHeader}>
+            <Text style={[styles.tableCell, { flex: 2 }]}>Pregunta</Text>
+            <Text style={styles.tableCell}>Respuesta</Text>
+          </View>
+
+          {/* Preguntas normales */}
+          {questions.slice(10, 15).map((q: any) => {
+            const responses = workOrder.answers[index]?.FormAnswerResponse?.find(
+              (resp: any) => resp.question_id === q.id
+            );
+            console.log(responses);
+            // Encuentra la respuesta del operador por pregunta_id
+            const operatorResponse = responses?.response_operator;
+
+            return (
+              <View key={q.id} style={styles.tableRow}>
+                {/* Pregunta */}
+                <View style={[styles.tableCell, { flex: 2 }]}>
+                  <Text style={styles.questionText}>{q.title}</Text>
+                </View>
+
+                {/* Respuesta */}
+                <View style={[styles.tableCell, { flex: 1, alignItems: 'center' }]}>
+                  <View style={[styles.radioCircle, operatorResponse && styles.radioDisabled]}>
+                    {operatorResponse && <View style={styles.radioDot} />}
+                  </View>
+                </View>
+              </View>
+            );
+          })}
+          <Text style={styles.label}>Color De Personalización:</Text>
+          <TextInput
+            style={styles.input}
+            keyboardType="numeric"
+            value={workOrder?.answers[index].color_personalizacion ?? 'No se reconoce la muestra enviada'}
+            editable={false}
+            mode="outlined"
+            activeOutlineColor="#000"
+            theme={{ roundness: 30 }}
+          />
+          <Text style={styles.label}>Tipo de Código de Barras Que Se Personaliza:</Text>
+          <TextInput
+            style={styles.input}
+            keyboardType="numeric"
+            value={workOrder?.answers[index].codigo_barras ?? 'No se reconoce la muestra enviada'}
+            editable={false}
+            mode="outlined"
+            activeOutlineColor="#000"
+            theme={{ roundness: 30 }}
+          />
+          {/* Muestras */}
+          <Text style={styles.label}>Muestras entregadas:</Text>
+          <TextInput
+            style={styles.input}
+            keyboardType="numeric"
+            value={
+              typeof workOrder?.answers?.[index]?.sample_quantity === 'number'
+                ? workOrder.answers[index].sample_quantity.toString()
+                : ''
+            }
+            editable={false}
+            mode="outlined"
+            activeOutlineColor="#000"
+            theme={{ roundness: 30 }}
+          />
+        </>
+      )}
+
+      {workOrder?.answers[index].tipo_personalizacion === 'otto' && (
+        <>
+          {/* Encabezado estilo tabla */}
+          <View style={styles.tableHeader}>
+            <Text style={[styles.tableCell, { flex: 2 }]}>Pregunta</Text>
+            <Text style={styles.tableCell}>Respuesta</Text>
+          </View>
+
+          {/* Preguntas normales */}
+          {questions.slice(16, 23).map((q: any) => {
+            const responses = workOrder.answers[index]?.FormAnswerResponse?.find(
+              (resp: any) => resp.question_id === q.id
+            );
+            console.log(responses);
+            // Encuentra la respuesta del operador por pregunta_id
+            const operatorResponse = responses?.response_operator;
+
+            return (
+              <View key={q.id} style={styles.tableRow}>
+                {/* Pregunta */}
+                <View style={[styles.tableCell, { flex: 2 }]}>
+                  <Text style={styles.questionText}>{q.title}</Text>
+                </View>
+
+                {/* Respuesta */}
+                <View style={[styles.tableCell, { flex: 1, alignItems: 'center' }]}>
+                  <View style={[styles.radioCircle, operatorResponse && styles.radioDisabled]}>
+                    {operatorResponse && <View style={styles.radioDot} />}
+                  </View>
+                </View>
+              </View>
+            );
+          })}
+
+          {/* Muestras */}
+          <Text style={styles.label}>Muestras entregadas:</Text>
+          <TextInput
+            style={styles.input}
+            keyboardType="numeric"
+            value={
+              typeof workOrder?.answers?.[index]?.sample_quantity === 'number'
+                ? workOrder.answers[index].sample_quantity.toString()
+                : ''
+            }
+            editable={false}
+            mode="outlined"
+            activeOutlineColor="#000"
+            theme={{ roundness: 30 }}
+          />
+        </>
+      )}
+
+      {workOrder?.answers[index].tipo_personalizacion === 'embolsadora' && (
+        <>
+          {/* Encabezado estilo tabla */}
+          <View style={styles.tableHeader}>
+            <Text style={[styles.tableCell, { flex: 2 }]}>Pregunta</Text>
+            <Text style={styles.tableCell}>Respuesta</Text>
+          </View>
+
+          {/* Preguntas normales */}
+          {questions.slice(24, 25).map((q: any) => {
+            const responses = workOrder.answers[index]?.FormAnswerResponse?.find(
+              (resp: any) => resp.question_id === q.id
+            );
+            console.log(responses);
+            // Encuentra la respuesta del operador por pregunta_id
+            const operatorResponse = responses?.response_operator;
+
+            return (
+              <View key={q.id} style={styles.tableRow}>
+                {/* Pregunta */}
+                <View style={[styles.tableCell, { flex: 2 }]}>
+                  <Text style={styles.questionText}>{q.title}</Text>
+                </View>
+
+                {/* Respuesta */}
+                <View style={[styles.tableCell, { flex: 1, alignItems: 'center' }]}>
+                  <View style={[styles.radioCircle, operatorResponse && styles.radioDisabled]}>
+                    {operatorResponse && <View style={styles.radioDot} />}
+                  </View>
+                </View>
+              </View>
+            );
+          })}
+          <Text style={styles.label}>Color De Personalización:</Text>
+          <TextInput
+            style={styles.input}
+            keyboardType="numeric"
+            value={workOrder?.answers[index].color_personalizacion ?? 'No se reconoce la muestra enviada'}
+            editable={false}
+            mode="outlined"
+            activeOutlineColor="#000"
+            theme={{ roundness: 30 }}
+          />
+          <Text style={styles.label}>Tipo de Código de Barras Que Se Personaliza:</Text>
+          <TextInput
+            style={styles.input}
+            keyboardType="numeric"
+            value={workOrder?.answers[index].codigo_barras ?? 'No se reconoce la muestra enviada'}
+            editable={false}
+            mode="outlined"
+            activeOutlineColor="#000"
+            theme={{ roundness: 30 }}
+          />
+          {/* Muestras */}
+          <Text style={styles.label}>Muestras entregadas:</Text>
+          <TextInput
+            style={styles.input}
+            keyboardType="numeric"
+            value={
+              typeof workOrder?.answers?.[index]?.sample_quantity === 'number'
+                ? workOrder.answers[index].sample_quantity.toString()
+                : ''
+            }
+            editable={false}
+            mode="outlined"
+            activeOutlineColor="#000"
+            theme={{ roundness: 30 }}
+          />
+        </>
+      )}
 
       <Text style={[styles.modalTitle, { marginTop: 40 }]}>Mis respuestas</Text>
 
       {workOrder?.answers[index].tipo_personalizacion === 'laser' && (
         <>
-        {/* Encabezado estilo tabla */}
-        <View style={styles.tableHeader}>
-          <Text style={[styles.tableCell, { flex: 2 }]}>Pregunta</Text>
-          <Text style={styles.tableCell}>Respuesta</Text>
-        </View>
-        {/* Preguntas normales */}
-        {workOrder.area.formQuestions
-          .slice(9, 13)
-          .filter((q: any) => q.role_id === 3)
-          .map((q: any) => (
-          <View key={q.id} style={styles.tableRow}>
-            {/* Pregunta */}
-            <View style={[styles.tableCell, { flex: 2 }]}>
-              <Text style={styles.questionText}>{q.title}</Text>
-            </View>
-            {/* Respuestas */}
-            <View style={[styles.tableCell, { flex: 1, alignItems: 'center' }]}>
-              <TouchableOpacity
-                onPress={() => handleCheckboxChange(q.id)}
-                style={[
-                  styles.radioCircle,
-                  checkedQuestions.includes(q.id) && styles.checkedBox,
-                ]}
-              >
-                {checkedQuestions.includes(q.id) && (
-                  <View style={styles.radioDot} />
-                )}
-              </TouchableOpacity>
-            </View>
+          {/* Encabezado estilo tabla */}
+          <View style={styles.tableHeader}>
+            <Text style={[styles.tableCell, { flex: 2 }]}>Pregunta</Text>
+            <Text style={styles.tableCell}>Respuesta</Text>
           </View>
-        ))}
-        <Text style={styles.label}>Verificar Script / Layout Vs Ot / Autorizacion:</Text>
-        <TextInput
-          style={styles.input}
-          keyboardType="numeric"
-          placeholder="Ej: 2"
-          value={verificarScript}
-          onChangeText={setVerificarScript}
-        />
-        <Text style={styles.label}>Validar, Anotar KVC (Llaves), Carga de Aplicación o Prehabilitación:</Text>
-        <TextInput
-          style={styles.input}
-          keyboardType="numeric"
-          placeholder="Ej: 2"
-          value={validarKVC}
-          onChangeText={setValidarKVC}
-        />
-        <Text style={styles.label}>Describir Apariencia Del Quemado Del Laser (Color):</Text>
-        <TextInput
-          style={styles.input}
-          keyboardType="numeric"
-          placeholder="Ej: 2"
-          value={aparienciaQuemado}
-          onChangeText={setAparienciaQuemado}
-        />
+          {/* Preguntas normales */}
+          {workOrder.area.formQuestions
+            .slice(9, 13)
+            .filter((q: any) => q.role_id === 3)
+            .map((q: any) => (
+              <View key={q.id} style={styles.tableRow}>
+                {/* Pregunta */}
+                <View style={[styles.tableCell, { flex: 2 }]}>
+                  <Text style={styles.questionText}>{q.title}</Text>
+                </View>
+                {/* Respuestas */}
+                <View style={[styles.tableCell, { flex: 1, alignItems: 'center' }]}>
+                  <TouchableOpacity
+                    onPress={() => handleCheckboxChange(q.id)}
+                    style={[
+                      styles.radioCircle,
+                      checkedQuestions.includes(q.id) && styles.checkedBox,
+                    ]}
+                  >
+                    {checkedQuestions.includes(q.id) && (
+                      <View style={styles.radioDot} />
+                    )}
+                  </TouchableOpacity>
+                </View>
+              </View>
+            ))}
+          <Text style={styles.label}>Verificar Script / Layout Vs Ot / Autorizacion:</Text>
+          <TextInput
+            style={styles.input}
+            keyboardType="numeric"
+            placeholder="Ej: 2"
+            value={verificarScript}
+            onChangeText={setVerificarScript}
+            mode="outlined"
+            activeOutlineColor="#000"
+            theme={{ roundness: 30 }}
+          />
+          <Text style={styles.label}>Validar, Anotar KVC (Llaves), Carga de Aplicación o Prehabilitación:</Text>
+          <TextInput
+            style={styles.input}
+            keyboardType="numeric"
+            placeholder="Ej: 2"
+            value={validarKVC}
+            onChangeText={setValidarKVC}
+            mode="outlined"
+            activeOutlineColor="#000"
+            theme={{ roundness: 30 }}
+          />
+          <Text style={styles.label}>Describir Apariencia Del Quemado Del Laser (Color):</Text>
+          <TextInput
+            style={styles.input}
+            keyboardType="numeric"
+            placeholder="Ej: 2"
+            value={aparienciaQuemado}
+            onChangeText={setAparienciaQuemado}
+            mode="outlined"
+            activeOutlineColor="#000"
+            theme={{ roundness: 30 }}
+          />
         </>
       )}
 
       {workOrder?.answers[index].tipo_personalizacion === 'persos' && (
         <>
-        {/* Encabezado estilo tabla */}
-        <View style={styles.tableHeader}>
-          <Text style={[styles.tableCell, { flex: 2 }]}>Pregunta</Text>
-          <Text style={styles.tableCell}>Respuesta</Text>
-        </View>
-        {/* Preguntas normales */}
-        {workOrder.area.formQuestions
-          .slice(13, 15)
-          .filter((q: any) => q.role_id === 3)
-          .map((q: any) => (
-          <View key={q.id} style={styles.tableRow}>
-            {/* Pregunta */}
-            <View style={[styles.tableCell, { flex: 2 }]}>
-              <Text style={styles.questionText}>{q.title}</Text>
-            </View>
-            {/* Respuestas */}
-            <View style={[styles.tableCell, { flex: 1, alignItems: 'center' }]}>
-              <TouchableOpacity
-                onPress={() => handleCheckboxChange(q.id)}
-                style={[
-                  styles.radioCircle,
-                  checkedQuestions.includes(q.id) && styles.checkedBox,
-                ]}
-              >
-                {checkedQuestions.includes(q.id) && (
-                  <View style={styles.radioDot} />
-                )}
-              </TouchableOpacity>
-            </View>
+          {/* Encabezado estilo tabla */}
+          <View style={styles.tableHeader}>
+            <Text style={[styles.tableCell, { flex: 2 }]}>Pregunta</Text>
+            <Text style={styles.tableCell}>Respuesta</Text>
           </View>
-        ))}
-        <Text style={styles.label}>Validar Carga De Aplicación (PersoMaster)</Text>
-        <TextInput
-          style={styles.input}
-          keyboardType="numeric"
-          placeholder="Ej: 2"
-          value={cargaAplicacion}
-          onChangeText={setCargaAplicacion}
-        />
+          {/* Preguntas normales */}
+          {workOrder.area.formQuestions
+            .slice(13, 15)
+            .filter((q: any) => q.role_id === 3)
+            .map((q: any) => (
+              <View key={q.id} style={styles.tableRow}>
+                {/* Pregunta */}
+                <View style={[styles.tableCell, { flex: 2 }]}>
+                  <Text style={styles.questionText}>{q.title}</Text>
+                </View>
+                {/* Respuestas */}
+                <View style={[styles.tableCell, { flex: 1, alignItems: 'center' }]}>
+                  <TouchableOpacity
+                    onPress={() => handleCheckboxChange(q.id)}
+                    style={[
+                      styles.radioCircle,
+                      checkedQuestions.includes(q.id) && styles.checkedBox,
+                    ]}
+                  >
+                    {checkedQuestions.includes(q.id) && (
+                      <View style={styles.radioDot} />
+                    )}
+                  </TouchableOpacity>
+                </View>
+              </View>
+            ))}
+          <Text style={styles.label}>Validar Carga De Aplicación (PersoMaster)</Text>
+          <TextInput
+            style={styles.input}
+            keyboardType="numeric"
+            placeholder="Ej: 2"
+            value={cargaAplicacion}
+            onChangeText={setCargaAplicacion}
+            mode="outlined"
+            activeOutlineColor="#000"
+            theme={{ roundness: 30 }}
+          />
         </>
       )}
 
-      {workOrder?.answers[index].tipo_personalizacion === 'etiquetadora' && (
+      {['etiquetadora', 'packsmart', 'otto', 'embolsadora'].includes(workOrder?.answers[index].tipo_personalizacion) && (
         <>
-        <Text style={styles.label}>No hay preguntas por parte de calidad.</Text>
+          <Text style={styles.label}>No hay preguntas por parte de calidad.</Text>
         </>
       )}
-      
+
 
       {/* Botones */}
       <View style={styles.modalButtonRow}>
@@ -481,6 +706,9 @@ const PersonalizacionComponent = ({ workOrder }: { workOrder: any }) => {
               placeholder="Escribe la inconformidad..."
               multiline
               style={styles.textarea}
+              mode="outlined"
+              activeOutlineColor="#000"
+              theme={{ roundness: 30 }}
             />
             <View style={styles.modalActions}>
               <TouchableOpacity style={styles.cancelButton} onPress={() => setShowInconformidad(false)}>
@@ -500,33 +728,30 @@ const PersonalizacionComponent = ({ workOrder }: { workOrder: any }) => {
 export default PersonalizacionComponent;
 
 const styles = StyleSheet.create({
-  container: { 
+  container: {
     flex: 1,
     paddingTop: 16,
     paddingBottom: 32,
-    paddingHorizontal: 8, 
-    backgroundColor: '#fdfaf6', 
+    paddingHorizontal: 8,
+    backgroundColor: '#fdfaf6',
   },
-  title: { 
-    fontSize: 20, 
-    fontWeight: 'bold', 
+  title: {
+    fontSize: 20,
+    fontWeight: 'bold',
     marginBottom: 16,
     textAlign: 'center',
     color: 'black',
     padding: Platform.OS === 'ios' ? 10 : 0,
   },
-  subtitle: { 
-    fontSize: 16, 
-    fontWeight: 'bold', 
+  subtitle: {
+    fontSize: 16,
+    fontWeight: 'bold',
     marginTop: 20,
     marginBottom: 12,
   },
   label: { fontWeight: '600', marginTop: 12, fontSize: 16 },
   value: { marginBottom: 0 },
   input: {
-    borderWidth: 1,
-    borderColor: '#ccc',
-    borderRadius: 18,
     padding: 10,
     backgroundColor: '#fff',
     height: 50,
@@ -545,10 +770,7 @@ const styles = StyleSheet.create({
   },
   textarea: {
     backgroundColor: '#fff',
-    borderRadius: 12,
     padding: 10,
-    borderWidth: 1,
-    borderColor: '#ccc',
     minHeight: 100,
     fontSize: 16,
     textAlignVertical: 'top',
@@ -619,7 +841,7 @@ const styles = StyleSheet.create({
   modalActions: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    marginTop: 10 
+    marginTop: 10
   },
   cancelButton: {
     backgroundColor: '#A9A9A9',
@@ -746,13 +968,13 @@ const styles = StyleSheet.create({
     marginTop: 12,
     alignItems: 'flex-start',
   },
-  
+
   radioLabel: {
     flexDirection: 'row',
     alignItems: 'center',
     marginBottom: 12,
     gap: 10
-  }, 
+  },
   radioText: {
     fontSize: 16,
     color: '#1f2937',

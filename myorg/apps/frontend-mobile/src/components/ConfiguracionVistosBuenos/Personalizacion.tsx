@@ -76,7 +76,7 @@ export default function Personalizacion({ formQuestion }: Props) {
       <Text style={styles.subtitle}>Respuestas del operador</Text>
       <RadioButton.Group onValueChange={setSelectedOption} value={selectedOption}>
         <View style={styles.radioOption}>
-          <RadioButton value="etiquetadora" color="#0070f3"/> 
+          <RadioButton value="etiquetadora" color="#0070f3" />
           <Text>Etiquetadora</Text>
         </View>
         <View style={styles.radioOption}>
@@ -84,8 +84,20 @@ export default function Personalizacion({ formQuestion }: Props) {
           <Text>Persos's</Text>
         </View>
         <View style={styles.radioOption}>
-          <RadioButton value="laser" color='#0070f3'/>
+          <RadioButton value="laser" color='#0070f3' />
           <Text>Láser</Text>
+        </View>
+        <View style={styles.radioOption}>
+          <RadioButton value="packsmart" color='#0070f3' />
+          <Text>Packsmart</Text>
+        </View>
+        <View style={styles.radioOption}>
+          <RadioButton value="otto" color='#0070f3' />
+          <Text>Otto</Text>
+        </View>
+        <View style={styles.radioOption}>
+          <RadioButton value="embolsadora" color='#0070f3' />
+          <Text>Embolsadora</Text>
         </View>
       </RadioButton.Group>
 
@@ -93,11 +105,17 @@ export default function Personalizacion({ formQuestion }: Props) {
         {selectedOption === 'etiquetadora' && filteredQuestions(null, 0, 1).map(renderQuestion)}
         {selectedOption === 'persos' && filteredQuestions(null, 1, 10).map(renderQuestion)}
         {selectedOption === 'laser' && <Text>No hay preguntas por parte del operador.</Text>}
+        {selectedOption === 'packsmart' && filteredQuestions(null, 14, 20).map(renderQuestion)}
+        {selectedOption === 'otto' && filteredQuestions(null, 20, 28).map(renderQuestion)}
+        {selectedOption === 'embolsadora' && filteredQuestions(null, 28, 30).map(renderQuestion)}
       </View>
 
       <Text style={styles.subtitle}>Mis respuestas</Text>
       <View style={{ marginBottom: 20 }}>
         {selectedOption === 'etiquetadora' && <Text>No hay preguntas por parte de calidad.</Text>}
+        {selectedOption === 'packsmart' && <Text>No hay preguntas por parte de calidad.</Text>}
+        {selectedOption === 'otto' && <Text>No hay preguntas por parte de calidad.</Text>}
+        {selectedOption === 'embolsadora' && <Text>No hay preguntas por parte de calidad.</Text>}
         {selectedOption === 'persos' && filteredQuestions(3, 13, 15).map(renderQuestion)}
         {selectedOption === 'laser' && filteredQuestions(3, 10, 13).map(renderQuestion)}
       </View>

@@ -286,7 +286,7 @@ const PersonalizacionComponent = ({ workOrder }: { workOrder: any }) => {
         <Text style={styles.buttonText}>Liberar Producto</Text>
       </TouchableOpacity>
 
-      <View style={{ marginBottom: 60}}></View>
+      <View style={{ marginBottom: 60 }}></View>
 
       {/* Modal CQM */}
       <Modal visible={showCqmModal} animationType="slide">
@@ -294,27 +294,31 @@ const PersonalizacionComponent = ({ workOrder }: { workOrder: any }) => {
           <Text style={styles.title}>Preguntas del Área: {workOrder.area.name}</Text>
 
           {/* Tabs */}
+
           <View style={styles.tabs}>
-            {['etiquetadora', 'persos', 'laser'].map((opt) => (
-              <TouchableOpacity
-                key={opt}
-                style={[
-                  styles.tab,
-                  selectedOption === opt && styles.tabSelected
-                ]}
-                onPress={() => setSelectedOption(opt)}
-              >
-                <Text
+            <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ gap: 8}}>
+              {['etiquetadora', 'persos', 'laser', 'packsmart', 'otto', 'embolsadora'].map((opt) => (
+                <TouchableOpacity
+                  key={opt}
                   style={[
-                    styles.tabText,
-                    selectedOption === opt && styles.tabTextSelected
+                    styles.tab,
+                    selectedOption === opt && styles.tabSelected
                   ]}
+                  onPress={() => setSelectedOption(opt)}
                 >
-                  {opt === 'persos' ? "Persos's" : opt.charAt(0).toUpperCase() + opt.slice(1)}
-                </Text>
-              </TouchableOpacity>
-            ))}
+                  <Text
+                    style={[
+                      styles.tabText,
+                      selectedOption === opt && styles.tabTextSelected
+                    ]}
+                  >
+                    {opt === 'persos' ? "Persos's" : opt.charAt(0).toUpperCase() + opt.slice(1)}
+                  </Text>
+                </TouchableOpacity>
+              ))}
+            </ScrollView>
           </View>
+
 
           {/* Tabla de preguntas */}
           {selectedOption === 'etiquetadora' && firstQuestion && (
@@ -404,6 +408,106 @@ const PersonalizacionComponent = ({ workOrder }: { workOrder: any }) => {
             </>
           )
           }
+          {selectedOption === 'otto' && (
+            <>
+              <ScrollView style={styles.scrollArea}>
+                {/* Encabezado estilo tabla */}
+                <View style={styles.tableHeader}>
+                  <Text style={[styles.tableCell, { flex: 2 }]}>Pregunta</Text>
+                  <Text style={styles.tableCell}>Respuesta</Text>
+                </View>
+
+                {/* Preguntas normales */}
+                {workOrder.area.formQuestions
+                  .slice(20, 28).map((q: any) => (
+                    <View key={q.id} style={styles.tableRow}>
+                      {/* Pregunta */}
+                      <View style={[styles.tableCell, { flex: 2 }]}>
+                        <Text style={styles.questionText}>{q.title}</Text>
+                      </View>
+
+                      {/* Respuesta */}
+                      <View style={[styles.tableCell, { flex: 1, alignItems: 'center' }]}>
+                        <TouchableOpacity
+                          onPress={() => toggleCheckbox(q.id, checkedQuestion, setCheckedQuestion)}
+                          style={styles.radioCircle}
+                        >
+                          {checkedQuestion.includes(q.id) && <View style={styles.radioDot} />}
+                        </TouchableOpacity>
+                      </View>
+                    </View>
+                  ))}
+              </ScrollView>
+            </>
+          )
+          }
+          {selectedOption === 'packsmart' && (
+            <>
+              <ScrollView style={styles.scrollArea}>
+                {/* Encabezado estilo tabla */}
+                <View style={styles.tableHeader}>
+                  <Text style={[styles.tableCell, { flex: 2 }]}>Pregunta</Text>
+                  <Text style={styles.tableCell}>Respuesta</Text>
+                </View>
+
+                {/* Preguntas normales */}
+                {workOrder.area.formQuestions
+                  .slice(14, 20).map((q: any) => (
+                    <View key={q.id} style={styles.tableRow}>
+                      {/* Pregunta */}
+                      <View style={[styles.tableCell, { flex: 2 }]}>
+                        <Text style={styles.questionText}>{q.title}</Text>
+                      </View>
+
+                      {/* Respuesta */}
+                      <View style={[styles.tableCell, { flex: 1, alignItems: 'center' }]}>
+                        <TouchableOpacity
+                          onPress={() => toggleCheckbox(q.id, checkedQuestion, setCheckedQuestion)}
+                          style={styles.radioCircle}
+                        >
+                          {checkedQuestion.includes(q.id) && <View style={styles.radioDot} />}
+                        </TouchableOpacity>
+                      </View>
+                    </View>
+                  ))}
+              </ScrollView>
+            </>
+          )
+          }
+
+          {selectedOption === 'embolsadora' && (
+            <>
+              <ScrollView style={styles.scrollArea}>
+                {/* Encabezado estilo tabla */}
+                <View style={styles.tableHeader}>
+                  <Text style={[styles.tableCell, { flex: 2 }]}>Pregunta</Text>
+                  <Text style={styles.tableCell}>Respuesta</Text>
+                </View>
+
+                {/* Preguntas normales */}
+                {workOrder.area.formQuestions
+                  .slice(28, 30).map((q: any) => (
+                    <View key={q.id} style={styles.tableRow}>
+                      {/* Pregunta */}
+                      <View style={[styles.tableCell, { flex: 2 }]}>
+                        <Text style={styles.questionText}>{q.title}</Text>
+                      </View>
+
+                      {/* Respuesta */}
+                      <View style={[styles.tableCell, { flex: 1, alignItems: 'center' }]}>
+                        <TouchableOpacity
+                          onPress={() => toggleCheckbox(q.id, checkedQuestion, setCheckedQuestion)}
+                          style={styles.radioCircle}
+                        >
+                          {checkedQuestion.includes(q.id) && <View style={styles.radioDot} />}
+                        </TouchableOpacity>
+                      </View>
+                    </View>
+                  ))}
+              </ScrollView>
+            </>
+          )
+          }
 
           {/* Campo de muestras */}
           <Text style={styles.label}>Muestras:</Text>
@@ -467,6 +571,15 @@ const PersonalizacionComponent = ({ workOrder }: { workOrder: any }) => {
             </ScrollView>
           )}
 
+          {['etiquetadora', 'packsmart', 'otto', 'embolsadora'].includes(selectedOption) && showQuality &&(
+            <>
+              {/* Botones */}
+              <Text>
+                No hay preguntas
+              </Text>
+            </>
+          )
+          }
           {/* Botones */}
           <View style={styles.footerButtons}>
             <TouchableOpacity style={styles.cancelBtn} onPress={() => setShowCqmModal(false)}>

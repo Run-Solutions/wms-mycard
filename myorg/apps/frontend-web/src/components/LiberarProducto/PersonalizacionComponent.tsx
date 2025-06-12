@@ -44,8 +44,8 @@ export default function PersonalizacionComponent({ workOrder }: Props) {
   const handleCheckboxChange = (questionId: number, isChecked: boolean) => {
     setResponses((prevResponses) => {
       const updateResponses = prevResponses.filter(response => response.questionId !== questionId);
-      if(isChecked) { 
-        updateResponses.push({ questionId, answer: isChecked}); 
+      if (isChecked) {
+        updateResponses.push({ questionId, answer: isChecked });
       }
       return updateResponses;
     });
@@ -65,31 +65,31 @@ export default function PersonalizacionComponent({ workOrder }: Props) {
     setQualitySectionOpen(!qualitySectionOpen);
   };
 
-  const handleSelectAll = (isChecked: boolean) => {
-    const questionIds = workOrder.area.formQuestions.slice(1, 10).map((q: { id: number }) => q.id);
-  
+  const handleSelectAll = (isChecked: boolean, init: number, end: number) => {
+    const questionIds = workOrder.area.formQuestions.slice(init, end).map((q: { id: number }) => q.id);
+
     if (isChecked) {
       // Marcar todas las preguntas
       setCheckedQuestions(questionIds);
-  
+
       setResponses((prevResponses) => {
         // Filtrar respuestas viejas de esas preguntas
         const updatedResponses = prevResponses.filter(
           (response) => !questionIds.includes(response.questionId)
         );
-  
+
         // Agregar todas como true
         const newResponses = questionIds.map((id: number) => ({
           questionId: id,
           answer: true,
         }));
-  
+
         return [...updatedResponses, ...newResponses];
       });
     } else {
       // Desmarcar todas
       setCheckedQuestions([]);
-  
+
       setResponses((prevResponses) =>
         prevResponses.filter((response) => !questionIds.includes(response.questionId))
       );
@@ -138,17 +138,17 @@ export default function PersonalizacionComponent({ workOrder }: Props) {
       tipo_personalizacion: selectedOption,
     }
     let aditionalFields = {};
-    if(selectedOption === 'etiquetadora'){
+    if (selectedOption === 'etiquetadora') {
       aditionalFields = {
         verificar_etiqueta: verificarEtiqueta,
       };
-    } else if (selectedOption === 'persos'){
+    } else if (selectedOption === 'persos') {
       aditionalFields = {
         color_personalizacion: colorPersonalizacion,
         codigo_barras: codigoBarras,
       };
-    } else if (selectedOption === 'laser'){
-      aditionalFields= {
+    } else if (selectedOption === 'laser') {
+      aditionalFields = {
       }
     }
     const payload = {
@@ -163,23 +163,19 @@ export default function PersonalizacionComponent({ workOrder }: Props) {
       console.log('Error al guardar la respuesta: ', error);
     }
   }
-  
+
   // Para Liberar el producto cuando ya ha pasado por CQM
-  const [showConfirm, setShowConfirm] = useState(false); 
+  const [showConfirm, setShowConfirm] = useState(false);
   const handleLiberarClick = () => {
-    if (Number(sampleQuantity) <= 0) {
-      alert('Por favor, ingresa una cantidad de muestra válida.');
-      return;
-    }
-  
+
     if (lastCompletedOrPartial.partialReleases.length > 0) {
       const totalValidatedQuantity = lastCompletedOrPartial.partialReleases
         .filter((release: { validated: boolean, quantity: number }) => release.validated)
         .reduce((sum: number, release: { quantity: number }) => sum + release.quantity, 0);
-    
+
       console.log('Total validado:', totalValidatedQuantity);
     }
-  
+
     setShowConfirm(true); // Si pasa todas las validaciones, ahora sí abre el modal
   };
   const handlePersonalizacionSubmit = async () => {
@@ -196,8 +192,8 @@ export default function PersonalizacionComponent({ workOrder }: Props) {
       formAnswerId: currentFlow.answers[0].id,
     };
 
-    console.log('datos a enviar',payload);
-  
+    console.log('datos a enviar', payload);
+
     try {
       await releaseProductFromPersonalizacion(payload);
       router.push('/liberarProducto');
@@ -205,105 +201,105 @@ export default function PersonalizacionComponent({ workOrder }: Props) {
       console.log('Error al enviar datos:', error);
     }
   };
-  
+
   ;
 
   return (
     <>
-    <Container>
-      <Title>Área: Personalización</Title>
+      <Container>
+        <Title>Área: Personalización</Title>
 
-      <DataWrapper>
-        <InfoItem>
-          <Label>Número de Orden:</Label>
-          <Value>{workOrder.workOrder.ot_id}</Value>
-        </InfoItem>
-        <InfoItem>
-          <Label>ID del Presupuesto:</Label>
-          <Value>{workOrder.workOrder.mycard_id}</Value>
-        </InfoItem>
-        <InfoItem>
-          <Label>Cantidad:</Label>
-          <Value>{workOrder.workOrder.quantity}</Value>
-        </InfoItem>
-      </DataWrapper>
-      <DataWrapper style={{ marginTop: '20px'}}>
-        <InfoItem>
-          <Label>Usuario del area previa:</Label>
-          <Value>{lastCompletedOrPartial.user.username}</Value>
-        </InfoItem>
-        <InfoItem>
-          <Label>{lastCompletedOrPartial.areaResponse && lastCompletedOrPartial.partialReleases.length === 0 ? ('Cantidad entregada:')  : lastCompletedOrPartial.partialReleases?.some((r: PartialRelease) => r.validated) ? 'Cantidad entregada validada:' : 'Cantidad faltante por liberar:'}</Label>
-          <Value>
-            {lastCompletedOrPartial.areaResponse && lastCompletedOrPartial.partialReleases.length === 0
-            ? (
-            // Mostrar cantidad según sub-área disponible
-              lastCompletedOrPartial.areaResponse.prepress?.plates ??
-              lastCompletedOrPartial.areaResponse.impression?.quantity ??
-              lastCompletedOrPartial.areaResponse.serigrafia?.quantity ??
-              lastCompletedOrPartial.areaResponse.empalme?.quantity ??
-              lastCompletedOrPartial.areaResponse.laminacion?.quantity ??
-              lastCompletedOrPartial.areaResponse.corte?.quantity ??
-              lastCompletedOrPartial.areaResponse.colorEdge?.quantity ??
-              lastCompletedOrPartial.areaResponse.hotStamping?.quantity ??
-              lastCompletedOrPartial.areaResponse.millingChip?.quantity ??
-              lastCompletedOrPartial.areaResponse.personalizacion?.quantity ??
-              'Sin cantidad'
-            )
-            : lastCompletedOrPartial.partialReleases?.some((r: PartialRelease) => r.validated)
-              ? (
-                  lastCompletedOrPartial.partialReleases
-                  .filter((release: PartialRelease) => release.validated)
-                  .reduce((sum: number, release: PartialRelease) => sum + release.quantity, 0)
+        <DataWrapper>
+          <InfoItem>
+            <Label>Número de Orden:</Label>
+            <Value>{workOrder.workOrder.ot_id}</Value>
+          </InfoItem>
+          <InfoItem>
+            <Label>ID del Presupuesto:</Label>
+            <Value>{workOrder.workOrder.mycard_id}</Value>
+          </InfoItem>
+          <InfoItem>
+            <Label>Cantidad:</Label>
+            <Value>{workOrder.workOrder.quantity}</Value>
+          </InfoItem>
+        </DataWrapper>
+        <DataWrapper style={{ marginTop: '20px' }}>
+          <InfoItem>
+            <Label>Usuario del area previa:</Label>
+            <Value>{lastCompletedOrPartial.user.username}</Value>
+          </InfoItem>
+          <InfoItem>
+            <Label>{lastCompletedOrPartial.areaResponse && lastCompletedOrPartial.partialReleases.length === 0 ? ('Cantidad entregada:') : lastCompletedOrPartial.partialReleases?.some((r: PartialRelease) => r.validated) ? 'Cantidad entregada validada:' : 'Cantidad faltante por liberar:'}</Label>
+            <Value>
+              {lastCompletedOrPartial.areaResponse && lastCompletedOrPartial.partialReleases.length === 0
+                ? (
+                  // Mostrar cantidad según sub-área disponible
+                  lastCompletedOrPartial.areaResponse.prepress?.plates ??
+                  lastCompletedOrPartial.areaResponse.impression?.quantity ??
+                  lastCompletedOrPartial.areaResponse.serigrafia?.quantity ??
+                  lastCompletedOrPartial.areaResponse.empalme?.quantity ??
+                  lastCompletedOrPartial.areaResponse.laminacion?.quantity ??
+                  lastCompletedOrPartial.areaResponse.corte?.quantity ??
+                  lastCompletedOrPartial.areaResponse.colorEdge?.quantity ??
+                  lastCompletedOrPartial.areaResponse.hotStamping?.quantity ??
+                  lastCompletedOrPartial.areaResponse.millingChip?.quantity ??
+                  lastCompletedOrPartial.areaResponse.personalizacion?.quantity ??
+                  'Sin cantidad'
                 )
-              : 
-                (lastCompletedOrPartial.workOrder?.quantity ?? 0) - (lastCompletedOrPartial.partialReleases?.reduce((sum: number, release: PartialRelease) => sum + release.quantity, 0) ?? 0)
+                : lastCompletedOrPartial.partialReleases?.some((r: PartialRelease) => r.validated)
+                  ? (
+                    lastCompletedOrPartial.partialReleases
+                      .filter((release: PartialRelease) => release.validated)
+                      .reduce((sum: number, release: PartialRelease) => sum + release.quantity, 0)
+                  )
+                  :
+                  (lastCompletedOrPartial.workOrder?.quantity ?? 0) - (lastCompletedOrPartial.partialReleases?.reduce((sum: number, release: PartialRelease) => sum + release.quantity, 0) ?? 0)
               }
-          </Value>
-        </InfoItem>
-        {workOrder?.partialReleases?.length > 0 && (
-        <InfoItem>
-          <Label>Cantidad por Liberar:</Label>
-          <Value>
-            {(lastCompletedOrPartial.partialReleases
-              .filter((release: { validated: boolean, quantity: number }) => release.validated)
-              .reduce((sum: number, release: PartialRelease) => sum + release.quantity, 0)
-            ) -
-            (workOrder.partialReleases
-              .reduce((sum: number, release: PartialRelease) => sum + release.quantity, 0)
-            )
-            }
-          </Value>
-        </InfoItem>
-        )}
-      </DataWrapper>
-        <InfoItem style={{ marginTop: '20px'}}>
+            </Value>
+          </InfoItem>
+          {workOrder?.partialReleases?.length > 0 && (
+            <InfoItem>
+              <Label>Cantidad por Liberar:</Label>
+              <Value>
+                {(lastCompletedOrPartial.partialReleases
+                  .filter((release: { validated: boolean, quantity: number }) => release.validated)
+                  .reduce((sum: number, release: PartialRelease) => sum + release.quantity, 0)
+                ) -
+                  (workOrder.partialReleases
+                    .reduce((sum: number, release: PartialRelease) => sum + release.quantity, 0)
+                  )
+                }
+              </Value>
+            </InfoItem>
+          )}
+        </DataWrapper>
+        <InfoItem style={{ marginTop: '20px' }}>
           <Label>Comentarios:</Label>
           <Value>{workOrder.workOrder.comments}</Value>
         </InfoItem>
-      <NewData>
-        <SectionTitle>Datos de Producción</SectionTitle>
-        <NewDataWrapper>
+        <NewData>
+          <SectionTitle>Datos de Producción</SectionTitle>
+          <NewDataWrapper>
+            <InputGroup>
+              <Label>Buenas:</Label>
+              <Input type="number" min='0' placeholder="Ej: 2" value={goodQuantity} onChange={(e) => setGoodQuantity(e.target.value)} disabled={isDisabled} />
+              <Label>Malas:</Label>
+              <Input type="number" min='0' placeholder="Ej: 2" value={badQuantity} onChange={(e) => setBadQuantity(e.target.value)} disabled={isDisabled} />
+              <Label>Excedente:</Label>
+              <Input type="number" min='0' placeholder="Ej: 2" value={excessQuantity} onChange={(e) => setExcessQuantity(e.target.value)} disabled={isDisabled} />
+            </InputGroup>
+            <CqmButton status={workOrder.status} onClick={openModal} disabled={['Enviado a CQM', 'En Calidad', 'Listo'].includes(workOrder.status)}>Enviar a CQM</CqmButton>
+          </NewDataWrapper>
           <InputGroup>
-            <Label>Buenas:</Label>
-            <Input type="number" min= '0' placeholder="Ej: 2" value={goodQuantity} onChange={(e) => setGoodQuantity(e.target.value)} disabled={isDisabled} />
-            <Label>Malas:</Label>
-            <Input type="number" min= '0' placeholder="Ej: 2" value={badQuantity} onChange={(e) => setBadQuantity(e.target.value)} disabled={isDisabled} />
-            <Label>Excedente:</Label>
-            <Input type="number" min= '0' placeholder="Ej: 2" value={excessQuantity} onChange={(e) => setExcessQuantity(e.target.value)} disabled={isDisabled} />
+            <SectionTitle>Comentarios</SectionTitle>
+            <Textarea placeholder="Agrega un comentario adicional..." disabled={isDisabled} />
           </InputGroup>
-          <CqmButton status={workOrder.status} onClick={openModal} disabled={['Enviado a CQM', 'En Calidad', 'Listo'].includes(workOrder.status)}>Enviar a CQM</CqmButton>
-        </NewDataWrapper>
-        <InputGroup>
-          <SectionTitle>Comentarios</SectionTitle>
-          <Textarea placeholder="Agrega un comentario adicional..." disabled={isDisabled}/>
-        </InputGroup>
-      </NewData>
-      <LiberarButton disabled={isDisabled || ['Enviado a CQM', 'En Calidad'].includes(workOrder.status) || ['En calidad', 'Parcial', 'Pendiente parcial', 'En auditoria', 'Enviado a auditoria'].includes(nextFlow?.status) && !allParcialsValidated} onClick={handleLiberarClick}>Liberar Producto</LiberarButton>
-    </Container>
+        </NewData>
+        <LiberarButton disabled={isDisabled || ['Enviado a CQM', 'En Calidad'].includes(workOrder.status) || ['En calidad', 'Parcial', 'Pendiente parcial', 'En auditoria', 'Enviado a auditoria'].includes(nextFlow?.status) && !allParcialsValidated} onClick={handleLiberarClick}>Liberar Producto</LiberarButton>
+      </Container>
 
-    {/* Modal para enviar a liberacion */}
-    {showConfirm && (
+      {/* Modal para enviar a liberacion */}
+      {showConfirm && (
         <ModalOverlay>
           <ModalBox>
             <h4>¿Estás segura/o que deseas liberar este producto?</h4>
@@ -315,246 +311,399 @@ export default function PersonalizacionComponent({ workOrder }: Props) {
         </ModalOverlay>
       )}
 
-    {/* Modal para enviar a CQM */}
-    {showModal && (
-      <ModalOverlay>
-        <ModalContent>
-          <ModalTitle>Preguntas del Área: {workOrder.area.name}</ModalTitle>
-          <RadioGroup>
-            <RadioButton $checked={selectedOption === 'etiquetadora'}>
-              <input
-                type="radio"
-                value="etiquetadora"
-                checked={selectedOption === 'etiquetadora'}
-                onChange={(e) => setSelectedOption(e.target.value)}
-              />
-              Etiquetadora
-            </RadioButton>
-            <RadioButton $checked={selectedOption === 'persos'}>
-              <input
-                type="radio"
-                value="persos"
-                checked={selectedOption === 'persos'}
-                onChange={(e) => setSelectedOption(e.target.value)}
-              />
-              Persos's
-            </RadioButton>
-            <RadioButton $checked={selectedOption === 'laser'}>
-              <input
-                type="radio"
-                value="laser"
-                checked={selectedOption === 'laser'}
-                onChange={(e) => setSelectedOption(e.target.value)}
-              />
-              Láser
-            </RadioButton>
-          </RadioGroup>
+      {/* Modal para enviar a CQM */}
+      {showModal && (
+        <ModalOverlay>
+          <ModalContent>
+            <ModalTitle>Preguntas del Área: {workOrder.area.name}</ModalTitle>
+            <RadioGroup>
+              <RadioButton $checked={selectedOption === 'etiquetadora'}>
+                <input
+                  type="radio"
+                  value="etiquetadora"
+                  checked={selectedOption === 'etiquetadora'}
+                  onChange={(e) => setSelectedOption(e.target.value)}
+                />
+                Etiquetadora
+              </RadioButton>
+              <RadioButton $checked={selectedOption === 'persos'}>
+                <input
+                  type="radio"
+                  value="persos"
+                  checked={selectedOption === 'persos'}
+                  onChange={(e) => setSelectedOption(e.target.value)}
+                />
+                Persos's
+              </RadioButton>
+              <RadioButton $checked={selectedOption === 'laser'}>
+                <input
+                  type="radio"
+                  value="laser"
+                  checked={selectedOption === 'laser'}
+                  onChange={(e) => setSelectedOption(e.target.value)}
+                />
+                Láser
+              </RadioButton>
+              <RadioButton $checked={selectedOption === 'packsmart'}>
+                <input
+                  type="radio"
+                  value="packsmart"
+                  checked={selectedOption === 'packsmart'}
+                  onChange={(e) => setSelectedOption(e.target.value)}
+                />
+                Packsmart
+              </RadioButton>
+              <RadioButton $checked={selectedOption === 'otto'}>
+                <input
+                  type="radio"
+                  value="otto"
+                  checked={selectedOption === 'otto'}
+                  onChange={(e) => setSelectedOption(e.target.value)}
+                />
+                Otto
+              </RadioButton>
+              <RadioButton $checked={selectedOption === 'embolsadora'}>
+                <input
+                  type="radio"
+                  value="embolsadora"
+                  checked={selectedOption === 'embolsadora'}
+                  onChange={(e) => setSelectedOption(e.target.value)}
+                />
+                Embolsadora
+              </RadioButton>
+            </RadioGroup>
 
-          {selectedOption === 'etiquetadora' && (
-            <>
-              <Table>
-                <thead>
-                  <tr>
-                    <th>Pregunta</th>
-                    <th>Respuesta</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  <tr>
-                    <td>{workOrder.area.formQuestions[0]?.title}</td>
-                    <td><input type="checkbox" checked={checkedQuestions.includes(workOrder.area.formQuestions[0]?.id)} onChange={(e) => handleCheckboxChange(workOrder.area.formQuestions[0]?.id, e.target.checked)}/></td>
-                  </tr>
-                </tbody>
-              </Table>
-              <InputGroup style={{ paddingTop: '30px', width: '70%'}}>
-                <Label>Verificar Tipo De Etiqueta Vs Ot Y Pegar Utilizada:</Label>
-                <Input type="text" placeholder="Ej: " value={verificarEtiqueta} onChange={(e) => setVerificarEtiqueta(e.target.value)}/>
-              </InputGroup>
-            </>
-          )}
-          
-          {selectedOption === 'persos' && (
-            <>
-              <Table>
-                <thead>
-                  <tr>
-                    <th>Pregunta</th>
-                    <th>
-                      Respuesta
-                      <button 
-                        onClick={toggleQuestions} 
-                        style={{ marginLeft: "3px", cursor: "pointer", border: "none", background: "transparent" }}
-                      >
-                        {questionsOpen ? '▼' : '▶'}
-                      </button>
-                      {questionsOpen && (
+            {selectedOption === 'etiquetadora' && (
+              <>
+                <Table>
+                  <thead>
+                    <tr>
+                      <th>Pregunta</th>
+                      <th>Respuesta</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    <tr>
+                      <td>{workOrder.area.formQuestions[0]?.title}</td>
+                      <td><input type="checkbox" checked={checkedQuestions.includes(workOrder.area.formQuestions[0]?.id)} onChange={(e) => handleCheckboxChange(workOrder.area.formQuestions[0]?.id, e.target.checked)} /></td>
+                    </tr>
+                  </tbody>
+                </Table>
+                <InputGroup style={{ paddingTop: '30px', width: '70%' }}>
+                  <Label>Verificar Tipo De Etiqueta Vs Ot Y Pegar Utilizada:</Label>
+                  <Input type="text" placeholder="Ej: " value={verificarEtiqueta} onChange={(e) => setVerificarEtiqueta(e.target.value)} />
+                </InputGroup>
+              </>
+            )}
+
+            {selectedOption === 'persos' && (
+              <>
+                <Table>
+                  <thead>
+                    <tr>
+                      <th>Pregunta</th>
+                      <th>
+                        Respuesta
+                        <button
+                          onClick={toggleQuestions}
+                          style={{ marginLeft: "3px", cursor: "pointer", border: "none", background: "transparent" }}
+                        >
+                          {questionsOpen ? '▼' : '▶'}
+                        </button>
+                        {questionsOpen && (
+                          <input
+                            type="checkbox"
+                            checked={
+                              workOrder.area.formQuestions.slice(1, 10).every((q: { id: number }) =>
+                                checkedQuestions.includes(q.id)
+                              )
+                            }
+                            onChange={(e) => handleSelectAll(e.target.checked, 1, 10)}
+                            style={{ marginLeft: "8px" }}
+                          />
+                        )}
+                      </th>
+                    </tr>
+                  </thead>
+
+                  <tbody>
+                    {questionsOpen &&
+                      workOrder.area.formQuestions
+                        .slice(1, 10)
+                        .map((question: { id: number; title: string }) => (
+                          <tr key={question.id}>
+                            <td>{question.title}</td>
+                            <td>
+                              <input
+                                type="checkbox"
+                                checked={checkedQuestions.includes(question.id)}
+                                onChange={(e) => handleCheckboxChange(question.id, e.target.checked)}
+                              />
+                            </td>
+                          </tr>
+                        ))}
+                  </tbody>
+                </Table>
+                <InputGroup style={{ paddingTop: '30px', width: '70%' }}>
+                  <Label>Color De Personalización:</Label>
+                  <Input type="text" placeholder="Ej: " value={colorPersonalizacion} onChange={(e) => setColorPersonalizacion(e.target.value)} />
+                </InputGroup>
+                <InputGroup style={{ paddingTop: '30px', width: '70%' }}>
+                  <Label>Tipo de Código de Barras Que Se Personaliza:</Label>
+                  <Input type="text" placeholder="Ej: " value={codigoBarras} onChange={(e) => setCodigoBarras(e.target.value)} />
+                </InputGroup>
+              </>
+            )}
+
+            {selectedOption === 'laser' && (
+              <>
+              </>
+            )}
+
+            {selectedOption === 'packsmart' && (
+              <>
+                <Table>
+                  <thead>
+                    <tr>
+                      <th>Pregunta</th>
+                      <th>
+                        Respuesta
                         <input
                           type="checkbox"
                           checked={
-                            workOrder.area.formQuestions.slice(1, 10).every((q: { id: number }) =>
+                            workOrder.area.formQuestions.slice(14, 20).every((q: { id: number }) =>
                               checkedQuestions.includes(q.id)
                             )
                           }
-                          onChange={(e) => handleSelectAll(e.target.checked)}
+                          onChange={(e) => handleSelectAll(e.target.checked, 14, 20)}
                           style={{ marginLeft: "8px" }}
                         />
-                      )}
-                    </th>
-                  </tr>
-                </thead>
+                      </th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {questionsOpen &&
+                      workOrder.area.formQuestions
+                        .slice(14, 20)
+                        .map((question: { id: number; title: string }) => (
+                          <tr key={question.id}>
+                            <td>{question.title}</td>
+                            <td>
+                              <input
+                                type="checkbox"
+                                checked={checkedQuestions.includes(question.id)}
+                                onChange={(e) => handleCheckboxChange(question.id, e.target.checked)}
+                              />
+                            </td>
+                          </tr>
+                        ))}
+                  </tbody>
+                </Table>
+              </>
+            )}
 
-                <tbody>
-                  {questionsOpen &&
-                    workOrder.area.formQuestions
-                    .slice(1, 10)
-                    .map((question: { id: number; title: string }) => (
-                      <tr key={question.id}>
-                        <td>{question.title}</td>
-                        <td>
-                          <input
-                            type="checkbox"
-                            checked={checkedQuestions.includes(question.id)}
-                            onChange={(e) => handleCheckboxChange(question.id, e.target.checked)}
-                          />
-                        </td>
-                      </tr>
-                    ))}
-                </tbody>
-              </Table>
-              <InputGroup style={{ paddingTop: '30px', width: '70%'}}>
-                <Label>Color De Personalización:</Label>
-                <Input type="text" placeholder="Ej: " value={colorPersonalizacion} onChange={(e) => setColorPersonalizacion(e.target.value)}/>
-              </InputGroup>
-              <InputGroup style={{ paddingTop: '30px', width: '70%'}}>
-                <Label>Tipo de Código de Barras Que Se Personaliza:</Label>
-                <Input type="text" placeholder="Ej: " value={codigoBarras} onChange={(e) => setCodigoBarras(e.target.value)}/>
-              </InputGroup>
-            </>
-          )}
-          
-          {selectedOption === 'laser' && (
-            <>
-            </>
-          )}
-          <InputGroup style={{ paddingTop: '20px'}}>
-            <Label style={{ paddingTop: '30px'}}>Muestras:</Label>
-            <Input type="number" placeholder="Ej: 2" value={sampleQuantity} onChange={handleSampleQuantityChange}/>
-          </InputGroup>
-          {selectedOption === 'etiquetadora' && (
-            <>
-              <ModalTitle style={{ marginTop: '1.5rem', marginBottom: '0.3rem'}}>
-                Preguntas de Calidad
-                <button onClick={toggleQualitySection} style={{ marginLeft: '10px',cursor: "pointer", border: "none", background: "transparent", fontSize: "1.2rem" }}>{qualitySectionOpen ? '▼' : '▶'}</button>
-              </ModalTitle>
-              {qualitySectionOpen && (
+            {selectedOption === 'otto' && (
               <>
-              <InputGroup style={{ paddingTop: '10px', width: '70%'}}>
-                <Label>No hay preguntas</Label>
-              </InputGroup>
+                <Table>
+                  <thead>
+                    <tr>
+                      <th>Pregunta</th>
+                      <th>
+                        Respuesta
+                        <input
+                          type="checkbox"
+                          checked={
+                            workOrder.area.formQuestions.slice(20, 28).every((q: { id: number }) =>
+                              checkedQuestions.includes(q.id)
+                            )
+                          }
+                          onChange={(e) => handleSelectAll(e.target.checked, 20, 28)}
+                          style={{ marginLeft: "8px" }}
+                        />
+                      </th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {questionsOpen &&
+                      workOrder.area.formQuestions
+                        .slice(20, 28)
+                        .map((question: { id: number; title: string }) => (
+                          <tr key={question.id}>
+                            <td>{question.title}</td>
+                            <td>
+                              <input
+                                type="checkbox"
+                                checked={checkedQuestions.includes(question.id)}
+                                onChange={(e) => handleCheckboxChange(question.id, e.target.checked)}
+                              />
+                            </td>
+                          </tr>
+                        ))}
+                  </tbody>
+                </Table>
               </>
-              )}
-            </>
-          )}
-          {selectedOption === 'persos' && (
-            <>
-              <ModalTitle style={{ marginTop: '1.5rem', marginBottom: '0.3rem'}}>
-                Preguntas de Calidad
-                <button onClick={toggleQualitySection} style={{ marginLeft: '10px',cursor: "pointer", border: "none", background: "transparent", fontSize: "1.2rem" }}>{qualitySectionOpen ? '▼' : '▶'}</button>
-              </ModalTitle>
-              {qualitySectionOpen && (
+            )}
+
+            {selectedOption === 'embolsadora' && (
               <>
-              <Table>
-                <thead>
-                  <tr>
-                    <th>Pregunta</th>
-                    <th>
-                      Respuesta
-                      <button onClick={toggleQuestions} style={{ marginLeft: "8px", cursor: "pointer", border: "none", background: "transparent" }}>{questionsOpen ? '▼' : '▶'}</button>
-                    </th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {questionsOpen && workOrder.area.formQuestions
-                  .slice(13, 16)
-                  .filter((question: { role_id: number | null }) => question.role_id === 3)
-                  .map((question: { id: number; title: string }) => {
-                    // Buscar la respuesta correspondiente a esta pregunta
-                    const answer = workOrder.answers[0]?.FormAnswerResponse?.find(
-                      (resp: any) => resp.question_id === question.id
-                    );
-                    return (
-                      <tr key={question.id}>
-                        <td>{question.title}</td>
-                        <td></td>
-                      </tr>
-                    );
-                  })}
-                </tbody>
-              </Table>
-              <InputGroup style={{ paddingTop: '10px', width: '70%'}}>
-                <Label>Validar Carga De Aplicación (PersoMaster)</Label>
-                <Input type="text" placeholder="Ej: " disabled/>
-              </InputGroup>
+                <Table>
+                  <thead>
+                    <tr>
+                      <th>Pregunta</th>
+                      <th>
+                        Respuesta
+                        <input
+                          type="checkbox"
+                          checked={
+                            workOrder.area.formQuestions.slice(28, 30).every((q: { id: number }) =>
+                              checkedQuestions.includes(q.id)
+                            )
+                          }
+                          onChange={(e) => handleSelectAll(e.target.checked, 28, 39)}
+                          style={{ marginLeft: "8px" }}
+                        />
+                      </th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {questionsOpen &&
+                      workOrder.area.formQuestions
+                        .slice(28, 30)
+                        .map((question: { id: number; title: string }) => (
+                          <tr key={question.id}>
+                            <td>{question.title}</td>
+                            <td>
+                              <input
+                                type="checkbox"
+                                checked={checkedQuestions.includes(question.id)}
+                                onChange={(e) => handleCheckboxChange(question.id, e.target.checked)}
+                              />
+                            </td>
+                          </tr>
+                        ))}
+                  </tbody>
+                </Table>
               </>
-              )}
-            </>
-          )}
-          {selectedOption === 'laser' && (
-            <>
-              <ModalTitle style={{ marginTop: '1.5rem', marginBottom: '0.3rem'}}>
-                Preguntas de Calidad
-                <button onClick={toggleQualitySection} style={{ marginLeft: '10px',cursor: "pointer", border: "none", background: "transparent", fontSize: "1.2rem" }}>{qualitySectionOpen ? '▼' : '▶'}</button>
-              </ModalTitle>
-              {qualitySectionOpen && (
-              <>
-              <Table>
-                <thead>
-                  <tr>
-                    <th>Pregunta</th>
-                    <th>
-                      Respuesta
-                      <button onClick={toggleQuestions} style={{ marginLeft: "8px", cursor: "pointer", border: "none", background: "transparent" }}>{questionsOpen ? '▼' : '▶'}</button>
-                    </th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {questionsOpen && workOrder.area.formQuestions
-                  .slice(9, 13)
-                  .filter((question: { role_id: number | null }) => question.role_id === 3)
-                  .map((question: { id: number; title: string }) => {
-                    // Buscar la respuesta correspondiente a esta pregunta
-                    const answer = workOrder.answers[0]?.FormAnswerResponse?.find(
-                      (resp: any) => resp.question_id === question.id
-                    );
-                    return (
-                      <tr key={question.id}>
-                        <td>{question.title}</td>
-                        <td></td>
-                      </tr>
-                    );
-                  })}
-                </tbody>
-              </Table>
-              <InputGroup style={{ paddingTop: '10px', width: '70%'}}>
-              <Label>Verificar Script / Layout Vs Ot / Autorizacion:</Label>
-              <Input type="text" placeholder="Ej: " disabled/>
-              <Label>Validar, Anotar KVC (Llaves), Carga de Aplicación o Prehabilitación:</Label>
-              <Input type="text" placeholder="Ej: " disabled/>
-              <Label>Describir Apariencia Del Quemado Del Laser (Color):</Label>
-              <Input type="text" placeholder="Ej: " disabled/>
+            )}
+            <InputGroup style={{ paddingTop: '20px' }}>
+              <Label style={{ paddingTop: '30px' }}>Muestras:</Label>
+              <Input type="number" placeholder="Ej: 2" value={sampleQuantity} onChange={handleSampleQuantityChange} />
             </InputGroup>
+            {selectedOption === 'etiquetadora' && (
+              <>
+                <ModalTitle style={{ marginTop: '1.5rem', marginBottom: '0.3rem' }}>
+                  Preguntas de Calidad
+                  <button onClick={toggleQualitySection} style={{ marginLeft: '10px', cursor: "pointer", border: "none", background: "transparent", fontSize: "1.2rem" }}>{qualitySectionOpen ? '▼' : '▶'}</button>
+                </ModalTitle>
+                {qualitySectionOpen && (
+                  <>
+                    <InputGroup style={{ paddingTop: '10px', width: '70%' }}>
+                      <Label>No hay preguntas</Label>
+                    </InputGroup>
+                  </>
+                )}
               </>
-              )}
-            </>
-          )}
-          <div style={{ display: 'flex', gap: '1rem'}}>
-            <CloseButton onClick={closeModal}>Cerrar</CloseButton>
-            <SubmitButton onClick={handleSubmit}>Enviar Respuestas</SubmitButton>
-          </div>
-        </ModalContent>
-      </ModalOverlay>
-    )}
-  </>
+            )}
+            {selectedOption === 'persos' && (
+              <>
+                <ModalTitle style={{ marginTop: '1.5rem', marginBottom: '0.3rem' }}>
+                  Preguntas de Calidad
+                  <button onClick={toggleQualitySection} style={{ marginLeft: '10px', cursor: "pointer", border: "none", background: "transparent", fontSize: "1.2rem" }}>{qualitySectionOpen ? '▼' : '▶'}</button>
+                </ModalTitle>
+                {qualitySectionOpen && (
+                  <>
+                    <Table>
+                      <thead>
+                        <tr>
+                          <th>Pregunta</th>
+                          <th>
+                            Respuesta
+                            <button onClick={toggleQuestions} style={{ marginLeft: "8px", cursor: "pointer", border: "none", background: "transparent" }}>{questionsOpen ? '▼' : '▶'}</button>
+                          </th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {questionsOpen && workOrder.area.formQuestions
+                          .slice(13, 16)
+                          .filter((question: { role_id: number | null }) => question.role_id === 3)
+                          .map((question: { id: number; title: string }) => {
+                            // Buscar la respuesta correspondiente a esta pregunta
+                            const answer = workOrder.answers[0]?.FormAnswerResponse?.find(
+                              (resp: any) => resp.question_id === question.id
+                            );
+                            return (
+                              <tr key={question.id}>
+                                <td>{question.title}</td>
+                                <td></td>
+                              </tr>
+                            );
+                          })}
+                      </tbody>
+                    </Table>
+                    <InputGroup style={{ paddingTop: '10px', width: '70%' }}>
+                      <Label>Validar Carga De Aplicación (PersoMaster)</Label>
+                      <Input type="text" placeholder="Ej: " disabled />
+                    </InputGroup>
+                  </>
+                )}
+              </>
+            )}
+            {selectedOption === 'laser' && (
+              <>
+                <ModalTitle style={{ marginTop: '1.5rem', marginBottom: '0.3rem' }}>
+                  Preguntas de Calidad
+                  <button onClick={toggleQualitySection} style={{ marginLeft: '10px', cursor: "pointer", border: "none", background: "transparent", fontSize: "1.2rem" }}>{qualitySectionOpen ? '▼' : '▶'}</button>
+                </ModalTitle>
+                {qualitySectionOpen && (
+                  <>
+                    <Table>
+                      <thead>
+                        <tr>
+                          <th>Pregunta</th>
+                          <th>
+                            Respuesta
+                            <button onClick={toggleQuestions} style={{ marginLeft: "8px", cursor: "pointer", border: "none", background: "transparent" }}>{questionsOpen ? '▼' : '▶'}</button>
+                          </th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {questionsOpen && workOrder.area.formQuestions
+                          .slice(9, 13)
+                          .filter((question: { role_id: number | null }) => question.role_id === 3)
+                          .map((question: { id: number; title: string }) => {
+                            // Buscar la respuesta correspondiente a esta pregunta
+                            const answer = workOrder.answers[0]?.FormAnswerResponse?.find(
+                              (resp: any) => resp.question_id === question.id
+                            );
+                            return (
+                              <tr key={question.id}>
+                                <td>{question.title}</td>
+                                <td></td>
+                              </tr>
+                            );
+                          })}
+                      </tbody>
+                    </Table>
+                    <InputGroup style={{ paddingTop: '10px', width: '70%' }}>
+                      <Label>Verificar Script / Layout Vs Ot / Autorizacion:</Label>
+                      <Input type="text" placeholder="Ej: " disabled />
+                      <Label>Validar, Anotar KVC (Llaves), Carga de Aplicación o Prehabilitación:</Label>
+                      <Input type="text" placeholder="Ej: " disabled />
+                      <Label>Describir Apariencia Del Quemado Del Laser (Color):</Label>
+                      <Input type="text" placeholder="Ej: " disabled />
+                    </InputGroup>
+                  </>
+                )}
+              </>
+            )}
+            <div style={{ display: 'flex', gap: '1rem' }}>
+              <CloseButton onClick={closeModal}>Cerrar</CloseButton>
+              <SubmitButton onClick={handleSubmit}>Enviar Respuestas</SubmitButton>
+            </div>
+          </ModalContent>
+        </ModalOverlay>
+      )}
+    </>
   );
 }
 
@@ -733,10 +882,10 @@ const CqmButton = styled.button<CqmButtonProps>`
 
   &:hover {
     background-color: ${({ status }) => {
-      if (status === 'Listo') return '#16a34a'; // verde hover
-      if (['Enviado a CQM', 'En Calidad'].includes(status)) return '#9ca3af'; // gris hover igual
-      return '#1d4ed8'; // azul hover
-    }};
+    if (status === 'Listo') return '#16a34a'; // verde hover
+    if (['Enviado a CQM', 'En Calidad'].includes(status)) return '#9ca3af'; // gris hover igual
+    return '#1d4ed8'; // azul hover
+  }};
   }
 `;
 
