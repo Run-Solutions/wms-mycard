@@ -51,6 +51,7 @@ const WorkOrderDetailScreen: React.FC = () => {
           cqm: '',
           muestras: '',
           usuario: areaResponse?.user?.username || '',
+          auditor: '',
         };
       case 2: // impresión
         return {
@@ -60,6 +61,7 @@ const WorkOrderDetailScreen: React.FC = () => {
           cqm: areaResponse?.impression?.form_answer?.sample_quantity ?? '',
           muestras: '',
           usuario: areaResponse?.user?.username || '',
+          auditor: '',
         };
       case 3: // serigrafía
         return {
@@ -69,6 +71,7 @@ const WorkOrderDetailScreen: React.FC = () => {
           cqm: areaResponse?.serigrafia?.form_answer?.sample_quantity ?? '',
           muestras: '',
           usuario: areaResponse?.user?.username || '',
+          auditor: '',
         };
       case 4: // empalme
         return {
@@ -78,6 +81,7 @@ const WorkOrderDetailScreen: React.FC = () => {
           cqm: areaResponse?.empalme?.form_answer?.sample_quantity ?? '',
           muestras: '',
           usuario: areaResponse?.user?.username || '',
+          auditor: '',
         };
       case 5: // empalme
         return {
@@ -87,6 +91,7 @@ const WorkOrderDetailScreen: React.FC = () => {
           cqm: areaResponse?.laminacion?.form_answer?.sample_quantity ?? '',
           muestras: '',
           usuario: areaResponse?.user?.username || '',
+          auditor: '',
         };
       case 6: // corte
         return {
@@ -96,6 +101,7 @@ const WorkOrderDetailScreen: React.FC = () => {
           cqm: areaResponse?.corte?.form_answer?.sample_quantity ?? 0,
           muestras: areaResponse?.corte?.formAuditory?.sample_auditory ?? '',
           usuario: areaResponse?.user?.username || '',
+          auditor: areaResponse?.corte?.formAuditory?.user?.username || '',
         };
       case 7: // color-edge
         return {
@@ -105,6 +111,7 @@ const WorkOrderDetailScreen: React.FC = () => {
           cqm: areaResponse?.colorEdge?.form_answer?.sample_quantity || 0,
           muestras: areaResponse?.colorEdge?.formAuditory?.sample_auditory ?? '',
           usuario: areaResponse?.user?.username || '',
+          auditor: areaResponse?.colorEdge?.formAuditory?.user?.username || '',
         };
       case 8: // hot-stamping
         return {
@@ -114,7 +121,7 @@ const WorkOrderDetailScreen: React.FC = () => {
           cqm: areaResponse?.hotStamping?.form_answer?.sample_quantity || 0,
           muestras: areaResponse?.hotStamping?.formAuditory?.sample_auditory ?? '',
           usuario: areaResponse?.user?.username || '',
-
+          auditor: areaResponse?.hotStamping?.formAuditory?.user?.username || '',
         };
       case 9: // milling-chip
         console.log(areaResponse?.millingChip);
@@ -125,6 +132,7 @@ const WorkOrderDetailScreen: React.FC = () => {
           cqm: areaResponse?.millingChip?.form_answer?.sample_quantity || 0,
           muestras: areaResponse?.millingChip?.formAuditory?.sample_auditory ?? '',
           usuario: areaResponse?.user?.username || '',
+          auditor: areaResponse?.millingChip?.formAuditory?.user?.username || '',
         };
       case 10: // personalizacion
         return {
@@ -134,6 +142,7 @@ const WorkOrderDetailScreen: React.FC = () => {
           cqm: areaResponse?.personalizacion?.form_answer?.sample_quantity || 0,
           muestras: areaResponse?.personalizacion?.formAuditory?.sample_auditory ?? '',
           usuario: areaResponse?.user?.username || '',
+          auditor: areaResponse?.personalizacion?.formAuditory?.user?.username || '',
         };
       default:
         return {
@@ -142,7 +151,8 @@ const WorkOrderDetailScreen: React.FC = () => {
           excedente: 0,
           muestras: 0,
           cqm: 0,
-          usuario: ''
+          usuario: '',
+          auditor: ''
         };
     }
   };
@@ -212,7 +222,9 @@ const WorkOrderDetailScreen: React.FC = () => {
             <Text style={styles.cell}>Excedente</Text>
             <Text style={styles.cell}>CQM</Text>
             <Text style={styles.cell}>Muestras</Text>
+            <Text style={styles.cell}>Totales</Text>
             <Text style={styles.cellUser}>Usuario</Text>
+            <Text style={styles.cellUser}>Auditor</Text>
           </View>
           {areas.map((area: any, index: number) => (
             <View key={index} style={styles.row}>
@@ -222,18 +234,12 @@ const WorkOrderDetailScreen: React.FC = () => {
               <Text style={styles.cell}>{area.excedente}</Text>
               <Text style={styles.cell}>{area.cqm}</Text>
               <Text style={styles.cell}>{area.muestras}</Text>
-              <Text style={styles.cellUser}>{area?.usuario || 'N/A'}</Text>
+              <Text style={styles.cell}>{Number(area.buenas) + Number(area.malas) + Number(area.excedente) + Number(area.cqm) + Number(area.muestras)}</Text>
+              <Text style={styles.cellUser}>{area?.usuario}</Text>
+              <Text style={styles.cellUser}>{area?.auditor}</Text>
             </View>
           ))}
-          <View style={[styles.row, { backgroundColor: '#f0f0f0' }]}>
-            <Text style={styles.cellUser}>Totales</Text>
-            <Text style={styles.cell}>{totals.buenas}</Text>
-            <Text style={styles.cell}>{totals.malas}</Text>
-            <Text style={styles.cell}>{totals.excedente}</Text>
-            <Text style={styles.cell}>{totals.cqm}</Text>
-            <Text style={styles.cell}>{totals.muestras}</Text>
-            <Text style={styles.cellUser}>—</Text>
-          </View>
+
         </View>
       </ScrollView>
 

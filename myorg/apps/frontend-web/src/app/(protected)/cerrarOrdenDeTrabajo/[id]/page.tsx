@@ -31,12 +31,12 @@ export default function CloseWorkOrderAuxPage({ params }: Props) {
 
   const getAreaData = (areaId: number, areaResponse: any) => {
     switch (areaId) {
-      case 6: return { ...areaResponse?.corte, usuario: areaResponse?.user?.username || '' };
-      case 7: return { ...areaResponse?.colorEdge, usuario: areaResponse?.user?.username || '' };
-      case 8: return { ...areaResponse?.hotStamping, usuario: areaResponse?.user?.username || '' };
-      case 9: return { ...areaResponse?.millingChip, usuario: areaResponse?.user?.username || '' };
-      case 10: return { ...areaResponse?.personalizacion, usuario: areaResponse?.user?.username || '' };
-      default: return { buenas: 0, malas: 0, excedente: 0, cqm: 0, muestras: 0, usuario: '' };
+      case 6: return { ...areaResponse?.corte, usuario: areaResponse?.user?.username || '', auditor: areaResponse?.corte?.formAuditory?.user?.username || '' };
+      case 7: return { ...areaResponse?.colorEdge, usuario: areaResponse?.user?.username || '', auditor: areaResponse?.colorEdge?.formAuditory?.user?.username || '' };
+      case 8: return { ...areaResponse?.hotStamping, usuario: areaResponse?.user?.username || '', auditor: areaResponse?.hotStamping?.formAuditory?.user?.username || '' };
+      case 9: return { ...areaResponse?.millingChip, usuario: areaResponse?.user?.username || '', auditor: areaResponse?.millingChip?.formAuditory?.user?.username || '' };
+      case 10: return { ...areaResponse?.personalizacion, usuario: areaResponse?.user?.username || '', auditor: areaResponse?.personalizacion?.formAuditory?.user?.username || '' };
+      default: return { buenas: 0, malas: 0, excedente: 0, cqm: 0, muestras: 0, usuario: '', auditor: '' };
     }
   };
 

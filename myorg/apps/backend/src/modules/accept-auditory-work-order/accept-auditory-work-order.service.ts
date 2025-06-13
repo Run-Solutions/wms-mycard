@@ -42,107 +42,114 @@ export class AcceptAuditoryWorkOrderService {
   }
 
   // Para que el auditor acepte la orden de corte
-  async acceptWorkOrderResponse(id: number, userId: number, dto: AcceptAuditoryDto){
+  async acceptWorkOrderResponse(id: number, userId: number, dto: AcceptAuditoryDto) {
     const corte = await this.prisma.corteResponse.findUnique({
       where: { id },
-      include: { 
+      include: {
         formAuditory: true,
         areas_response: {
           include: {
-            WorkOrderFlow: true,
+            WorkOrderFlow: {
+              include: {
+                partialReleases: true,
+                workOrder: true,
+              },
+            },
           },
         },
       },
     });
-    if(!corte){
+    // Si no hay corte, buscamos si el ID es el de un flujo con partial pendiente
+    if (!corte) {
       const partial = await this.prisma.partialRelease.findFirst({
         where: { work_order_flow_id: id, validated: false },
       });
-      if(partial) {
-        const formAuditory = await this.prisma.formAuditory.upsert({
-          where: { id: partial?.id },
-          update: {
-            reviewed_by_id: userId,
-            sample_auditory: dto.sample_auditory,
-          },
-          create: {
-            id: partial?.id,
-            reviewed_by_id: userId,
-            sample_auditory: dto.sample_auditory,
-          },
-        });
-        await this.prisma.partialRelease.update({
-          where: { id: partial?.id },
-          data: {
-            validated: true,
-            form_auditory_id: formAuditory.id,
-          },
-        });
-        await this.prisma.workOrderFlow.update({
-          where: { id: partial?.work_order_flow_id },
-          data: {
-            status: 'Parcial',
-          },
-        });
-        return formAuditory;
+      if (!partial) {
+        throw new Error('Corte not found y no hay partial pendiente');
       }
-      throw new Error('Corte not found');
-    }
-    const workOrderFlow = await this.prisma.workOrderFlow.findUnique({
-      where: { id: corte?.areas_response.work_order_flow_id },
-      include: {
-        partialReleases: true,
-      },
-    });
-    const pendingPartial = workOrderFlow?.partialReleases.find(p => !p.validated);
-    if (pendingPartial) {
-      await this.prisma.partialRelease.update({
-        where: { id: pendingPartial.id },
-        data: {
-          validated: true,
-        },
-      });
-      await this.prisma.workOrderFlow.update({
-        where: { id: pendingPartial?.work_order_flow_id },
-        data: {
-          status: 'Parcial',
-        },
-      });
       const formAuditory = await this.prisma.formAuditory.upsert({
-        where: { id: pendingPartial?.id },
+        where: { id: partial.id },
         update: {
           reviewed_by_id: userId,
           sample_auditory: dto.sample_auditory,
         },
         create: {
-          id: pendingPartial?.id,
+          id: partial.id,
           reviewed_by_id: userId,
+          sample_auditory: dto.sample_auditory,
         },
+      });
+      await this.prisma.partialRelease.update({
+        where: { id: partial.id },
+        data: {
+          validated: true,
+          form_auditory_id: formAuditory.id,
+        },
+      });
+      await this.prisma.workOrderFlow.update({
+        where: { id: partial.work_order_flow_id },
+        data: { status: 'Parcial' },
+      });
+      // Buscar next flow
+      const currentFlow = await this.prisma.workOrderFlow.findUnique({
+        where: { id: partial.work_order_flow_id },
       });
       const nextFlow = await this.prisma.workOrderFlow.findFirst({
         where: {
-          work_order_id: workOrderFlow?.work_order_id,
-          id: {
-            gt: workOrderFlow?.id,
-          },
+          work_order_id: currentFlow?.work_order_id,
+          id: { gt: currentFlow?.id },
         },
-        orderBy: {
-          id: 'asc',
-        },
+        orderBy: { id: 'asc' },
       });
-  
       if (nextFlow) {
         await this.prisma.workOrderFlow.update({
-          where: {
-            id: nextFlow.id,
-          },
-          data: {
-            status: 'Pendiente parcial',
-          },
+          where: { id: nextFlow.id },
+          data: { status: 'Pendiente parcial' },
         });
       }
       return formAuditory;
     }
+    // Si hay corte, seguimos flujo normal
+    const workOrderFlow = corte.areas_response?.WorkOrderFlow;
+    if (!workOrderFlow) throw new Error('No hay WorkOrderFlow asociado al corte');
+    const pendingPartial = workOrderFlow.partialReleases.find(p => !p.validated);
+    if (pendingPartial) {
+      await this.prisma.partialRelease.update({
+        where: { id: pendingPartial.id },
+        data: { validated: true },
+      });
+      await this.prisma.workOrderFlow.update({
+        where: { id: pendingPartial.work_order_flow_id },
+        data: { status: 'Completado' },
+      });
+      const formAuditory = await this.prisma.formAuditory.upsert({
+        where: { id: pendingPartial.id },
+        update: {
+          reviewed_by_id: userId,
+          sample_auditory: dto.sample_auditory,
+        },
+        create: {
+          id: pendingPartial.id,
+          reviewed_by_id: userId,
+          sample_auditory: dto.sample_auditory,
+        },
+      });
+      const nextFlow = await this.prisma.workOrderFlow.findFirst({
+        where: {
+          work_order_id: workOrderFlow.work_order_id,
+          id: { gt: workOrderFlow.id },
+        },
+        orderBy: { id: 'asc' },
+      });
+      if (nextFlow) {
+        await this.prisma.workOrderFlow.update({
+          where: { id: nextFlow.id },
+          data: { status: 'Pendiente parcial' },
+        });
+      }
+      return formAuditory;
+    }
+    // Si no hay parcial pendiente, se completa normalmente
     const formAuditory = await this.prisma.formAuditory.upsert({
       where: { id: corte.form_auditory_id },
       update: {
@@ -152,42 +159,29 @@ export class AcceptAuditoryWorkOrderService {
       create: {
         id: corte.id,
         reviewed_by_id: userId,
+        sample_auditory: dto.sample_auditory,
       },
     });
     await this.prisma.workOrderFlow.update({
-      where: { id: corte.areas_response.work_order_flow_id},
-      data: {
-        status: 'Completado'
-      },
+      where: { id: workOrderFlow.id },
+      data: { status: 'Completado' },
     });
-    // Buscar el siguiente flujo (id mayor, mismo work_order_id)
     const nextFlow = await this.prisma.workOrderFlow.findFirst({
       where: {
-        work_order_id: workOrderFlow?.work_order_id,
-        id: {
-          gt: workOrderFlow?.id,
-        },
+        work_order_id: workOrderFlow.work_order_id,
+        id: { gt: workOrderFlow.id },
       },
-      orderBy: {
-        id: 'asc',
-      },
+      orderBy: { id: 'asc' },
     });
-
     if (nextFlow) {
       await this.prisma.workOrderFlow.update({
-        where: {
-          id: nextFlow.id,
-        },
-        data: {
-          status: 'Pendiente',
-        },
+        where: { id: nextFlow.id },
+        data: { status: 'Pendiente' },
       });
     } else {
       await this.prisma.workOrderFlow.update({
-        where: { id: corte.areas_response.work_order_flow_id},
-        data: {
-          status: 'En auditoria'
-        },
+        where: { id: workOrderFlow.id },
+        data: { status: 'En auditoria' },
       });
     }
     return formAuditory;
@@ -201,7 +195,12 @@ export class AcceptAuditoryWorkOrderService {
         formAuditory: true,
         areas_response: {
           include: {
-            WorkOrderFlow: true,
+            WorkOrderFlow: {
+              include: {
+                partialReleases: true,
+                workOrder: true,
+              },
+            }
           },
         },
       },
@@ -210,91 +209,92 @@ export class AcceptAuditoryWorkOrderService {
       const partial = await this.prisma.partialRelease.findFirst({
         where: { work_order_flow_id: id, validated: false },
       });
-      if(partial) {
-        const formAuditory = await this.prisma.formAuditory.upsert({
-          where: { id: partial?.id },
-          update: {
-            reviewed_by_id: userId,
-            sample_auditory: dto.sample_auditory,
-          },
-          create: {
-            id: partial?.id,
-            reviewed_by_id: userId,
-            sample_auditory: dto.sample_auditory,
-          },
-        });
-        await this.prisma.partialRelease.update({
-          where: { id: partial?.id },
-          data: {
-            validated: true,
-            form_auditory_id: formAuditory.id,
-          },
-        });
-        await this.prisma.workOrderFlow.update({
-          where: { id: partial?.work_order_flow_id },
-          data: {
-            status: 'Parcial',
-          },
-        });
-        return formAuditory;
+      if(!partial) {
+        throw new Error('Color Edge not found y no hay partial pendiente');
       }
-      throw new Error('Color Edge not found');
-    }
-    const workOrderFlow = await this.prisma.workOrderFlow.findUnique({
-      where: { id: colorEdge?.areas_response.work_order_flow_id },
-      include: {
-        partialReleases: true,
-      },
-    });
-    const pendingPartial = workOrderFlow?.partialReleases.find(p => !p.validated);
-    if (pendingPartial) {
-      await this.prisma.partialRelease.update({
-        where: { id: pendingPartial.id },
-        data: {
-          validated: true,
-        },
-      });
-      await this.prisma.workOrderFlow.update({
-        where: { id: pendingPartial?.work_order_flow_id },
-        data: {
-          status: 'Parcial',
-        },
-      });
       const formAuditory = await this.prisma.formAuditory.upsert({
-        where: { id: pendingPartial?.id },
+        where: { id: partial?.id },
         update: {
           reviewed_by_id: userId,
           sample_auditory: dto.sample_auditory,
         },
         create: {
-          id: pendingPartial?.id,
+          id: partial?.id,
           reviewed_by_id: userId,
+          sample_auditory: dto.sample_auditory,
         },
+      });
+      await this.prisma.partialRelease.update({
+        where: { id: partial?.id },
+        data: {
+          validated: true,
+          form_auditory_id: formAuditory.id,
+        },
+      });
+      await this.prisma.workOrderFlow.update({
+        where: { id: partial?.work_order_flow_id },
+        data: { status: 'Parcial'},
+      });
+      // Buscar next flow
+      const currentFlow = await this.prisma.workOrderFlow.findUnique({
+        where: { id: partial?.work_order_flow_id },
       });
       const nextFlow = await this.prisma.workOrderFlow.findFirst({
         where: {
-          work_order_id: workOrderFlow?.work_order_id,
-          id: {
-            gt: workOrderFlow?.id,
-          },
+          work_order_id: currentFlow?.work_order_id,
+          id: { gt: currentFlow?.id },
         },
-        orderBy: {
-          id: 'asc',
-        },
+        orderBy: { id: 'asc' },
       });
-  
       if (nextFlow) {
         await this.prisma.workOrderFlow.update({
-          where: {
-            id: nextFlow.id,
-          },
-          data: {
-            status: 'Pendiente parcial',
-          },
+          where: { id: nextFlow.id },
+          data: { status: 'Pendiente parcial' },
         });
       }
-      return formAuditory;
-    }
+        return formAuditory;
+      }
+      // Si hay colorEdge, seguimos flujo normal
+      const workOrderFlow = colorEdge.areas_response?.WorkOrderFlow;
+      if (!workOrderFlow) throw new Error('No hay WorkOrderFlow asociado al colorEdge');
+      const pendingPartial = workOrderFlow.partialReleases.find(p => !p.validated);
+      if (pendingPartial) {
+        await this.prisma.partialRelease.update({
+          where: { id: pendingPartial.id },
+          data: { validated: true },
+        });
+        await this.prisma.workOrderFlow.update({
+          where: { id: pendingPartial?.work_order_flow_id },
+          data: { status: 'Completado' },
+        });
+        const formAuditory = await this.prisma.formAuditory.upsert({
+          where: { id: pendingPartial?.id },
+          update: {
+            reviewed_by_id: userId,
+            sample_auditory: dto.sample_auditory,
+          },
+          create: {
+            id: pendingPartial?.id,
+            reviewed_by_id: userId,
+            sample_auditory: dto.sample_auditory,
+          },
+        });
+        const nextFlow = await this.prisma.workOrderFlow.findFirst({
+          where: {
+            work_order_id: workOrderFlow?.work_order_id,
+            id: { gt: workOrderFlow?.id },
+          },
+          orderBy: { id: 'asc' },
+        });
+        if (nextFlow) {
+          await this.prisma.workOrderFlow.update({
+            where: { id: nextFlow.id },
+            data: { status: 'Pendiente parcial' },
+          });
+        }
+        return formAuditory;
+      }
+    // Si no hay parcial pendiente, se completa normalmente
     const formAuditory = await this.prisma.formAuditory.upsert({
       where: { id: colorEdge.form_auditory_id },
       update: {
@@ -304,43 +304,29 @@ export class AcceptAuditoryWorkOrderService {
       create: {
         id: colorEdge.form_auditory_id,
         reviewed_by_id: userId,
+        sample_auditory: dto.sample_auditory,
       },
     });
-
     await this.prisma.workOrderFlow.update({
-      where: { id: colorEdge.areas_response.work_order_flow_id},
-      data: {
-        status: 'Completado'
-      },
+      where: { id: workOrderFlow.id},
+      data: { status: 'Completado' },
     });
-    // Buscar el siguiente flujo (id mayor, mismo work_order_id)
     const nextFlow = await this.prisma.workOrderFlow.findFirst({
       where: {
-        work_order_id: workOrderFlow?.work_order_id,
-        id: {
-          gt: workOrderFlow?.id,
-        },
+        work_order_id: workOrderFlow.work_order_id,
+        id: {  gt: workOrderFlow?.id },
       },
-      orderBy: {
-        id: 'asc',
-      },
+      orderBy: { id: 'asc' },
     });
-
     if (nextFlow) {
       await this.prisma.workOrderFlow.update({
-        where: {
-          id: nextFlow.id,
-        },
-        data: {
-          status: 'Pendiente',
-        },
+        where: { id: nextFlow.id },
+        data: { status: 'Pendiente' },
       });
     } else {
       await this.prisma.workOrderFlow.update({
-        where: { id: colorEdge.areas_response.work_order_flow_id},
-        data: {
-          status: 'En auditoria'
-        },
+        where: { id: workOrderFlow.id},
+        data: { status: 'En auditoria' },
       });
     }
     return formAuditory;
@@ -354,7 +340,12 @@ export class AcceptAuditoryWorkOrderService {
         formAuditory: true,
         areas_response: {
           include: {
-            WorkOrderFlow: true,
+            WorkOrderFlow: {
+              include: {
+                partialReleases: true,
+                workOrder: true,
+              },
+            }
           },
         },
       },
@@ -363,87 +354,90 @@ export class AcceptAuditoryWorkOrderService {
       const partial = await this.prisma.partialRelease.findFirst({
         where: { work_order_flow_id: id, validated: false },
       });
-      if(partial) {
-        const formAuditory = await this.prisma.formAuditory.upsert({
-          where: { id: partial?.id },
-          update: {
-            reviewed_by_id: userId,
-            sample_auditory: dto.sample_auditory,
-          },
-          create: {
-            id: partial?.id,
-            reviewed_by_id: userId,
-            sample_auditory: dto.sample_auditory,
-          },
-        });
-        await this.prisma.partialRelease.update({
-          where: { id: partial?.id },
-          data: {
-            validated: true,
-            form_auditory_id: formAuditory.id,
-          },
-        });
-        await this.prisma.workOrderFlow.update({
-          where: { id: partial?.work_order_flow_id },
-          data: {
-            status: 'Parcial',
-          },
-        });
-        return formAuditory;
+      if (!partial) {
+        throw new Error('Corte not found y no hay partial pendiente');
       }
-      throw new Error('HotStamping not found');
-    }
-    const workOrderFlow = await this.prisma.workOrderFlow.findUnique({
-      where: { id: hotStamping?.areas_response.work_order_flow_id },
-      include: {
-        partialReleases: true,
-      },
-    });
-    const pendingPartial = workOrderFlow?.partialReleases.find(p => !p.validated);
-    if (pendingPartial) {
-      await this.prisma.partialRelease.update({
-        where: { id: pendingPartial.id },
-        data: {
-          validated: true,
-        },
-      });
-      await this.prisma.workOrderFlow.update({
-        where: { id: pendingPartial?.work_order_flow_id },
-        data: {
-          status: 'Parcial',
-        },
-      });
       const formAuditory = await this.prisma.formAuditory.upsert({
-        where: { id: pendingPartial?.id },
+        where: { id: partial.id },
         update: {
           reviewed_by_id: userId,
           sample_auditory: dto.sample_auditory,
         },
         create: {
-          id: pendingPartial?.id,
+          id: partial.id,
           reviewed_by_id: userId,
+          sample_auditory: dto.sample_auditory,
+        },
+      });
+      await this.prisma.partialRelease.update({
+        where: { id: partial.id },
+        data: {
+          validated: true,
+          form_auditory_id: formAuditory.id,
+        },
+      });
+      await this.prisma.workOrderFlow.update({
+        where: { id: partial.work_order_flow_id },
+        data: {
+          status: 'Parcial',
+        },
+      });
+      // Buscar next flow
+      const currentFlow = await this.prisma.workOrderFlow.findUnique({
+        where: { id: partial.work_order_flow_id },
+      });
+      const nextFlow = await this.prisma.workOrderFlow.findFirst({
+        where: {
+          work_order_id: currentFlow?.work_order_id,
+          id: {
+            gt: currentFlow?.id,
+          },
+        },
+        orderBy: { id: 'asc' },
+      });
+      if (nextFlow) {
+        await this.prisma.workOrderFlow.update({
+          where: { id: nextFlow.id },
+          data: { status: 'Pendiente parcial' },
+        });
+      }
+      return formAuditory;
+    }
+    const workOrderFlow = hotStamping.areas_response?.WorkOrderFlow;
+    if (!workOrderFlow) throw new Error('No hay WorkOrderFlow asociado al hotStamping');
+    const pendingPartial = workOrderFlow.partialReleases.find(p => !p.validated);
+    if (pendingPartial) {
+      await this.prisma.partialRelease.update({ 
+        where: { id: pendingPartial.id },
+        data: { validated: true },
+      });
+      await this.prisma.workOrderFlow.update({
+        where: { id: pendingPartial.work_order_flow_id },
+        data: { status: 'Parcial' },
+      });
+      const formAuditory = await this.prisma.formAuditory.upsert({
+        where: { id: pendingPartial.id },
+        update: {
+          reviewed_by_id: userId,
+          sample_auditory: dto.sample_auditory,
+        },
+        create: {
+          id: pendingPartial.id,
+          reviewed_by_id: userId,
+          sample_auditory: dto.sample_auditory,
         },
       });
       const nextFlow = await this.prisma.workOrderFlow.findFirst({
         where: {
           work_order_id: workOrderFlow?.work_order_id,
-          id: {
-            gt: workOrderFlow?.id,
-          },
+          id: { gt: workOrderFlow?.id, },
         },
-        orderBy: {
-          id: 'asc',
-        },
+        orderBy: { id: 'asc', },
       });
-  
       if (nextFlow) {
         await this.prisma.workOrderFlow.update({
-          where: {
-            id: nextFlow.id,
-          },
-          data: {
-            status: 'Pendiente parcial',
-          },
+          where: { id: nextFlow.id },
+          data: { status: 'Pendiente parcial' },
         });
       }
       return formAuditory;
@@ -455,45 +449,31 @@ export class AcceptAuditoryWorkOrderService {
         sample_auditory: dto.sample_auditory,
       },
       create: {
-        id: hotStamping.form_auditory_id,
+        id: hotStamping.id,
         reviewed_by_id: userId,
+        sample_auditory: dto.sample_auditory,
       },
     });
-
     await this.prisma.workOrderFlow.update({
-      where: { id: hotStamping.areas_response.work_order_flow_id},
-      data: {
-        status: 'Completado'
-      },
+      where: { id: workOrderFlow.id },
+      data: { status: 'Completado' },
     });
-    // Buscar el siguiente flujo (id mayor, mismo work_order_id)
     const nextFlow = await this.prisma.workOrderFlow.findFirst({
       where: {
         work_order_id: workOrderFlow?.work_order_id,
-        id: {
-          gt: workOrderFlow?.id,
-        },
+        id: { gt: workOrderFlow?.id },
       },
-      orderBy: {
-        id: 'asc',
-      },
+      orderBy: { id: 'asc' },
     });
-
     if (nextFlow) {
       await this.prisma.workOrderFlow.update({
-        where: {
-          id: nextFlow.id,
-        },
-        data: {
-          status: 'Pendiente',
-        },
+        where: { id: nextFlow.id },
+        data: { status: 'Pendiente' },
       });
     } else {
       await this.prisma.workOrderFlow.update({
-        where: { id: hotStamping.areas_response.work_order_flow_id},
-        data: {
-          status: 'En auditoria'
-        },
+        where: { id: workOrderFlow.id },
+        data: { status: 'En auditoria' },
       });
     }
     return formAuditory;
@@ -507,7 +487,12 @@ export class AcceptAuditoryWorkOrderService {
         formAuditory: true,
         areas_response: {
           include: {
-            WorkOrderFlow: true,
+            WorkOrderFlow: {
+              include: {
+                partialReleases: true,
+                workOrder: true,
+              },
+            },
           },
         },
       },
@@ -516,87 +501,89 @@ export class AcceptAuditoryWorkOrderService {
       const partial = await this.prisma.partialRelease.findFirst({
         where: { work_order_flow_id: id, validated: false },
       });
-      if(partial) {
-        const formAuditory = await this.prisma.formAuditory.upsert({
-          where: { id: partial?.id },
-          update: {
-            reviewed_by_id: userId,
-            sample_auditory: dto.sample_auditory,
-          },
-          create: {
-            id: partial?.id,
-            reviewed_by_id: userId,
-            sample_auditory: dto.sample_auditory,
-          },
-        });
-        await this.prisma.partialRelease.update({
-          where: { id: partial?.id },
-          data: {
-            validated: true,
-            form_auditory_id: formAuditory.id,
-          },
-        });
-        await this.prisma.workOrderFlow.update({
-          where: { id: partial?.work_order_flow_id },
-          data: {
-            status: 'Parcial',
-          },
-        });
-        return formAuditory;
+      if(!partial) {
+        throw new Error('MillingChip not found y no hay partial pendiente');
       }
-      throw new Error('MillingChip not found');
-    }
-    const workOrderFlow = await this.prisma.workOrderFlow.findUnique({
-      where: { id: millingChip?.areas_response.work_order_flow_id },
-      include: {
-        partialReleases: true,
-      },
-    });
-    const pendingPartial = workOrderFlow?.partialReleases.find(p => !p.validated);
-    if (pendingPartial) {
-      await this.prisma.partialRelease.update({
-        where: { id: pendingPartial.id },
-        data: {
-          validated: true,
-        },
-      });
-      await this.prisma.workOrderFlow.update({
-        where: { id: pendingPartial?.work_order_flow_id },
-        data: {
-          status: 'Parcial',
-        },
-      });
       const formAuditory = await this.prisma.formAuditory.upsert({
-        where: { id: pendingPartial?.id },
+        where: { id: partial.id },
         update: {
           reviewed_by_id: userId,
           sample_auditory: dto.sample_auditory,
         },
         create: {
-          id: pendingPartial?.id,
+          id: partial.id,
           reviewed_by_id: userId,
+          sample_auditory: dto.sample_auditory,
+        },
+      });
+      await this.prisma.partialRelease.update({
+        where: { id: partial.id },
+        data: {
+          validated: true,
+          form_auditory_id: formAuditory.id,
+        },
+      });
+      await this.prisma.workOrderFlow.update({
+        where: { id: partial.work_order_flow_id },
+        data: {
+          status: 'Parcial',
+        },
+      });
+      // Buscar next flow
+      const currentFlow = await this.prisma.workOrderFlow.findUnique({
+        where: { id: partial.work_order_flow_id },
+      });
+      const nextFlow = await this.prisma.workOrderFlow.findFirst({
+        where: {
+          work_order_id: currentFlow?.work_order_id,
+          id: { gt: currentFlow?.id },
+        },
+        orderBy: { id: 'asc' },
+      });
+      if (nextFlow) {
+        await this.prisma.workOrderFlow.update({
+          where: { id: nextFlow.id },
+          data: { status: 'Pendiente parcial' },
+        });
+      }
+      return formAuditory;
+    }
+    // Si hay millingChip, seguimos flujo normal
+    const workOrderFlow = millingChip.areas_response?.WorkOrderFlow;
+    if (!workOrderFlow) throw new Error('No hay WorkOrderFlow asociado al millingChip');
+    const pendingPartial = workOrderFlow.partialReleases.find(p => !p.validated);
+    if (pendingPartial) {
+      await this.prisma.partialRelease.update({
+        where: { id: pendingPartial.id },
+        data: { validated: true },
+      });
+      await this.prisma.workOrderFlow.update({
+        where: { id: pendingPartial.work_order_flow_id },
+        data: { status: 'Completado' },
+      });
+      const formAuditory = await this.prisma.formAuditory.upsert({
+        where: { id: pendingPartial.id },
+        update: {
+          reviewed_by_id: userId,
+          sample_auditory: dto.sample_auditory,
+        },
+        create: {
+          id: pendingPartial.id,
+          reviewed_by_id: userId,
+          sample_auditory: dto.sample_auditory,
         },
       });
       const nextFlow = await this.prisma.workOrderFlow.findFirst({
         where: {
           work_order_id: workOrderFlow?.work_order_id,
-          id: {
-            gt: workOrderFlow?.id,
-          },
+          id: { gt: workOrderFlow?.id },
         },
-        orderBy: {
-          id: 'asc',
-        },
+        orderBy: { id: 'asc' },
       });
-  
       if (nextFlow) {
         await this.prisma.workOrderFlow.update({
-          where: {
-            id: nextFlow.id,
-          },
-          data: {
-            status: 'Pendiente parcial',
-          },
+          where: { id: nextFlow.id },
+          data: { status: 'Pendiente parcial' },
         });
       }
       return formAuditory;
@@ -608,45 +595,31 @@ export class AcceptAuditoryWorkOrderService {
         sample_auditory: dto.sample_auditory,
       },
       create: {
-        id: millingChip.form_auditory_id,
+        id: millingChip.id,
         reviewed_by_id: userId,
+        sample_auditory: dto.sample_auditory,
       },
     });
-
     await this.prisma.workOrderFlow.update({
-      where: { id: millingChip.areas_response.work_order_flow_id},
-      data: {
-        status: 'Completado'
-      },
+      where: { id: workOrderFlow.id },
+      data: { status: 'Completado' },
     });
-    // Buscar el siguiente flujo (id mayor, mismo work_order_id)
     const nextFlow = await this.prisma.workOrderFlow.findFirst({
       where: {
-        work_order_id: workOrderFlow?.work_order_id,
-        id: {
-          gt: workOrderFlow?.id,
-        },
+        work_order_id: workOrderFlow.work_order_id,
+        id: { gt: workOrderFlow.id },
       },
-      orderBy: {
-        id: 'asc',
-      },
+      orderBy: { id: 'asc' },
     });
-
     if (nextFlow) {
       await this.prisma.workOrderFlow.update({
-        where: {
-          id: nextFlow.id,
-        },
-        data: {
-          status: 'Pendiente',
-        },
+        where: { id: nextFlow.id },
+        data: { status: 'Pendiente' },
       });
     } else {
       await this.prisma.workOrderFlow.update({
-        where: { id: millingChip.areas_response.work_order_flow_id},
-        data: {
-          status: 'En auditoria'
-        },
+        where: { id: workOrderFlow.id },
+        data: { status: 'En auditoria' },
       });
     }
     return formAuditory;
@@ -660,7 +633,12 @@ export class AcceptAuditoryWorkOrderService {
         formAuditory: true,
         areas_response: {
           include: {
-            WorkOrderFlow: true,
+            WorkOrderFlow: {
+              include: {
+                partialReleases: true,
+                workOrder: true,
+              },
+            },
           },
         },
       },
@@ -669,87 +647,87 @@ export class AcceptAuditoryWorkOrderService {
       const partial = await this.prisma.partialRelease.findFirst({
         where: { work_order_flow_id: id, validated: false },
       });
-      if(partial) {
-        const formAuditory = await this.prisma.formAuditory.upsert({
-          where: { id: partial?.id },
-          update: {
-            reviewed_by_id: userId,
-            sample_auditory: dto.sample_auditory,
-          },
-          create: {
-            id: partial?.id,
-            reviewed_by_id: userId,
-            sample_auditory: dto.sample_auditory,
-          },
-        });
-        await this.prisma.partialRelease.update({
-          where: { id: partial?.id },
-          data: {
-            validated: true,
-            form_auditory_id: formAuditory.id,
-          },
-        });
-        await this.prisma.workOrderFlow.update({
-          where: { id: partial?.work_order_flow_id },
-          data: {
-            status: 'Parcial',
-          },
-        });
-        return formAuditory;
+      if (!partial) {
+        throw new Error('Corte not found y no hay partial pendiente');
       }
-      throw new Error('Corte not found');
-    }
-    const workOrderFlow = await this.prisma.workOrderFlow.findUnique({
-      where: { id: personalizacion?.areas_response.work_order_flow_id },
-      include: {
-        partialReleases: true,
-      },
-    });
-    const pendingPartial = workOrderFlow?.partialReleases.find(p => !p.validated);
-    if (pendingPartial) {
-      await this.prisma.partialRelease.update({
-        where: { id: pendingPartial.id },
-        data: {
-          validated: true,
-        },
-      });
-      await this.prisma.workOrderFlow.update({
-        where: { id: pendingPartial?.work_order_flow_id },
-        data: {
-          status: 'Parcial',
-        },
-      });
       const formAuditory = await this.prisma.formAuditory.upsert({
-        where: { id: pendingPartial?.id },
+        where: { id: partial.id },
         update: {
           reviewed_by_id: userId,
           sample_auditory: dto.sample_auditory,
         },
         create: {
-          id: pendingPartial?.id,
+          id: partial.id,
           reviewed_by_id: userId,
+          sample_auditory: dto.sample_auditory,
+        },
+      });
+      await this.prisma.partialRelease.update({
+        where: { id: partial.id },
+        data: {
+          validated: true,
+          form_auditory_id: formAuditory.id,
+        },
+      });
+      await this.prisma.workOrderFlow.update({
+        where: { id: partial.work_order_flow_id },
+        data: { status: 'Parcial' },
+      });
+      // Buscar next flow
+      const currentFlow = await this.prisma.workOrderFlow.findUnique({
+        where: { id: partial.work_order_flow_id },
+      });
+      const nextFlow = await this.prisma.workOrderFlow.findFirst({
+        where: {
+          work_order_id: currentFlow?.work_order_id,
+          id: { gt: currentFlow?.id },
+        },
+        orderBy: { id: 'asc' },
+      });
+      if (nextFlow) {
+        await this.prisma.workOrderFlow.update({
+          where: { id: nextFlow.id },
+          data: { status: 'Pendiente parcial' },
+        });
+      }
+      return formAuditory;
+    }
+    // Si hay personalizacion, seguimos flujo normal
+    const workOrderFlow = personalizacion.areas_response?.WorkOrderFlow;
+    if (!workOrderFlow) throw new Error('No hay WorkOrderFlow asociado a la personalizacion');
+    const pendingPartial = workOrderFlow.partialReleases.find(p => !p.validated);
+    if (pendingPartial) {
+      await this.prisma.partialRelease.update({
+        where: { id: pendingPartial.id },
+        data: { validated: true },
+      });
+      await this.prisma.workOrderFlow.update({
+        where: { id: pendingPartial?.work_order_flow_id },
+        data: { status: 'Completado' },
+      });
+      const formAuditory = await this.prisma.formAuditory.upsert({
+        where: { id: pendingPartial.id },
+        update: {
+          reviewed_by_id: userId,
+          sample_auditory: dto.sample_auditory,
+        },
+        create: {
+          id: pendingPartial.id,
+          reviewed_by_id: userId,
+          sample_auditory: dto.sample_auditory,
         },
       });
       const nextFlow = await this.prisma.workOrderFlow.findFirst({
         where: {
           work_order_id: workOrderFlow?.work_order_id,
-          id: {
-            gt: workOrderFlow?.id,
-          },
+          id: { gt: workOrderFlow?.id },
         },
-        orderBy: {
-          id: 'asc',
-        },
+        orderBy: { id: 'asc' },
       });
-  
       if (nextFlow) {
         await this.prisma.workOrderFlow.update({
-          where: {
-            id: nextFlow.id,
-          },
-          data: {
-            status: 'Pendiente parcial',
-          },
+          where: { id: nextFlow.id },
+          data: { status: 'Pendiente parcial' },
         });
       }
       return formAuditory;
@@ -761,45 +739,31 @@ export class AcceptAuditoryWorkOrderService {
         sample_auditory: dto.sample_auditory,
       },
       create: {
-        id: personalizacion.form_auditory_id,
+        id: personalizacion.id,
         reviewed_by_id: userId,
+        sample_auditory: dto.sample_auditory,
       },
     });
-
     await this.prisma.workOrderFlow.update({
-      where: { id: personalizacion.areas_response.work_order_flow_id},
-      data: {
-        status: 'Completado'
-      },
+      where: { id: workOrderFlow.id },
+      data: { status: 'Completado' },
     });
-    // Buscar el siguiente flujo (id mayor, mismo work_order_id)
     const nextFlow = await this.prisma.workOrderFlow.findFirst({
       where: {
-        work_order_id: workOrderFlow?.work_order_id,
-        id: {
-          gt: workOrderFlow?.id,
-        },
+        work_order_id: workOrderFlow.work_order_id,
+        id: { gt: workOrderFlow.id },
       },
-      orderBy: {
-        id: 'asc',
-      },
+      orderBy: { id: 'asc' },
     });
-
     if (nextFlow) {
       await this.prisma.workOrderFlow.update({
-        where: {
-          id: nextFlow.id,
-        },
-        data: {
-          status: 'Pendiente',
-        },
+        where: { id: nextFlow.id },
+        data: { status: 'Pendiente' },
       });
     } else {
       await this.prisma.workOrderFlow.update({
-        where: { id: personalizacion.areas_response.work_order_flow_id},
-        data: {
-          status: 'En auditoria'
-        },
+        where: { id: workOrderFlow.id },       
+        data: { status: 'En auditoria' },
       });
     }
     return formAuditory;

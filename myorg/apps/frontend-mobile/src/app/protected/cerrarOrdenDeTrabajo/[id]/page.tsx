@@ -43,7 +43,7 @@ const CerrarOrdenDeTrabajoAuxScreen: React.FC = () => {
 
   // Función para obtener los datos específicos de cada área
   const getAreaData = (areaId: number, areaResponse: any) => {
-    console.log("user",areaResponse?.user?.username);
+    console.log("user", areaResponse?.user?.username);
     switch (areaId) {
       case 6: // corte
         return {
@@ -53,6 +53,7 @@ const CerrarOrdenDeTrabajoAuxScreen: React.FC = () => {
           cqm: areaResponse?.corte?.form_answer?.sample_quantity ?? 0,
           muestras: areaResponse?.corte?.formAuditory?.sample_auditory ?? '',
           usuario: areaResponse?.user?.username || '',
+          auditor: areaResponse?.corte?.formAuditory?.user?.username || '',
         };
       case 7: // color-edge
         return {
@@ -62,6 +63,7 @@ const CerrarOrdenDeTrabajoAuxScreen: React.FC = () => {
           cqm: areaResponse?.colorEdge?.form_answer?.sample_quantity || 0,
           muestras: areaResponse?.colorEdge?.formAuditory?.sample_auditory ?? '',
           usuario: areaResponse?.user?.username || '',
+          auditor: areaResponse?.colorEdge?.formAuditory?.user?.username || '',
         };
       case 8: // hot-stamping
         return {
@@ -71,6 +73,7 @@ const CerrarOrdenDeTrabajoAuxScreen: React.FC = () => {
           cqm: areaResponse?.hotStamping?.form_answer?.sample_quantity || 0,
           muestras: areaResponse?.hotStamping?.formAuditory?.sample_auditory ?? '',
           usuario: areaResponse?.user?.username || '',
+          auditor: areaResponse?.hotStamping?.formAuditory?.user?.username || '',
 
         };
       case 9: // milling-chip
@@ -82,6 +85,7 @@ const CerrarOrdenDeTrabajoAuxScreen: React.FC = () => {
           cqm: areaResponse?.millingChip?.form_answer?.sample_quantity || 0,
           muestras: areaResponse?.millingChip?.formAuditory?.sample_auditory ?? '',
           usuario: areaResponse?.user?.username || '',
+          auditor: areaResponse?.millingChip?.formAuditory?.user?.username || '',
         };
       case 10: // personalizacion
         return {
@@ -91,6 +95,7 @@ const CerrarOrdenDeTrabajoAuxScreen: React.FC = () => {
           cqm: areaResponse?.personalizacion?.form_answer?.sample_quantity || 0,
           muestras: areaResponse?.personalizacion?.formAuditory?.sample_auditory ?? '',
           usuario: areaResponse?.user?.username || '',
+          auditor: areaResponse?.personalizacion?.formAuditory?.user?.username || '',
         };
       default:
         return {
@@ -99,7 +104,8 @@ const CerrarOrdenDeTrabajoAuxScreen: React.FC = () => {
           excedente: 0,
           muestras: 0,
           cqm: 0,
-          usuario: ''
+          usuario: '',
+          auditor: ''
         };
     }
   };
@@ -176,7 +182,9 @@ const CerrarOrdenDeTrabajoAuxScreen: React.FC = () => {
             <Text style={styles.cell}>Excedente</Text>
             <Text style={styles.cell}>CQM</Text>
             <Text style={styles.cell}>Muestras</Text>
+            <Text style={styles.cell}>Totales</Text>
             <Text style={styles.cellUser}>Usuario</Text>
+            <Text style={styles.cellUser}>Auditor</Text>
           </View>
           {areas.filter((area: any) => area.id >= 6).map((area: any, index: number) => (
             <View key={index} style={styles.row}>
@@ -186,18 +194,11 @@ const CerrarOrdenDeTrabajoAuxScreen: React.FC = () => {
               <Text style={styles.cell}>{area.excedente}</Text>
               <Text style={styles.cell}>{area.cqm}</Text>
               <Text style={styles.cell}>{area.muestras}</Text>
-              <Text style={styles.cellUser}>{area?.usuario || 'N/A'}</Text>
+              <Text style={styles.cell}>{Number(area.buenas) + Number(area.malas) + Number(area.excedente) + Number(area.cqm) + Number(area.muestras)}</Text>
+              <Text style={styles.cellUser}>{area?.usuario}</Text>
+              <Text style={styles.cellUser}>{area?.auditor}</Text>
             </View>
           ))}
-          <View style={[styles.row, { backgroundColor: '#f0f0f0' }]}>
-            <Text style={styles.cellUser}>Totales</Text>
-            <Text style={styles.cell}>{totals.buenas}</Text>
-            <Text style={styles.cell}>{totals.malas}</Text>
-            <Text style={styles.cell}>{totals.excedente}</Text>
-            <Text style={styles.cell}>{totals.cqm}</Text>
-            <Text style={styles.cell}>{totals.muestras}</Text>
-            <Text style={styles.cellUser}>—</Text>
-          </View>
         </View>
       </ScrollView>
 
@@ -278,7 +279,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 10,
     textAlign: 'center',
   },
-  cellUser:{
+  cellUser: {
     width: 120,
     paddingHorizontal: 10
   },

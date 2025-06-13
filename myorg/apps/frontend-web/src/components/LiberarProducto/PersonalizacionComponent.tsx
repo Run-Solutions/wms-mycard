@@ -482,7 +482,7 @@ export default function PersonalizacionComponent({ workOrder }: Props) {
                     </tr>
                   </thead>
                   <tbody>
-                    {questionsOpen &&
+                    {
                       workOrder.area.formQuestions
                         .slice(14, 20)
                         .map((question: { id: number; title: string }) => (
@@ -524,7 +524,7 @@ export default function PersonalizacionComponent({ workOrder }: Props) {
                     </tr>
                   </thead>
                   <tbody>
-                    {questionsOpen &&
+                    {
                       workOrder.area.formQuestions
                         .slice(20, 28)
                         .map((question: { id: number; title: string }) => (
@@ -566,7 +566,7 @@ export default function PersonalizacionComponent({ workOrder }: Props) {
                     </tr>
                   </thead>
                   <tbody>
-                    {questionsOpen &&
+                    {
                       workOrder.area.formQuestions
                         .slice(28, 30)
                         .map((question: { id: number; title: string }) => (
@@ -589,7 +589,7 @@ export default function PersonalizacionComponent({ workOrder }: Props) {
               <Label style={{ paddingTop: '30px' }}>Muestras:</Label>
               <Input type="number" placeholder="Ej: 2" value={sampleQuantity} onChange={handleSampleQuantityChange} />
             </InputGroup>
-            {selectedOption === 'etiquetadora' && (
+            {['etiquetadora', 'packsmart', 'otto', 'embolsadora'].includes(selectedOption) && (
               <>
                 <ModalTitle style={{ marginTop: '1.5rem', marginBottom: '0.3rem' }}>
                   Preguntas de Calidad

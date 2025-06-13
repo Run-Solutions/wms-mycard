@@ -113,31 +113,51 @@ export class CloseAuditoryWorkOrderService {
                     corte: {
                       include: {
                         form_answer: true,
-                        formAuditory: true,
+                        formAuditory: {
+                          include: {
+                            user: true,
+                          }
+                        },
                       }
                     },
                     colorEdge: {
                       include: {
                         form_answer: true,
-                        formAuditory: true,
+                        formAuditory: {
+                          include: {
+                            user: true,
+                          }
+                        },
                       }
                     },
                     hotStamping: {
                       include: {
                         form_answer: true,
-                        formAuditory: true,
+                        formAuditory: {
+                          include: {
+                            user: true,
+                          }
+                        },
                       }
                     },
                     millingChip: {
                       include: {
                         form_answer: true,
-                        formAuditory: true,
+                        formAuditory: {
+                          include: {
+                            user: true,
+                          }
+                        },
                       }
                     },
                     personalizacion: {
                       include: {
                         form_answer: true,
-                        formAuditory: true,
+                        formAuditory: {
+                          include: {
+                            user: true,
+                          }
+                        },
                       }
                     }
                   },
