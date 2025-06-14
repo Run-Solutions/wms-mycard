@@ -82,7 +82,7 @@ const HotStampingComponent: React.FC<{ workOrder: any }> = ({ workOrder }) => {
 
   return (
     <View>
-      <ScrollView contentContainerStyle={[styles.container, { paddingBottom: 100 }]}>
+      <ScrollView contentContainerStyle={[styles.container, { paddingBottom: 230 }]}>
         <Text style={styles.title}>Área: Hot Stamping</Text>
 
         <View style={styles.card}>

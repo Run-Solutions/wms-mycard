@@ -11,10 +11,17 @@ interface Props {
 }
 
 type AreaData = {
+  id: number;
   name: string;
   status: string;
-  response: string;
+  response: {
+    user: {
+      username: string;
+    }
+  };
   answers: any;
+  usuario: string;
+  auditor: string;
   buenas: number;
   malas: number;
   cqm: number;
@@ -47,110 +54,41 @@ export default function SeguimientoDeOtsAuxPage({ params }: Props) {
 
   // Función para obtener los datos específicos de cada área
   const getAreaData = (areaId: number, areaResponse: any) => {
-    switch(areaId) {
-      case 1: // preprensa
-        return {
-          buenas: areaResponse?.prepress?.plates || 0,
-          malas: areaResponse?.prepress?.bad_quantity || '',
-          excedente: areaResponse?.prepress?.excess_quantity || '',
-          cqm: '',
-          muestras: '',
-        };
-      case 2: // impresión
-        return {
-          buenas: areaResponse?.impression?.release_quantity || 0,
-          malas: areaResponse?.impression?.bad_quantity || '',
-          excedente: areaResponse?.impression?.excess_quantity || '',
-          cqm: areaResponse?.impression?.form_answer?.sample_quantity ?? '',
-          muestras: '',
-        };
-      case 3: // serigrafía
-        return {
-          buenas: areaResponse?.serigrafia?.release_quantity || 0,
-          malas: areaResponse?.serigrafia?.bad_quantity || '',
-          excedente: areaResponse?.serigrafia?.excess_quantity || '',
-          cqm: areaResponse?.serigrafia?.form_answer?.sample_quantity ?? '',
-          muestras: '',
-        };
-      case 4: // empalme
-        return {
-          buenas: areaResponse?.empalme?.release_quantity || '',
-          malas: areaResponse?.empalme?.bad_quantity || '',
-          excedente: areaResponse?.empalme?.excess_quantity || '',
-          cqm: areaResponse?.empalme?.form_answer?.sample_quantity ?? '',
-          muestras: '',
-        };
-      case 5: // empalme
-        return {
-          buenas: areaResponse?.laminacion?.release_quantity || 0,
-          malas: areaResponse?.laminacion?.bad_quantity || '',
-          excedente: areaResponse?.laminacion?.excess_quantity || '',
-          cqm: areaResponse?.laminacion?.form_answer?.sample_quantity ?? '',
-          muestras: '',
-        };
-        case 6: // corte
-        return {
-          buenas: areaResponse?.corte?.good_quantity || 0,
-          malas: areaResponse?.corte?.bad_quantity || 0,
-          excedente: areaResponse?.corte?.excess_quantity || 0,
-          cqm: areaResponse?.corte?.form_answer?.sample_quantity ?? 0,
-          muestras: areaResponse?.corte?.formAuditory?.sample_auditory ?? ''
-        };
-      case 7: // color-edge
-        return {
-          buenas: areaResponse?.colorEdge?.good_quantity || 0,
-          malas: areaResponse?.colorEdge?.bad_quantity || 0,
-          excedente: areaResponse?.colorEdge?.excess_quantity || 0,
-          cqm: areaResponse?.colorEdge?.form_answer?.sample_quantity || 0,
-          muestras: areaResponse?.colorEdge?.formAuditory?.sample_auditory ?? ''
-        };
-      case 8: // hot-stamping
-        return {
-          buenas: areaResponse?.hotStamping?.good_quantity || 0,
-          malas: areaResponse?.hotStamping?.bad_quantity || 0,
-          excedente: areaResponse?.hotStamping?.excess_quantity || 0,
-          cqm: areaResponse?.hotStamping?.form_answer?.sample_quantity || 0,
-          muestras: areaResponse?.hotStamping?.formAuditory?.sample_auditory ?? ''
-        };
-      case 9: // milling-chip
-        return {
-          buenas: areaResponse?.millingChip?.good_quantity || 0,
-          malas: areaResponse?.millingChip?.bad_quantity || 0,
-          excedente: areaResponse?.millingChip?.excess_quantity || 0,
-          cqm: areaResponse?.millingChip?.form_answer?.sample_quantity || 0,
-          muestras: areaResponse?.millingChip?.formAuditory?.sample_auditory ?? ''
-        };
-      case 10: // personalizacion
-        return {
-          buenas: areaResponse?.personalizacion?.good_quantity || 0,
-          malas: areaResponse?.personalizacion?.bad_quantity || 0,
-          excedente: areaResponse?.personalizacion?.excess_quantity || 0,
-          cqm: areaResponse?.personalizacion?.form_answer?.sample_quantity || 0,
-          muestras: areaResponse?.personalizacion?.formAuditory?.sample_auditory ?? ''
-        };
+    switch (areaId) {
+      case 1:
+        return { buenas: areaResponse?.prepress?.plates || 0, malas: areaResponse?.prepress?.bad_quantity || 0, excedente: areaResponse?.prepress?.excess_quantity || 0, cqm: 0, muestras: 0, usuario: areaResponse?.user?.username || '', auditor: '' };
+      case 2:
+        return { buenas: areaResponse?.impression?.release_quantity || 0, malas: areaResponse?.impression?.bad_quantity || 0, excedente: areaResponse?.impression?.excess_quantity || 0, cqm: areaResponse?.impression?.form_answer?.sample_quantity ?? 0, muestras: 0,usuario: areaResponse?.user?.username || '', auditor: '' };
+      case 3:
+        return { buenas: areaResponse?.serigrafia?.release_quantity || 0, malas: areaResponse?.serigrafia?.bad_quantity || 0, excedente: areaResponse?.serigrafia?.excess_quantity || 0, cqm: areaResponse?.serigrafia?.form_answer?.sample_quantity ?? 0, muestras: 0,usuario: areaResponse?.user?.username || '', auditor: '' };
+      case 4:
+        return { buenas: areaResponse?.empalme?.release_quantity || 0, malas: areaResponse?.empalme?.bad_quantity || 0, excedente: areaResponse?.empalme?.excess_quantity || 0, cqm: areaResponse?.empalme?.form_answer?.sample_quantity ?? 0, muestras: 0,usuario: areaResponse?.user?.username || '', auditor: '' };
+      case 5:
+        return { buenas: areaResponse?.laminacion?.release_quantity || 0, malas: areaResponse?.laminacion?.bad_quantity || 0, excedente: areaResponse?.laminacion?.excess_quantity || 0, cqm: areaResponse?.laminacion?.form_answer?.sample_quantity ?? 0, muestras: 0,usuario: areaResponse?.user?.username || '', auditor: '' };
+      case 6:
+        return { buenas: areaResponse?.corte?.good_quantity || 0, malas: areaResponse?.corte?.bad_quantity || 0, excedente: areaResponse?.corte?.excess_quantity || 0, cqm: areaResponse?.corte?.form_answer?.sample_quantity ?? 0, muestras: areaResponse?.corte?.formAuditory?.sample_auditory ?? 0,usuario: areaResponse?.user?.username || '', auditor: areaResponse?.corte?.formAuditory?.user?.username || '' };
+      case 7:
+        return { buenas: areaResponse?.colorEdge?.good_quantity || 0, malas: areaResponse?.colorEdge?.bad_quantity || 0, excedente: areaResponse?.colorEdge?.excess_quantity || 0, cqm: areaResponse?.colorEdge?.form_answer?.sample_quantity || 0, muestras: areaResponse?.colorEdge?.formAuditory?.sample_auditory ?? 0,usuario: areaResponse?.user?.username || '', auditor: areaResponse?.colorEdge?.formAuditory?.user?.username || '' };
+      case 8:
+        return { buenas: areaResponse?.hotStamping?.good_quantity || 0, malas: areaResponse?.hotStamping?.bad_quantity || 0, excedente: areaResponse?.hotStamping?.excess_quantity || 0, cqm: areaResponse?.hotStamping?.form_answer?.sample_quantity || 0, muestras: areaResponse?.hotStamping?.formAuditory?.sample_auditory ?? 0,usuario: areaResponse?.user?.username || '', auditor: areaResponse?.hotStamping?.formAuditory?.user?.username || '' };
+      case 9:
+        return { buenas: areaResponse?.millingChip?.good_quantity || 0, malas: areaResponse?.millingChip?.bad_quantity || 0, excedente: areaResponse?.millingChip?.excess_quantity || 0, cqm: areaResponse?.millingChip?.form_answer?.sample_quantity || 0, muestras: areaResponse?.millingChip?.formAuditory?.sample_auditory ?? 0,usuario: areaResponse?.user?.username || '', auditor: areaResponse?.millingChip?.formAuditory?.user?.username || '' };
+      case 10:
+        return { buenas: areaResponse?.personalizacion?.good_quantity || 0, malas: areaResponse?.personalizacion?.bad_quantity || 0, excedente: areaResponse?.personalizacion?.excess_quantity || 0, cqm: areaResponse?.personalizacion?.form_answer?.sample_quantity || 0, muestras: areaResponse?.personalizacion?.formAuditory?.sample_auditory ?? 0,usuario: areaResponse?.user?.username || '', auditor: areaResponse?.personalizacion?.formAuditory?.user?.username || '' };
       default:
-        return {
-          buenas: 0,
-          malas: 0,
-          excedente: 0,
-          muestras: 0,
-          cqm: 0
-        };
+        return { buenas: 0, malas: 0, excedente: 0, cqm: 0, muestras: 0 };
     }
   };
 
-  // Para obtener todas las areas del flujo
-  const areas: AreaData[] = workOrder?.flow?.map((item: any) => {
-    const areaData = getAreaData(item.area_id, item.areaResponse);
-      return {
-        id: item.area_id,
-        name: item.area?.name || 'Sin nombre',
-        status: item.status || 'Desconocido',
-        response: item.areaResponse || {},
-        answers: item.answers?.[0] || {},
-        ...areaData
-      };
-  }) || [];
+  const areas: AreaData[] = workOrder?.flow?.map((item: any) => ({
+    id: item.area_id,
+    name: item.area?.name || 'Sin nombre',
+    status: item.status || 'Desconocido',
+    response: item.areaResponse || {},
+    answers: item.answers?.[0] || {},
+    ...getAreaData(item.area_id, item.areaResponse)
+  })) || [];
+
 
   const cantidadHojasRaw = Number(workOrder?.quantity) / 24;
   const cantidadHojas = cantidadHojasRaw > 0 ? Math.ceil(cantidadHojasRaw) : 0;
@@ -186,64 +124,77 @@ export default function SeguimientoDeOtsAuxPage({ params }: Props) {
         <Section>
           <SectionTitle>Datos de Producción</SectionTitle>
           <TableWrapper>
-            <Table>
+          <Table>
               <thead>
                 <tr>
-                  <th></th>
-                  {areas.map((area, index) => (
-                    <th key={index}>{area.name}</th>
+                  <th />
+                  {areas.map((area) => (
+                    <th key={area.id} title={`Estado: ${area.status}`}>
+                      <span>{area.name}</span>
+                    </th>
                   ))}
                 </tr>
               </thead>
               <tbody>
                 <tr>
+                  <td>Usuario</td>
+                  {areas.map((area) => (
+                    <td key={area.id}>{area.usuario}</td>
+                  ))}
+                </tr>
+                <tr>
+                  <td>Auditor</td>
+                  {areas.map((area) => (
+                    <td key={area.id}>{area.auditor}</td>
+                  ))}
+                </tr>
+                <tr>
                   <td>Estado</td>
-                  {areas.map((area, index) => (
-                    <td key={index}>{area.status}</td>
+                  {areas.map((area) => (
+                    <td key={area.id}>{area.status}</td>
                   ))}
                 </tr>
                 <tr>
                   <td>Buenas</td>
-                  {areas.map((area, index) => (
-                    <td key={index}>{area.buenas || ''}</td>
+                  {areas.map((area) => (
+                    <td key={area.id}>{area.buenas}</td>
                   ))}
                 </tr>
                 <tr>
                   <td>Malas</td>
-                  {areas.map((area, index) => (
-                    <td key={index}>{area.malas}
-                    </td>
+                  {areas.map((area) => (
+                    <td key={area.id}>{area.malas}</td>
                   ))}
                 </tr>
                 <tr>
                   <td>Excedente</td>
-                  {areas.map((area, index) => (
-                    <td key={index}>{area.excedente}</td>
+                  {areas.map((area) => (
+                    <td key={area.id}>{area.excedente}</td>
                   ))}
                 </tr>
                 <tr>
                   <td>CQM</td>
-                  {areas.map((area, index) => (
-                    <td key={index}>{area.cqm}</td>
+                  {areas.map((area) => (
+                    <td key={area.id}>{area.cqm}</td>
                   ))}
                 </tr>
                 <tr>
                   <td>Muestras</td>
-                  {areas.map((area, index) => (
-                    <td key={index}>{area.muestras}</td>
+                  {areas.map((area) => (
+                    <td key={area.id}>{area.muestras}</td>
                   ))}
                 </tr>
                 <tr>
-                <td>SUMA TOTAL</td>
-                {areas.map((area, index) => {
-                    const buenas = Number(area.buenas) || 0;
-                    const malas = Number(area.malas) || 0;
-                    const excedente = Number(area.excedente) || 0;
-                    const cqm = Number(area.cqm) || 0;
-                    const muestras = Number(area.muestras) || 0;
-                    const total = buenas + malas + excedente + cqm + muestras;
-                    return <td key={index}>{total}</td>;
-                })}
+                  <td>SUMA TOTAL</td>
+                  {areas.map((area) => (
+                    <td key={area.id}>
+                      {area.buenas +
+                        area.malas +
+                        area.excedente +
+                        area.cqm +
+                        area.muestras}
+                    </td>
+                  ))}
                 </tr>
               </tbody>
             </Table>
@@ -296,13 +247,14 @@ const InfoItem = styled.div`
 
 const Label = styled.span`
   font-weight: 600;
-  color: ${({ theme }) => theme.palette.text.primary}
+  color: black;
   margin-bottom: 0.25rem;
 `;
 
 const Value = styled.span`
   font-size: 1.125rem;  
   margin-top: 5px;
+  color: black;
 `;
 
 const Section = styled.div`

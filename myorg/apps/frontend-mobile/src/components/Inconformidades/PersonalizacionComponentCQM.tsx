@@ -67,9 +67,7 @@ const PersonalizacionComponentCQM = ({ workOrder }: { workOrder: any }) => {
 
   return (
     <View>
-      <ScrollView
-        contentContainerStyle={[styles.container, { paddingBottom: 100 }]}
-      >
+      <ScrollView contentContainerStyle={[styles.container, { paddingBottom: 230 }]}>
         <Text style={styles.sectionTitle}>Entregaste</Text>
         <Text style={styles.label}>Tipo de Personalizacion:</Text>
         <TextInput

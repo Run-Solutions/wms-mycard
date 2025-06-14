@@ -12,7 +12,7 @@ interface User {
   username: string;
   email: string;
   phone?: string;
-  role: {id:number, name: string, createdAt: string, updateAt: string};
+  role: string;
   profile_image?: string;
 }
 
@@ -130,7 +130,7 @@ const UsersPage: React.FC = () => {
                   <CustomTableCell>{user.username}</CustomTableCell>
                   <CustomTableCell>{user.email}</CustomTableCell>
                   <CustomTableCell>{user.phone || 'N/A'}</CustomTableCell>
-                  <CustomTableCell>{user.role?.name || 'Sin rol'}</CustomTableCell>
+                  <CustomTableCell>{user?.role || 'Sin rol'}</CustomTableCell>
                   <CustomTableCell>
                     <Box display="flex" gap={1}>
                       <Button variant="contained" color="primary" onClick={() => handleEdit(user)}>Editar</Button>

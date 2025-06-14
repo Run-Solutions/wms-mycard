@@ -295,11 +295,13 @@ const InfoItem = styled.div`
 const Label = styled.span`
   font-weight: 600;
   display: block;
+  color: black;
   margin-bottom: 0.25rem;
 `;
 
 const Value = styled.span`
   font-size: 1.125rem;
+  color: black;
 `;
 
 const Section = styled.div`
@@ -329,12 +331,14 @@ const Table = styled.table`
   td {
     padding: 0.75rem;
     text-align: center;
+    color: black;
     border-bottom: 1px solid #e5e7eb;
   }
 
   th {
     background: #f3f4f6;
     font-weight: 600;
+    color: #374151;
     position: relative;
   }
 

@@ -78,6 +78,27 @@ const InconformidadesScreen: React.FC = () => {
     );
   };
 
+  const StatusLegend = () => {
+    const legendItems = [
+      { label: 'Completado', color: '#22c55e' },
+      { label: 'Enviado a CQM/En Calidad', color: '#facc15' },
+      { label: 'Parcial', color: '#f5945c' },
+      { label: 'En Proceso/Listo', color: '#4a90e2' },
+      { label: 'En Espera', color: '#d1d5db' },
+    ];
+  
+    return (
+      <View style={styles.legendContainer}>
+        {legendItems.map((item, index) => (
+          <View key={index} style={styles.legendItem}>
+            <View style={[styles.circle, { backgroundColor: item.color }]} />
+            <Text style={styles.legendText}>{item.label}</Text>
+          </View>
+        ))}
+      </View>
+    );
+  };
+
   return (
     <View style={styles.container}>
       <View style={styles.headerWrapper}>
@@ -94,6 +115,7 @@ const InconformidadesScreen: React.FC = () => {
         </View>
       ) : (
         <View style={styles.listWrapper}>
+          <StatusLegend />
           <WorkOrderList
             orders={filterOrdersByStatus(['En inconformidad'])}
             title="Órdenes en inconformidad"
@@ -141,5 +163,28 @@ const styles = StyleSheet.create({
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
+  },
+  legendContainer: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 3,
+    marginHorizontal: 16,
+    marginBottom: 10,
+  },
+  legendItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginRight: 1,
+    marginBottom: 2,
+  },
+  circle: {
+    width: 12,
+    height: 12,
+    borderRadius: 6,
+    marginRight: 2,
+  },
+  legendText: {
+    fontSize: 13,
+    color: '#000',
   },
 });
