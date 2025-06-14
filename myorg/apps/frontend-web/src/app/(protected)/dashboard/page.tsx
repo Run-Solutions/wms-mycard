@@ -5,6 +5,7 @@ import { Box, CircularProgress } from '@mui/material';
 import  MuiGrid  from '@mui/material/Grid';
 import FlipCard from '@/components/Card/FlipCard';
 import { useRouter } from 'next/navigation';
+import { BASE_URL } from '@/api/http';
 
 interface Module {
   id: number;
@@ -25,7 +26,7 @@ const DashboardPage: React.FC = () => {
         // Se recupera el token del user logeado
         const token = localStorage.getItem('token');
         if (!token) throw new Error('⛔ No se ha leído el token');
-        const response = await fetch('http://localhost:3000/dashboard/modules', {
+        const response = await fetch(`${BASE_URL}/dashboard/modules`, {
           method: 'GET',
           headers: {
             'Authorization': `Bearer ${token}`,

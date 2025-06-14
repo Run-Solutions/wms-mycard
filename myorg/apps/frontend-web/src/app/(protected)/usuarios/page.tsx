@@ -6,13 +6,14 @@ import { useRouter } from "next/navigation";
 import { Table, TableBody, TableCell, TableContainer, TableHead, TableRow, Paper, Typography, Button, Avatar, TextField, Box } from '@mui/material';
 import styled, { useTheme } from 'styled-components';
 import { getUsers, updateUser, deleteUser as deleteUserApi } from '@/api/usuarios';
+import { BASE_URL } from '@/api/http';
 
 interface User {
   id: number;
   username: string;
   email: string;
   phone?: string;
-  role: {id:number, name: string, createdAt: string, updateAt: string};
+  role: string;
   profile_image?: string;
 }
 
@@ -28,6 +29,7 @@ const UsersPage: React.FC = () => {
   const fetchUsers = async () => {
     try {
       const res = await getUsers();
+      console.log(res);
       if (res) {
         setUsers(res);
       }
@@ -55,6 +57,7 @@ const UsersPage: React.FC = () => {
   const filteredUsers = users.filter(user =>
     user.username.toLowerCase().includes(searchValue.toLowerCase())
   );
+  console.log(filteredUsers);
 
   const handleFormSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -121,7 +124,7 @@ const UsersPage: React.FC = () => {
                     <Avatar
                       src={
                         user.profile_image
-                          ? `http://localhost:3000/uploads/${user.profile_image}`
+                          ? `${BASE_URL}/uploads/${user.profile_image}`
                           : '/logos/users.webp'
                       }
                       alt={user.username}
@@ -130,7 +133,7 @@ const UsersPage: React.FC = () => {
                   <CustomTableCell>{user.username}</CustomTableCell>
                   <CustomTableCell>{user.email}</CustomTableCell>
                   <CustomTableCell>{user.phone || 'N/A'}</CustomTableCell>
-                  <CustomTableCell>{user.role?.name || 'Sin rol'}</CustomTableCell>
+                  <CustomTableCell>{user?.role || 'Sin rol'}</CustomTableCell>
                   <CustomTableCell>
                     <Box display="flex" gap={1}>
                       <Button variant="contained" color="primary" onClick={() => handleEdit(user)}>Editar</Button>

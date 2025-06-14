@@ -82,7 +82,7 @@ const MillingChipComponent: React.FC<{ workOrder: any }> = ({ workOrder }) => {
 
   return (
     <View>
-      <ScrollView contentContainerStyle={[styles.container, { paddingBottom: 100 }]}>
+      <ScrollView contentContainerStyle={[styles.container, { paddingBottom: 230 }]}>
         <Text style={styles.title}>Área: Milling Chip</Text>
 
         <View style={styles.card}>
@@ -226,7 +226,7 @@ const styles = StyleSheet.create({
     padding: 14,
     borderRadius: 18,
     alignItems: 'center',
-    marginBottom: 30,
+    marginBottom: 50,
   },
   buttonText: {
     color: '#fff',

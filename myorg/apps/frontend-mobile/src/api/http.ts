@@ -3,7 +3,7 @@ import AsyncStorage from "@react-native-async-storage/async-storage";
 import axios from "axios";
 
 const API = axios.create({
-  baseURL: "http://169.254.88.229:3000",
+  baseURL: "https://mycard.runsolutions-services.com",
   timeout: 10000,
 });
 
