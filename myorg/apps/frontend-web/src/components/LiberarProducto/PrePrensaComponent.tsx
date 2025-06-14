@@ -247,7 +247,7 @@ const Textarea = styled.textarea`
 
 const LiberarButton = styled.button`
   margin-top: 2rem;
-  background-color: #2563eb;
+  background-color: ${({ theme }) => theme.palette.primary.main};
   color: white;
   padding: 0.75rem 2rem;
   border-radius: 0.5rem;
@@ -281,7 +281,7 @@ const ModalBox = styled.div`
 `;
 
 const ConfirmButton = styled.button`
-  background-color: #2563eb;
+  background-color: ${({ theme }) => theme.palette.primary.main};
   color: white;
   padding: 0.5rem 1.5rem;
   border-radius: 0.5rem;

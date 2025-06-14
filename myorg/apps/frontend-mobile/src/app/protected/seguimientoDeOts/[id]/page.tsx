@@ -39,139 +39,141 @@ const WorkOrderDetailScreen: React.FC = () => {
     loadData();
   }, [id]);
 
-  // Función para obtener los datos específicos de cada área
-  const getAreaData = (areaId: number, areaResponse: any) => {
-    console.log("user",areaResponse?.user?.username);
-    switch (areaId) {
-      case 1: // preprensa
-        return {
-          buenas: areaResponse?.prepress?.plates || 0,
-          malas: areaResponse?.prepress?.bad_quantity || '',
-          excedente: areaResponse?.prepress?.excess_quantity || '',
-          cqm: '',
-          muestras: '',
-          usuario: areaResponse?.user?.username || '',
-        };
-      case 2: // impresión
-        return {
-          buenas: areaResponse?.impression?.release_quantity || 0,
-          malas: areaResponse?.impression?.bad_quantity || '',
-          excedente: areaResponse?.impression?.excess_quantity || '',
-          cqm: areaResponse?.impression?.form_answer?.sample_quantity ?? '',
-          muestras: '',
-          usuario: areaResponse?.user?.username || '',
-        };
-      case 3: // serigrafía
-        return {
-          buenas: areaResponse?.serigrafia?.release_quantity || 0,
-          malas: areaResponse?.serigrafia?.bad_quantity || '',
-          excedente: areaResponse?.serigrafia?.excess_quantity || '',
-          cqm: areaResponse?.serigrafia?.form_answer?.sample_quantity ?? '',
-          muestras: '',
-          usuario: areaResponse?.user?.username || '',
-        };
-      case 4: // empalme
-        return {
-          buenas: areaResponse?.empalme?.release_quantity || '',
-          malas: areaResponse?.empalme?.bad_quantity || '',
-          excedente: areaResponse?.empalme?.excess_quantity || '',
-          cqm: areaResponse?.empalme?.form_answer?.sample_quantity ?? '',
-          muestras: '',
-          usuario: areaResponse?.user?.username || '',
-        };
-      case 5: // empalme
-        return {
-          buenas: areaResponse?.laminacion?.release_quantity || 0,
-          malas: areaResponse?.laminacion?.bad_quantity || '',
-          excedente: areaResponse?.laminacion?.excess_quantity || '',
-          cqm: areaResponse?.laminacion?.form_answer?.sample_quantity ?? '',
-          muestras: '',
-          usuario: areaResponse?.user?.username || '',
-        };
-      case 6: // corte
-        return {
-          buenas: areaResponse?.corte?.good_quantity || 0,
-          malas: areaResponse?.corte?.bad_quantity || 0,
-          excedente: areaResponse?.corte?.excess_quantity || 0,
-          cqm: areaResponse?.corte?.form_answer?.sample_quantity ?? 0,
-          muestras: areaResponse?.corte?.formAuditory?.sample_auditory ?? '',
-          usuario: areaResponse?.user?.username || '',
-        };
-      case 7: // color-edge
-        return {
-          buenas: areaResponse?.colorEdge?.good_quantity || 0,
-          malas: areaResponse?.colorEdge?.bad_quantity || 0,
-          excedente: areaResponse?.colorEdge?.excess_quantity || 0,
-          cqm: areaResponse?.colorEdge?.form_answer?.sample_quantity || 0,
-          muestras: areaResponse?.colorEdge?.formAuditory?.sample_auditory ?? '',
-          usuario: areaResponse?.user?.username || '',
-        };
-      case 8: // hot-stamping
-        return {
-          buenas: areaResponse?.hotStamping?.good_quantity || 0,
-          malas: areaResponse?.hotStamping?.bad_quantity || 0,
-          excedente: areaResponse?.hotStamping?.excess_quantity || 0,
-          cqm: areaResponse?.hotStamping?.form_answer?.sample_quantity || 0,
-          muestras: areaResponse?.hotStamping?.formAuditory?.sample_auditory ?? '',
-          usuario: areaResponse?.user?.username || '',
+ // Función para obtener los datos específicos de cada área
+ const getAreaData = (areaId: number, areaResponse: any) => {
+  console.log("user",areaResponse?.user?.username);
+  switch (areaId) {
+    case 1: // preprensa
+      return {
+        buenas: areaResponse?.prepress?.plates || 0,
+        malas: areaResponse?.prepress?.bad_quantity || '',
+        excedente: areaResponse?.prepress?.excess_quantity || '',
+        cqm: '',
+        muestras: '',
+        usuario: areaResponse?.user?.username || '',
+        auditor: '- No evalua -',
+      };
+    case 2: // impresión
+      return {
+        buenas: areaResponse?.impression?.release_quantity || 0,
+        malas: areaResponse?.impression?.bad_quantity || '',
+        excedente: areaResponse?.impression?.excess_quantity || '',
+        cqm: areaResponse?.impression?.form_answer?.sample_quantity ?? '',
+        muestras: '',
+        usuario: areaResponse?.user?.username || '',
+        auditor: '- No evalua -',
+      };
+    case 3: // serigrafía
+      return {
+        buenas: areaResponse?.serigrafia?.release_quantity || 0,
+        malas: areaResponse?.serigrafia?.bad_quantity || '',
+        excedente: areaResponse?.serigrafia?.excess_quantity || '',
+        cqm: areaResponse?.serigrafia?.form_answer?.sample_quantity ?? '',
+        muestras: '',
+        usuario: areaResponse?.user?.username || '',
+        auditor: '- No evalua -',
+      };
+    case 4: // empalme
+      return {
+        buenas: areaResponse?.empalme?.release_quantity || '',
+        malas: areaResponse?.empalme?.bad_quantity || '',
+        excedente: areaResponse?.empalme?.excess_quantity || '',
+        cqm: areaResponse?.empalme?.form_answer?.sample_quantity ?? '',
+        muestras: '',
+        usuario: areaResponse?.user?.username || '',
+        auditor: '- No evalua -',
+      };
+    case 5: // empalme
+      return {
+        buenas: areaResponse?.laminacion?.release_quantity || 0,
+        malas: areaResponse?.laminacion?.bad_quantity || '',
+        excedente: areaResponse?.laminacion?.excess_quantity || '',
+        cqm: areaResponse?.laminacion?.form_answer?.sample_quantity ?? '',
+        muestras: '',
+        usuario: areaResponse?.user?.username || '',
+        auditor: '- No evalua -',
+      };
+    case 6: // corte
+      return {
+        buenas: areaResponse?.corte?.good_quantity || 0,
+        malas: areaResponse?.corte?.bad_quantity || 0,
+        excedente: areaResponse?.corte?.excess_quantity || 0,
+        cqm: areaResponse?.corte?.form_answer?.sample_quantity ?? 0,
+        muestras: areaResponse?.corte?.formAuditory?.sample_auditory ?? '',
+        usuario: areaResponse?.user?.username || '',
+        auditor: areaResponse?.corte?.formAuditory?.user?.username || '',
+      };
+    case 7: // color-edge
+      return {
+        buenas: areaResponse?.colorEdge?.good_quantity || 0,
+        malas: areaResponse?.colorEdge?.bad_quantity || 0,
+        excedente: areaResponse?.colorEdge?.excess_quantity || 0,
+        cqm: areaResponse?.colorEdge?.form_answer?.sample_quantity || 0,
+        muestras: areaResponse?.colorEdge?.formAuditory?.sample_auditory ?? '',
+        usuario: areaResponse?.user?.username || '',
+        auditor: areaResponse?.colorEdge?.formAuditory?.user?.username || '',
+      };
+    case 8: // hot-stamping
+      return {
+        buenas: areaResponse?.hotStamping?.good_quantity || 0,
+        malas: areaResponse?.hotStamping?.bad_quantity || 0,
+        excedente: areaResponse?.hotStamping?.excess_quantity || 0,
+        cqm: areaResponse?.hotStamping?.form_answer?.sample_quantity || 0,
+        muestras: areaResponse?.hotStamping?.formAuditory?.sample_auditory ?? '',
+        usuario: areaResponse?.user?.username || '',
+        auditor: areaResponse?.hotStamping?.formAuditory?.user?.username || '',
+      };
+    case 9: // milling-chip
+      console.log(areaResponse?.millingChip);
+      return {
+        buenas: areaResponse?.millingChip?.good_quantity || 0,
+        malas: areaResponse?.millingChip?.bad_quantity || 0,
+        excedente: areaResponse?.millingChip?.excess_quantity || 0,
+        cqm: areaResponse?.millingChip?.form_answer?.sample_quantity || 0,
+        muestras: areaResponse?.millingChip?.formAuditory?.sample_auditory ?? '',
+        usuario: areaResponse?.user?.username || '',
+        auditor: areaResponse?.millingChip?.formAuditory?.user?.username || '',
+      };
+    case 10: // personalizacion
+      return {
+        buenas: areaResponse?.personalizacion?.good_quantity || 0,
+        malas: areaResponse?.personalizacion?.bad_quantity || 0,
+        excedente: areaResponse?.personalizacion?.excess_quantity || 0,
+        cqm: areaResponse?.personalizacion?.form_answer?.sample_quantity || 0,
+        muestras: areaResponse?.personalizacion?.formAuditory?.sample_auditory ?? '',
+        usuario: areaResponse?.user?.username || '',
+        auditor: areaResponse?.personalizacion?.formAuditory?.user?.username || '',
+      };
+    default:
+      return {
+        buenas: 0,
+        malas: 0,
+        excedente: 0,
+        muestras: 0,
+        cqm: 0,
+        usuario: '',
+        auditor: ''
+      };
+  }
+};
 
-        };
-      case 9: // milling-chip
-        console.log(areaResponse?.millingChip);
-        return {
-          buenas: areaResponse?.millingChip?.good_quantity || 0,
-          malas: areaResponse?.millingChip?.bad_quantity || 0,
-          excedente: areaResponse?.millingChip?.excess_quantity || 0,
-          cqm: areaResponse?.millingChip?.form_answer?.sample_quantity || 0,
-          muestras: areaResponse?.millingChip?.formAuditory?.sample_auditory ?? '',
-          usuario: areaResponse?.user?.username || '',
-        };
-      case 10: // personalizacion
-        return {
-          buenas: areaResponse?.personalizacion?.good_quantity || 0,
-          malas: areaResponse?.personalizacion?.bad_quantity || 0,
-          excedente: areaResponse?.personalizacion?.excess_quantity || 0,
-          cqm: areaResponse?.personalizacion?.form_answer?.sample_quantity || 0,
-          muestras: areaResponse?.personalizacion?.formAuditory?.sample_auditory ?? '',
-          usuario: areaResponse?.user?.username || '',
-        };
-      default:
-        return {
-          buenas: 0,
-          malas: 0,
-          excedente: 0,
-          muestras: 0,
-          cqm: 0,
-          usuario: ''
-        };
-    }
+const areas = workOrder?.flow?.map((item: any) => {
+  const areaData = getAreaData(item.area_id, item.areaResponse);
+  console.log('areaData', areaData.usuario);
+  return {
+    id: item.area_id,
+    name: item.area?.name || 'Sin nombre',
+    status: item.status || 'Desconocido',
+    response: item.areaResponse || {},
+    answers: item.answers?.[0] || {},
+    ...areaData,
   };
-
-  const areas = workOrder?.flow?.map((item: any) => {
-    const areaData = getAreaData(item.area_id, item.areaResponse);
-    console.log('areaData', areaData.usuario);
-    return {
-      id: item.area_id,
-      name: item.area?.name || 'Sin nombre',
-      status: item.status || 'Desconocido',
-      response: item.areaResponse || {},
-      answers: item.answers?.[0] || {},
-      ...areaData,
-    };
-  }) || [];
+}) || [];
 
 
-  const totals = areas.reduce(
-    (acc: AreaTotals, area: any): AreaTotals => {
-      acc.buenas += Number(area.buenas) || 0;
-      acc.malas += Number(area.malas) || 0;
-      acc.excedente += Number(area.excedente) || 0;
-      acc.cqm += Number(area.cqm) || 0;
-      acc.muestras += Number(area.muestras) || 0;
-      return acc;
-    },
-    { buenas: 0, malas: 0, excedente: 0, cqm: 0, muestras: 0 }
-  );
+  const cantidadHojasRaw = Number(workOrder?.quantity) / 24;
+  const cantidadHojas = cantidadHojasRaw > 0 ? Math.ceil(cantidadHojasRaw) : 0;
+
 
   const handleCloseOrder = async () => {
     try {
@@ -195,8 +197,11 @@ const WorkOrderDetailScreen: React.FC = () => {
         <Text style={styles.label}>Presupuesto:</Text>
         <Text style={styles.value}>{workOrder?.mycard_id}</Text>
 
-        <Text style={styles.label}>Cantidad:</Text>
+        <Text style={styles.label}>Cantidad (TARJETAS):</Text>
         <Text style={styles.value}>{workOrder?.quantity}</Text>
+
+        <Text style={styles.label}>Cantidad (HOJAS):</Text>
+        <Text style={styles.value}>{cantidadHojas}</Text>
 
         <Text style={styles.label}>Comentarios:</Text>
         <Text style={styles.value}>{workOrder?.comments}</Text>
@@ -205,35 +210,32 @@ const WorkOrderDetailScreen: React.FC = () => {
       <Text style={styles.subtitle}>Datos de Producción por Área</Text>
       <ScrollView horizontal>
         <View style={styles.table}>
-          <View style={styles.headerRow}>
+        <View style={styles.headerRow}>
             <Text style={styles.cellUser}>Área</Text>
-            <Text style={styles.cell}>Buenas</Text>
-            <Text style={styles.cell}>Malas</Text>
-            <Text style={styles.cell}>Excedente</Text>
-            <Text style={styles.cell}>CQM</Text>
-            <Text style={styles.cell}>Muestras</Text>
+            <Text style={styles.cellUser}>Estado</Text>
+            <Text style={styles.cellUser}>Buenas</Text>
+            <Text style={styles.cellUser}>Malas</Text>
+            <Text style={styles.cellUser}>Excedente</Text>
+            <Text style={styles.cellUser}>CQM</Text>
+            <Text style={styles.cellUser}>Muestras</Text>
+            <Text style={styles.cellUser}>Totales</Text>
             <Text style={styles.cellUser}>Usuario</Text>
+            <Text style={styles.cellUser}>Auditor</Text>
           </View>
           {areas.map((area: any, index: number) => (
             <View key={index} style={styles.row}>
               <Text style={styles.cellUser}>{area.name}</Text>
-              <Text style={styles.cell}>{area.buenas}</Text>
-              <Text style={styles.cell}>{area.malas}</Text>
-              <Text style={styles.cell}>{area.excedente}</Text>
-              <Text style={styles.cell}>{area.cqm}</Text>
-              <Text style={styles.cell}>{area.muestras}</Text>
-              <Text style={styles.cellUser}>{area?.usuario || 'N/A'}</Text>
+              <Text style={styles.cellUser}>{area.status}</Text>
+              <Text style={styles.cellUser}>{area.buenas}</Text>
+              <Text style={styles.cellUser}>{area.malas}</Text>
+              <Text style={styles.cellUser}>{area.excedente}</Text>
+              <Text style={styles.cellUser}>{area.cqm}</Text>
+              <Text style={styles.cellUser}>{area.muestras}</Text>
+              <Text style={styles.cellUser}>{Number(area.buenas) + Number(area.malas) + Number(area.excedente) + Number(area.cqm) + Number(area.muestras)}</Text>
+              <Text style={styles.cellUser}>{area?.usuario}</Text>
+              <Text style={styles.cellUser}>{area?.auditor}</Text>
             </View>
           ))}
-          <View style={[styles.row, { backgroundColor: '#f0f0f0' }]}>
-            <Text style={styles.cellUser}>Totales</Text>
-            <Text style={styles.cell}>{totals.buenas}</Text>
-            <Text style={styles.cell}>{totals.malas}</Text>
-            <Text style={styles.cell}>{totals.excedente}</Text>
-            <Text style={styles.cell}>{totals.cqm}</Text>
-            <Text style={styles.cell}>{totals.muestras}</Text>
-            <Text style={styles.cellUser}>—</Text>
-          </View>
         </View>
       </ScrollView>
 
@@ -315,7 +317,7 @@ const styles = StyleSheet.create({
     textAlign: 'center',
   },
   cellUser:{
-    width: 120,
+    minWidth: 120,
     paddingHorizontal: 10
   },
   button: {

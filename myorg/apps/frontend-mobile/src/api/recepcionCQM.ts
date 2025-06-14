@@ -50,7 +50,7 @@ export const getOrdersInCalidad = async (): Promise<WorkOrder[]> => {
         status: f.status,
         area: { name: f.area?.name },
       })),
-      files: [],
+      files: item.workOrder.files || [],
     }));
   } catch (error: any) {
     console.error('Error en getOrdersInCalidad:', error?.message || error);

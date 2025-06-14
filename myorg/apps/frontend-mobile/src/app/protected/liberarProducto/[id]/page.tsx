@@ -78,6 +78,9 @@ const LiberarProductoAuxScreen: React.FC = () => {
     }
   };
 
+  const cantidadHojasRaw = Number(workOrder?.workOrder.quantity) / 24;
+  const cantidadHojas = cantidadHojasRaw > 0 ? Math.ceil(cantidadHojasRaw) : 0;
+
   return (
     <ScrollView contentContainerStyle={styles.container}>
       {loading ? (
@@ -93,7 +96,10 @@ const LiberarProductoAuxScreen: React.FC = () => {
               Presupuesto: <Text style={styles.value}>{workOrder.workOrder.mycard_id}</Text>
             </Text>
             <Text style={styles.label}>
-              Cantidad: <Text style={styles.value}>{workOrder.workOrder.quantity}</Text>
+              Cantidad (TARJETAS): <Text style={styles.value}>{workOrder.workOrder.quantity}</Text>
+            </Text>
+            <Text style={styles.label}>
+              Cantidad (HOJAS): <Text style={styles.value}>{cantidadHojas}</Text>
             </Text>
             <Text style={styles.label}>
               Comentarios: <Text style={styles.value}>{workOrder.workOrder.comments}</Text>

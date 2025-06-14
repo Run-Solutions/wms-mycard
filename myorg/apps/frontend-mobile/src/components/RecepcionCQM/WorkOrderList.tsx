@@ -9,7 +9,8 @@ import { InternalStackParamList } from '../../navigation/types';
 import * as FileSystem from 'expo-file-system';
 import { Buffer } from 'buffer';
 import FileViewer from 'react-native-file-viewer';
-
+import styled from 'styled-components/native';
+import { TextInput } from 'react-native-paper';
 
 type Navigation = NavigationProp<InternalStackParamList, 'RecepcionCQMAuxScreen'>;
 
@@ -56,7 +57,12 @@ interface Props {
 }
 
 const WorkOrderList: React.FC<Props> = ({ orders, onSelectOrder }) => {
+  const [searchValue, setSearchValue] = React.useState('');
   const navigation = useNavigation<any>();
+  const validOrders = Array.isArray(orders) ? orders : [];
+  const filteredOrders = validOrders.filter(order =>
+    order.ot_id.toLowerCase().includes(searchValue.toLowerCase())
+  );
   const downloadFile = async (filename: string) => {
     try {
       const res = await getFileByName(filename);
@@ -185,27 +191,60 @@ const WorkOrderList: React.FC<Props> = ({ orders, onSelectOrder }) => {
   };
     
   return (
-    <FlatList
-      data={orders}
-      keyExtractor={(item) => item.id.toString()}
-      renderItem={renderItem}
-      contentContainerStyle={styles.list}
-    />
+    <View style={{ flex: 1, padding: 5, backgroundColor: '#fdfaf6' }}>
+      <Container>
+        <Label>Buscar OT</Label>
+        <TextInput
+          label="Buscar OT"
+          value={searchValue}
+          onChangeText={setSearchValue}
+          mode="outlined"
+          activeOutlineColor="#000"
+          style={styles.input}
+          theme={{ roundness: 30 }}
+        />
+      </Container>
+      <FlatList
+        data={filteredOrders}
+        keyExtractor={(item) => item.id.toString()}
+        renderItem={renderItem}
+        contentContainerStyle={styles.list}
+      />
+    </View>
   );
 };
 
 export default WorkOrderList;
+
+const Container = styled.View`
+  margin-vertical: 8px;
+  margin-horizontal: 10px;
+`;
+
+const Label = styled.Text`
+  color: black;
+  margin-bottom: 4px;
+  font-size: 14px;
+  font-weight: bold;
+`;
 
 const styles = StyleSheet.create({
   list: {
     paddingHorizontal: 16,
     paddingBottom: 20,
   },
+  input: {
+    marginBottom: 16,
+    backgroundColor: '#fff',
+    borderRadius: 30,
+    fontSize: 14,
+    width: '90%',
+  },
   card: {
     backgroundColor: '#ffffff',
     padding: 14,
     borderRadius: 16,
-    marginBottom: 16,
+    marginBottom: 1,
     borderColor: '#ddd',
     borderWidth: 1,
     shadowColor: '#000',

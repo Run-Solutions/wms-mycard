@@ -168,6 +168,10 @@ export default function ImpresionComponent({ workOrder }: Props) {
   };
 
   const handleSubmitInconformidad = async () => {
+    if (!inconformidad.trim()) {
+      alert('Debes ingresar una inconformidad antes de continuar.');
+      return;
+    }
     try {
       const res = await sendInconformidadCQM(workOrder.id, inconformidad);
       router.push('/recepcionCqm');
@@ -176,6 +180,9 @@ export default function ImpresionComponent({ workOrder }: Props) {
       alert('Error al conectar con el servidor');
     }
   }
+
+  const cantidadHojasRaw = Number(workOrder?.workOrder.quantity) / 24;
+  const cantidadHojas = cantidadHojasRaw > 0 ? Math.ceil(cantidadHojasRaw) : 0;
   
   return (
     <Container>
@@ -191,9 +198,15 @@ export default function ImpresionComponent({ workOrder }: Props) {
           <Value>{workOrder.workOrder.mycard_id}</Value>
         </InfoItem>
         <InfoItem>
-          <Label>Cantidad:</Label>
-          <Value>{workOrder.workOrder.quantity}</Value>
+          <Label>Cantidad (TARJETAS):</Label>
+          <Value>{workOrder.workOrder.quantity || "No definida"}</Value>
         </InfoItem>
+        <InfoItem style={{ backgroundColor: '#eaeaf5', borderRadius: '8px'}}>
+          <Label>Cantidad (HOJAS):</Label>
+          <Value>{cantidadHojas}</Value>
+        </InfoItem>
+      </DataWrapper>
+      <DataWrapper>
         <InfoItem>
           <Label>Operador:</Label>
           <Value>{workOrder.user.username}</Value>
@@ -415,13 +428,12 @@ const SectionTitle = styled.h3`
 const DataWrapper = styled.div`
   display: flex;
   flex-wrap: wrap;
-  gap: 2rem;
-  flex-direction: row;
 `;
 
 const InfoItem = styled.div`
   flex: 1;
-  min-width: 200px;
+  padding: 5px;
+  min-width: 150px;
 `;
 
 const Label = styled.label`
@@ -458,7 +470,7 @@ const Input = styled.input`
   transition: border 0.3s;
 
   &:focus {
-    border-color: #2563eb;
+    border-color: #0038A8;
   }
 `;
 
@@ -477,7 +489,7 @@ const RadioLabel = styled.label`
 `;
 
 const Radio = styled.input`
-  accent-color: #2563eb;
+  accent-color: #0038A8;
 `;
 
 const Textarea = styled.textarea`
@@ -491,14 +503,14 @@ const Textarea = styled.textarea`
   resize: vertical;
 
   &:focus {
-    border-color: #2563eb;
+    border-color: #0038A8;
     outline: none;
   }
 `;
 
 const AceptarButton = styled.button<{ disabled?: boolean }>`
   margin-top: 1.5rem;
-  background-color: #2563EB;
+  background-color: #0038A8;
   color: white;
   padding: 0.5rem 1.25rem;
   border-radius: 0.5rem;
@@ -585,7 +597,7 @@ const ModalActions = styled.div`
 
 const Button = styled.button`
   padding: 0.5rem 1rem;
-  background-color: #0070f3;
+  background-color: #0038A8;
   color: white;
   border: none;
   border-radius: 8px;
@@ -606,7 +618,7 @@ const ModalBox = styled.div`
 `;
 
 const ConfirmButton = styled.button`
-  background-color: #2563eb;
+  background-color: #0038A8;
   color: white;
   padding: 0.5rem 1.5rem;
   border-radius: 0.5rem;

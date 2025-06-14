@@ -85,12 +85,7 @@ export default function CorteComponentAcceptAuditory({ workOrder }: Props) {
         alert('Por favor, asegurate de ingresar muestras.');
         return;
       }
-      let CorteId  = null;
-      if (workOrder?.partialReleases?.length > 0) {
-        CorteId = workOrder.id;
-      } else {
-        CorteId = workOrder?.areaResponse?.corte?.id;
-      }
+      const CorteId = workOrder?.areaResponse?.corte?.id ?? workOrder.id;
       try {
         await acceptWorkOrderFlowAuditory(CorteId, sampleAuditory);
         router.push('/aceptarAuditoria'); 
@@ -101,6 +96,10 @@ export default function CorteComponentAcceptAuditory({ workOrder }: Props) {
     }
 
     const handleSubmitInconformidad = async () => {
+      if (!inconformidad.trim()) {
+        alert('Debes ingresar una inconformidad antes de continuar.');
+        return;
+      }
       try {
         await registrarInconformidadAuditory(workOrder?.id, inconformidad);
         router.push('/aceptarAuditoria');
@@ -123,8 +122,22 @@ export default function CorteComponentAcceptAuditory({ workOrder }: Props) {
             <Value>{workOrder.workOrder.mycard_id}</Value>
           </InfoItem>
           <InfoItem>
+            <Label>Cantidad:</Label>
+            <Value>{workOrder?.workOrder.quantity || "No definida"}</Value>
+          </InfoItem>
+          <InfoItem>
             <Label>Área que lo envía:</Label>
             <Value>{workOrder?.area.name || "No definida"}</Value>
+          </InfoItem>
+          <InfoItem>
+            <Label>Usuario que lo envía:</Label>
+            <Value>{workOrder?.user.username || "No definida"}</Value>
+          </InfoItem>
+        </DataWrapper>
+        <DataWrapper>
+          <InfoItem>
+            <Label>Comentarios:</Label>
+            <Value>{workOrder?.workOrder.comments || "No definida"}</Value>
           </InfoItem>
         </DataWrapper>
         <NewData>
@@ -229,11 +242,11 @@ const SectionTitle = styled.h3`
 const DataWrapper = styled.div`
   display: flex;
   flex-wrap: wrap;
-  gap: 2rem;
 `;
 
 const InfoItem = styled.div`
   flex: 1;
+  padding: 5px;
   min-width: 200px;
 `;
 
@@ -272,7 +285,7 @@ const Input = styled.input`
   transition: border 0.3s;
 
   &:focus {
-    border-color: #2563eb;
+    border-color: #0038A8;
   }
 `;
 
@@ -288,14 +301,14 @@ const Textarea = styled.textarea`
   resize: vertical;
 
   &:focus {
-    border-color: #2563eb;
+    border-color: #0038A8;
     outline: none;
   }
 `;
 
 const AceptarButton = styled.button<{ disabled?: boolean }>`
   margin-top: 2rem;
-  background-color: ${({ disabled }) => (disabled ? "#9CA3AF" : "#2563EB")};
+  background-color: ${({ disabled }) => (disabled ? "#9CA3AF" : "#0038A8")};
   color: white;
   padding: 0.75rem 2rem;
   border-radius: 0.5rem;
@@ -312,19 +325,19 @@ const AceptarButton = styled.button<{ disabled?: boolean }>`
 
 const InconformidadButton = styled.button<{ disabled?: boolean }>`
   height: 50px;
-  background-color: ${({ disabled }) => (disabled ? "#D1D5DB" : "#2563EB")};
+  background-color: ${({ disabled }) => (disabled ? "#D1D5DB" : "#A9A9A9")};
   color: white;
   padding: 0.75rem 2rem;
   border-radius: 0.5rem;
   font-weight: 600;
   transition: background 0.3s;
-  align-self: flex-center;
+  align-self: flex-end;
   cursor: ${({ disabled }) => (disabled ? "not-allowed" : "pointer")};
   opacity: ${({ disabled }) => (disabled ? 0.7 : 1)};
 
   &:hover {
     background-color: ${({ disabled }) =>
-      disabled ? "#D1D5DB" : "#1D4ED8"};
+      disabled ? "#D1D5DB" : "#8d8d92"};
   }
 `;
 
@@ -351,7 +364,7 @@ const ModalBox = styled.div`
 `;
 
 const ConfirmButton = styled.button`
-  background-color: #2563eb;
+  background-color: #0038A8;
   color: white;
   padding: 0.5rem 1.5rem;
   border-radius: 0.5rem;

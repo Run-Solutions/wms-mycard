@@ -4,7 +4,6 @@ import React, { useEffect, useState } from 'react';
 import {
   View,
   Text,
-  TextInput,
   ScrollView,
   StyleSheet,
   TouchableOpacity,
@@ -14,10 +13,8 @@ import {
 } from 'react-native';
 import * as DocumentPicker from 'expo-document-picker';
 import DropDownPicker from 'react-native-dropdown-picker';
-import { KeyboardAwareScrollView } from 'react-native-keyboard-aware-scroll-view';
-
+import { TextInput } from 'react-native-paper';
 import Checkbox from 'expo-checkbox';
-import AsyncStorage from '@react-native-async-storage/async-storage';
 import { getAreasOperator, createWorkOrder } from '../../../api/ordenesDeTrabajo';
 
 const OrdenesDeTrabajoScreen: React.FC = () => {
@@ -101,6 +98,8 @@ const OrdenesDeTrabajoScreen: React.FC = () => {
     }
   };
 
+  const cantidadHojas: number = Math.ceil(parseInt(formData.quantity) / 24) || 0;
+
   return (
     <View style={styles.container}>
       <Text style={styles.header}>📋 Crear nueva orden de trabajo</Text>
@@ -113,6 +112,9 @@ const OrdenesDeTrabajoScreen: React.FC = () => {
           styles.input,
           focusedInput === 'ot_id' && styles.inputFocused
         ]}
+        theme={{ roundness: 30 }}
+        mode="outlined"
+        activeOutlineColor="#000"
         value={formData.ot_id}
         onFocus={() => setFocusedInput('ot_id')}
         onBlur={() => setFocusedInput(null)}
@@ -124,17 +126,23 @@ const OrdenesDeTrabajoScreen: React.FC = () => {
           styles.input,
           focusedInput === 'mycard_id' && styles.inputFocused
         ]}
+        theme={{ roundness: 30 }}
+        mode="outlined"
+        activeOutlineColor="#000"
         value={formData.mycard_id}
         onFocus={() => setFocusedInput('mycard_id')}
         onBlur={() => setFocusedInput(null)}
         onChangeText={(text) => setFormData({ ...formData, mycard_id: text })}
       />
       <TextInput
-        placeholder="Cantidad"
+        placeholder="Cantidad (TARJETAS)"
         style={[
           styles.input,
           focusedInput === 'quantity' && styles.inputFocused
         ]}
+        theme={{ roundness: 30 }}
+        mode="outlined"
+        activeOutlineColor="#000"
         keyboardType="numeric"
         value={formData.quantity}
         onFocus={() => setFocusedInput('quantity')}
@@ -142,11 +150,29 @@ const OrdenesDeTrabajoScreen: React.FC = () => {
         onChangeText={(text) => setFormData({ ...formData, quantity: text })}
       />
       <TextInput
+        placeholder="Cantidad (HOJAS)"
+        style={[
+          styles.input,
+          focusedInput === 'quantity' && styles.inputFocused
+        ]}
+        theme={{ roundness: 30 }}
+        mode="outlined"
+        activeOutlineColor="#000"
+        keyboardType="numeric"
+        value={cantidadHojas.toString()}
+        onFocus={() => setFocusedInput('quantity')}
+        onBlur={() => setFocusedInput(null)}
+        editable={false} 
+      />
+      <TextInput
         placeholder="Comentarios"
         style={[styles.input,
           focusedInput === 'comments' && styles.inputFocused,
           { height: 80 }
         ]}
+        theme={{ roundness: 30 }}
+        mode="outlined"
+        activeOutlineColor="#000"
         multiline
         value={formData.comments}
         onFocus={() => setFocusedInput('comments')}
@@ -164,7 +190,7 @@ const OrdenesDeTrabajoScreen: React.FC = () => {
         labelStyle={{ fontSize: 16 }} // estilo de los ítems
           key={i}
           items={areasOperator}
-          listMode="SCROLLVIEW" // 👈 evitar conflictos con ScrollViews
+          listMode="SCROLLVIEW" 
           open={!!openStates[i]}
           setOpen={(val) => {
             const isOpen = typeof val === 'function' ? val(!!openStates[i]) : val;
@@ -249,13 +275,11 @@ const OrdenesDeTrabajoScreen: React.FC = () => {
         <Text style={{ marginLeft: 8 }}>Prioridad</Text>
       </View>
 
-      <View style={styles.submitButton}>
-        <Button
-          title="Crear Orden"
-          onPress={handleSubmit}
-          color={Platform.OS === 'ios' ? '#fff' : '#0038A8'} // color texto para Android
-        />
-      </View>
+      <TouchableOpacity style={styles.submitButton} onPress={handleSubmit}>
+        <Text style={styles.buttonText}>Crear Orden de Trabajo</Text>
+      </TouchableOpacity>
+
+
     </ScrollView>
     </View>
   );
@@ -278,17 +302,14 @@ const styles = StyleSheet.create({
     padding: Platform.OS === 'ios' ? 14 : 0,
   },
   input: {
-    borderWidth: 1,
-    borderColor: '#ccc',
-    borderRadius: 18,
     padding: 10,
     marginBottom: 12,
     backgroundColor: '#fff',
-    height: 50,
+    height: 30,
     fontSize: 16,
   },
   inputFocused: {
-    borderColor: '#000', // ⬅️ Borde negro en foco
+    borderColor: '#000', 
   },
   dropdown: {
     borderWidth: 1,
@@ -359,12 +380,16 @@ const styles = StyleSheet.create({
     fontWeight: 'bold',
   },
   submitButton: {
-    height: 50,
-    marginBottom: 40,
     backgroundColor: '#0038A8',
+    padding: 12,
     borderRadius: 18,
-    paddingTop: 5,
     alignItems: 'center',
+    marginBottom: 20,
+    height: 50,
+  },
+  buttonText: {
+    color: '#fff',
+    fontWeight: 'bold',
   },
   scrollArea: {
     flex: 1,

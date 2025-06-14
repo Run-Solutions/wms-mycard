@@ -83,6 +83,10 @@ export default function MillingChipComponent({ workOrder }: Props) {
   };
 
   const handleSubmitInconformidad = async () => {
+    if (!inconformidad.trim()) {
+      alert('Debes ingresar una inconformidad antes de continuar.');
+      return;
+    }
     try {
       const res = await sendInconformidadCQM(workOrder.id, inconformidad);
       router.push('/recepcionCqm');
@@ -211,7 +215,7 @@ export default function MillingChipComponent({ workOrder }: Props) {
         
       </NewData>
       <div style={{ display: 'flex', gap: '1rem'}}>
-      <RechazarButton>Rechazar</RechazarButton>
+      <RechazarButton onClick={() => setShowInconformidad(true)}>Rechazar</RechazarButton>
       <AceptarButton onClick={() => setShowConfirmModal(true)}>Aprobado</AceptarButton>
       </div>
       {showConfirmModal && (
@@ -336,7 +340,7 @@ const Input = styled.input`
   transition: border 0.3s;
 
   &:focus {
-    border-color: #2563eb;
+    border-color: #0038A8;
   }
 `;
 
@@ -355,7 +359,7 @@ const RadioLabel = styled.label`
 `;
 
 const Radio = styled.input`
-  accent-color: #2563eb;
+  accent-color: #0038A8;
 `;
 
 const Textarea = styled.textarea`
@@ -369,14 +373,14 @@ const Textarea = styled.textarea`
   resize: vertical;
 
   &:focus {
-    border-color: #2563eb;
+    border-color: #0038A8;
     outline: none;
   }
 `;
 
 const AceptarButton = styled.button<{ disabled?: boolean }>`
   margin-top: 1.5rem;
-  background-color: #2563EB;
+  background-color: #0038A8;
   color: white;
   padding: 0.5rem 1.25rem;
   border-radius: 0.5rem;
@@ -414,7 +418,7 @@ const RechazarButton = styled.button<{ disabled?: boolean }>`
 
 const CqmButton = styled.button`
   margin-top: 2rem;
-  background-color: #2563eb;
+  background-color: #0038A8;
   color: white;
   padding: 0.75rem 2rem;
   border-radius: 0.5rem;
@@ -537,7 +541,7 @@ const CancelButton = styled.button`
 `;
 
 const ConfirmButton = styled.button`
-  background-color: #2563eb;
+  background-color: #0038A8;
   color: white;
   padding: 0.5rem 1.5rem;
   border-radius: 0.5rem;

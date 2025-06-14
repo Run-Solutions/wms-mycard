@@ -6,6 +6,7 @@ import styled, { useTheme } from 'styled-components';
 import { useRouter } from "next/navigation";
 import { acceptWorkOrderFlow, getPendingOrders } from '@/api/aceptarProducto';
 import { getFileByName } from "@/api/seguimientoDeOts";
+import { useAuthContext } from '@/context/AuthContext';
 
 // Se define el tipo de datos
 interface WorkOrder {
@@ -38,6 +39,8 @@ interface WorkOrder {
     }[];
     flow: {
       id: number;
+      status: string;
+      assigned_user: number;
       area: {
         id: number;
         name: string;
@@ -56,9 +59,52 @@ interface WorkOrder {
   };
 }
 
+type PartialRelease = {
+  validated: boolean;
+  quantity: number;
+};
+
+type WorkOrderFlow = {
+  id: number;
+  area_id: number;
+  status: string;
+  assigned_user: number | null;
+  work_order_id: number;
+  partialReleases?: PartialRelease[];
+};
+
+function puedeAceptarNuevaEtapa(
+  currentFlow: WorkOrderFlow,
+  allFlows: WorkOrderFlow[],
+  currentUserId: number
+): boolean {
+  const flujosAnterioresMismaAreaYUsuario = allFlows.filter(
+    f =>
+      f.area_id === currentFlow.area_id &&
+      f.id < currentFlow.id &&
+      f.assigned_user === currentUserId
+  )
+  if (flujosAnterioresMismaAreaYUsuario.length === 0) {
+    // ✅ Nunca participó antes: puede aceptar
+    return true;
+  }
+  for (const flujo of flujosAnterioresMismaAreaYUsuario) {
+    const pendiente =
+      ["Parcial", "Listo"].includes(flujo.status) ||
+      (flujo.partialReleases || []).some((r) => !r.validated);
+    if (pendiente) {
+      console.log("⛔ Usuario ya participó y aún tiene pendientes:", flujo);
+      return false;
+    }
+  }
+  // ✅ Participó antes pero todo está liberado
+  return true;
+}
+
 const AcceptProductPage: React.FC = () => {
   const theme = useTheme();
   const router = useRouter();
+  const { user } = useAuthContext();
 
   // Para obtener Ordenes Pendientes
   const [WorkOrders, setWorkOrders] = useState<WorkOrder[]>([]);
@@ -81,13 +127,45 @@ const AcceptProductPage: React.FC = () => {
   const aceptarOT = async () => {
     console.log("Se hizo clic en Aceptar OT");
     if (!selectedOrder) return;
-    //const flowId = selectedOrder?.workOrder.flow[0].id;
-    const flowItem = selectedOrder?.workOrder.flow.find(
-      (f) => f.area.id === selectedOrder.area_id
+    const flowItem = [...selectedOrder?.workOrder.flow || []]
+    .reverse()
+    .find(
+      (f) =>
+        f.area.id === selectedOrder.area_id &&
+        f.status === selectedOrder.status
     );
-    if (!flowItem) return;
+    if (!flowItem) {
+      alert('No se encontró el flujo activo para esta área');
+      return;
+    }
     const flowId = flowItem.id;
-    console.log(flowId);
+    const mappedFlows = selectedOrder.workOrder.flow.map((f) => ({
+      id: f.id,
+      status: f.status,
+      area_id: f.area.id,
+      assigned_user: f.assigned_user ?? null,
+      work_order_id: selectedOrder.workOrder.id,
+      partialReleases: (f as any).partialReleases || [],
+    }));
+
+    const currentUserId = user?.id;
+    if (!currentUserId) return;
+    const puedeAceptar = puedeAceptarNuevaEtapa(
+      {
+        ...flowItem,
+        area_id: selectedOrder.area_id,
+        assigned_user: currentUserId ?? null,
+        work_order_id: selectedOrder.work_order_id
+      },
+      mappedFlows,
+      currentUserId
+    );
+    console.log("puedeAceptar:", puedeAceptar);
+    console.log('User', currentUserId);
+    if (!puedeAceptar) {
+      alert("Debes liberar completamente tu participación anterior antes de aceptar esta etapa.");
+      return;
+    }
     // Si el área no es 1, redirigir inmediatamente
     if (selectedOrder?.area_id >= 2 && selectedOrder?.area_id <= 6) {
       router.push(`/aceptarProducto/${flowId}`); 

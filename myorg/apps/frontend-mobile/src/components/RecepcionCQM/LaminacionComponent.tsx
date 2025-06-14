@@ -4,7 +4,6 @@ import React, { useState } from 'react';
 import {
   View,
   Text,
-  TextInput,
   TouchableOpacity,
   ScrollView,
   StyleSheet,
@@ -12,6 +11,7 @@ import {
   Platform,
   Modal,
 } from 'react-native';
+import { TextInput } from 'react-native-paper';
 import { useNavigation } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { RootStackParamList } from '../../navigation/types';
@@ -103,6 +103,9 @@ const LaminacionComponent = ({ workOrder }: { workOrder: any }) => {
     }
   };
 
+  const cantidadHojasRaw = Number(workOrder?.workOrder.quantity) / 24;
+  const cantidadHojas = cantidadHojasRaw > 0 ? Math.ceil(cantidadHojasRaw) : 0;
+
   return (
     <ScrollView style={styles.container}>
       <Text style={styles.title}>Área a evaluar: Laminacion</Text>
@@ -113,8 +116,11 @@ const LaminacionComponent = ({ workOrder }: { workOrder: any }) => {
         <Text style={styles.label}>Id del Presupuesto:</Text>
         <Text style={styles.value}>{workOrder.workOrder.mycard_id}</Text>
       
-        <Text style={styles.label}>Cantidad:</Text>
+        <Text style={styles.label}>Cantidad (TARJETAS):</Text>
         <Text style={styles.value}>{workOrder.workOrder.quantity}</Text>
+
+        <Text style={styles.label}>Cantidad (HOJAS):</Text>
+        <Text style={styles.value}>{cantidadHojas}</Text>
       
         <Text style={styles.label}>Operador:</Text>
         <Text style={styles.value}>{workOrder.user.username}</Text>
@@ -160,7 +166,9 @@ const LaminacionComponent = ({ workOrder }: { workOrder: any }) => {
       <Text style={styles.label}>Validar Acabado Vs Orden De Trabajo:</Text>
       <TextInput
         style={styles.input}
-        keyboardType="numeric"
+        theme={{ roundness: 30 }}
+        mode="outlined"
+        activeOutlineColor="#000"
         value={workOrder?.answers[index].finish_validation ?? 'No se reconoce la muestra enviada' }
         editable={false}
       />
@@ -168,7 +176,9 @@ const LaminacionComponent = ({ workOrder }: { workOrder: any }) => {
       <Text style={styles.label}>Muestras entregadas:</Text>
       <TextInput
         style={styles.input}
-        keyboardType="numeric"
+        theme={{ roundness: 30 }}
+        mode="outlined"
+        activeOutlineColor="#000"
         value={
           typeof workOrder?.answers?.[index]?.sample_quantity === 'number'
           ? workOrder.answers[index].sample_quantity.toString()
@@ -278,6 +288,9 @@ const LaminacionComponent = ({ workOrder }: { workOrder: any }) => {
               placeholder="Escribe la inconformidad..."
               multiline
               style={styles.textarea}
+              theme={{ roundness: 30 }}
+              mode="outlined"
+              activeOutlineColor="#000"
             />
             <View style={styles.modalActions}>
               <TouchableOpacity style={styles.cancelButton} onPress={() => setShowInconformidad(false)}>
@@ -321,20 +334,15 @@ const styles = StyleSheet.create({
   label: { fontWeight: '600', marginTop: 12, fontSize: 16 },
   value: { marginBottom: 0 },
   input: {
-    borderWidth: 1,
-    borderColor: '#ccc',
-    borderRadius: 18,
     padding: 10,
+    marginBottom: 12,
     backgroundColor: '#fff',
-    height: 50,
+    height: 30,
     fontSize: 16,
   },
   textarea: {
     backgroundColor: '#fff',
-    borderRadius: 12,
     padding: 10,
-    borderWidth: 1,
-    borderColor: '#ccc',
     minHeight: 100,
     fontSize: 16,
     textAlignVertical: 'top',

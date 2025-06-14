@@ -51,7 +51,6 @@ export default function PersonalizacionComponent({ workOrder }: Props) {
   const [verificarScript, setVerificarScript] = useState('');
   const [validarKVC, setValidarKVC] = useState('');
   const [aparienciaQuemado, setAparienciaQuemado] = useState('');
-  const [alturaChip, setAlturaChip] = useState('');
 
   // Para controlar qué preguntas están marcadas
   const [checkedQuestions, setCheckedQuestions] = useState<number[]>([]);
@@ -71,29 +70,24 @@ export default function PersonalizacionComponent({ workOrder }: Props) {
   };
   const handleSelectAllPersos = (isChecked: boolean) => {
     const questionIds = workOrder.area.formQuestions.slice(13,15).map((q: { id: number }) => q.id);
-  
     if (isChecked) {
       // Marcar todas las preguntas
       setCheckedQuestions(questionIds);
-  
       setResponses((prevResponses) => {
         // Filtrar respuestas viejas de esas preguntas
         const updatedResponses = prevResponses.filter(
           (response) => !questionIds.includes(response.questionId)
         );
-  
         // Agregar todas como true
         const newResponses = questionIds.map((id: number) => ({
           questionId: id,
           answer: true,
         }));
-  
         return [...updatedResponses, ...newResponses];
       });
     } else {
       // Desmarcar todas
       setCheckedQuestions([]);
-  
       setResponses((prevResponses) =>
         prevResponses.filter((response) => !questionIds.includes(response.questionId))
       );
@@ -133,7 +127,6 @@ export default function PersonalizacionComponent({ workOrder }: Props) {
       };
     }else if(workOrder?.answers[index].tipo_personalizacion === 'etiquetadora'){
       aditionalFields={
-
       };
     }
     const payload = {
@@ -149,6 +142,10 @@ export default function PersonalizacionComponent({ workOrder }: Props) {
   };
 
   const handleSubmitInconformidad = async () => {
+    if (!inconformidad.trim()) {
+      alert('Debes ingresar una inconformidad antes de continuar.');
+      return;
+    }
     try {
       const res = await sendInconformidadCQM(workOrder.id, inconformidad);
       router.push('/recepcionCqm');
@@ -222,22 +219,22 @@ export default function PersonalizacionComponent({ workOrder }: Props) {
                   // Obtener la respuesta del operador (response_operator)
                   const operatorResponse = answer?.response_operator;
                   return(
-                  <tr key={question.id}>
-                    <td>{question.title}</td>
-                    <td>
-                    {typeof operatorResponse === 'boolean' ? (
-                        <input 
-                          type="checkbox" 
-                          checked={operatorResponse} 
-                          disabled 
-                        />
-                      ) : (
-                        <span>{operatorResponse !== undefined && operatorResponse !== null 
-                          ? operatorResponse.toString() 
-                          : ''}</span>
-                      )}
-                    </td>
-                  </tr>
+                    <tr key={question.id}>
+                      <td>{question.title}</td>
+                      <td>
+                      {typeof operatorResponse === 'boolean' ? (
+                          <input 
+                            type="checkbox" 
+                            checked={operatorResponse} 
+                            disabled 
+                          />
+                        ) : (
+                          <span>{operatorResponse !== undefined && operatorResponse !== null 
+                            ? operatorResponse.toString() 
+                            : ''}</span>
+                        )}
+                      </td>
+                    </tr>
                   );
                 })}
               </tbody>
@@ -301,7 +298,130 @@ export default function PersonalizacionComponent({ workOrder }: Props) {
             </InputGroup>
           </>
         )}
+        {workOrder?.answers[index].tipo_personalizacion === 'packsmart' && (
+          <>
+            <Table>
+              <thead>
+                <tr>
+                  <th>Pregunta</th>
+                  <th>Respuesta</th>
+                </tr>
+              </thead>
+              <tbody>
+                {workOrder.area.formQuestions.slice(14, 20)
+                  .map((question: { id: number; title: string }) => {
+                    // Buscar la respuesta correspondiente a esta pregunta
+                    const answer = workOrder.answers[index]?.FormAnswerResponse?.find(
+                      (resp: any) => resp.question_id === question.id
+                    );
 
+                    // Obtener la respuesta del operador (response_operator)
+                    const operatorResponse = answer?.response_operator;
+                    return (
+                      <tr key={question.id}>
+                        <td>{question.title}</td>
+                        <td>
+                          {typeof operatorResponse === 'boolean' ? (
+                            <input
+                              type="checkbox"
+                              checked={operatorResponse}
+                              disabled
+                            />
+                          ) : (
+                            <span>{operatorResponse !== undefined && operatorResponse !== null
+                              ? operatorResponse.toString()
+                              : ''}</span>
+                          )}
+                        </td>
+                      </tr>
+                    );
+                  })}
+              </tbody>
+            </Table>
+          </>
+        )}
+        {workOrder?.answers[index].tipo_personalizacion === 'otto' && (
+          <>
+            <Table>
+              <thead>
+                <tr>
+                  <th>Pregunta</th>
+                  <th>Respuesta</th>
+                </tr>
+              </thead>
+              <tbody>
+                {workOrder.area.formQuestions.slice(20, 28)
+                  .map((question: { id: number; title: string }) => {
+                    // Buscar la respuesta correspondiente a esta pregunta
+                    const answer = workOrder.answers[index]?.FormAnswerResponse?.find(
+                      (resp: any) => resp.question_id === question.id
+                    );
+                    // Obtener la respuesta del operador (response_operator)
+                    const operatorResponse = answer?.response_operator;
+                    return (
+                      <tr key={question.id}>
+                        <td>{question.title}</td>
+                        <td>
+                          {typeof operatorResponse === 'boolean' ? (
+                            <input
+                              type="checkbox"
+                              checked={operatorResponse}
+                              disabled
+                            />
+                          ) : (
+                            <span>{operatorResponse !== undefined && operatorResponse !== null
+                              ? operatorResponse.toString()
+                              : ''}</span>
+                          )}
+                        </td>
+                      </tr>
+                    );
+                  })}
+              </tbody>
+            </Table>
+          </>
+        )}
+        {workOrder?.answers[index].tipo_personalizacion === 'embolsadora' && (
+          <>
+            <Table>
+              <thead>
+                <tr>
+                  <th>Pregunta</th>
+                  <th>Respuesta</th>
+                </tr>
+              </thead>
+              <tbody>
+                {workOrder.area.formQuestions.slice(28, 30)
+                  .map((question: { id: number; title: string }) => {
+                    // Buscar la respuesta correspondiente a esta pregunta
+                    const answer = workOrder.answers[index]?.FormAnswerResponse?.find(
+                      (resp: any) => resp.question_id === question.id
+                    );
+                    // Obtener la respuesta del operador (response_operator)
+                    const operatorResponse = answer?.response_operator;
+                    return (
+                      <tr key={question.id}>
+                        <td>{question.title}</td>
+                        <td>
+                          {typeof operatorResponse === 'boolean' ? (
+                            <input
+                              type="checkbox"
+                              checked={operatorResponse}
+                              disabled
+                            />
+                          ) : (
+                            <span>{operatorResponse !== undefined && operatorResponse !== null
+                              ? operatorResponse.toString()
+                              : ''}</span>
+                          )}
+                        </td>
+                      </tr>
+                    );
+                  })}
+              </tbody>
+            </Table>
+          </>
+        )}
         </NewDataWrapper>
         <SectionTitle>Mis respuestas</SectionTitle>
         <NewDataWrapper>
@@ -394,13 +514,20 @@ export default function PersonalizacionComponent({ workOrder }: Props) {
             </>
           )}
           
-          {workOrder?.answers[index].tipo_personalizacion === 'etiquetadora' && (
-            <>
-              <InputGroup style={{ paddingTop: '10px', width: '70%'}}>
-                <Label>No tienes preguntas</Label>
-              </InputGroup>
-            </>
-          )}
+          {
+            (
+              workOrder?.answers[index].tipo_personalizacion === 'etiquetadora' ||
+              workOrder?.answers[index].tipo_personalizacion === 'otto' ||
+              workOrder?.answers[index].tipo_personalizacion === 'packsmart' ||
+              workOrder?.answers[index].tipo_personalizacion === 'embolsadora'
+            ) && (
+              <>
+                <InputGroup style={{ paddingTop: '10px', width: '70%' }}>
+                  <Label>No tienes preguntas</Label>
+                </InputGroup>
+              </>
+            )
+          }
         </NewDataWrapper>
         
       </NewData>
@@ -530,7 +657,7 @@ const Input = styled.input`
   transition: border 0.3s;
 
   &:focus {
-    border-color: #2563eb;
+    border-color: #0038A8;
   }
 `;
 
@@ -549,7 +676,7 @@ const RadioLabel = styled.label`
 `;
 
 const Radio = styled.input`
-  accent-color: #2563eb;
+  accent-color: #0038A8;
 `;
 
 const Textarea = styled.textarea`
@@ -563,14 +690,14 @@ const Textarea = styled.textarea`
   resize: vertical;
 
   &:focus {
-    border-color: #2563eb;
+    border-color: #0038A8;
     outline: none;
   }
 `;
 
 const AceptarButton = styled.button<{ disabled?: boolean }>`
   margin-top: 1.5rem;
-  background-color: #2563EB;
+  background-color: #0038A8;
   color: white;
   padding: 0.5rem 1.25rem;
   border-radius: 0.5rem;
@@ -696,7 +823,7 @@ const CancelButton = styled.button`
 `;
 
 const ConfirmButton = styled.button`
-  background-color: #2563eb;
+  background-color: #0038A8;
   color: white;
   padding: 0.5rem 1.5rem;
   border-radius: 0.5rem;

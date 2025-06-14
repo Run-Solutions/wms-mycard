@@ -3,13 +3,13 @@ import {
   View,
   Text,
   StyleSheet,
-  TextInput,
   ScrollView,
   TouchableOpacity,
   Modal,
   Alert,
   Platform,
 } from 'react-native';
+import { TextInput } from 'react-native-paper';
 import { useNavigation } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { RootStackParamList } from '../../navigation/types';
@@ -63,12 +63,12 @@ const MillingChipComponent: React.FC<{ workOrder: any }> = ({ workOrder }) => {
       (release: PartialRelease) => !release.validated
     );
     const areaResponseFlowId = workOrder.areaResponse
-    ? workOrder.areaResponse.work_order_flow_id
-    : partialRelease?.work_order_flow_id;
+      ? workOrder.areaResponse.work_order_flow_id
+      : partialRelease?.work_order_flow_id;
 
     console.log(areaResponseFlowId);
     try {
-  
+
       await acceptMillingChipInconformity(areaResponseFlowId);
       setShowModal(false);
       Alert.alert('Inconformidad aceptada');
@@ -87,11 +87,23 @@ const MillingChipComponent: React.FC<{ workOrder: any }> = ({ workOrder }) => {
 
         <View style={styles.card}>
           <Text style={styles.subtitle}>Buenas:</Text>
-          <TextInput style={styles.input} editable={false} value={String(releaseQuantity)} />
+          <TextInput style={styles.input} editable={false} value={String(releaseQuantity)}
+            mode="outlined"
+            activeOutlineColor="#000"
+            theme={{ roundness: 30 }}
+          />
           <Text style={styles.subtitle}>Malas:</Text>
-          <TextInput style={styles.input} editable={false} value={String(releaseBad)} />
+          <TextInput style={styles.input} editable={false} value={String(releaseBad)}
+            mode="outlined"
+            activeOutlineColor="#000"
+            theme={{ roundness: 30 }}
+          />
           <Text style={styles.subtitle}>Excedente:</Text>
-          <TextInput style={styles.input} editable={false} value={String(releaseExcess)} />
+          <TextInput style={styles.input} editable={false} value={String(releaseExcess)}
+            mode="outlined"
+            activeOutlineColor="#000"
+            theme={{ roundness: 30 }}
+          />
 
           <Text style={styles.label}>Comentarios</Text>
           <TextInput
@@ -99,6 +111,9 @@ const MillingChipComponent: React.FC<{ workOrder: any }> = ({ workOrder }) => {
             multiline
             editable={false}
             value={releaseComments}
+            mode="outlined"
+            activeOutlineColor="#000"
+            theme={{ roundness: 30 }}
           />
         </View>
 
@@ -110,6 +125,9 @@ const MillingChipComponent: React.FC<{ workOrder: any }> = ({ workOrder }) => {
             style={styles.input}
             editable={false}
             value={inconformityUser}
+            mode="outlined"
+            activeOutlineColor="#000"
+            theme={{ roundness: 30 }}
           />
 
           <Text style={styles.label}>Comentarios</Text>
@@ -118,6 +136,9 @@ const MillingChipComponent: React.FC<{ workOrder: any }> = ({ workOrder }) => {
             multiline
             editable={false}
             value={inconformityComments}
+            mode="outlined"
+            activeOutlineColor="#000"
+            theme={{ roundness: 30 }}
           />
         </View>
 
@@ -152,23 +173,23 @@ const MillingChipComponent: React.FC<{ workOrder: any }> = ({ workOrder }) => {
 export default MillingChipComponent;
 
 const styles = StyleSheet.create({
-  container: { 
+  container: {
     paddingTop: 16,
     paddingBottom: 32,
-    paddingHorizontal: 8, 
-    backgroundColor: '#fdfaf6', 
+    paddingHorizontal: 8,
+    backgroundColor: '#fdfaf6',
   },
-  title: { 
-    fontSize: 20, 
-    fontWeight: 'bold', 
+  title: {
+    fontSize: 20,
+    fontWeight: 'bold',
     marginBottom: 16,
     textAlign: 'center',
     color: 'black',
     padding: Platform.OS === 'ios' ? 10 : 0,
   },
-  subtitle: { 
-    fontSize: 16, 
-    fontWeight: 'bold', 
+  subtitle: {
+    fontSize: 16,
+    fontWeight: 'bold',
     marginTop: 20,
     marginBottom: 4,
   },
@@ -180,21 +201,15 @@ const styles = StyleSheet.create({
     color: '#374151',
   },
   input: {
-    borderWidth: 1,
-    borderColor: '#ccc',
-    borderRadius: 18,
     padding: 10,
     marginBottom: 12,
     backgroundColor: '#fff',
-    height: 50,
+    height: 30,
     fontSize: 16,
   },
   textarea: {
     backgroundColor: '#fff',
-    borderRadius: 12,
     padding: 10,
-    borderWidth: 1,
-    borderColor: '#ccc',
     minHeight: 100,
     fontSize: 16,
     textAlignVertical: 'top',

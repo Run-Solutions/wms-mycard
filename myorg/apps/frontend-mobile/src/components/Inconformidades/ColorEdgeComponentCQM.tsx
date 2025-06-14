@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
-import { View, Text, TextInput, Button, Alert, Modal, TouchableOpacity, ScrollView, StyleSheet, Platform } from 'react-native';
+import { View, Text, Button, Alert, Modal, TouchableOpacity, ScrollView, StyleSheet, Platform } from 'react-native';
 import { acceptCQMInconformity } from '../../api/inconformidades';
+import { TextInput } from "react-native-paper";
 import { useNavigation } from '@react-navigation/native';
 
 const ColorEdgeComponentCQM = ({ workOrder }: { workOrder: any }) => {
@@ -72,26 +73,30 @@ const ColorEdgeComponentCQM = ({ workOrder }: { workOrder: any }) => {
           <Text style={styles.label}>Color Edge:</Text>
           <TextInput
             style={styles.input}
-            keyboardType="numeric"
             value={workOrder?.answers?.[index]?.color_edge}
             editable={false}
+            mode="outlined"
+            activeOutlineColor="#000"
+            theme={{ roundness: 30 }}
           />
           <Text style={styles.label}>Muestras entregadas:</Text>
           <TextInput
             style={styles.input}
-            keyboardType="numeric"
             value={
               typeof workOrder?.answers?.[index]?.sample_quantity === 'number'
-              ? workOrder.answers[index].sample_quantity.toString()
-              : ''
+                ? workOrder.answers[index].sample_quantity.toString()
+                : ''
             }
             editable={false}
+            mode="outlined"
+            activeOutlineColor="#000"
+            theme={{ roundness: 30 }}
           />
 
           {typeof workOrder?.answers?.[index]?.sample_quantity !== 'number' && (
-          <Text style={{ color: '#b91c1c', marginTop: 8, textAlign: 'center' }}>
-            No se reconoce la muestra enviada
-          </Text>
+            <Text style={{ color: '#b91c1c', marginTop: 8, textAlign: 'center' }}>
+              No se reconoce la muestra enviada
+            </Text>
           )}
         </View>
 
@@ -102,6 +107,9 @@ const ColorEdgeComponentCQM = ({ workOrder }: { workOrder: any }) => {
             value={workOrder.answers[index].inconformities[lastIndex].user.username}
             editable={false}
             style={styles.input}
+            mode="outlined"
+            activeOutlineColor="#000"
+            theme={{ roundness: 30 }}
           />
           <Text style={styles.label}>Comentarios:</Text>
           <TextInput
@@ -109,6 +117,9 @@ const ColorEdgeComponentCQM = ({ workOrder }: { workOrder: any }) => {
             editable={false}
             multiline
             style={[styles.input, { minHeight: 100 }]}
+            mode="outlined"
+            activeOutlineColor="#000"
+            theme={{ roundness: 30 }}
           />
         </View>
 
@@ -142,11 +153,11 @@ const ColorEdgeComponentCQM = ({ workOrder }: { workOrder: any }) => {
 export default ColorEdgeComponentCQM;
 
 const styles = StyleSheet.create({
-  container: { 
+  container: {
     paddingTop: 16,
     paddingBottom: 32,
-    paddingHorizontal: 8, 
-    backgroundColor: '#fdfaf6', 
+    paddingHorizontal: 8,
+    backgroundColor: '#fdfaf6',
   },
   sectionTitle: {
     fontSize: 22,
@@ -226,12 +237,10 @@ const styles = StyleSheet.create({
     marginBottom: 8,
   },
   input: {
-    borderWidth: 1,
-    borderColor: '#d1d5db',
-    borderRadius: 10,
     padding: 10,
     backgroundColor: '#f9fafb',
     marginBottom: 16,
+    height: 30,
     fontSize: 16,
   },
   button: {

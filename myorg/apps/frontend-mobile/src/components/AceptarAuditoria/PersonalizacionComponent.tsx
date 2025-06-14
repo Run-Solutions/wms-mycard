@@ -1,9 +1,10 @@
 // myorg/apps/frontend-mobile/src/components/AceptarAuditoria/ColorEdgeComponents.tsx
 import React, { useEffect, useState } from 'react';
 import {
-  View, Text, TextInput, StyleSheet, TouchableOpacity,
+  View, Text, StyleSheet, TouchableOpacity,
   Modal, Alert, ScrollView, Platform
 } from 'react-native';
+import { TextInput } from 'react-native-paper';
 import { useNavigation } from '@react-navigation/native';
 import { acceptWorkOrderFlowPersonalizacionAuditory, registrarInconformidadAuditory } from '../../api/aceptarAuditoria';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
@@ -76,15 +77,10 @@ const PersonalizacionComponentAcceptAuditory: React.FC<{ workOrder: any }> = ({ 
 
   const handleAceptar = async () => {
     if (!sampleAuditory) {
-      alert('Por favor, asegurate de ingresar muestras.');
+      Alert.alert('Error', 'Por favor, asegurate de ingresar muestras.');
       return;
     }
-    let PersonalizacionId  = null;
-    if (workOrder?.partialReleases?.length > 0) {
-      PersonalizacionId = workOrder.id;
-    } else {
-      PersonalizacionId = workOrder?.areaResponse?.personalizacion?.id;
-    }
+    const PersonalizacionId = workOrder?.areaResponse?.personalizacion?.id ?? workOrder.id;
     try {
       await acceptWorkOrderFlowPersonalizacionAuditory(PersonalizacionId, sampleAuditory);
       Alert.alert("Recepción aceptada");
@@ -149,6 +145,9 @@ const PersonalizacionComponentAcceptAuditory: React.FC<{ workOrder: any }> = ({ 
         keyboardType="numeric"
         placeholder="Ej: 2"
         value={sampleAuditory}
+        theme={{ roundness: 30 }}
+        mode="outlined"
+        activeOutlineColor="#000"
         onChangeText={setSampleAuditory}
       />
 
@@ -189,6 +188,9 @@ const PersonalizacionComponentAcceptAuditory: React.FC<{ workOrder: any }> = ({ 
               onChangeText={setInconformidad}
               placeholder="Escribe la inconformidad..."
               multiline
+              theme={{ roundness: 30 }}
+              mode="outlined"
+              activeOutlineColor="#000"
               style={styles.textarea}
             />
             <View style={styles.modalActions}>
@@ -255,17 +257,14 @@ const styles = StyleSheet.create({
     textAlignVertical: 'center',
   },
   inputActive: {
-    borderWidth: 1,
-    borderColor: '#ccc',
-    borderRadius: 18,
     padding: 10,
     backgroundColor: '#fff',
     height: 50,
     fontSize: 16,
   },
   textarea: {
-    backgroundColor: '#fff', padding: 12, borderRadius: 12,
-    borderColor: '#ccc', borderWidth: 1, textAlignVertical: 'top', height: 100
+    backgroundColor: '#fff', padding: 12,
+    textAlignVertical: 'top', height: 100
   },
   acceptButton: {
     backgroundColor: '#0038A8',

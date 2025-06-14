@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
-import { View, Text, TextInput, StyleSheet, FlatList, Alert, TouchableOpacity, Modal, Pressable } from 'react-native';
+import { TextInput } from 'react-native-paper';
+import { View, Text, StyleSheet, FlatList, Alert, TouchableOpacity, Modal, Pressable } from 'react-native';
 import { Checkbox, RadioButton } from 'react-native-paper';
 import { deleteFormQuestion, updateFormQuestion } from '../../api/configVistosBuenos';
 
@@ -50,33 +51,33 @@ export default function Personalizacion({ formQuestion }: Props) {
       (q) => q.role_id === role && q.areas.some((a: any) => a.id === 10)
     );
 
-  const renderQuestion = (question: any) => (
-    <View key={question.id} style={styles.row} >
-      <Text style={{
-        fontSize: 16,
-        color: '#111827',
-        marginBottom: 8,
-      }}>{question.title}</Text>
-      <View style={styles.rightSide}>
-        <Checkbox status={"unchecked"} />
-        <TouchableOpacity onPress={() => { setEditingId(question.id); setNewTitle(question.title) }} style={styles.button}>
-          <Text style={styles.buttonText}>Editar</Text>
-        </TouchableOpacity>
-        <TouchableOpacity onPress={() => setDeletingId(question.id)} style={styles.button}>
-          <Text style={styles.buttonText}>Eliminar</Text>
-        </TouchableOpacity>
-      </View>
-    </View >
-  );
+    const renderQuestion = (question: any) => (
+      <View key={question.id} style={styles.row} >
+        <Text style={{
+          fontSize: 16,
+          color: '#111827',
+          marginBottom: 8,
+        }}>{question.title}</Text>
+        <View style={styles.rightSide}>
+          <Checkbox status={"unchecked"} />
+          <TouchableOpacity onPress={() => { setEditingId(question.id); setNewTitle(question.title) }} style={styles.button}>
+            <Text style={styles.buttonText}>Editar</Text>
+          </TouchableOpacity>
+          <TouchableOpacity onPress={() => setDeletingId(question.id)} style={styles.button}>
+            <Text style={styles.buttonText}>Eliminar</Text>
+          </TouchableOpacity>
+        </View>
+      </View >
+    );
 
   return (
     <View style={styles.container}>
-      <Text style={styles.title}>Área a evaluar: Impresión</Text>
+      <Text style={styles.title}>Área a evaluar: Personalización</Text>
 
       <Text style={styles.subtitle}>Respuestas del operador</Text>
       <RadioButton.Group onValueChange={setSelectedOption} value={selectedOption}>
         <View style={styles.radioOption}>
-          <RadioButton value="etiquetadora" color="#0070f3"/> 
+          <RadioButton value="etiquetadora" color="#0070f3" />
           <Text>Etiquetadora</Text>
         </View>
         <View style={styles.radioOption}>
@@ -84,22 +85,102 @@ export default function Personalizacion({ formQuestion }: Props) {
           <Text>Persos's</Text>
         </View>
         <View style={styles.radioOption}>
-          <RadioButton value="laser" color='#0070f3'/>
+          <RadioButton value="laser" color='#0070f3' />
           <Text>Láser</Text>
+        </View>
+        <View style={styles.radioOption}>
+          <RadioButton value="packsmart" color='#0070f3' />
+          <Text>Packsmart</Text>
+        </View>
+        <View style={styles.radioOption}>
+          <RadioButton value="otto" color='#0070f3' />
+          <Text>Otto</Text>
+        </View>
+        <View style={styles.radioOption}>
+          <RadioButton value="embolsadora" color='#0070f3' />
+          <Text>Embolsadora</Text>
         </View>
       </RadioButton.Group>
 
+
       <View style={{ marginVertical: 10 }}>
-        {selectedOption === 'etiquetadora' && filteredQuestions(null, 0, 1).map(renderQuestion)}
-        {selectedOption === 'persos' && filteredQuestions(null, 1, 10).map(renderQuestion)}
-        {selectedOption === 'laser' && <Text>No hay preguntas por parte del operador.</Text>}
+        {selectedOption === 'etiquetadora' && (
+          <>
+            {filteredQuestions(null, 0, 1).map(renderQuestion)}
+            <Text style={styles.label}>Verificar Tipo De Etiqueta Vs Ot Y Pegar Utilizada:</Text>
+            <TextInput style={styles.input} theme={{ roundness: 30 }} mode="outlined" activeOutlineColor="#000" editable={false} />
+            <Text style={styles.label}>Muestras entregadas:</Text>
+            <TextInput style={styles.input} theme={{ roundness: 30 }} mode="outlined" activeOutlineColor="#000" editable={false} />
+          </>
+        )}
+
+        {selectedOption === 'persos' && (
+          <>
+            {filteredQuestions(null, 1, 10).map(renderQuestion)}
+            <Text style={styles.label}>Color de Personalizacion:
+            </Text>
+            <TextInput style={styles.input} theme={{ roundness: 30 }} mode="outlined" activeOutlineColor="#000" editable={false} />
+            <Text style={styles.label}>Tipo de Codigo de Barras Que Se Personaliza:</Text>
+            <TextInput style={styles.input} theme={{ roundness: 30 }} mode="outlined" activeOutlineColor="#000" editable={false} />
+            <Text style={styles.label}>Muestras entregadas:</Text>
+            <TextInput style={styles.input} theme={{ roundness: 30 }} mode="outlined" activeOutlineColor="#000" editable={false} />
+          </>
+        )}
+
+        {selectedOption === 'laser' && (
+          <>
+          <Text>No hay preguntas por parte del operador.</Text>
+          <Text style={styles.label}>Muestras entregadas:</Text>
+          <TextInput style={styles.input} theme={{ roundness: 30 }} mode="outlined" activeOutlineColor="#000" editable={false} />
+          </>
+        )}
+
+        {selectedOption === 'packsmart' && (
+          <>
+            {filteredQuestions(null, 14, 20).map(renderQuestion)}
+            <Text style={styles.label}>Muestras entregadas:</Text>
+            <TextInput style={styles.input} theme={{ roundness: 30 }} mode="outlined" activeOutlineColor="#000" editable={false} />
+          </>
+        )}
+        {selectedOption === 'otto' && (
+          <>
+            {filteredQuestions(null, 20, 28).map(renderQuestion)}
+            <Text style={styles.label}>Muestras entregadas:</Text>
+            <TextInput style={styles.input} theme={{ roundness: 30 }} mode="outlined" activeOutlineColor="#000" editable={false} />
+          </>
+        )}
+        {selectedOption === 'embolsadora' && (
+          <>
+            {filteredQuestions(null, 28, 30).map(renderQuestion)}
+            <Text style={styles.label}>Muestras entregadas:</Text>
+            <TextInput style={styles.input} theme={{ roundness: 30 }} mode="outlined" activeOutlineColor="#000" editable={false} />
+          </>
+        )}
       </View>
 
       <Text style={styles.subtitle}>Mis respuestas</Text>
       <View style={{ marginBottom: 20 }}>
-        {selectedOption === 'etiquetadora' && <Text>No hay preguntas por parte de calidad.</Text>}
-        {selectedOption === 'persos' && filteredQuestions(3, 13, 15).map(renderQuestion)}
-        {selectedOption === 'laser' && filteredQuestions(3, 10, 13).map(renderQuestion)}
+        {['etiquetadora', 'otto', 'embolsadora', 'packsmart'].includes(selectedOption) && (
+          <Text>No hay preguntas por parte de calidad.</Text>
+        )}
+        {selectedOption === 'persos' && 
+          <>
+          {filteredQuestions(3, 13, 15).map(renderQuestion)}
+          <Text style={styles.label}>Validar Carga De Aplicación (PersoMaster) Anotar:</Text>
+          <TextInput style={styles.input} theme={{ roundness: 30 }} mode="outlined" activeOutlineColor="#000" editable={false} />
+          </>
+        }
+        {selectedOption === 'laser' && 
+        <>
+          {filteredQuestions(3, 10, 13).map(renderQuestion)}
+          <Text style={styles.label}>Verificar Script / Layout Vs Ot /Autorización, Favor De Anotar:</Text>
+          <TextInput style={styles.input} theme={{ roundness: 30 }} mode="outlined" activeOutlineColor="#000" editable={false} />
+          <Text style={styles.label}>Validar, Anotar Kcv (Llaves), Carga De Aplicación O Prehabilitación (Si Aplica):</Text>
+          <TextInput style={styles.input} theme={{ roundness: 30 }} mode="outlined" activeOutlineColor="#000" editable={false} />
+          <Text style={styles.label}>Describir Apariencia Del Quemado Del Láser (Color):</Text>
+          <TextInput style={styles.input} theme={{ roundness: 30 }} mode="outlined" activeOutlineColor="#000" editable={false} />
+        </>
+        }
       </View>
 
       {/* Edit Modal */}
@@ -111,6 +192,9 @@ export default function Personalizacion({ formQuestion }: Props) {
               value={newTitle}
               onChangeText={setNewTitle}
               style={styles.input}
+              theme={{ roundness: 30 }}
+              mode="outlined"
+              activeOutlineColor="#000"
               placeholder="Nuevo título"
             />
             <View style={styles.modalButtons}>
@@ -195,12 +279,16 @@ const styles = StyleSheet.create({
     fontSize: 18,
     marginBottom: 12,
   },
+  label: {
+    marginTop: 12,
+    fontWeight: '500',
+  },
   input: {
-    borderWidth: 1,
-    borderColor: '#D1D5DB',
-    borderRadius: 6,
     padding: 10,
-    marginBottom: 12,
+    height: 20,
+    marginVertical: 8,
+    width: '90%',
+    backgroundColor: '#fff',
   },
   modalButtons: {
     flexDirection: 'row',

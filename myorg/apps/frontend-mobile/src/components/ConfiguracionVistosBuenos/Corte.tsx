@@ -2,7 +2,6 @@ import React, { useState } from 'react';
 import {
   View,
   Text,
-  TextInput,
   TouchableOpacity,
   ScrollView,
   StyleSheet,
@@ -10,6 +9,7 @@ import {
   Modal,
   Pressable
 } from 'react-native';
+import { TextInput } from 'react-native-paper';
 import QuestionTable from './QuestionTable';
 import { deleteFormQuestion, updateFormQuestion } from '../../api/configVistosBuenos';
 
@@ -76,8 +76,8 @@ export default function Corte({ formQuestion }: Props) {
         onEdit={(e) => { setEditingId(e.id); setNewTitle(e.title) }}
         onDelete={(e) => setDeletingId(e)}
       />
-
-      <TextInput style={styles.input} keyboardType='numeric' editable={false} />
+      <Text style={styles.label}>Muestras entregadas:</Text>
+      <TextInput style={styles.input} theme={{ roundness: 30 }} mode="outlined" activeOutlineColor="#000" editable={false} />
 
       <QuestionTable
         title='Mis respuestas'
@@ -98,6 +98,9 @@ export default function Corte({ formQuestion }: Props) {
               value={newTitle}
               onChangeText={setNewTitle}
               style={styles.input}
+              theme={{ roundness: 30 }}
+              mode="outlined"
+              activeOutlineColor="#000"
               placeholder="Nuevo título"
             />
             <View style={styles.modalButtons}>
@@ -146,12 +149,11 @@ const styles = StyleSheet.create({
     fontWeight: '500',
   },
   input: {
-    borderColor: '#ccc',
-    borderWidth: 1,
     padding: 10,
-    borderRadius: 8,
+    height: 20,
     marginVertical: 8,
-    width: '90%'
+    width: '90%',
+    backgroundColor: '#fff',
   },
   modalButtons: {
     flexDirection: 'row',

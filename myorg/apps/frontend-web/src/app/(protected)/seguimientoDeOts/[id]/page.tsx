@@ -152,6 +152,9 @@ export default function SeguimientoDeOtsAuxPage({ params }: Props) {
       };
   }) || [];
 
+  const cantidadHojasRaw = Number(workOrder?.quantity) / 24;
+  const cantidadHojas = cantidadHojasRaw > 0 ? Math.ceil(cantidadHojasRaw) : 0;
+
   return (
     <>
       <Container>
@@ -167,8 +170,12 @@ export default function SeguimientoDeOtsAuxPage({ params }: Props) {
             <Value>{workOrder?.mycard_id}</Value>
           </InfoItem>
           <InfoItem>
-            <Label>Cantidad: </Label>
+            <Label>Cantidad (TARJETAS): </Label>
             <Value>{workOrder?.quantity}</Value>
+          </InfoItem>
+          <InfoItem>
+            <Label>Cantidad (HOJAS): </Label>
+            <Value>{cantidadHojas}</Value>
           </InfoItem>
         </DataWrapper>
           <InfoItem>
@@ -340,7 +347,7 @@ const Table = styled.table`
 `;
 
 const CloseButton = styled.button`
-  background: #2563EB;
+  background-color: ${({ theme }) => theme.palette.primary.main};
   color: white;
   padding: 0.9rem 1.5rem;
   border: none;
@@ -379,7 +386,7 @@ const ModalBox = styled.div`
 `;
 
 const ConfirmButton = styled.button`
-  background-color: #2563eb;
+  background-color: #0038A8;
   color: white;
   padding: 0.5rem 1.5rem;
   border-radius: 0.5rem;

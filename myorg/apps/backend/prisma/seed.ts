@@ -6,20 +6,26 @@ async function main() {
   console.log("🌱 Insertando datos iniciales...");
 
   // 🔹 Seed para AreasOperator
-  await prisma.areasOperator.createMany({
-    data: [
-      { id: 1, name: "preprensa" },
-      { id: 2, name: "impresion" },
-      { id: 3, name: "serigrafia" },
-      { id: 4, name: "empalme" },
-      { id: 5, name: "laminacion" },
-      { id: 6, name: "corte" },
-      { id: 7, name: "color edge" },
-      { id: 8, name: "hot stamping" },
-      { id: 9, name: "milling chip" },
-      { id: 10, name: "personalizacion" },
-    ],
-  });
+  const areas = [
+    { id: 1, name: "preprensa" },
+    { id: 2, name: "impresion" },
+    { id: 3, name: "serigrafia" },
+    { id: 4, name: "empalme" },
+    { id: 5, name: "laminacion" },
+    { id: 6, name: "corte" },
+    { id: 7, name: "color edge" },
+    { id: 8, name: "hot stamping" },
+    { id: 9, name: "milling chip" },
+    { id: 10, name: "personalizacion" },
+  ];
+  
+  for (const area of areas) {
+    await prisma.areasOperator.upsert({
+      where: { id: area.id },
+      update: {}, // o podrías usar `update: { name: area.name }` si quieres actualizar el nombre si cambia
+      create: area,
+    });
+  }
 
   // 🔹 Seed para Module
   await prisma.module.createMany({
@@ -38,6 +44,7 @@ async function main() {
       { id: 12, name: "Liberar Producto", description: "Maneja las OTs que tienes en tu área para liberar.", imageName: "putaway.jpg", logoName: "putaway.webp" },
       { id: 13, name: "Inconformidades", description: "Maneja las OTs que han sido rechazadas por parte de la operacion siguiente.", imageName: "nebulas.gif", logoName: "extra.webp" },
     ],
+    skipDuplicates: true,
   });
 
   // 🔹 Seed para Role
@@ -48,6 +55,7 @@ async function main() {
       { id: 3, name: "calidad" },
       { id: 4, name: "auditor" },
     ],
+    skipDuplicates: true,
   });
 
   // 🔹 Seed para ModulePermission (asignando permisos a roles)
@@ -67,6 +75,7 @@ async function main() {
       { id: 12, role_id: 2, module_id: 12, enabled: true },
       { id: 13, role_id: 2, module_id: 13, enabled: true },
     ],
+    skipDuplicates: true,
   });
   
   // 🔹 Seed para FormQuestions asociadas a "impresion"
@@ -130,7 +139,22 @@ async function main() {
     { id: 61, title: "Verificar Fuente Y Tamaño De Textos Vs OT / Autorización", key: "verificacion_fuente", role_id: 3, areas: [10] },
     { id: 62, title: "Verificar Posición De Los Elementos (Textos / Folio)", key: "verificacion_posicion", role_id: 3, areas: [10] },
     { id: 65, title: "Verificar Anclaje de Tinta", key: "anclaje_tinta_perso", role_id: 3, areas: [10] },
-    { id: 66, title: "Validar Que Se Haya Revisado Y Autorizado Codificación De Cinta Magnética Y/O Chip", key: "cinta_magnetica", role_id: 3, areas: [10] },
+    { id: 66, title: "Revisar Que La Tarjeta No Se Desprenda", key: "revisar_tarjeta", role_id: null, areas: [10] },
+    { id: 67, title: "Revisar La Posición Correcta De La Tarjeta", key: "revisar_posicion_tarjeta", role_id: null, areas: [10] },
+    { id: 68, title: "Verificar Que El Papel No Se Desgarre Al Desprender La Tarjeta", key: "verificar_papel", role_id: null, areas: [10] },
+    { id: 69, title: "Revisa La Cantidad De Pegamento Blanco", key: "verificar_pegamento", role_id: null, areas: [10] },
+    { id: 70, title: "Revisa Que Se Descargue El Papel Del Carrier Al Abrir", key: "verfificar_papel_carrier", role_id: null, areas: [10] },
+    { id: 71, title: "Revisar Doblado Del Carrier Correctamente", key: "verificar_doblado_carrier", role_id: null, areas: [10] },
+    { id: 72, title: "Revisar Caída Conforme Pdf Firmado (Datos Y Posición Correctos", key: "revisar_caida_conforme_pdf", role_id: null, areas: [10] },
+    { id: 73, title: "Sku Carrier Corresponde", key: "sku_corresponde", role_id: null, areas: [10] },
+    { id: 74, title: "Sku De Sobre Corresponde", key: "sku_de_sobre_corresponde", role_id: null, areas: [10] },
+    { id: 75, title: "Etiqueta No Cae Sobre Nip", key: "etiqueta_no_cae", role_id: null, areas: [10] },
+    { id: 76, title: "Lectura De Código De Barras O Qr (Si Aplica)", key: "lectura_barras_qr", role_id: null, areas: [10] },
+    { id: 77, title: "Revisar Tipo De Letra Si Está Especificado", key: "revisar_tipo_letra", role_id: null, areas: [10] },
+    { id: 78, title: "Doblez Correcto Carrier", key: "doblez_carrier", role_id: null, areas: [10] },
+    { id: 79, title: "Pegado Correcto Del Sobre", key: "pegado_correcto", role_id: null, areas: [10] },
+    { id: 80, title: "Se Encuentra Bien Sellado", key: "se_encuentra_sellado", role_id: null, areas: [10] },
+    { id: 81, title: "Posición Correcta De Sellado", key: "posicion_sellado", role_id: null, areas: [10] },
   ];
 
   for (const question of questionsData) {

@@ -5,7 +5,7 @@ import { CreateWorkOrderDto } from './dto/create-work-order.dto';
 
 @Injectable()
 export class WorkOrderService {
-  constructor(private prisma: PrismaService) {}
+  constructor(private prisma: PrismaService) { }
 
   async createWorkOrder(dto: CreateWorkOrderDto, files: { ot: Express.Multer.File | null; sku: Express.Multer.File | null; op: Express.Multer.File | null }, userId: number) {
     const { ot_id, mycard_id, areasOperatorIds, comments, } = dto;
@@ -21,22 +21,22 @@ export class WorkOrderService {
     }
     // Para guardar la OT en la BD
     const workOrder = await this.prisma.workOrder.create({
-        data: { 
-          ot_id, 
-          mycard_id, 
-          quantity, 
-          status: 'En proceso', 
-          priority,
-          comments,
-          created_by: userId 
-        }
+      data: {
+        ot_id,
+        mycard_id,
+        quantity,
+        status: 'En proceso',
+        priority,
+        comments,
+        created_by: userId
+      }
     });
 
     // Subir los archivos
     const fileMappings = [
-        { key: 'ot', file: files.ot, type: 'OT' },
-        { key: 'sku', file: files.sku, type: 'SKU' },
-        { key: 'op', file: files.op, type: 'OP' }
+      { key: 'ot', file: files.ot, type: 'OT' },
+      { key: 'sku', file: files.sku, type: 'SKU' },
+      { key: 'op', file: files.op, type: 'OP' }
     ];
 
     // Para subir los archivos
@@ -54,13 +54,13 @@ export class WorkOrderService {
         }
       }
     } catch (error) {
-        console.error('Error al guardar los archivos:', error);
+      console.error('Error al guardar los archivos:', error);
     }
 
     // Para asignar las areas, debe ser un array de numeros
     let areasArray: number[] = [];
     if (areasOperatorIds) {
-        areasArray = Array.isArray(areasOperatorIds) ? areasOperatorIds.map(Number) : [];
+      areasArray = Array.isArray(areasOperatorIds) ? areasOperatorIds.map(Number) : [];
     }
     console.log('Tipo de areasOperatorIds:', typeof areasArray);
     console.log('Contenido de areasOperatorIds:', areasArray);
@@ -79,18 +79,18 @@ export class WorkOrderService {
         });
       }
     } catch (error: unknown) {
-        if (error instanceof Error) {
-          console.error('Error al asignar áreas:', error.message);
-        }
+      if (error instanceof Error) {
+        console.error('Error al asignar áreas:', error.message);
+      }
     }
 
     return workOrder;
   }
 
   // Para obtener los WorkOrders en proceso
-  async getInProgressWorkOrders(userId: number, statuses: string[]){
-    console.log('Buscando ordenes');
-    if(!userId){
+  async getInProgressWorkOrders(userId: number, statuses: string[]) {
+    console.log('Buscando ordenes', statuses);
+    if (!userId) {
       throw new Error('No se proporcionan areas validas');
     }
     const inProgressWorkOrders = await this.prisma.workOrder.findMany({
@@ -102,16 +102,18 @@ export class WorkOrderService {
       include: {
         user: true,
         flow: {
-            include: {
-                area: true,
-            }
+          include: {
+            area: true,
+            areaResponse: true
+          }
         },
         files: true,
         formAnswers: true,
+
       },
     });
-    if(inProgressWorkOrders.length === 0) {
-      return { message: 'No hay ordenes pendientes para esta area.'}
+    if (inProgressWorkOrders.length === 0) {
+      return { message: 'No hay ordenes pendientes para esta area.' }
     }
     console.log('Ordenes pendientes desde work-orders services', inProgressWorkOrders);
     return inProgressWorkOrders;
@@ -131,8 +133,9 @@ export class WorkOrderService {
               include: {
                 inconformities: {
                   include: {
-                  user: true,
-                },}
+                    user: true,
+                  },
+                }
               }
             },
             area: {
@@ -168,41 +171,61 @@ export class WorkOrderService {
                   include: {
                     form_answer: true,
                   },
-                }, 
+                },
                 corte: {
                   include: {
                     form_answer: true,
-                    formAuditory: true,
+                    formAuditory: {
+                      include: {
+                        user: true
+                      }
+                    },
                   },
                 },
                 colorEdge: {
                   include: {
                     form_answer: true,
-                    formAuditory: true,
+                    formAuditory: {
+                      include: {
+                        user: true
+                      }
+                    },
                   },
                 },
                 hotStamping: {
                   include: {
                     form_answer: true,
-                    formAuditory: true,
+                    formAuditory: {
+                      include: {
+                        user: true
+                      }
+                    },
                   },
-                }, 
+                },
                 millingChip: {
                   include: {
                     form_answer: true,
-                    formAuditory: true,
+                    formAuditory: {
+                      include: {
+                        user: true
+                      }
+                    },
                   },
                 },
                 personalizacion: {
                   include: {
                     form_answer: true,
-                    formAuditory: true,
+                    formAuditory: {
+                      include: {
+                        user: true
+                      }
+                    },
                   },
                 },
               }
             },
             answers: {
-              include:{
+              include: {
                 FormAnswerResponse: true,
                 inconformities: {
                   include: {
@@ -215,104 +238,104 @@ export class WorkOrderService {
         }
       },
     });
-    if(!workOrder) {
-      return { message: 'No se encontró una orden para esta área.'}
+    if (!workOrder) {
+      return { message: 'No se encontró una orden para esta área.' }
     }
     return workOrder;
   }
 
-  async getInAuditoryWorkOrderById(id: string){
-      const workOrderFlow = await this.prisma.workOrderFlow.findFirst({
-        where: {
-          workOrder:
-          {
-            is: {
-              ot_id: id,
-            }
-          },
-          status: 'En auditoria',
+  async getInAuditoryWorkOrderById(id: string) {
+    const workOrderFlow = await this.prisma.workOrderFlow.findFirst({
+      where: {
+        workOrder:
+        {
+          is: {
+            ot_id: id,
+          }
         },
-        include: {
-          workOrder: {
-            include: {
-              flow: {
-                include: {
-                  area: true,
-                  areaResponse: {
-                    include: {
-                      corte: {
-                        include: {
-                          form_answer: true,
-                          formAuditory: true,
-                        }
+        status: 'En auditoria',
+      },
+      include: {
+        workOrder: {
+          include: {
+            flow: {
+              include: {
+                area: true,
+                areaResponse: {
+                  include: {
+                    corte: {
+                      include: {
+                        form_answer: true,
+                        formAuditory: true,
                       }
-                    },
+                    }
                   },
                 },
               },
-              areasResponses: {
-                include: {
-                  corte: true,
-                }
-              },
-              formAnswers: {
-                include: {
-                  corteResponse: true,
-                  colorEdgeResponse: true,
-                  hotStampingResponse: true,
-                  millingChipResponse: true, 
-                  personalizacionResponse: true,
-                }
+            },
+            areasResponses: {
+              include: {
+                corte: true,
               }
             },
-          },
-          answers: {
-            include: {
-              corteResponse: true
+            formAnswers: {
+              include: {
+                corteResponse: true,
+                colorEdgeResponse: true,
+                hotStampingResponse: true,
+                millingChipResponse: true,
+                personalizacionResponse: true,
+              }
             }
+          },
+        },
+        answers: {
+          include: {
+            corteResponse: true
           }
+        }
+      },
+    });
+    if (!workOrderFlow) {
+      return { message: 'No se encontró una orden para esta área.' }
+    }
+    return workOrderFlow;
+  }
+
+  async closeWorkOrderById(dto: CreateWorkOrderDto, userId: number) {
+    return this.prisma.$transaction(async (tx) => {
+      await tx.workOrder.update({
+        where: {
+          ot_id: dto.ot_id,
+        },
+        data: {
+          status: 'Cerrado',
+          closed_by: userId,
         },
       });
-      if(!workOrderFlow) {
-        return { message: 'No se encontró una orden para esta área.'}
-      }
-      return workOrderFlow;
-    }
-  
-    async closeWorkOrderById(dto: CreateWorkOrderDto, userId: number) {
-      return this.prisma.$transaction(async (tx) => {
-        await tx.workOrder.update({
-          where: {
-            ot_id: dto.ot_id,
-          },
-          data: {
-            status: 'Cerrado',
-            closed_by: userId,
-          },
-        });
-        const WorkOrder = await tx.workOrder.findUnique({
-          where: {
-            ot_id: dto.ot_id,
-          },
-          select: {
-            id: true,
-          },
-        });
-        if (!WorkOrder) {
-          throw new Error('Orden de trabajo no encontrada');
-        }
-        await tx.workOrderFlow.updateMany({
-          where: {
-            work_order_id: WorkOrder.id,
-            NOT: {
-              status: 'Completado',
-            },
-          },
-          data: {
-            status: 'Cerrado',
-          },
-        });
-        return { message: 'Respuesta guardada con exito'};
+      const WorkOrder = await tx.workOrder.findUnique({
+        where: {
+          ot_id: dto.ot_id,
+        },
+        select: {
+          id: true,
+        },
       });
-    }
+      if (!WorkOrder) {
+        throw new Error('Orden de trabajo no encontrada');
+      }
+      await tx.workOrderFlow.updateMany({
+        where: {
+          work_order_id: WorkOrder.id,
+          NOT: {
+            status: 'Completado',
+          },
+        },
+        data: {
+          status: 'Cerrado',
+        },
+      });
+      return { message: 'Respuesta guardada con exito' };
+    });
+  }
 }

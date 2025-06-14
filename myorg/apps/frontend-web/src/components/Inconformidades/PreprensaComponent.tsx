@@ -182,7 +182,7 @@ const Textarea = styled.textarea`
 `;
 
 const CloseButton = styled.button`
-  background: #2563EB;
+  background: #0038A8;
   color: white;
   margin-top: 20px;
   padding: 0.9rem 1.5rem;
@@ -222,7 +222,7 @@ const ModalBox = styled.div`
 `;
 
 const ConfirmButton = styled.button`
-  background-color: #2563eb;
+  background-color: #0038A8;
   color: white;
   padding: 0.5rem 1.5rem;
   border-radius: 0.5rem;

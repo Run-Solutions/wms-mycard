@@ -1,4 +1,6 @@
+// myorg/apps/frontend-mobile/src/contexts/AuthContext.tsx
 import React, { createContext, useState, ReactNode } from 'react';
+import { useContext } from 'react';
 
 interface AuthContextProps {
   isAuthenticated: boolean;
@@ -8,6 +10,7 @@ interface AuthContextProps {
   
 }
 interface User {
+  sub: number;
   username: String,
   role: String,
   role_id: number,
@@ -31,3 +34,5 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     </AuthContext.Provider>
   );
 };
+
+export const useAuth = () => useContext(AuthContext);

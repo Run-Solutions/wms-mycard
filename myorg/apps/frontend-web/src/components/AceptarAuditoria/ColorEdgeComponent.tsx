@@ -4,6 +4,7 @@ import { useRouter } from "next/navigation";
 import { useState, useEffect } from "react";
 import styled from "styled-components";
 import { acceptWorkOrderFlowColorEdgeAuditory, registrarInconformidadAuditory } from "@/api/aceptarAuditoria";
+
 // Define un tipo para los valores del formulario
 type ColorEdgeData = {
   good_quantity: string;
@@ -16,16 +17,22 @@ type ColorEdgeData = {
 interface Props {
   workOrder: any;
 }
+type PartialRelease = {
+  area: string;
+  quantity: string;
+  bad_quantity: string;
+  excess_quantity: string;
+  observation: string;
+  validated: boolean;
+}
 
 export default function ColorEdgeComponentAcceptAuditory({ workOrder }: Props) {
   const router = useRouter();
-  const [message, setMessage] = useState('');
   const [showConfirm, setShowConfirm] = useState(false);
   const [showInconformidad, setShowInconformidad] = useState(false);
   const [inconformidad, setInconformidad] = useState<string>('');
 
   // Estado para saber si los valores han sido modificados y para habilitar o deshabilitar el botón
-  const [isModified, setIsModified] = useState(false);
   const [isDisabled, setIsDisabled] = useState(true);
 
   const [sampleAuditory, setSampleQuantity] = useState('');
@@ -39,39 +46,46 @@ export default function ColorEdgeComponentAcceptAuditory({ workOrder }: Props) {
       cqm_quantity: "",
       comments: "",
     });
-
-    const currentFLow = [...workOrder.workOrder.flow]
-    .reverse()
-    .find((item) => item.status === "Enviado a Auditoria");
+    const cqm_quantity = workOrder.answers.reduce(
+      (total: number, answer: { sample_quantity?: number | string }) => {
+        return total + (Number(answer.sample_quantity) || 0);
+      },
+      0
+    );
 
     useEffect(() => {
-      if (currentFLow?.areaResponse?.colorEdge) {
+      if (workOrder?.areaResponse?.colorEdge && workOrder?.partialReleases?.length === 0) {
         const vals: ColorEdgeData = {
-          good_quantity: currentFLow.areaResponse.colorEdge.good_quantity || "0",
-          bad_quantity: currentFLow.areaResponse.colorEdge.bad_quantity || "0",
-          excess_quantity: currentFLow.areaResponse.colorEdge.excess_quantity || "0",
-          cqm_quantity: currentFLow.answers[0].sample_quantity || "0",
-          comments: currentFLow.areaResponse.colorEdge.comments || "",
+          good_quantity: workOrder.areaResponse.colorEdge.good_quantity || "0",
+          bad_quantity: workOrder.areaResponse.colorEdge.bad_quantity || "0",
+          excess_quantity: workOrder.areaResponse.colorEdge.excess_quantity || "0",
+          cqm_quantity: cqm_quantity || "0",
+          comments: workOrder.areaResponse.colorEdge.comments || "",
         };
         setDefaultValues(vals);
-        // El botón se mantiene deshabilitado hasta que haya un cambio
-        setIsModified(false);
-        setIsDisabled(true);
+      } else {
+        const firstUnvalidatedPartial = workOrder.partialReleases.find(
+          (release: PartialRelease) => !release.validated
+        );
+        const vals: ColorEdgeData = {
+          good_quantity: firstUnvalidatedPartial.quantity || '',
+          bad_quantity: firstUnvalidatedPartial.bad_quantity || '',
+          excess_quantity: firstUnvalidatedPartial.excess_quantity || '',
+          cqm_quantity: cqm_quantity || '',
+          comments: firstUnvalidatedPartial.observation || '',
+        };
+        setDefaultValues(vals);
       }
     }, [workOrder]);
 
     const handleSubmit = async (e: React.FormEvent) => {
       e.preventDefault();
       if (!sampleAuditory) {
-        alert('Por favor, asegurate de que no haya inconformidades con las cantidades entregadas.');
+        alert('Por favor, asegurate de ingresar muestras.');
         return;
       }
-      let ColorEdgeId  = null;
-      if (workOrder?.partialReleases?.length > 0) {
-        ColorEdgeId = workOrder.id;
-      } else {
-        ColorEdgeId = workOrder?.areaResponse?.colorEdge?.id;
-      }
+      // Envío siempre colorEdge.id si existe; si no, workOrder.id
+      const ColorEdgeId = workOrder?.areaResponse?.colorEdge?.id ?? workOrder.id;
       try {
         await acceptWorkOrderFlowColorEdgeAuditory(ColorEdgeId, sampleAuditory);
         router.push('/aceptarAuditoria');
@@ -82,6 +96,10 @@ export default function ColorEdgeComponentAcceptAuditory({ workOrder }: Props) {
     }
 
     const handleSubmitInconformidad = async () => {
+      if (!inconformidad.trim()) {
+        alert('Debes ingresar una inconformidad antes de continuar.');
+        return;
+      }
       try {
         await registrarInconformidadAuditory(workOrder?.id, inconformidad);
         router.push('/aceptarAuditoria');
@@ -104,8 +122,22 @@ export default function ColorEdgeComponentAcceptAuditory({ workOrder }: Props) {
             <Value>{workOrder.workOrder.mycard_id}</Value>
           </InfoItem>
           <InfoItem>
+            <Label>Cantidad:</Label>
+            <Value>{workOrder?.workOrder.quantity || "No definida"}</Value>
+          </InfoItem>
+          <InfoItem>
             <Label>Área que lo envía:</Label>
             <Value>{workOrder?.area.name || "No definida"}</Value>
+          </InfoItem>
+          <InfoItem>
+            <Label>Usuario que lo envía:</Label>
+            <Value>{workOrder?.user.username || "No definida"}</Value>
+          </InfoItem>
+        </DataWrapper>
+        <DataWrapper>
+          <InfoItem>
+            <Label>Comentarios:</Label>
+            <Value>{workOrder?.workOrder.comments || "No definida"}</Value>
           </InfoItem>
         </DataWrapper>
         <NewData>
@@ -134,7 +166,6 @@ export default function ColorEdgeComponentAcceptAuditory({ workOrder }: Props) {
           </InputGroup>
         </NewData>
         <AceptarButton onClick={() => setShowConfirm(true)}>Aceptar recepción del producto</AceptarButton>
-        {message && <p>{message}</p>}
         {showConfirm && (
           <ModalOverlay>
             <ModalBox>
@@ -214,11 +245,11 @@ const SectionTitle = styled.h3`
 const DataWrapper = styled.div`
   display: flex;
   flex-wrap: wrap;
-  gap: 2rem;
 `;
 
 const InfoItem = styled.div`
   flex: 1;
+  padding: 5px;
   min-width: 200px;
 `;
 
@@ -257,7 +288,7 @@ const Input = styled.input`
   transition: border 0.3s;
 
   &:focus {
-    border-color: #2563eb;
+    border-color: #0038A8;
   }
 `;
 
@@ -273,14 +304,14 @@ const Textarea = styled.textarea`
   resize: vertical;
 
   &:focus {
-    border-color: #2563eb;
+    border-color: #0038A8;
     outline: none;
   }
 `;
 
 const AceptarButton = styled.button<{ disabled?: boolean }>`
   margin-top: 2rem;
-  background-color: ${({ disabled }) => (disabled ? "#9CA3AF" : "#2563EB")};
+  background-color: ${({ disabled }) => (disabled ? "#9CA3AF" : "#0038A8")};
   color: white;
   padding: 0.75rem 2rem;
   border-radius: 0.5rem;
@@ -297,19 +328,19 @@ const AceptarButton = styled.button<{ disabled?: boolean }>`
 
 const InconformidadButton = styled.button<{ disabled?: boolean }>`
   height: 50px;
-  background-color: ${({ disabled }) => (disabled ? "#D1D5DB" : "#2563EB")};
+  background-color: ${({ disabled }) => (disabled ? "#D1D5DB" : "#A9A9A9")};
   color: white;
   padding: 0.75rem 2rem;
   border-radius: 0.5rem;
   font-weight: 600;
   transition: background 0.3s;
-  align-self: flex-center;
+  align-self: flex-end;
   cursor: ${({ disabled }) => (disabled ? "not-allowed" : "pointer")};
   opacity: ${({ disabled }) => (disabled ? 0.7 : 1)};
 
   &:hover {
     background-color: ${({ disabled }) =>
-      disabled ? "#D1D5DB" : "#1D4ED8"};
+      disabled ? "#D1D5DB" : "#8d8d92"};
   }
 `;
 
@@ -336,7 +367,7 @@ const ModalBox = styled.div`
 `;
 
 const ConfirmButton = styled.button`
-  background-color: #2563eb;
+  background-color: #0038A8;
   color: white;
   padding: 0.5rem 1.5rem;
   border-radius: 0.5rem;

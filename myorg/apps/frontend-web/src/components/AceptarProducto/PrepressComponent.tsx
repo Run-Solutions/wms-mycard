@@ -77,12 +77,15 @@ export default function PrepressComponentAccept({ workOrder }: Props) {
       alert('Error al conectar con el servidor');
     }
   }
+
+  const cantidadHojasRaw = Number(workOrder?.workOrder.quantity) / 24;
+  const cantidadHojas = cantidadHojasRaw > 0 ? Math.ceil(cantidadHojasRaw) : 0;
   
   return (
     <Container>
       <Title>Área: {workOrder.area.name}</Title>
 
-      <DataWrapper>
+      <DataWrapper style={{ gap: '2px'}}>
         <InfoItem>
           <Label>Número de Orden:</Label>
           <Value>{workOrder.workOrder.ot_id}</Value>
@@ -92,8 +95,12 @@ export default function PrepressComponentAccept({ workOrder }: Props) {
           <Value>{workOrder.workOrder.mycard_id}</Value>
         </InfoItem>
         <InfoItem>
-          <Label>Cantidad:</Label>
+          <Label>Cantidad (TARJETAS):</Label>
           <Value>{workOrder.workOrder.quantity || "No definida"}</Value>
+        </InfoItem>
+        <InfoItem style={{ backgroundColor: '#eaeaf5', borderRadius: '8px'}}>
+          <Label>Cantidad (HOJAS):</Label>
+          <Value>{cantidadHojas}</Value>
         </InfoItem>
       </DataWrapper>
 
@@ -220,12 +227,12 @@ const SectionTitle = styled.h3`
 const DataWrapper = styled.div`
   display: flex;
   flex-wrap: wrap;
-  gap: 2rem;
 `;
 
 const InfoItem = styled.div`
   flex: 1;
-  min-width: 200px;
+  padding: 5px;
+  min-width: 150px;
 `;
 
 const Label = styled.label`
@@ -285,7 +292,7 @@ const Textarea = styled.textarea`
 
 const AceptarButton = styled.button<{ disabled?: boolean }>`
   margin-top: 2rem;
-  background-color: ${({ disabled }) => (disabled ? "#9CA3AF" : "#2563EB")};
+  background-color: ${({ disabled }) => (disabled ? "#9CA3AF" : "#0038A8")};
   color: white;
   padding: 0.75rem 2rem;
   border-radius: 0.5rem;
@@ -302,7 +309,7 @@ const AceptarButton = styled.button<{ disabled?: boolean }>`
 
 const InconformidadButton = styled.button<{ disabled?: boolean }>`
   height: 50px;
-  background-color: ${({ disabled }) => (disabled ? "#D1D5DB" : "#2563EB")};
+  background-color: ${({ disabled }) => (disabled ? "#D1D5DB" : "#A9A9A9")};
   color: white;
   padding: 0.75rem 2rem;
   border-radius: 0.5rem;
@@ -314,7 +321,7 @@ const InconformidadButton = styled.button<{ disabled?: boolean }>`
 
   &:hover {
     background-color: ${({ disabled }) =>
-      disabled ? "#D1D5DB" : "#1D4ED8"};
+      disabled ? "#D1D5DB" : "#8d8d92"};
   }
 `;
 
@@ -359,7 +366,7 @@ const ModalBox = styled.div`
 `;
 
 const ConfirmButton = styled.button`
-  background-color: #2563eb;
+  background-color: ${({ theme }) => theme.palette.primary.main};
   color: white;
   padding: 0.5rem 1.5rem;
   border-radius: 0.5rem;
@@ -372,7 +379,7 @@ const ConfirmButton = styled.button`
 
   &:hover,
   &:focus {
-    background-color: #1e40af;
+    background-color: #1D4ED8;
     outline: none;
   }
 `;

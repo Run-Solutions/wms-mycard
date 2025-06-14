@@ -143,6 +143,7 @@ const WorkOrdersPage: React.FC = () => {
       alert('La OT es duplicada');
     }
   };
+  const cantidadHojas: number = Math.ceil(parseInt(formData.quantity) / 24) || 0;
 
   return (
     <PageContainer>
@@ -161,8 +162,12 @@ const WorkOrdersPage: React.FC = () => {
             <Input type="text" name="mycard_id" value={formData.mycard_id} onChange={handleChange} required />
           </Auxiliar>
           <Auxiliar>
-            <Label>Cantidad:</Label>
+            <Label>Cantidad (TARJETAS):</Label>
             <Input type="number" name="quantity" value={formData.quantity} onChange={handleChange} required />
+          </Auxiliar>
+          <Auxiliar>
+            <Label>Cantidad (HOJAS):</Label>
+            <Input type="number" name="quantity" value={cantidadHojas} readOnly/>
           </Auxiliar>
         </DataWrapper>
 

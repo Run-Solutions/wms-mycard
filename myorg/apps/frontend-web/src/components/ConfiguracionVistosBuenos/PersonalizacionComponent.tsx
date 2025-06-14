@@ -19,7 +19,7 @@ export default function PersonalizacionComponent({ formQuestion }: Props) {
   const [editingId, setEditingId] = useState<number | null>(null);
   const [newTitle, setNewTitle] = useState('');
   const [deletingId, setDeletingId] = useState<number | null>(null);
-  const [formQuestions, setFormQuestions] = useState<any[]>(formQuestion); 
+  const [formQuestions, setFormQuestions] = useState<any[]>(formQuestion);
   const [selectedOption, setSelectedOption] = useState('etiquetadora');
 
   const handleUpdateTitle = async (id: number, updatedTitle: string) => {
@@ -37,7 +37,6 @@ export default function PersonalizacionComponent({ formQuestion }: Props) {
       );
       setFormQuestions(updatedQuestions);
       setEditingId(null);
-  
       console.log("Datos enviados:", {
         id,
         title: updatedTitle,
@@ -67,138 +66,267 @@ export default function PersonalizacionComponent({ formQuestion }: Props) {
 
   return (
     <Container>
-      <Title>Área a evaluar: Impresion</Title>
+      <Title>Área a evaluar: Personalización</Title>
 
       <NewData>
         <SectionTitle>Respuestas del operador</SectionTitle>
         <NewDataWrapper>
           <RadioGroup>
-              <RadioButton $checked={selectedOption === 'etiquetadora'}>
-                <input
-                  type="radio"
-                  value="etiquetadora"
-                  checked={selectedOption === 'etiquetadora'}
-                  onChange={(e) => setSelectedOption(e.target.value)}
-                />
-                Etiquetadora
-              </RadioButton>
-              <RadioButton $checked={selectedOption === 'persos'}>
-                <input
-                  type="radio"
-                  value="persos"
-                  checked={selectedOption === 'persos'}
-                  onChange={(e) => setSelectedOption(e.target.value)}
-                />
-                Persos's
-              </RadioButton>
-              <RadioButton $checked={selectedOption === 'laser'}>
-                <input
-                  type="radio"
-                  value="laser"
-                  checked={selectedOption === 'laser'}
-                  onChange={(e) => setSelectedOption(e.target.value)}
-                />
-                Láser
-              </RadioButton>
-            </RadioGroup>
-            {selectedOption === 'etiquetadora' && (
-              <>
-                <Table>
-                  <thead>
-                    <tr>
-                      <th>Pregunta</th>
-                      <th>Respuesta</th>
-                      <th>Acciones</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {formQuestions.slice(0,1).filter((question: any) => question.role_id === null && question.areas.some((area: any) => area.id === 10))
-                      .map((question: any) => {
-                        // Como no mostraste la estructura de las respuestas aquí, lo dejo vacío
-                        const frontAnswer = null; 
-                        const vueltaAnswer = null;
-                        return (
-                          <tr key={question.id}>
-                            <td>{question.title}</td>
-                            <td><input type="checkbox" checked={false} disabled/></td>
-                            <td>
-                              <button style={{ marginRight: '8px' }} onClick={() => {
-                                setEditingId(question.id);
-                                setNewTitle(question.title);
-                                }}><FaEdit /></button>
-                              <button onClick={() => setDeletingId(question.id)}><FaTrash /></button>
-                            </td>
-                          </tr>
-                        );
-                      })}
-                  </tbody>
-                </Table>
-                <InputGroup style={{ width: '50%'}}>
-                  <Label>Verificar Tipo De Etiqueta Vs Ot Y Pegar Utilizada:</Label>
-                  <Input type="number" readOnly />
-                </InputGroup>
-              </>
-            )}
-            {selectedOption === 'persos' && (
-              <>
-                <Table>
-                  <thead>
-                    <tr>
-                      <th>Pregunta</th>
-                      <th>Respuesta</th>
-                      <th>Acciones</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {formQuestions.slice(1,10).filter((question: any) => question.role_id === null && question.areas.some((area: any) => area.id === 10))
-                      .map((question: any) => {
-                        // Como no mostraste la estructura de las respuestas aquí, lo dejo vacío
-                        const frontAnswer = null; 
-                        const vueltaAnswer = null;
-                        return (
-                          <tr key={question.id}>
-                            <td>{question.title}</td>
-                            <td><input type="checkbox" checked={false} disabled/></td>
-                            <td>
-                              <button style={{ marginRight: '8px' }} onClick={() => {
-                                setEditingId(question.id);
-                                setNewTitle(question.title);
-                                }}><FaEdit /></button>
-                              <button onClick={() => setDeletingId(question.id)}><FaTrash /></button>
-                            </td>
-                          </tr>
-                        );
-                      })}
-                  </tbody>
-                </Table>
-                <InputGroup style={{ width: '50%', marginTop: '-10px'}}>
-                  <Label>Color de Personalizacion:</Label>
-                  <Input type="number" readOnly />
-                </InputGroup>
-                <InputGroup style={{ width: '50%', marginTop: '-10px'}}>
-                  <Label>Tipo de Codigo de Barras Que Se Personaliza:</Label>
-                  <Input type="number" readOnly />
-                </InputGroup>
-              </>
-            )}
-            {selectedOption === 'laser' && (
-              <>
-              <InputGroup style={{ width: '50%'}}>
+            <RadioButton $checked={selectedOption === 'etiquetadora'}>
+              <input
+                type="radio"
+                value="etiquetadora"
+                checked={selectedOption === 'etiquetadora'}
+                onChange={(e) => setSelectedOption(e.target.value)}
+              />
+              Etiquetadora
+            </RadioButton>
+            <RadioButton $checked={selectedOption === 'persos'}>
+              <input
+                type="radio"
+                value="persos"
+                checked={selectedOption === 'persos'}
+                onChange={(e) => setSelectedOption(e.target.value)}
+              />
+              Persos's
+            </RadioButton>
+            <RadioButton $checked={selectedOption === 'laser'}>
+              <input
+                type="radio"
+                value="laser"
+                checked={selectedOption === 'laser'}
+                onChange={(e) => setSelectedOption(e.target.value)}
+              />
+              Láser
+            </RadioButton>
+            <RadioButton $checked={selectedOption === 'packsmart'}>
+              <input
+                type="radio"
+                value="packsmart"
+                checked={selectedOption === 'packsmart'}
+                onChange={(e) => setSelectedOption(e.target.value)}
+              />
+              Packsmart
+            </RadioButton>
+            <RadioButton $checked={selectedOption === 'otto'}>
+              <input
+                type="radio"
+                value="otto"
+                checked={selectedOption === 'otto'}
+                onChange={(e) => setSelectedOption(e.target.value)}
+              />
+              Otto
+            </RadioButton>
+            <RadioButton $checked={selectedOption === 'embolsadora'}>
+              <input
+                type="radio"
+                value="embolsadora"
+                checked={selectedOption === 'embolsadora'}
+                onChange={(e) => setSelectedOption(e.target.value)}
+              />
+              Embolsadora
+            </RadioButton>
+          </RadioGroup>
+          {selectedOption === 'etiquetadora' && (
+            <>
+              <Table>
+                <thead>
+                  <tr>
+                    <th>Pregunta</th>
+                    <th>Respuesta</th>
+                    <th>Acciones</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {formQuestions.slice(0, 1).filter((question: any) => question.role_id === null && question.areas.some((area: any) => area.id === 10))
+                    .map((question: any) => {
+                      // Como no mostraste la estructura de las respuestas aquí, lo dejo vacío
+                      const frontAnswer = null;
+                      const vueltaAnswer = null;
+                      return (
+                        <tr key={question.id}>
+                          <td>{question.title}</td>
+                          <td><input type="checkbox" checked={false} disabled /></td>
+                          <td>
+                            <button style={{ marginRight: '8px' }} onClick={() => {
+                              setEditingId(question.id);
+                              setNewTitle(question.title);
+                            }}><FaEdit /></button>
+                            <button onClick={() => setDeletingId(question.id)}><FaTrash /></button>
+                          </td>
+                        </tr>
+                      );
+                    })}
+                </tbody>
+              </Table>
+              <InputGroup style={{ width: '50%' }}>
+                <Label>Verificar Tipo De Etiqueta Vs Ot Y Pegar Utilizada:</Label>
+                <Input type="number" readOnly />
+              </InputGroup>
+            </>
+          )}
+          {selectedOption === 'persos' && (
+            <>
+              <Table>
+                <thead>
+                  <tr>
+                    <th>Pregunta</th>
+                    <th>Respuesta</th>
+                    <th>Acciones</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {formQuestions.slice(1, 10).filter((question: any) => question.role_id === null && question.areas.some((area: any) => area.id === 10))
+                    .map((question: any) => {
+                      // Como no mostraste la estructura de las respuestas aquí, lo dejo vacío
+                      const frontAnswer = null;
+                      const vueltaAnswer = null;
+                      return (
+                        <tr key={question.id}>
+                          <td>{question.title}</td>
+                          <td><input type="checkbox" checked={false} disabled /></td>
+                          <td>
+                            <button style={{ marginRight: '8px' }} onClick={() => {
+                              setEditingId(question.id);
+                              setNewTitle(question.title);
+                            }}><FaEdit /></button>
+                            <button onClick={() => setDeletingId(question.id)}><FaTrash /></button>
+                          </td>
+                        </tr>
+                      );
+                    })}
+                </tbody>
+              </Table>
+              <InputGroup style={{ width: '50%', marginTop: '-10px' }}>
+                <Label>Color de Personalizacion:</Label>
+                <Input type="number" readOnly />
+              </InputGroup>
+              <InputGroup style={{ width: '50%', marginTop: '-10px' }}>
+                <Label>Tipo de Codigo de Barras Que Se Personaliza:</Label>
+                <Input type="number" readOnly />
+              </InputGroup>
+            </>
+          )}
+          {selectedOption === 'laser' && (
+            <>
+              <InputGroup style={{ width: '50%' }}>
                 <Label>No hay preguntas por parte del operador.</Label>
-              </InputGroup>        
-              </>
-            )}
-              <InputGroup style={{ width: '50%', marginTop: '-10px'}}>
-                <Label>Muestras entregadas:</Label>
-              <Input type="number" readOnly />
-            </InputGroup>
+              </InputGroup>
+            </>
+          )}
+          {selectedOption === 'packsmart' && (
+            <>
+              <Table>
+                <thead>
+                  <tr>
+                    <th>Pregunta</th>
+                    <th>Respuesta</th>
+                    <th>Acciones</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {formQuestions.slice(14, 20).filter((question: any) => question.role_id === null && question.areas.some((area: any) => area.id === 10))
+                    .map((question: any) => {
+                      // Como no mostraste la estructura de las respuestas aquí, lo dejo vacío
+                      const frontAnswer = null;
+                      const vueltaAnswer = null;
+                      return (
+                        <tr key={question.id}>
+                          <td>{question.title}</td>
+                          <td><input type="checkbox" checked={false} disabled /></td>
+                          <td>
+                            <button style={{ marginRight: '8px' }} onClick={() => {
+                              setEditingId(question.id);
+                              setNewTitle(question.title);
+                            }}><FaEdit /></button>
+                            <button onClick={() => setDeletingId(question.id)}><FaTrash /></button>
+                          </td>
+                        </tr>
+                      );
+                    })}
+                </tbody>
+              </Table>
+            </>
+          )}
+          {selectedOption === 'otto' && (
+            <>
+              <Table>
+                <thead>
+                  <tr>
+                    <th>Pregunta</th>
+                    <th>Respuesta</th>
+                    <th>Acciones</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {formQuestions.slice(21, 28).filter((question: any) => question.role_id === null && question.areas.some((area: any) => area.id === 10))
+                    .map((question: any) => {
+                      // Como no mostraste la estructura de las respuestas aquí, lo dejo vacío
+                      const frontAnswer = null;
+                      const vueltaAnswer = null;
+                      return (
+                        <tr key={question.id}>
+                          <td>{question.title}</td>
+                          <td><input type="checkbox" checked={false} disabled /></td>
+                          <td>
+                            <button style={{ marginRight: '8px' }} onClick={() => {
+                              setEditingId(question.id);
+                              setNewTitle(question.title);
+                            }}><FaEdit /></button>
+                            <button onClick={() => setDeletingId(question.id)}><FaTrash /></button>
+                          </td>
+                        </tr>
+                      );
+                    })}
+                </tbody>
+              </Table>
+            </>
+          )}
+          {selectedOption === 'embolsadora' && (
+            <>
+              <Table>
+                <thead>
+                  <tr>
+                    <th>Pregunta</th>
+                    <th>Respuesta</th>
+                    <th>Acciones</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {formQuestions.slice(28, 30).filter((question: any) => question.role_id === null && question.areas.some((area: any) => area.id === 10))
+                    .map((question: any) => {
+                      // Como no mostraste la estructura de las respuestas aquí, lo dejo vacío
+                      const frontAnswer = null;
+                      const vueltaAnswer = null;
+                      return (
+                        <tr key={question.id}>
+                          <td>{question.title}</td>
+                          <td><input type="checkbox" checked={false} disabled /></td>
+                          <td>
+                            <button style={{ marginRight: '8px' }} onClick={() => {
+                              setEditingId(question.id);
+                              setNewTitle(question.title);
+                            }}><FaEdit /></button>
+                            <button onClick={() => setDeletingId(question.id)}><FaTrash /></button>
+                          </td>
+                        </tr>
+                      );
+                    })}
+                </tbody>
+              </Table>
+            </>
+          )}
+          <InputGroup style={{ width: '50%', marginTop: '-10px' }}>
+            <Label>Muestras entregadas:</Label>
+            <Input type="number" readOnly />
+          </InputGroup>
         </NewDataWrapper>
 
         <NewData>
           <SectionTitle>Mis respuestas</SectionTitle>
-          {selectedOption === 'etiquetadora' && (
+          {['embolsadora', 'packsmart', 'otto', 'etiquetadora'].includes(selectedOption) && (
             <>
-              <InputGroup style={{ width: '50%'}}>
+              <InputGroup style={{ width: '50%' }}>
                 <Label>No hay preguntas por parte de calidad.</Label>
               </InputGroup>
             </>
@@ -206,36 +334,36 @@ export default function PersonalizacionComponent({ formQuestion }: Props) {
           {selectedOption === 'persos' && (
             <>
               <Table>
-              <thead>
-                <tr>
-                  <th>Pregunta</th>
-                  <th>Respuesta</th>
-                  <th>Acciones</th>
-                </tr>
-              </thead>
-              <tbody>
-              {formQuestions.slice(13,15).filter((question: any) => question.role_id === 3 && question.areas.some((area: any) => area.id === 10))
-                .map((question: any) => {
-                  // Como no mostraste la estructura de las respuestas aquí, lo dejo vacío
-                  const frontAnswer = null; 
-                  const vueltaAnswer = null;
-                  return (
-                    <tr key={question.id}>
-                      <td>{question.title}</td>
-                      <td><input type="checkbox" checked={false} disabled/></td>
-                      <td>
-                        <button style={{ marginRight: '8px' }} onClick={() => {
-                          setEditingId(question.id);
-                          setNewTitle(question.title);
-                          }}><FaEdit /></button>
-                        <button onClick={() => setDeletingId(question.id)}><FaTrash /></button>
-                      </td>
-                    </tr>
-                  );
-                })}
-            </tbody>
-            </Table>
-              <InputGroup style={{ width: '50%', marginTop:'20px'}}>
+                <thead>
+                  <tr>
+                    <th>Pregunta</th>
+                    <th>Respuesta</th>
+                    <th>Acciones</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {formQuestions.slice(13, 15).filter((question: any) => question.role_id === 3 && question.areas.some((area: any) => area.id === 10))
+                    .map((question: any) => {
+                      // Como no mostraste la estructura de las respuestas aquí, lo dejo vacío
+                      const frontAnswer = null;
+                      const vueltaAnswer = null;
+                      return (
+                        <tr key={question.id}>
+                          <td>{question.title}</td>
+                          <td><input type="checkbox" checked={false} disabled /></td>
+                          <td>
+                            <button style={{ marginRight: '8px' }} onClick={() => {
+                              setEditingId(question.id);
+                              setNewTitle(question.title);
+                            }}><FaEdit /></button>
+                            <button onClick={() => setDeletingId(question.id)}><FaTrash /></button>
+                          </td>
+                        </tr>
+                      );
+                    })}
+                </tbody>
+              </Table>
+              <InputGroup style={{ width: '50%', marginTop: '20px' }}>
                 <Label>Validar Carga De Aplicación (PersoMaster) Anotar:</Label>
                 <Input type="number" readOnly />
               </InputGroup>
@@ -244,51 +372,51 @@ export default function PersonalizacionComponent({ formQuestion }: Props) {
           {selectedOption === 'laser' && (
             <>
               <Table>
-              <thead>
-                <tr>
-                  <th>Pregunta</th>
-                  <th>Respuesta</th>
-                  <th>Acciones</th>
-                </tr>
-              </thead>
-              <tbody>
-              {formQuestions.slice(10,13).filter((question: any) => question.role_id === 3 && question.areas.some((area: any) => area.id === 10))
-                .map((question: any) => {
-                  // Como no mostraste la estructura de las respuestas aquí, lo dejo vacío
-                  const frontAnswer = null; 
-                  const vueltaAnswer = null;
-                  return (
-                    <tr key={question.id}>
-                      <td>{question.title}</td>
-                      <td><input type="checkbox" checked={false} disabled/></td>
-                      <td>
-                        <button style={{ marginRight: '8px' }} onClick={() => {
-                          setEditingId(question.id);
-                          setNewTitle(question.title);
-                          }}><FaEdit /></button>
-                        <button onClick={() => setDeletingId(question.id)}><FaTrash /></button>
-                      </td>
-                    </tr>
-                  );
-                })}
-            </tbody>
-            </Table>
-              <InputGroup style={{ width: '50%', marginTop:'20px'}}>
+                <thead>
+                  <tr>
+                    <th>Pregunta</th>
+                    <th>Respuesta</th>
+                    <th>Acciones</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {formQuestions.slice(10, 13).filter((question: any) => question.role_id === 3 && question.areas.some((area: any) => area.id === 10))
+                    .map((question: any) => {
+                      // Como no mostraste la estructura de las respuestas aquí, lo dejo vacío
+                      const frontAnswer = null;
+                      const vueltaAnswer = null;
+                      return (
+                        <tr key={question.id}>
+                          <td>{question.title}</td>
+                          <td><input type="checkbox" checked={false} disabled /></td>
+                          <td>
+                            <button style={{ marginRight: '8px' }} onClick={() => {
+                              setEditingId(question.id);
+                              setNewTitle(question.title);
+                            }}><FaEdit /></button>
+                            <button onClick={() => setDeletingId(question.id)}><FaTrash /></button>
+                          </td>
+                        </tr>
+                      );
+                    })}
+                </tbody>
+              </Table>
+              <InputGroup style={{ width: '50%', marginTop: '20px' }}>
                 <Label>Verificar Script / Layout Vs Ot /Autorización, Favor De Anotar:</Label>
                 <Input type="number" readOnly />
               </InputGroup>
-              <InputGroup style={{ width: '50%', marginTop:'20px'}}>
+              <InputGroup style={{ width: '50%', marginTop: '20px' }}>
                 <Label>Validar, Anotar Kcv (Llaves), Carga De Aplicación O Prehabilitación (Si Aplica):</Label>
                 <Input type="number" readOnly />
               </InputGroup>
-              <InputGroup style={{ width: '50%', marginTop:'20px'}}>
+              <InputGroup style={{ width: '50%', marginTop: '20px' }}>
                 <Label>Describir Apariencia Del Quemado Del Láser (Color):</Label>
                 <Input type="number" readOnly />
               </InputGroup>
             </>
           )}
-          
-          
+
+
         </NewData>
       </NewData>
       {editingId !== null && (
@@ -318,7 +446,7 @@ export default function PersonalizacionComponent({ formQuestion }: Props) {
       )}
       {deletingId !== null && (
         <ModalOverlay>
-          <ModalContent style={{ width: '400px'}}>
+          <ModalContent style={{ width: '400px' }}>
             <ModalTitle>Eliminar esta pregunta</ModalTitle>
             <p>¿Estás segura/o de que deseas eliminar esta pregunta? Esta acción no se puede deshacer.</p>
             <ModalActions>
@@ -350,7 +478,7 @@ const Container = styled.div`
   margin-top: 1.5rem;
   border-radius: 1rem;
   box-shadow: 0 4px 12px rgba(0,0,0,0.1);
-  max-width: 800px;
+  max-width: 880px;
   margin-left: auto;
   margin-right: auto;
 `;
@@ -425,7 +553,7 @@ const Input = styled.input`
 
 const RadioGroup = styled.div`
   display: flex;
-  gap: 2rem;
+  gap: 1rem;
   margin-top: 0.5rem;
 `;
 

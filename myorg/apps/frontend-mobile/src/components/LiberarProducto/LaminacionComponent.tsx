@@ -2,7 +2,6 @@ import React, { useState } from 'react';
 import {
   View,
   Text,
-  TextInput,
   TouchableOpacity,
   ScrollView,
   StyleSheet,
@@ -10,11 +9,13 @@ import {
   Platform,
   Modal,
 } from 'react-native';
+import { TextInput } from 'react-native-paper';
 import { useNavigation } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { RootStackParamList } from '../../navigation/types';
 import { submitToCQMLaminacion, releaseProductFromLaminacion } from '../../api/liberarProducto';
 import { RadioButton } from 'react-native-paper';
+import { useAuth } from '../../contexts/AuthContext';
 
 interface PartialRelease {
   validated: boolean;
@@ -23,7 +24,7 @@ interface PartialRelease {
 const LaminacionComponent = ({ workOrder }: { workOrder: any }) => {
   console.log('Order', workOrder);
   const navigation = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
-  const [sampleQuantity, setSampleQuantity] = useState('');
+  const [sampleQuantity, setSampleQuantity] = useState<number>(0);
   const [comments, setComments] = useState('');
   const [showCqmModal, setShowCqmModal] = useState(false);
   const [showConfirm, setShowConfirm] = useState(false);
@@ -34,16 +35,25 @@ const LaminacionComponent = ({ workOrder }: { workOrder: any }) => {
 
   const questions = workOrder.area.formQuestions?.filter((q: any) => q.role_id === null) || [];
   const qualityQuestions = workOrder.area.formQuestions?.filter((q: any) => q.role_id === 3) || [];
-  const isDisabled =
-  workOrder.status === 'En proceso';
-  
+  const isDisabled = workOrder.status === 'En proceso';
+ 
+  const { user } = useAuth();
+  const currentUserId = user?.sub;
   console.log("El mismo workOrder (workOrder)", workOrder);
   const flowList = [...workOrder.workOrder.flow];
-  // Índice del flow actual basado en su id
-  const currentIndex = flowList.findIndex((item) => item.id === workOrder.id);
+  const currentFlow = workOrder.workOrder.flow.find(
+    (f: any) =>
+      f.area_id === workOrder.area.id &&
+    ['Pendiente', 'En proceso', 'Parcial', 'Pendiente parcial', 'Listo', 'Enviado a CQM', 'En Calidad'].includes(f.status) &&
+      f.user?.id === currentUserId
+  );
+
+  if (!currentFlow) {
+    alert("No tienes una orden activa para esta área.");
+    return;
+  }
+  const currentIndex = flowList.findIndex((item) => item.id === currentFlow?.id);
   console.log('el currentIndex', currentIndex);
-  // Flow actual
-  const currentFlow = currentIndex !== -1 ? flowList[currentIndex] : null;
   // Anterior (si hay)
   const lastCompletedOrPartial = currentIndex > 0 ? flowList[currentIndex - 1] : null;
   // Siguiente (si hay)
@@ -54,77 +64,16 @@ const LaminacionComponent = ({ workOrder }: { workOrder: any }) => {
   console.log("El siguiente flujo (nextFlow)", nextFlow);
   console.log("Ultimo parcial o completado", lastCompletedOrPartial);
 
-  const cantidadEntregadaLabel = lastCompletedOrPartial.areaResponse
-  ? 'Cantidad entregada:'
-  : lastCompletedOrPartial.partialReleases?.some((r: PartialRelease) => r.validated)
-    ? 'Cantidad entregada validada:'
-    : 'Cantidad faltante por liberar:';
-
-  const cantidadEntregadaValue = lastCompletedOrPartial.areaResponse
-    ? (
-      lastCompletedOrPartial.areaResponse.prepress?.plates ??
-      lastCompletedOrPartial.areaResponse.impression?.release_quantity ??
-      lastCompletedOrPartial.areaResponse.serigrafia?.release_quantity ??
-      lastCompletedOrPartial.areaResponse.empalme?.release_quantity ??
-      lastCompletedOrPartial.areaResponse.laminacion?.release_quantity ??
-      lastCompletedOrPartial.areaResponse.corte?.good_quantity ??
-      lastCompletedOrPartial.areaResponse.colorEdge?.good_quantity ??
-      lastCompletedOrPartial.areaResponse.hotStamping?.good_quantity ??
-      lastCompletedOrPartial.areaResponse.millingChip?.good_quantity ??
-      lastCompletedOrPartial.areaResponse.personalizacion?.good_quantity ??
-      'Sin cantidad'
-    )
-    : lastCompletedOrPartial.partialReleases?.some((r: PartialRelease) => r.validated)
-      ? lastCompletedOrPartial.partialReleases
-          .filter((r: PartialRelease) => r.validated)
-          .reduce((sum: number, r: { quantity: number }) => sum + r.quantity, 0)
-      : (lastCompletedOrPartial.workOrder?.quantity ?? 0) -
-        (lastCompletedOrPartial.partialReleases?.reduce((sum: number, r: { quantity: number }) => sum + r.quantity, 0) ?? 0);
-
-  const mostrarCantidadPorLiberar =
-    (workOrder?.partialReleases?.length ?? 0) > 0;
-
-  let cantidadPorLiberar = 0;
-  if (mostrarCantidadPorLiberar) {
-    if (lastCompletedOrPartial.area.name === 'preprensa') {
-      cantidadPorLiberar = workOrder.workOrder.quantity -
-        workOrder.partialReleases.reduce((sum: number, r: {quantity: number}) => sum + r.quantity, 0);
-    } else {
-      const validadas = lastCompletedOrPartial.partialReleases?.filter((release: { validated: boolean, quantity: number }) => release.validated) ?? [];
-      const sumaValidadas = validadas.reduce((sum: number, r: {quantity: number}) => sum + r.quantity, 0);
-      const sumaParciales = workOrder.partialReleases.reduce((sum: number, r: {quantity: number}) => sum + r.quantity, 0);
-      cantidadPorLiberar = validadas.length > 0
-        ? (sumaValidadas - sumaParciales)
-        : sumaParciales;
-    }
-  }
-
-  const allParcialsValidated = workOrder.partialReleases?.every(
-    (r: { validated: boolean }) => r.validated
+  const allParcialsValidated = currentFlow.partialReleases?.every(
+    (r: PartialRelease) => r.validated
   );
 
-  const disableLiberarButton = 
-    isDisabled ||
-    ['Enviado a CQM', 'En Calidad', 'Parcial', ].includes(workOrder.status) ||
-    (nextFlow && 
-      ['Listo', 'Enviado a CQM', 'En calidad', 'Parcial', 'Pendiente parcial'].includes(nextFlow?.status) &&
-      !allParcialsValidated);
-    const disableLiberarCQM = ['Enviado a CQM', 'En Calidad', 'Listo'].includes(workOrder.status);
-    const isListo = workOrder.status === 'Listo';
-
-  const toggleCheckbox = (
-    id: number,
-    target: number[],
-    setter: React.Dispatch<React.SetStateAction<number[]>>
-  ) => {
-    setter(target.includes(id) ? target.filter(i => i !== id) : [...target, id]);
-  };
+  const tarjetasporliberar = sampleQuantity * 24;
 
   const enviarACQM = async () => {
     const isFrenteVueltaValid = checkedQuestion.length > 0 || checkedQuestion.length > 0;
-    const isSampleValid = Number(sampleQuantity) > 0;
   
-    if (!questions.length || !isFrenteVueltaValid || !isSampleValid) {
+    if (!questions.length || !isFrenteVueltaValid) {
       Alert.alert('Completa todas las preguntas y cantidad de muestra.');
       return;
     }
@@ -166,7 +115,7 @@ const LaminacionComponent = ({ workOrder }: { workOrder: any }) => {
       workOrderFlowId: currentFlow.id,
       areaId: workOrder.area.id,
       assignedUser: currentFlow.assigned_user,
-      releaseQuantity: Number(sampleQuantity),
+      releaseQuantity: Number(tarjetasporliberar),
       comments,
       formAnswerId: currentFlow.answers?.[0]?.id,
     };
@@ -181,42 +130,171 @@ const LaminacionComponent = ({ workOrder }: { workOrder: any }) => {
     }
   };
 
+  const cantidadEntregadaLabel = lastCompletedOrPartial.areaResponse ? ('Cantidad entregada:') : lastCompletedOrPartial.partialReleases?.some((r: PartialRelease) => r.validated) ? 'Cantidad entregada validada:' : 'Cantidad faltante por liberar:'
+
+  const cantidadEntregadaValue = lastCompletedOrPartial.areaResponse
+  ? (
+    // Mostrar cantidad según sub-área disponible
+    lastCompletedOrPartial.areaResponse.prepress?.plates ??
+    lastCompletedOrPartial.areaResponse.impression?.release_quantity ??
+    lastCompletedOrPartial.areaResponse.serigrafia?.release_quantity ??
+    lastCompletedOrPartial.areaResponse.empalme?.release_quantity ??
+    lastCompletedOrPartial.areaResponse.laminacion?.release_quantity ??
+    lastCompletedOrPartial.areaResponse.corte?.good_quantity ??
+    lastCompletedOrPartial.areaResponse.colorEdge?.good_quantity ??
+    lastCompletedOrPartial.areaResponse.hotStamping?.good_quantity ??
+    lastCompletedOrPartial.areaResponse.millingChip?.good_quantity ??
+    lastCompletedOrPartial.areaResponse.personalizacion?.good_quantity ??
+    'Sin cantidad'
+  )
+  : lastCompletedOrPartial.partialReleases?.some((r: PartialRelease) => r.validated)
+  ? (
+    lastCompletedOrPartial.partialReleases
+      .filter((release: PartialRelease) => release.validated)
+      .reduce((sum: number, release: PartialRelease) => sum + release.quantity, 0)
+  )
+  : 
+  (lastCompletedOrPartial.workOrder?.quantity ?? 0) - (lastCompletedOrPartial.partialReleases?.reduce((sum: number, release: PartialRelease) => sum + release.quantity, 0) ?? 0);
+
+  let cantidadporliberar = 0;
+  const totalLiberado = currentFlow.partialReleases?.reduce(
+    (sum: number, release: PartialRelease) => sum + release.quantity,
+    0
+  ) ?? 0;
+  console.log('Total liberado:', totalLiberado);
+  const validados = lastCompletedOrPartial.partialReleases
+    ?.filter((r: PartialRelease) => r.validated)
+    .reduce((sum: number, r: PartialRelease) => sum + r.quantity, 0) ?? 0;
+  console.log('Cantidad validada:', validados);
+  // ✅ 1. Preprensa tiene prioridad
+  if (lastCompletedOrPartial.area?.name === 'preprensa') {
+    cantidadporliberar = currentFlow.workOrder.quantity - totalLiberado;
+  }
+  // ✅ 2. Si hay validados en otras áreas
+  else if (validados > 0) {
+    let resta = validados - totalLiberado;
+    if (resta < 0) {
+      cantidadporliberar = 0;
+    } else {
+      cantidadporliberar = resta;
+    }
+  }
+  // ✅ 3. Si hay liberaciones sin validar
+  else if (totalLiberado > 0) {
+    cantidadporliberar = currentFlow.workOrder.quantity - totalLiberado;
+  }
+  // ✅ 4. Si no hay nada, usar la cantidad entregada
+  else {
+    cantidadporliberar =
+      lastCompletedOrPartial.areaResponse.prepress?.plates ??
+      lastCompletedOrPartial.areaResponse.impression?.release_quantity ??
+      lastCompletedOrPartial.areaResponse.serigrafia?.release_quantity ??
+      lastCompletedOrPartial.areaResponse.empalme?.release_quantity ??
+      lastCompletedOrPartial.areaResponse.laminacion?.release_quantity ??
+      lastCompletedOrPartial.areaResponse.corte?.good_quantity ??
+      lastCompletedOrPartial.areaResponse.colorEdge?.good_quantity ??
+      lastCompletedOrPartial.areaResponse.hotStamping?.good_quantity ??
+      lastCompletedOrPartial.areaResponse.millingChip?.good_quantity ??
+      lastCompletedOrPartial.areaResponse.personalizacion?.good_quantity ??
+      currentFlow.workOrder.quantity ??
+      0;
+    }
+
+    const shouldDisableLiberar = () => {
+      const currentInvalidStatuses = ['Enviado a CQM', 'En Calidad', 'Parcial', 'En proceso'];
+      const nextInvalidStatuses = ['Enviado a CQM', 'Listo', 'En Calidad', 'Pendiente parcial'];
+    
+      const isCurrentInvalid = currentInvalidStatuses.includes(currentFlow.status?.trim());
+      const isNextInvalid = nextInvalidStatuses.includes(nextFlow?.status?.trim());
+      const isNextInvalidAndNotValidated = nextInvalidStatuses.includes(nextFlow?.status?.trim()) && !allParcialsValidated;
+    
+      return isDisabled || isCurrentInvalid || isNextInvalidAndNotValidated || isNextInvalid;
+    };
+    const shouldDisableCQM = () => {
+      const estadosBloqueados = ['Enviado a CQM', 'En Calidad', 'Listo'];
+      const isDisabled =
+        estadosBloqueados.includes(currentFlow.status) ||
+        estadosBloqueados.includes(lastCompletedOrPartial.status) ||
+        estadosBloqueados.includes(nextFlow?.status) || // nextFlow puede ser opcional
+        Number(cantidadporliberar) === 0;
+    
+      return isDisabled;
+    };
+    const disableLiberarButton = shouldDisableLiberar();
+    const disableLiberarCQM = shouldDisableCQM();
+    const isListo = currentFlow.status === 'Listo';
+
+    const cantidadHojasRaw = Number(workOrder?.workOrder.quantity) / 24;
+    const cantidadHojas = cantidadHojasRaw > 0 ? Math.ceil(cantidadHojasRaw) : 0;
+
+  const toggleCheckbox = (
+    id: number,
+    target: number[],
+    setter: React.Dispatch<React.SetStateAction<number[]>>
+  ) => {
+    setter(target.includes(id) ? target.filter(i => i !== id) : [...target, id]);
+  };
+
+  
+
   return (
     <ScrollView style={styles.container}>
       <Text style={styles.title}>Área: Laminación</Text>
 
       <View style={styles.cardDetail}>
+        <Text style={styles.labelDetail}>Cantidad (HOJAS): 
+          <Text style={styles.valueDetail}> {cantidadHojas}</Text>
+        </Text>
         <Text style={styles.labelDetail}>Área que lo envía: 
           <Text style={styles.valueDetail}> {lastCompletedOrPartial.area.name}</Text>
         </Text>
-        <Text style={styles.labelDetail}>
-          Usuario del área previa: <Text style={styles.valueDetail}>{lastCompletedOrPartial.user.username}</Text>
+        <Text style={styles.labelDetail}> Usuario del área previa: 
+          <Text style={styles.valueDetail}>{lastCompletedOrPartial.user.username}</Text>
         </Text>
         <Text style={styles.labelDetail}>
           {cantidadEntregadaLabel}
         <Text style={styles.valueDetail}> {cantidadEntregadaValue}</Text>
         </Text>
       
-        {mostrarCantidadPorLiberar && (
+        {workOrder?.partialReleases?.length > 0 && (
           <Text style={styles.labelDetail}>
             Cantidad por Liberar:
-            <Text style={styles.valueDetail}> {cantidadPorLiberar}</Text>
+            <Text style={styles.valueDetail}> {cantidadporliberar}</Text>
           </Text>
         )}
       </View>
 
-      <Text style={styles.label}>Cantidad a liberar:</Text>
+      <Text style={styles.label}>Cantidad a liberar (HOJAS):</Text>
       <TextInput
         style={styles.input}
+        theme={{ roundness: 30 }}
+        mode="outlined"
+        activeOutlineColor="#000"
         keyboardType="numeric"
         placeholder="Ej: 100"
-        value={sampleQuantity}
-        onChangeText={setSampleQuantity}
+        value={sampleQuantity.toString()}
+        onChangeText={(text) => setSampleQuantity(Number(text))}
+      />
+
+      <Text style={styles.label}>Cantidad a liberar (TARJETAS):</Text>
+      <TextInput
+        style={styles.input}
+        theme={{ roundness: 30 }}
+        mode="outlined"
+        activeOutlineColor="#000"
+        keyboardType="numeric"
+        placeholder="Ej: 100"
+        value={tarjetasporliberar.toString()}
+        editable={false}
+        selectTextOnFocus={false}
       />
 
       <Text style={styles.label}>Comentarios:</Text>
       <TextInput
         style={styles.textarea}
+        theme={{ roundness: 30 }}
+        mode="outlined"
+        activeOutlineColor="#000"
         multiline
         placeholder="Agrega comentarios..."
         value={comments}
@@ -299,6 +377,9 @@ const LaminacionComponent = ({ workOrder }: { workOrder: any }) => {
           {value === 'Otro' && (
             <TextInput
               style={styles.input}
+              theme={{ roundness: 30 }}
+              mode="outlined"
+              activeOutlineColor="#000"
               placeholder="Ej: "
               value={otherValue}
               onChangeText={setOtherValue}
@@ -309,10 +390,13 @@ const LaminacionComponent = ({ workOrder }: { workOrder: any }) => {
           <Text style={styles.label}>Muestras:</Text>
           <TextInput
             style={styles.input}
+            theme={{ roundness: 30 }}
+            mode="outlined"
+            activeOutlineColor="#000"
             keyboardType="numeric"
             placeholder="Ej: 2"
-            value={sampleQuantity}
-            onChangeText={setSampleQuantity}
+            value={sampleQuantity.toString()}
+            onChangeText={(text) => setSampleQuantity(Number(text))}
           />
 
           {/* Sección expandible de calidad */}
@@ -406,21 +490,18 @@ const styles = StyleSheet.create({
     fontSize: 16,
   },
   input: {
-    borderWidth: 1,
-    borderColor: '#ccc',
     borderRadius: 18,
     padding: 10,
+    marginBottom: 12,
     backgroundColor: '#fff',
-    height: 50,
+    height: 30,
     fontSize: 16,
   },
   textarea: {
     backgroundColor: '#fff',
     borderRadius: 12,
     padding: 10,
-    borderWidth: 1,
-    borderColor: '#ccc',
-    minHeight: 100,
+    minHeight: 30,
     fontSize: 16,
     textAlignVertical: 'top',
   },

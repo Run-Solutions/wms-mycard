@@ -4,7 +4,6 @@ import React, { useState } from 'react';
 import {
   View,
   Text,
-  TextInput,
   TouchableOpacity,
   ScrollView,
   StyleSheet,
@@ -12,6 +11,7 @@ import {
   Platform,
   Modal,
 } from 'react-native';
+import { TextInput } from 'react-native-paper';
 import { useNavigation } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { RootStackParamList } from '../../navigation/types';
@@ -154,28 +154,36 @@ const HotStampingComponent = ({ workOrder }: { workOrder: any }) => {
       <Text style={styles.label}>Color Foil:</Text>
       <TextInput
         style={styles.input}
-        keyboardType="numeric"
+        theme={{ roundness: 30 }}
+        mode="outlined"
+        activeOutlineColor="#000"
         value={workOrder?.answers[index].color_foil ?? 'No se reconoce la muestra enviada' }
         editable={false}
       />
       <Text style={styles.label}>Revisar Posición Vs Ot:</Text>
       <TextInput
         style={styles.input}
-        keyboardType="numeric"
+        theme={{ roundness: 30 }}
+        mode="outlined"
+        activeOutlineColor="#000"
         value={workOrder?.answers[index].revisar_posicion ?? 'No se reconoce la muestra enviada' }
         editable={false}
       />
       <Text style={styles.label}>Imagen de Holograma Vs Ot:</Text>
       <TextInput
         style={styles.input}
-        keyboardType="numeric"
+        theme={{ roundness: 30 }}
+        mode="outlined"
+        activeOutlineColor="#000"
         value={workOrder?.answers[index].imagen_holograma ?? 'No se reconoce la muestra enviada' }
         editable={false}
       />
       <Text style={styles.label}>Muestras entregadas:</Text>
       <TextInput
         style={styles.input}
-        keyboardType="numeric"
+        theme={{ roundness: 30 }}
+        mode="outlined"
+        activeOutlineColor="#000"
         value={
           typeof workOrder?.answers?.[index]?.sample_quantity === 'number'
           ? workOrder.answers[index].sample_quantity.toString()
@@ -284,6 +292,9 @@ const HotStampingComponent = ({ workOrder }: { workOrder: any }) => {
               placeholder="Escribe la inconformidad..."
               multiline
               style={styles.textarea}
+              theme={{ roundness: 30 }}
+              mode="outlined"
+              activeOutlineColor="#000"
             />
             <View style={styles.modalActions}>
               <TouchableOpacity style={styles.cancelButton} onPress={() => setShowInconformidad(false)}>
@@ -327,20 +338,15 @@ const styles = StyleSheet.create({
   label: { fontWeight: '600', marginTop: 12, fontSize: 16 },
   value: { marginBottom: 0 },
   input: {
-    borderWidth: 1,
-    borderColor: '#ccc',
-    borderRadius: 18,
     padding: 10,
+    marginBottom: 12,
     backgroundColor: '#fff',
-    height: 50,
+    height: 30,
     fontSize: 16,
   },
   textarea: {
     backgroundColor: '#fff',
-    borderRadius: 12,
     padding: 10,
-    borderWidth: 1,
-    borderColor: '#ccc',
     minHeight: 100,
     fontSize: 16,
     textAlignVertical: 'top',

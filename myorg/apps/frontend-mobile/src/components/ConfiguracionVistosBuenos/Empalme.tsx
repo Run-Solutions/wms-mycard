@@ -2,7 +2,6 @@ import React, { useState } from 'react';
 import {
   View,
   Text,
-  TextInput,
   TouchableOpacity,
   ScrollView,
   StyleSheet,
@@ -10,6 +9,7 @@ import {
   Modal,
   Pressable
 } from 'react-native';
+import { TextInput } from 'react-native-paper';
 import QuestionTable from './QuestionTable';
 import { deleteFormQuestion, updateFormQuestion } from '../../api/configVistosBuenos';
 
@@ -80,7 +80,7 @@ export default function Empalme({ formQuestion }: Props) {
       />
 
       <Text style={styles.label}>Muestras entregadas:</Text>
-      <TextInput style={styles.input} keyboardType='numeric' editable={false} />
+      <TextInput style={styles.input} theme={{ roundness: 30 }} mode="outlined" activeOutlineColor="#000" editable={false} />
 
 
       <QuestionTable
@@ -93,7 +93,7 @@ export default function Empalme({ formQuestion }: Props) {
       />
 
       <Text style={styles.label}>Validar Inlays Vs OT:</Text>
-      <TextInput style={styles.input} editable={false} />
+      <TextInput style={styles.input} theme={{ roundness: 30 }} mode="outlined" activeOutlineColor="#000" editable={false} />
 
       <Text style={styles.label}>Tipo de banda magnética:</Text>
       <View style={styles.radioGroup}>
@@ -106,10 +106,10 @@ export default function Empalme({ formQuestion }: Props) {
       </View>
 
       <Text style={styles.label}>Color:</Text>
-      <TextInput style={styles.input} editable={false} />
+      <TextInput style={styles.input} theme={{ roundness: 30 }} mode="outlined" activeOutlineColor="#000" editable={false} />
 
       <Text style={styles.label}>Tipo de Holográfico:</Text>
-      <TextInput style={styles.input} editable={false} />
+      <TextInput style={styles.input} theme={{ roundness: 30 }} mode="outlined" activeOutlineColor="#000" editable={false} />
 
       {/* Edit Modal */}
       <Modal visible={editingId !== null} transparent animationType="fade">
@@ -120,6 +120,9 @@ export default function Empalme({ formQuestion }: Props) {
               value={newTitle}
               onChangeText={setNewTitle}
               style={styles.input}
+              theme={{ roundness: 30 }}
+              mode="outlined"
+              activeOutlineColor="#000"
               placeholder="Nuevo título"
             />
             <View style={styles.modalButtons}>
@@ -199,12 +202,11 @@ const styles = StyleSheet.create({
     elevation: 10,
   },
   input: {
-    borderColor: '#ccc',
-    borderWidth: 1,
     padding: 10,
-    borderRadius: 8,
+    height: 20,
     marginVertical: 8,
-    width: '90%'
+    width: '90%',
+    backgroundColor: '#fff',
   },
   radioGroup: {
     flexDirection: 'row',

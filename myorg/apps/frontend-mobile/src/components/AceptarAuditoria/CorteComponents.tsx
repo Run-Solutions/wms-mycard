@@ -1,9 +1,10 @@
 // myorg/apps/frontend-mobile/src/components/AceptarAuditoria/CorteComponents.tsx
 import React, { useEffect, useState } from 'react';
 import {
-  View, Text, TextInput, StyleSheet, TouchableOpacity,
+  View, Text, StyleSheet, TouchableOpacity,
   Modal, Alert, ScrollView, Platform
 } from 'react-native';
+import { TextInput } from 'react-native-paper';
 import { useNavigation } from '@react-navigation/native';
 import { acceptWorkOrderFlowAuditory, registrarInconformidadAuditory } from '../../api/aceptarAuditoria';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
@@ -76,15 +77,10 @@ const CorteComponentAcceptAuditory: React.FC<{ workOrder: any }> = ({ workOrder 
 
   const handleAceptar = async () => {
     if (!sampleAuditory) {
-      alert('Por favor, asegurate de ingresar muestras.');
+      Alert.alert('Error', 'Por favor, asegurate de ingresar muestras.');
       return;
     }
-    let CorteId  = null;
-    if (workOrder?.partialReleases?.length > 0) {
-      CorteId = workOrder.id;
-    } else {
-      CorteId = workOrder?.areaResponse?.corte?.id;
-    }
+    const CorteId = workOrder?.areaResponse?.corte?.id ?? workOrder.id;
     try {
       await acceptWorkOrderFlowAuditory(CorteId, sampleAuditory);
       Alert.alert("Recepción aceptada");
@@ -141,12 +137,17 @@ const CorteComponentAcceptAuditory: React.FC<{ workOrder: any }> = ({ workOrder 
       <Text style={styles.input}>{defaultValues.bad_quantity}</Text>
       <Text style={styles.subtitle}>Excedente:</Text>
       <Text style={styles.input}>{defaultValues.excess_quantity}</Text>
+      <Text style={styles.subtitle}>Muestras en CQM:</Text>
+      <Text style={styles.input}>{defaultValues.cqm_quantity}</Text>
       <Text style={styles.subtitle}>Muestras:</Text>
       <TextInput
         style={styles.inputActive}
         keyboardType="numeric"
         placeholder="Ej: 2"
         value={sampleAuditory}
+        theme={{ roundness: 30 }}
+        mode="outlined"
+        activeOutlineColor="#000"
         onChangeText={setSampleAuditory}
       />
 
@@ -187,6 +188,9 @@ const CorteComponentAcceptAuditory: React.FC<{ workOrder: any }> = ({ workOrder 
               onChangeText={setInconformidad}
               placeholder="Escribe la inconformidad..."
               multiline
+              theme={{ roundness: 30 }}
+              mode="outlined"
+              activeOutlineColor="#000"
               style={styles.textarea}
             />
             <View style={styles.modalActions}>
@@ -253,17 +257,14 @@ const styles = StyleSheet.create({
     textAlignVertical: 'center',
   },
   inputActive: {
-    borderWidth: 1,
-    borderColor: '#ccc',
-    borderRadius: 18,
     padding: 10,
     backgroundColor: '#fff',
     height: 50,
     fontSize: 16,
   },
   textarea: {
-    backgroundColor: '#fff', padding: 12, borderRadius: 12,
-    borderColor: '#ccc', borderWidth: 1, textAlignVertical: 'top', height: 100
+    backgroundColor: '#fff', padding: 12,
+    textAlignVertical: 'top', height: 100
   },
   acceptButton: {
     backgroundColor: '#0038A8',

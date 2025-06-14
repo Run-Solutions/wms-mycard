@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
-import { View, Text, TextInput, Button, Alert, Modal, TouchableOpacity, ScrollView, StyleSheet, Platform } from 'react-native';
+import { View, Text, Button, Alert, Modal, TouchableOpacity, ScrollView, StyleSheet, Platform } from 'react-native';
+import { TextInput } from 'react-native-paper';
 import { acceptCQMInconformity } from '../../api/inconformidades';
 import { useNavigation } from '@react-navigation/native';
 
@@ -11,7 +12,7 @@ const MillingChipComponentCQM = ({ workOrder }: { workOrder: any }) => {
   const index = workOrder?.answers
     ?.map((a: any, i: number) => ({ ...a, index: i }))
     .reverse()
-    .find((a: any) => a.reviewed === false)?.index;
+    .find((a: any) => a.reviewed === false)?.index; TextInput
 
   const lastIndex =
     workOrder.answers[index].inconformities.length > 1
@@ -37,70 +38,76 @@ const MillingChipComponentCQM = ({ workOrder }: { workOrder: any }) => {
         <Text style={styles.sectionTitle}>Entregaste</Text>
 
         <View style={styles.card}>
-      {/* Encabezado estilo tabla */}
-      <View style={styles.tableHeader}>
-        <Text style={[styles.tableCell, { flex: 2 }]}>Pregunta</Text>
-        <Text style={styles.tableCell}>Respuesta</Text>
-      </View>
-
-      {/* Preguntas normales */}
-      {questions.map((q: any) => {
-        const responses = workOrder.answers[index]?.FormAnswerResponse?.find(
-          (resp: any) => resp.question_id === q.id
-        );
-        console.log(responses);
-        // Encuentra la respuesta del operador por pregunta_id
-        const operatorResponse = responses?.response_operator;
-
-        return (
-          <View key={q.id} style={styles.tableRow}>
-            {/* Pregunta */}
-            <View style={[styles.tableCell, { flex: 2 }]}>
-              <Text style={styles.questionText}>{q.title}</Text>
-            </View>
-
-            {/* Respuesta */}
-            <View style={[styles.tableCell, { flex: 1, alignItems: 'center' }]}>
-              <View style={[styles.radioCircle, operatorResponse && styles.radioDisabled]}>
-                {operatorResponse && <View style={styles.radioDot} />}
-              </View>
-            </View>
+          {/* Encabezado estilo tabla */}
+          <View style={styles.tableHeader}>
+            <Text style={[styles.tableCell, { flex: 2 }]}>Pregunta</Text>
+            <Text style={styles.tableCell}>Respuesta</Text>
           </View>
-        );
-      })}
 
-      {/* Muestras */}
-      <Text style={[styles.label, { marginTop: 20 }]}>Revisar Tecnología De Chip y Color Vs Ot:</Text>
-      <TextInput
-        style={styles.input}
-        keyboardType="numeric"
-        value={workOrder?.answers[index].revisar_tecnologia ?? 'No se reconoce la muestra enviada' }
-        editable={false}
-      />
-      <Text style={styles.label}>Validar y Anotar KCV (Intercambio De Llaves), Carga De Aplicación o Prehabilitación (Si Aplica):</Text>
-      <TextInput
-        style={styles.input}
-        keyboardType="numeric"
-        value={workOrder?.answers[index].validar_kvc ?? 'No se reconoce la muestra enviada' }
-        editable={false}
-      />
-      <Text style={styles.label}>Muestras entregadas:</Text>
-      <TextInput
-        style={styles.input}
-        keyboardType="numeric"
-        value={
-          typeof workOrder?.answers?.[index]?.sample_quantity === 'number'
-          ? workOrder.answers[index].sample_quantity.toString()
-          : ''
-        }
-        editable={false}
-      />
+          {/* Preguntas normales */}
+          {questions.map((q: any) => {
+            const responses = workOrder.answers[index]?.FormAnswerResponse?.find(
+              (resp: any) => resp.question_id === q.id
+            );
+            console.log(responses);
+            // Encuentra la respuesta del operador por pregunta_id
+            const operatorResponse = responses?.response_operator;
 
-      {typeof workOrder?.answers?.[index]?.sample_quantity !== 'number' && (
-      <Text style={{ color: '#b91c1c', marginTop: 8, textAlign: 'center' }}>
-        No se reconoce la muestra enviada
-      </Text>
-      )}
+            return (
+              <View key={q.id} style={styles.tableRow}>
+                {/* Pregunta */}
+                <View style={[styles.tableCell, { flex: 2 }]}>
+                  <Text style={styles.questionText}>{q.title}</Text>
+                </View>
+
+                {/* Respuesta */}
+                <View style={[styles.tableCell, { flex: 1, alignItems: 'center' }]}>
+                  <View style={[styles.radioCircle, operatorResponse && styles.radioDisabled]}>
+                    {operatorResponse && <View style={styles.radioDot} />}
+                  </View>
+                </View>
+              </View>
+            );
+          })}
+
+          {/* Muestras */}
+          <Text style={[styles.label, { marginTop: 20 }]}>Revisar Tecnología De Chip y Color Vs Ot:</Text>
+          <TextInput
+            style={styles.input}
+            value={workOrder?.answers[index].revisar_tecnologia ?? 'No se reconoce la muestra enviada'}
+            editable={false}
+            mode="outlined"
+            activeOutlineColor="#000"
+            theme={{ roundness: 30 }}
+          />
+          <Text style={styles.label}>Validar y Anotar KCV (Intercambio De Llaves), Carga De Aplicación o Prehabilitación (Si Aplica):</Text>
+          <TextInput
+            style={styles.input}
+            value={workOrder?.answers[index].validar_kvc ?? 'No se reconoce la muestra enviada'}
+            editable={false}
+            mode="outlined"
+            activeOutlineColor="#000"
+            theme={{ roundness: 30 }}
+          />
+          <Text style={styles.label}>Muestras entregadas:</Text>
+          <TextInput
+            style={styles.input}
+            value={
+              typeof workOrder?.answers?.[index]?.sample_quantity === 'number'
+                ? workOrder.answers[index].sample_quantity.toString()
+                : ''
+            }
+            editable={false}
+            mode="outlined"
+            activeOutlineColor="#000"
+            theme={{ roundness: 30 }}
+          />
+
+          {typeof workOrder?.answers?.[index]?.sample_quantity !== 'number' && (
+            <Text style={{ color: '#b91c1c', marginTop: 8, textAlign: 'center' }}>
+              No se reconoce la muestra enviada
+            </Text>
+          )}
         </View>
 
         <Text style={styles.sectionTitle}>Inconformidad</Text>
@@ -110,6 +117,9 @@ const MillingChipComponentCQM = ({ workOrder }: { workOrder: any }) => {
             value={workOrder.answers[index].inconformities[lastIndex].user.username}
             editable={false}
             style={styles.input}
+            mode="outlined"
+            activeOutlineColor="#000"
+            theme={{ roundness: 30 }}
           />
           <Text style={styles.label}>Comentarios:</Text>
           <TextInput
@@ -117,6 +127,9 @@ const MillingChipComponentCQM = ({ workOrder }: { workOrder: any }) => {
             editable={false}
             multiline
             style={[styles.input, { minHeight: 100 }]}
+            mode="outlined"
+            activeOutlineColor="#000"
+            theme={{ roundness: 30 }}
           />
         </View>
 
@@ -150,11 +163,11 @@ const MillingChipComponentCQM = ({ workOrder }: { workOrder: any }) => {
 export default MillingChipComponentCQM;
 
 const styles = StyleSheet.create({
-  container: { 
+  container: {
     paddingTop: 16,
     paddingBottom: 32,
-    paddingHorizontal: 8, 
-    backgroundColor: '#fdfaf6', 
+    paddingHorizontal: 8,
+    backgroundColor: '#fdfaf6',
   },
   sectionTitle: {
     fontSize: 22,
@@ -233,12 +246,10 @@ const styles = StyleSheet.create({
     marginBottom: 8,
   },
   input: {
-    borderWidth: 1,
-    borderColor: '#d1d5db',
-    borderRadius: 10,
     padding: 10,
     backgroundColor: '#f9fafb',
     marginBottom: 16,
+    height: 30,
     fontSize: 16,
   },
   button: {

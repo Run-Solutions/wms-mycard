@@ -7,18 +7,24 @@ import { useFocusEffect } from '@react-navigation/native';
 import { useCallback } from 'react';
 import { CompositeNavigationProp, useNavigation } from '@react-navigation/native';
 import { DrawerNavigationProp } from '@react-navigation/drawer';
+import { useAuth } from '../../../contexts/AuthContext';
 
 interface WorkOrder {
   id: number;
+  work_order_id: number;
   area_id: number;
+  status: string;
   workOrder: {
+    id: number;
     ot_id: string;
     priority: boolean;
     createdAt: string;
     mycard_id: string;
     quantity: number;
     flow: {
-      id: string;
+      id: number;
+      status: string;
+      assigned_user: number;
       area: {
         id: number;
         name: string;
@@ -30,39 +36,110 @@ interface WorkOrder {
   };
 }
 
-type NavigationType = CompositeNavigationProp<
-  DrawerNavigationProp<RootStackParamList>,
-  NavigationProp<RootStackParamList>
->;
+type PartialRelease = {
+  validated: boolean;
+  quantity: number;
+};
+
+type WorkOrderFlow = {
+  id: number;
+  area_id: number;
+  status: string;
+  assigned_user: number | null;
+  work_order_id: number;
+  partialReleases?: PartialRelease[];
+};
+
+function puedeAceptarNuevaEtapa(
+  currentFlow: WorkOrderFlow,
+  allFlows: WorkOrderFlow[],
+  currentUserId: number
+): boolean {
+  const flujosAnterioresMismaAreaYUsuario = allFlows.filter(
+    f =>
+      f.area_id === currentFlow.area_id &&
+      f.id < currentFlow.id &&
+      f.assigned_user === currentUserId
+  )
+  if (flujosAnterioresMismaAreaYUsuario.length === 0) {
+    // ✅ Nunca participó antes: puede aceptar
+    return true;
+  }
+  for (const flujo of flujosAnterioresMismaAreaYUsuario) {
+    const pendiente =
+      ["Parcial", "Listo"].includes(flujo.status) ||
+      (flujo.partialReleases || []).some((r) => !r.validated);
+    if (pendiente) {
+      console.log("⛔ Usuario ya participó y aún tiene pendientes:", flujo);
+      return false;
+    }
+  }
+  // ✅ Participó antes pero todo está liberado
+  return true;
+}
+
+type NavigationType = CompositeNavigationProp<DrawerNavigationProp<RootStackParamList>, NavigationProp<RootStackParamList>>;
 
 const AceptarProductoScreen = () => {
   const [orders, setOrders] = useState<WorkOrder[]>([]);
   const [loading, setLoading] = useState(true);
   const [modalVisible, setModalVisible] = useState(false);
   const [selectedOrder, setSelectedOrder] = useState<WorkOrder | null>(null);
+  const { user } = useAuth();
 
   const navigation = useNavigation<NavigationType>();
   const aceptarOT = async () => {
     console.log("Aceptar OT");
     if (!selectedOrder) return;
-    const flowItem = selectedOrder.workOrder.flow?.find(
-      (f) => f.area.id === selectedOrder.area_id
+    const flowItem = [...selectedOrder?.workOrder.flow || []]
+    .reverse()
+    .find(
+      (f) =>
+        f.area.id === selectedOrder.area_id &&
+        f.status === selectedOrder.status
     );
+    if (!flowItem) {
+      Alert.alert('Error', 'No se encontró el flujo activo para esta área');
+      return;
+    }
     const flowId = flowItem?.id;
-    if (!flowId) {
-      Alert.alert("Error", "No se pudo encontrar el flujo de trabajo para esta orden.");
+    const mappedFlows = selectedOrder.workOrder.flow.map((f) => ({
+      id: f.id,
+      status: f.status,
+      area_id: f.area.id,
+      assigned_user: f.assigned_user ?? null,
+      work_order_id: selectedOrder.workOrder.id,
+      partialReleases: (f as any).partialReleases || [],
+    }));
+
+    const currentUserId = user?.sub;
+    if (!currentUserId) return;
+    const puedeAceptar = puedeAceptarNuevaEtapa(
+      {
+        ...flowItem,
+        area_id: selectedOrder.area_id,
+        assigned_user: currentUserId ?? null,
+        work_order_id: selectedOrder.work_order_id
+      },
+      mappedFlows,
+      currentUserId
+    );
+    console.log("puedeAceptar:", puedeAceptar);
+    console.log('User', currentUserId);
+    if (!puedeAceptar) {
+      Alert.alert('Error', "Debes liberar completamente tu participación anterior antes de aceptar esta etapa.");
       return;
     }
     if (selectedOrder.area_id >= 2 && selectedOrder.area_id <= 6) {
       closeModal();
       navigation.navigate('Principal', {
         screen: 'AceptarProductoAuxScreen',
-        params: { flowId },
+        params: { flowId: flowId.toString() },
       });
       return;
     }
     try {
-      await acceptWorkOrderFlow(flowId);
+      await acceptWorkOrderFlow(flowId.toString());
       Alert.alert("OT aceptada", "La orden fue aceptada exitosamente.");
       closeModal();
       fetchOrders(); // recargar lista

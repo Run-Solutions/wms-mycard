@@ -4,6 +4,7 @@ import { useRouter } from "next/navigation";
 import { useState } from "react";
 import styled from "styled-components";
 import { releaseProductFromImpress, submitToCQMImpression } from "@/api/liberarProducto";
+import { useAuthContext } from '@/context/AuthContext';
 
 interface Props {
   workOrder: any;
@@ -25,15 +26,36 @@ export default function ImpresionComponent({ workOrder }: Props) {
   const closeModal = () => {
     setShowModal(false);
   };
+  const shouldDisableLiberar = () => {
+    const currentInvalidStatuses = ['Enviado a CQM', 'En Calidad', 'Parcial', 'En proceso'];
+    const nextInvalidStatuses = ['Enviado a CQM', 'Listo', 'En Calidad', 'Pendiente parcial'];
+  
+    const isCurrentInvalid = currentInvalidStatuses.includes(currentFlow.status?.trim());
+    const isNextInvalid = nextInvalidStatuses.includes(nextFlow?.status?.trim());
+    const isNextInvalidAndNotValidated = nextInvalidStatuses.includes(nextFlow?.status?.trim()) && !allParcialsValidated;
+  
+    return isDisabled || isCurrentInvalid || isNextInvalidAndNotValidated || isNextInvalid;
+  };
+  const shouldDisableCQM = () => {
+    const estadosBloqueados = ['Enviado a CQM', 'En Calidad', 'Listo'];
+    const isDisabled =
+      estadosBloqueados.includes(currentFlow.status) ||
+      estadosBloqueados.includes(lastCompletedOrPartial.status) ||
+      estadosBloqueados.includes(nextFlow?.status) || // nextFlow puede ser opcional
+      Number(cantidadporliberar) === 0;
+  
+    return isDisabled;
+  };
   //Para guardar las respuestas 
   const [responses, setResponses] = useState<{ questionId: number, answer: boolean }[]>([]);
-  const [sampleQuantity, setSampleQuantity] = useState<number | string>('');
+  const [sampleQuantity, setSampleQuantity] = useState<number>(0);
   // Para controlar qué preguntas están marcadas
   const [checkedQuestionsFrente, setCheckedQuestionsFrente] = useState<number[]>([]);
   const [checkedQuestionsVuelta, setCheckedQuestionsVuelta] = useState<number[]>([]);
   // Función para manejar el cambio en el campo de muestras
   const handleSampleQuantityChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    setSampleQuantity(e.target.value);
+    const value = parseInt(e.target.value);
+    setSampleQuantity(isNaN(value) ? 0 : value);
   };
   const handleCheckboxChange = (
     questionId: number,
@@ -73,25 +95,20 @@ export default function ImpresionComponent({ workOrder }: Props) {
 
   const handleSelectAllFrente = (isChecked: boolean) => {
     const questionIds = workOrder.area.formQuestions.filter((q: any) => q.role_id === null).map((q: any) => q.id);
-  
     if (isChecked) {
       setCheckedQuestionsFrente(questionIds);
-  
       setResponses((prevResponses) => {
         const updatedResponses = prevResponses.filter(
           (response) => !questionIds.includes(response.questionId)
         );
-  
         const newResponses = questionIds.map((id: number) => ({
           questionId: id,
           answer: true,
         }));
-  
         return [...updatedResponses, ...newResponses];
       });
     } else {
       setCheckedQuestionsFrente([]);
-  
       setResponses((prevResponses) =>
         prevResponses.filter((response) => !questionIds.includes(response.questionId))
       );
@@ -99,25 +116,20 @@ export default function ImpresionComponent({ workOrder }: Props) {
   };
   const handleSelectAllVuelta = (isChecked: boolean) => {
     const questionIds = workOrder.area.formQuestions.filter((q: any) => q.role_id === null).map((q: any) => q.id);;
-  
     if (isChecked) {
       setCheckedQuestionsVuelta(questionIds);
-  
       setResponses((prevResponses) => {
         const updatedResponses = prevResponses.filter(
           (response) => !questionIds.includes(response.questionId)
         );
-  
         const newResponses = questionIds.map((id: number) => ({
           questionId: id,
           answer: true,
         }));
-  
         return [...updatedResponses, ...newResponses];
       });
     } else {
       setCheckedQuestionsVuelta([]);
-  
       setResponses((prevResponses) =>
         prevResponses.filter((response) => !questionIds.includes(response.questionId))
       );
@@ -126,11 +138,22 @@ export default function ImpresionComponent({ workOrder }: Props) {
 
   console.log("El mismo workOrder (workOrder)", workOrder);
   const flowList = [...workOrder.workOrder.flow];
-  // Índice del flow actual basado en su id
-  const currentIndex = flowList.findIndex((item) => item.id === workOrder.id);
+
+  const { user } = useAuthContext();
+  const currentUserId = user?.id;
+
+  const currentFlow = workOrder.workOrder.flow.find(
+    (f: any) =>
+      f.area_id === workOrder.area.id &&
+      ['Pendiente', 'En proceso', 'Parcial', 'Pendiente parcial', 'Listo', 'Enviado a CQM', 'En Calidad'].includes(f.status) &&
+      f.user?.id === currentUserId
+  );
+  if (!currentFlow) {
+    alert("No tienes una orden activa para esta área.");
+    return;
+  }
+  const currentIndex = flowList.findIndex((item) => item.id === currentFlow.id);
   console.log('el currentIndex', currentIndex);
-  // Flow actual
-  const currentFlow = currentIndex !== -1 ? flowList[currentIndex] : null;
   // Anterior (si hay)
   const lastCompletedOrPartial = currentIndex > 0 ? flowList[currentIndex - 1] : null;
   // Siguiente (si hay)
@@ -141,23 +164,29 @@ export default function ImpresionComponent({ workOrder }: Props) {
   console.log("El siguiente flujo (nextFlow)", nextFlow);
   console.log("Ultimo parcial o completado", lastCompletedOrPartial);
 
-  const allParcialsValidated = workOrder.partialReleases?.every(
+  const allParcialsValidated = currentFlow.partialReleases?.every(
     (r: PartialRelease) => r.validated
   );
+
+  const tarjetasporliberar = sampleQuantity * 24;
 
   // Para mandar la OT a evaluacion por CQM
   const handleSubmit = async () => {
     const questions = workOrder.area.formQuestions.filter((q: any) => q.role_id === null);
-    const flowId = workOrder.id;
+    const flowId = currentFlow.id;
+    if (checkedQuestionsFrente.length === 0) {
+      alert('Por favor, selecciona al menos una respuesta antes de enviar.');
+      return;
+    }
     const payload = {
       question_id: questions.map((q: any) => q.id),
       work_order_flow_id: flowId,
-      work_order_id: workOrder.workOrder.id,
-      area_id: workOrder.area.id,
+      work_order_id: currentFlow.workOrder.id,
+      area_id: currentFlow.area.id,
       frente: questions.map((q: any) => checkedQuestionsFrente.includes(q.id)),
       vuelta: questions.map((q: any) => checkedQuestionsVuelta.includes(q.id)),
       reviewed: false,
-      user_id: workOrder.assigned_user,
+      user_id: currentFlow.assigned_user,
       sample_quantity: Number(sampleQuantity),
     };
     const isFrenteVueltaValid = payload.frente.includes(true) || payload.vuelta.includes(true);
@@ -199,13 +228,10 @@ export default function ImpresionComponent({ workOrder }: Props) {
       workOrderFlowId: currentFlow.id,
       areaId: workOrder.area.id,
       assignedUser: currentFlow.assigned_user,
-      releaseQuantity: Number(sampleQuantity),
+      releaseQuantity: Number(tarjetasporliberar),
       comments: document.querySelector('textarea')?.value || '',
       formAnswerId: currentFlow.answers[0].id,
     };
-
-    console.log('datos a enviar',payload);
-  
     try {
       await releaseProductFromImpress(payload);
       router.push('/liberarProducto');
@@ -214,12 +240,59 @@ export default function ImpresionComponent({ workOrder }: Props) {
     }
   };
 
+  let cantidadporliberar = 0;
+  const totalLiberado = currentFlow.partialReleases?.reduce(
+    (sum: number, release: PartialRelease) => sum + release.quantity,
+    0
+  ) ?? 0;
+  console.log('Total liberado:', totalLiberado);
+  const validados = lastCompletedOrPartial.partialReleases
+    ?.filter((r: PartialRelease) => r.validated)
+    .reduce((sum: number, r: PartialRelease) => sum + r.quantity, 0) ?? 0;
+  console.log('Cantidad validada:', validados);
+ // ✅ 1. Preprensa tiene prioridad
+  if (lastCompletedOrPartial.area?.name === 'preprensa') {
+    cantidadporliberar = currentFlow.workOrder.quantity - totalLiberado;
+  }
+  // ✅ 2. Si hay validados en otras áreas
+  else if (validados > 0) {
+    let resta = validados - totalLiberado;
+    if (resta < 0) {
+      cantidadporliberar = 0;
+    } else {
+      cantidadporliberar = resta;
+    }
+  }
+  // ✅ 3. Si hay liberaciones sin validar
+  else if (totalLiberado > 0) {
+    cantidadporliberar = currentFlow.workOrder.quantity - totalLiberado;
+  }
+  // ✅ 4. Si no hay nada, usar la cantidad entregada
+  else {
+    cantidadporliberar =
+      lastCompletedOrPartial.areaResponse.prepress?.plates ??
+      lastCompletedOrPartial.areaResponse.impression?.release_quantity ??
+      lastCompletedOrPartial.areaResponse.serigrafia?.release_quantity ??
+      lastCompletedOrPartial.areaResponse.empalme?.release_quantity ??
+      lastCompletedOrPartial.areaResponse.laminacion?.release_quantity ??
+      lastCompletedOrPartial.areaResponse.corte?.good_quantity ??
+      lastCompletedOrPartial.areaResponse.colorEdge?.good_quantity ??
+      lastCompletedOrPartial.areaResponse.hotStamping?.good_quantity ??
+      lastCompletedOrPartial.areaResponse.millingChip?.good_quantity ??
+      lastCompletedOrPartial.areaResponse.personalizacion?.good_quantity ??
+      currentFlow.workOrder.quantity ??
+      0;
+  }
+
+  const cantidadHojasRaw = Number(workOrder?.workOrder.quantity) / 24;
+  const cantidadHojas = cantidadHojasRaw > 0 ? Math.ceil(cantidadHojasRaw) : 0;
+
   return (
     <>
     <Container>
       <Title>Área: Impresion</Title>
 
-      <DataWrapper>
+      <DataWrapper style={{ gap: '2px'}}>
         <InfoItem>
           <Label>Número de Orden:</Label>
           <Value>{workOrder.workOrder.ot_id}</Value>
@@ -229,8 +302,12 @@ export default function ImpresionComponent({ workOrder }: Props) {
           <Value>{workOrder.workOrder.mycard_id}</Value>
         </InfoItem>
         <InfoItem>
-          <Label>Cantidad:</Label>
-          <Value>{workOrder.workOrder.quantity}</Value>
+          <Label>Cantidad (TARJETAS):</Label>
+          <Value>{workOrder.workOrder.quantity || "No definida"}</Value>
+        </InfoItem>
+        <InfoItem style={{ backgroundColor: '#eaeaf5', borderRadius: '8px'}}>
+          <Label>Cantidad (HOJAS):</Label>
+          <Value>{cantidadHojas}</Value>
         </InfoItem>
       </DataWrapper>
       <DataWrapper style={{ marginTop: '20px'}}>
@@ -249,15 +326,15 @@ export default function ImpresionComponent({ workOrder }: Props) {
               ? (
                 // Mostrar cantidad según sub-área disponible
                 lastCompletedOrPartial.areaResponse.prepress?.plates ??
-                lastCompletedOrPartial.areaResponse.impression?.quantity ??
-                lastCompletedOrPartial.areaResponse.serigrafia?.quantity ??
-                lastCompletedOrPartial.areaResponse.empalme?.quantity ??
-                lastCompletedOrPartial.areaResponse.laminacion?.quantity ??
-                lastCompletedOrPartial.areaResponse.corte?.quantity ??
-                lastCompletedOrPartial.areaResponse.colorEdge?.quantity ??
-                lastCompletedOrPartial.areaResponse.hotStamping?.quantity ??
-                lastCompletedOrPartial.areaResponse.millingChip?.quantity ??
-                lastCompletedOrPartial.areaResponse.personalizacion?.quantity ??
+                lastCompletedOrPartial.areaResponse.impression?.release_quantity ??
+                lastCompletedOrPartial.areaResponse.serigrafia?.release_quantity ??
+                lastCompletedOrPartial.areaResponse.empalme?.release_quantity ??
+                lastCompletedOrPartial.areaResponse.laminacion?.release_quantity ??
+                lastCompletedOrPartial.areaResponse.corte?.good_quantity ??
+                lastCompletedOrPartial.areaResponse.colorEdge?.good_quantity ??
+                lastCompletedOrPartial.areaResponse.hotStamping?.good_quantity ??
+                lastCompletedOrPartial.areaResponse.millingChip?.good_quantity ??
+                lastCompletedOrPartial.areaResponse.personalizacion?.good_quantity ??
                 'Sin cantidad'
               )
               : lastCompletedOrPartial.partialReleases?.some((r: PartialRelease) => r.validated)
@@ -271,40 +348,12 @@ export default function ImpresionComponent({ workOrder }: Props) {
             }
           </Value>
         </InfoItem>
-        {(
-          (workOrder?.partialReleases?.length > 0 && lastCompletedOrPartial?.partialReleases?.length > 0)
-          || (workOrder?.partialReleases?.length > 0)
-        ) && (
-          <InfoItem>
+          {workOrder?.partialReleases?.length > 0 && (
+          <InfoItem >
             <Label>Cantidad por Liberar:</Label>
-            <Value>
-            {
-              workOrder?.partialReleases?.length > 0
-                ? (
-                  lastCompletedOrPartial.area.name === 'preprensa'
-                    ? (
-                      workOrder.workOrder.quantity -
-                      workOrder.partialReleases.reduce((sum: number, release: PartialRelease) => sum + release.quantity, 0)
-                    )
-                    : (
-                      lastCompletedOrPartial?.partialReleases?.length > 0
-                        ? (
-                          lastCompletedOrPartial.partialReleases
-                            .filter((release: { validated: boolean, quantity: number }) => release.validated)
-                            .reduce((sum: number, release: PartialRelease) => sum + release.quantity, 0)
-                          -
-                          workOrder.partialReleases.reduce((sum: number, release: PartialRelease) => sum + release.quantity, 0)
-                        )
-                        : (
-                          workOrder.partialReleases.reduce((sum: number, release: PartialRelease) => sum + release.quantity, 0)
-                        )
-                    )
-                )
-                : 0
-            }
-            </Value>
+            <Value>{cantidadporliberar}</Value>
           </InfoItem>
-        )}
+          )}
       </DataWrapper>
         <InfoItem style={{ marginTop: '20px'}}>
           <Label>Comentarios:</Label>
@@ -314,17 +363,21 @@ export default function ImpresionComponent({ workOrder }: Props) {
         <SectionTitle>Datos de Producción</SectionTitle>
         <NewDataWrapper>
           <InputGroup>
-            <Label>Cantidad a Liberar:</Label>
-            <Input type="number" min='0' placeholder="Ej: 2" value={sampleQuantity} onChange={handleSampleQuantityChange} disabled={isDisabled} />
+            <Label>Cantidad a Liberar (HOJAS):</Label>
+            <Input type="number" min='0' placeholder="Ej: 2" value={sampleQuantity} onChange={handleSampleQuantityChange} />
           </InputGroup>
-          <CqmButton status={workOrder.status} onClick={openModal} disabled={['Enviado a CQM', 'En Calidad', 'Listo'].includes(workOrder.status)}>Enviar a CQM</CqmButton>
+          <InputGroup>
+            <Label>Cantidad a liberar (TARJETAS):</Label>
+            <Input type="number" value={tarjetasporliberar} disabled readOnly />
+          </InputGroup>
+          <CqmButton status={currentFlow.status || lastCompletedOrPartial.status} cantidadporliberar={String(cantidadporliberar)} onClick={openModal} disabled={shouldDisableCQM()}>Enviar a CQM</CqmButton>
         </NewDataWrapper>
         <InputGroup>
           <SectionTitle>Comentarios</SectionTitle>
           <Textarea placeholder="Agrega un comentario adicional..." disabled={isDisabled}/>
         </InputGroup>
       </NewData>
-      <LiberarButton disabled={isDisabled || ['Enviado a CQM', 'En Calidad', 'Parcial'].includes(workOrder.status) || ['Listo', 'Enviado a CQM', 'En calidad', 'Parcial', 'Pendiente parcial'].includes(nextFlow?.status) && !allParcialsValidated} onClick={handleLiberarClick}>Liberar Producto</LiberarButton>
+      <LiberarButton disabled={shouldDisableLiberar()} onClick={handleLiberarClick}>Liberar Producto</LiberarButton>
     </Container>
 
     {/* Modal para enviar a liberacion */}
@@ -482,13 +535,12 @@ const SectionTitle = styled.h3`
 const DataWrapper = styled.div`
   display: flex;
   flex-wrap: wrap;
-  gap: 2rem;
-  flex-direction: row;
 `;
 
 const InfoItem = styled.div`
   flex: 1;
-  min-width: 200px;
+  padding: 5px;
+  min-width: 150px;
 `;
 
 const Label = styled.label`
@@ -505,7 +557,7 @@ const Value = styled.div`
 
 const NewDataWrapper = styled.div`
   display: flex;
-  gap: 8rem;
+  gap: 4rem;
   flex-wrap: wrap;
 `;
 
@@ -525,7 +577,7 @@ const Input = styled.input`
   transition: border 0.3s;
 
   &:focus {
-    border-color: #2563eb;
+    border-color: #0038A8;
   }
 `;
 
@@ -541,14 +593,14 @@ const Textarea = styled.textarea`
   resize: vertical;
 
   &:focus {
-    border-color: #2563eb;
+    border-color: #0038A8;
     outline: none;
   }
 `;
 
 const LiberarButton = styled.button<{ disabled?: boolean }>`
   margin-top: 2rem;
-  background-color: ${({ disabled }) => disabled ? '#9CA3AF' : '#2563EB'};
+  background-color: ${({ disabled }) => disabled ? '#9CA3AF' : '#0038A8'};
   color: white;
   padding: 0.75rem 2rem;
   border-radius: 0.5rem;
@@ -569,30 +621,32 @@ const LiberarButton = styled.button<{ disabled?: boolean }>`
 
 interface CqmButtonProps {
   status: string;
+  cantidadporliberar: string;
+  disabled?: boolean;
 }
 
 const CqmButton = styled.button<CqmButtonProps>`
   margin-top: 2rem;
-  background-color: ${({ status }) => {
+  background-color: ${({ status, disabled, cantidadporliberar }) => {
     if (status === 'Listo') return '#22c55e'; // verde
-    if (['Enviado a CQM', 'En Calidad'].includes(status)) return '#9ca3af'; // gris
-    return '#2563eb'; // azul
+    if (['Enviado a CQM', 'En Calidad'].includes(status) || Number(cantidadporliberar) === 0 || disabled) return '#9ca3af'; // gris
+    return '#0038A8'; // azul
   }};
   color: white;
   padding: 0.75rem 2rem;
   border-radius: 0.5rem;
   font-weight: 600;
   transition: background 0.3s;
-  cursor: ${({ status }) => {
-    if (['Enviado a CQM', 'En Calidad', 'Listo'].includes(status))
+  cursor: ${({ status, cantidadporliberar, disabled }) => {
+    if (['Enviado a CQM', 'En Calidad', 'Listo'].includes(status) || Number(cantidadporliberar) === 0 || disabled)
       return 'not-allowed';
     return 'pointer';
   }};
 
   &:hover {
-    background-color: ${({ status }) => {
+    background-color: ${({ status, cantidadporliberar, disabled }) => {
       if (status === 'Listo') return '#16a34a'; // verde hover
-      if (['Enviado a CQM', 'En Calidad'].includes(status)) return '#9ca3af'; // gris hover igual
+      if (['Enviado a CQM', 'En Calidad'].includes(status) || Number(cantidadporliberar) === 0 || disabled) return '#9ca3af'; // gris hover igual
       return '#1d4ed8'; // azul hover
     }};
   }
@@ -672,7 +726,7 @@ const CloseButton = styled.button`
 
 const SubmitButton = styled.button`
   margin-top: 1.5rem;
-  background-color: #2563eb;
+  background-color: #0038A8;
   color: white;
   padding: 0.75rem 2rem;
   border-radius: 0.5rem;
@@ -701,7 +755,7 @@ const ModalBox = styled.div`
 `;
 
 const ConfirmButton = styled.button`
-  background-color: #2563eb;
+  background-color: #0038A8;
   color: white;
   padding: 0.5rem 1.5rem;
   border-radius: 0.5rem;
@@ -753,5 +807,5 @@ const RadioLabel = styled.label`
 `;
 
 const Radio = styled.input`
-  accent-color: #2563eb;
+  accent-color: #0038A8;
 `;

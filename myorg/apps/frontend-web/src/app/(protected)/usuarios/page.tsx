@@ -289,7 +289,7 @@ const ButtonGroup = styled.div`
 
 const ActionButton = styled(Button)`
   && {
-    background-color: #2563eb;
+    background-color: #0038A8;
     color: white;
   }
 `;

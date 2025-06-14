@@ -273,7 +273,6 @@ const styles = StyleSheet.create({
     marginBottom: 4,
   },
   input: {
-    marginBottom: 16,
     backgroundColor: "#fff",
     borderRadius: 30,
     fontSize: 14,

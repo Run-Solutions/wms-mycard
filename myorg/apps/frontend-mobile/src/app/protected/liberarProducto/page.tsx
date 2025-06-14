@@ -99,6 +99,7 @@ const LiberarProductoScreen: React.FC = () => {
     );
   };
 
+
   return (
     <View style={styles.container}>
       <Text style={styles.header}>📋 Mis Órdenes</Text>
@@ -110,14 +111,10 @@ const LiberarProductoScreen: React.FC = () => {
         </View>
       ) : (
         <>
+          <StatusLegend />
           <WorkOrderList
             orders={filterOrdersByStatus(['En proceso', 'Enviado a CQM', 'Listo', 'En Calidad', 'Parcial'])}
           />
-          {areaId !== 1 && (
-            <WorkOrderList
-              orders={filterOrdersByStatus(['Listo', 'Parcial'])}
-            />
-          )}
         </>
       )}
     </View>

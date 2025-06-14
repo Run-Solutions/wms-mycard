@@ -2,12 +2,13 @@ import React, { useState } from 'react';
 import {
   View,
   Text,
-  TextInput,
   FlatList,
   Image,
   StyleSheet,
   ScrollView,
 } from 'react-native';
+import { TextInput } from 'react-native-paper';
+
 const avatar = require('../../../assets/logos/users.webp');
 /**
  * Componente de tabla dinámica en React Native.
@@ -106,6 +107,9 @@ export default function Table({
           placeholder="Buscar..."
           value={search}
           onChangeText={setSearch}
+          theme={{ roundness: 30 }}
+          mode="outlined"
+          activeOutlineColor="#000"
         />
       )}
       <ScrollView horizontal>
@@ -124,12 +128,9 @@ export default function Table({
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, padding: 16, backgroundColor: '#fff' },
+  container: { flex: 1, padding: 16, backgroundColor: '#fdfaf6' },
   searchInput: {
     height: 40,
-    borderColor: '#ccc',
-    borderWidth: 1,
-    borderRadius: 4,
     paddingHorizontal: 8,
     marginBottom: 8,
   },

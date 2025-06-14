@@ -1,13 +1,14 @@
 // myorg/apps/frontend-mobile/src/components/AceptarAuditoria/ColorEdgeComponents.tsx
 import React, { useEffect, useState } from 'react';
 import {
-  View, Text, TextInput, StyleSheet, TouchableOpacity,
+  View, Text, StyleSheet, TouchableOpacity,
   Modal, Alert, ScrollView, Platform
 } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
 import { acceptWorkOrderFlowMillingChipAuditory, registrarInconformidadAuditory } from '../../api/aceptarAuditoria';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { RootStackParamList } from '../../navigation/types';
+import { TextInput } from 'react-native-paper';
 
 type MillingChipData = {
   good_quantity: string;
@@ -76,15 +77,10 @@ const MillingChipComponentAcceptAuditory: React.FC<{ workOrder: any }> = ({ work
 
   const handleAceptar = async () => {
     if (!sampleAuditory) {
-      alert('Por favor, asegurate de ingresar muestras.');
+      Alert.alert('Error', 'Por favor, asegurate de ingresar muestras.');
       return;
     }
-    let MillingChipId  = null;
-    if (workOrder?.partialReleases?.length > 0) {
-      MillingChipId = workOrder.id;
-    } else {
-      MillingChipId = workOrder?.areaResponse?.millingChip?.id;
-    }
+    const MillingChipId = workOrder?.areaResponse?.millingChip?.id ?? workOrder.id;
     try {
       await acceptWorkOrderFlowMillingChipAuditory(MillingChipId, sampleAuditory);
       Alert.alert("Recepción aceptada");
@@ -146,6 +142,9 @@ const MillingChipComponentAcceptAuditory: React.FC<{ workOrder: any }> = ({ work
       <Text style={styles.subtitle}>Muestras:</Text>
       <TextInput
         style={styles.inputActive}
+        theme={{ roundness: 30 }}
+        mode="outlined"
+        activeOutlineColor="#000"
         keyboardType="numeric"
         placeholder="Ej: 2"
         value={sampleAuditory}
@@ -190,6 +189,9 @@ const MillingChipComponentAcceptAuditory: React.FC<{ workOrder: any }> = ({ work
               placeholder="Escribe la inconformidad..."
               multiline
               style={styles.textarea}
+              theme={{ roundness: 30 }}
+              mode="outlined"
+              activeOutlineColor="#000"
             />
             <View style={styles.modalActions}>
               <TouchableOpacity style={styles.cancelButton} onPress={() => setShowInconformidad(false)}>
@@ -255,17 +257,14 @@ const styles = StyleSheet.create({
     textAlignVertical: 'center',
   },
   inputActive: {
-    borderWidth: 1,
-    borderColor: '#ccc',
-    borderRadius: 18,
     padding: 10,
     backgroundColor: '#fff',
     height: 50,
     fontSize: 16,
   },
   textarea: {
-    backgroundColor: '#fff', padding: 12, borderRadius: 12,
-    borderColor: '#ccc', borderWidth: 1, textAlignVertical: 'top', height: 100
+    backgroundColor: '#fff', padding: 12,
+    textAlignVertical: 'top', height: 100
   },
   acceptButton: {
     backgroundColor: '#0038A8',

@@ -2,15 +2,18 @@ import React, { useState } from 'react';
 import {
   View,
   Text,
-  TextInput,
-  TouchableOpacity,
+  Pressable,
   ScrollView,
   StyleSheet,
   Alert,
-  Modal
+  Modal,
 } from 'react-native';
+import { TextInput } from 'react-native-paper';
 import QuestionTable from './QuestionTable';
-import { deleteFormQuestion, updateFormQuestion } from '../../api/configVistosBuenos';
+import {
+  deleteFormQuestion,
+  updateFormQuestion,
+} from '../../api/configVistosBuenos';
 
 interface Props {
   formQuestion: any[];
@@ -30,14 +33,14 @@ export default function Serigrafia({ formQuestion }: Props) {
   const [formQuestions, setFormQuestions] = useState<Question[]>(formQuestion);
 
   const handleUpdateTitle = async (id: number, updatedTitle: string) => {
-    const currentTitle = formQuestions.find(q => q.id === id)?.title;
+    const currentTitle = formQuestions.find((q) => q.id === id)?.title;
     if (currentTitle === updatedTitle) {
       Alert.alert('Aviso', 'El título no ha cambiado.');
       return;
     }
 
     try {
-      const updatedQuestions = formQuestions.map(q =>
+      const updatedQuestions = formQuestions.map((q) =>
         q.id === id ? { ...q, title: updatedTitle } : q
       );
       setFormQuestions(updatedQuestions);
@@ -53,7 +56,7 @@ export default function Serigrafia({ formQuestion }: Props) {
     try {
       const res = await deleteFormQuestion(id);
       if (res) {
-        setFormQuestions(prev => prev.filter(q => q.id !== id));
+        setFormQuestions((prev) => prev.filter((q) => q.id !== id));
         setDeletingId(null);
       } else {
         Alert.alert('Error', 'No se pudo eliminar la pregunta.');
@@ -68,69 +71,87 @@ export default function Serigrafia({ formQuestion }: Props) {
       <Text style={styles.title}>Área a evaluar: Serigrafía</Text>
 
       <QuestionTable
-        title='Respuestas del operador'
+        title="Respuestas del operador"
         questions={formQuestions}
         areaId={3}
         roleFilter={null}
-        onEdit={(e) => { setEditingId(e.id); setNewTitle(e.title) }}
+        onEdit={(e) => {
+          setEditingId(e.id);
+          setNewTitle(e.title);
+        }}
         onDelete={(e) => setDeletingId(e)}
       />
 
       <Text style={styles.label}>Muestras entregadas:</Text>
-      <TextInput style={styles.input} editable={false} />
+      <TextInput
+        style={styles.input}
+        theme={{ roundness: 30 }}
+        mode="outlined"
+        activeOutlineColor="#000"
+        editable={false}
+      />
 
       <QuestionTable
-        title='Mis respuestas'
+        title="Mis respuestas"
         questions={formQuestions}
         areaId={3}
         roleFilter={3}
-        onEdit={(e) => { setEditingId(e.id); setNewTitle(e.title) }}
+        onEdit={(e) => {
+          setEditingId(e.id);
+          setNewTitle(e.title);
+        }}
         onDelete={(e) => setDeletingId(e)}
       />
 
-      <Modal visible={editingId !== null}>
-        <View style={styles.modal}>
-          <Text style={styles.modalTitle}>Editar Pregunta</Text>
-          <TextInput
-            style={styles.input}
-            value={newTitle}
-            onChangeText={setNewTitle}
-            placeholder="Nuevo título"
-          />
-          <View style={styles.modalActions}>
-            <TouchableOpacity
-              onPress={() => setEditingId(null)}
-              style={[styles.button, { backgroundColor: '#bbb' }]}
-            >
-              <Text>Cancelar</Text>
-            </TouchableOpacity>
-            <TouchableOpacity
-              onPress={() => editingId && handleUpdateTitle(editingId, newTitle)}
-              style={styles.button}
-            >
-              <Text style={{ color: '#fff' }}>Guardar</Text>
-            </TouchableOpacity>
+      {/* Edit Modal */}
+      <Modal visible={editingId !== null} transparent animationType="fade">
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalBox}>
+            <Text style={styles.modalTitle}>Editar Pregunta</Text>
+            <TextInput
+              value={newTitle}
+              onChangeText={setNewTitle}
+              style={styles.input}
+              placeholder="Nuevo título"
+            />
+            <View style={styles.modalButtons}>
+              <Pressable
+                onPress={() => setEditingId(null)}
+                style={styles.cancelButton}
+              >
+                <Text>Cancelar</Text>
+              </Pressable>
+              <Pressable
+                onPress={() => handleUpdateTitle(editingId!, newTitle)}
+                style={styles.saveButton}
+              >
+                <Text>Guardar</Text>
+              </Pressable>
+            </View>
           </View>
         </View>
       </Modal>
 
-      <Modal visible={deletingId !== null}>
-        <View style={styles.modal}>
-          <Text style={styles.modalTitle}>¿Eliminar esta pregunta?</Text>
-          <Text>Esta acción no se puede deshacer.</Text>
-          <View style={styles.modalActions}>
-            <TouchableOpacity
-              onPress={() => setDeletingId(null)}
-              style={[styles.button, { backgroundColor: '#bbb' }]}
-            >
-              <Text>Cancelar</Text>
-            </TouchableOpacity>
-            <TouchableOpacity
-              onPress={() => deletingId && handleDeleteQuestion(deletingId)}
-              style={[styles.button, { backgroundColor: '#D9534F' }]}
-            >
-              <Text style={{ color: '#fff' }}>Eliminar</Text>
-            </TouchableOpacity>
+      {/* Delete Modal */}
+      <Modal visible={deletingId !== null} transparent animationType="fade">
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalBox}>
+            <Text style={styles.modalTitle}>¿Eliminar esta pregunta?</Text>
+            <Text>Esta acción no se puede deshacer.</Text>
+            <View style={styles.modalButtons}>
+              <Pressable
+                onPress={() => setDeletingId(null)}
+                style={styles.cancelButton}
+              >
+                <Text>Cancelar</Text>
+              </Pressable>
+              <Pressable
+                onPress={() => handleDeleteQuestion(deletingId!)}
+                style={styles.deleteButton}
+              >
+                <Text>Eliminar</Text>
+              </Pressable>
+            </View>
           </View>
         </View>
       </Modal>
@@ -158,11 +179,11 @@ const styles = StyleSheet.create({
     fontWeight: '500',
   },
   input: {
-    borderColor: '#ccc',
-    borderWidth: 1,
     padding: 10,
-    borderRadius: 8,
+    height: 20,
     marginVertical: 8,
+    width: '90%',
+    backgroundColor: '#fff',
   },
   row: {
     flexDirection: 'row',
@@ -182,20 +203,37 @@ const styles = StyleSheet.create({
   iconButton: {
     marginHorizontal: 4,
   },
-  modal: {
-    backgroundColor: '#fff',
-    padding: 20,
-    borderRadius: 10,
-  },
-  modalTitle: {
-    fontSize: 16,
-    fontWeight: '600',
-    marginBottom: 12,
-  },
-  modalActions: {
+  modalButtons: {
     flexDirection: 'row',
     justifyContent: 'space-around',
-    marginTop: 16,
+  },
+  cancelButton: {
+    padding: 10,
+    backgroundColor: '#BBBBBB',
+    borderRadius: 6,
+  },
+  saveButton: {
+    padding: 10,
+    backgroundColor: '#0070f3',
+    borderRadius: 6,
+  },
+  deleteButton: {
+    padding: 10,
+    backgroundColor: '#D9534F',
+    borderRadius: 6,
+  },
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: '#00000077',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  modalBox: {
+    width: '80%',
+    backgroundColor: '#FFF',
+    padding: 20,
+    borderRadius: 12,
+    elevation: 10,
   },
   button: {
     backgroundColor: '#0070f3',
@@ -203,5 +241,10 @@ const styles = StyleSheet.create({
     borderRadius: 6,
     minWidth: 90,
     alignItems: 'center',
+  },
+  modalTitle: {
+    fontSize: 16,
+    fontWeight: '600',
+    marginBottom: 12,
   },
 });

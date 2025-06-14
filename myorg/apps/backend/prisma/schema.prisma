@@ -28,7 +28,8 @@ model User {
   reviewedAnswers       FormAnswer[]        @relation("ReviewedBy")
   formAuditory          FormAuditory[]      @relation("UserAssignedToFormAuditory")
   inconformitiesCreated Inconformities[]    @relation("UserInconformities")
-  biometricKeys         UserBiometricKey[]  // <-- este es el campo que faltaba
+  biometricKeys         UserBiometricKey[]  
+  partialReleases   PartialRelease[]   @relation("UserPartialReleases")
 
   created_at            DateTime            @default(now()) @map("created_at")
   updated_at            DateTime            @updatedAt @map("updated_at")
@@ -168,6 +169,7 @@ model WorkOrderFlow {
 
 model PartialRelease {
   id                     Int                     @id @default(autoincrement())
+  user_id                Int?
   work_order_flow_id     Int                     
   quantity               Int
   positives              Int?
@@ -180,6 +182,7 @@ model PartialRelease {
   form_auditory_id       Int?
   created_at             DateTime            @default(now()) @map("created_at")
 
+  user                   User?               @relation("UserPartialReleases", fields: [user_id], references: [id])
   inconformities         Inconformities[]         // Relacion inversa
   WorkOrderFlow          WorkOrderFlow       @relation(fields: [work_order_flow_id], references: [id], onDelete: Cascade)
 }

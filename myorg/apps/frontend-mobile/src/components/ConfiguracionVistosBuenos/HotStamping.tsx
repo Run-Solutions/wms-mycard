@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
-import { View, Text, TextInput, Alert, StyleSheet, Pressable, Modal } from 'react-native';
-import { Portal } from 'react-native-paper';
+import { View, Text, Alert, StyleSheet, Pressable, Modal } from 'react-native';
+import { TextInput } from 'react-native-paper';
 import QuestionTable from './QuestionTable';
 import { deleteFormQuestion, updateFormQuestion } from '../../api/configVistosBuenos';
 
@@ -56,6 +56,23 @@ export default function HotStampingComponent({ formQuestion }: Props) {
         onDelete={(e) => setDeletingId(e)}
       />
 
+      <Text style={styles.label}>Color Foil:</Text>
+      <TextInput style={styles.input} theme={{ roundness: 30 }} mode="outlined" activeOutlineColor="#000" editable={false} />
+
+      <Text style={styles.label}>Revisar Posicion Vs Ot</Text>
+      <View style={styles.radioGroup}>
+        <Text>◯ Holograma</Text>
+        <Text>◯ Foil</Text>
+      </View>
+      <Text style={styles.label}>Imagen de Holograma Vs Ot</Text>
+      <View style={styles.radioGroup}>
+        <Text>◯ Holograma</Text>
+        <Text>◯ Foil</Text>
+      </View>
+
+      <Text style={styles.label}>Muestras entregadas:</Text>
+      <TextInput style={styles.input} theme={{ roundness: 30 }} mode="outlined" activeOutlineColor="#000" editable={false} />
+
 
       <QuestionTable
         title='Mis respuestas'
@@ -65,6 +82,7 @@ export default function HotStampingComponent({ formQuestion }: Props) {
         onEdit={(e) => { setEditingId(e.id); setNewTitle(e.title) }}
         onDelete={(e) => setDeletingId(e)}
       />
+      
 
 
         {/* Edit Modal */}
@@ -76,6 +94,9 @@ export default function HotStampingComponent({ formQuestion }: Props) {
                 value={newTitle}
                 onChangeText={setNewTitle}
                 style={styles.input}
+                theme={{ roundness: 30 }}
+                mode="outlined"
+                activeOutlineColor="#000"
                 placeholder="Nuevo título"
               />
               <View style={styles.modalButtons}>
@@ -110,7 +131,13 @@ const styles = StyleSheet.create({
   row: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginVertical: 8 },
   question: { flex: 1 },
   actions: { flexDirection: 'row', marginLeft: 8 },
-  input: { borderWidth: 1, borderColor: '#ccc', padding: 8, borderRadius: 4, marginTop: 10 },
+  input: {
+    padding: 10,
+    height: 20,
+    marginVertical: 8,
+    width: '90%',
+    backgroundColor: '#fff',
+  },
   modal: { backgroundColor: 'white', padding: 20, margin: 20, borderRadius: 8 },
   modalActions: { flexDirection: 'row', justifyContent: 'space-around', marginTop: 16 },
   modalButtons: {
@@ -122,10 +149,19 @@ const styles = StyleSheet.create({
     backgroundColor: '#BBBBBB',
     borderRadius: 6,
   },
+  label: {
+    marginTop: 12,
+    fontWeight: '500',
+  },
   saveButton: {
     padding: 10,
     backgroundColor: '#0070f3',
     borderRadius: 6,
+  },
+  radioGroup: {
+    flexDirection: 'row',
+    gap: 10,
+    marginVertical: 8,
   },
   deleteButton: {
     padding: 10,

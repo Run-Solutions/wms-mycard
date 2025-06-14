@@ -15,6 +15,7 @@ import * as SecureStore from 'expo-secure-store';
 
 type LoginScreenNavigationProp = NavigationProp<RootStackParamList, "Login">;
 interface User {
+  sub: number;
   username: string;
   role: string;
   role_id: number;
@@ -151,7 +152,7 @@ const LoginScreen: React.FC = () => {
           theme={{ roundness: 30 }}
         />
         {error && <Text style={styles.error}>{error}</Text>}
-        <Button mode="contained" onPress={handleLogin} style={styles.button}>
+        <Button mode="contained" onPress={handleBiometricLogin} style={styles.button}>
           Iniciar Sesión
         </Button>
         <Button

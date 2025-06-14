@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
-import { View, Text, TextInput, Button, Alert, Modal, TouchableOpacity, ScrollView, StyleSheet, Platform } from 'react-native';
+import { View, Text, Button, Alert, Modal, TouchableOpacity, ScrollView, StyleSheet, Platform } from 'react-native';
+import { TextInput } from 'react-native-paper';
 import { acceptCQMInconformity } from '../../api/inconformidades';
 import { useNavigation } from '@react-navigation/native';
 
@@ -45,8 +46,8 @@ const ImpresionComponentCQM = ({ workOrder }: { workOrder: any }) => {
           </View>
           {/* Preguntas normales */}
           {questions.map((q: any) => {
-          const responses = workOrder.answers[index]?.FormAnswerResponse?.filter(
-            (resp: any) => resp.question_id === q.id
+            const responses = workOrder.answers[index]?.FormAnswerResponse?.filter(
+              (resp: any) => resp.question_id === q.id
             );
             console.log(responses);
             // Encuentra la respuesta del operador por pregunta_id
@@ -70,7 +71,7 @@ const ImpresionComponentCQM = ({ workOrder }: { workOrder: any }) => {
                     {vueltaAnswer && <View style={styles.radioDot} />}
                   </View>
                 </View>
-            </View>
+              </View>
             );
           })}
           <Text style={styles.label}>Muestras entregadas:</Text>
@@ -78,6 +79,9 @@ const ImpresionComponentCQM = ({ workOrder }: { workOrder: any }) => {
             value={String(workOrder.answers[index]?.sample_quantity ?? 'No se reconoce la muestra enviada')}
             editable={false}
             style={styles.input}
+            mode="outlined"
+            activeOutlineColor="#000"
+            theme={{ roundness: 30 }}
           />
         </View>
 
@@ -88,6 +92,9 @@ const ImpresionComponentCQM = ({ workOrder }: { workOrder: any }) => {
             value={workOrder.answers[index].inconformities[lastIndex].user.username}
             editable={false}
             style={styles.input}
+            mode="outlined"
+            activeOutlineColor="#000"
+            theme={{ roundness: 30 }}
           />
           <Text style={styles.label}>Comentarios:</Text>
           <TextInput
@@ -95,6 +102,9 @@ const ImpresionComponentCQM = ({ workOrder }: { workOrder: any }) => {
             editable={false}
             multiline
             style={[styles.input, { minHeight: 100 }]}
+            mode="outlined"
+            activeOutlineColor="#000"
+            theme={{ roundness: 30 }}
           />
         </View>
 
@@ -128,11 +138,11 @@ const ImpresionComponentCQM = ({ workOrder }: { workOrder: any }) => {
 export default ImpresionComponentCQM;
 
 const styles = StyleSheet.create({
-  container: { 
+  container: {
     paddingTop: 16,
     paddingBottom: 32,
-    paddingHorizontal: 8, 
-    backgroundColor: '#fdfaf6', 
+    paddingHorizontal: 8,
+    backgroundColor: '#fdfaf6',
   },
   sectionTitle: {
     fontSize: 22,
@@ -212,12 +222,10 @@ const styles = StyleSheet.create({
     marginBottom: 8,
   },
   input: {
-    borderWidth: 1,
-    borderColor: '#d1d5db',
-    borderRadius: 10,
     padding: 10,
     backgroundColor: '#f9fafb',
     marginBottom: 16,
+    height: 30,
     fontSize: 16,
   },
   button: {

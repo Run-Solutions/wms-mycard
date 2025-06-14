@@ -1,9 +1,10 @@
 // src/components/AceptarProducto/PrepressComponentAccept.tsx
 import React, { useEffect, useState } from 'react';
 import {
-  View, Text, TextInput, StyleSheet, TouchableOpacity,
+  View, Text, StyleSheet, TouchableOpacity,
   Modal, Alert, ScrollView, Platform
 } from 'react-native';
+import { TextInput } from 'react-native-paper';
 import { useNavigation } from '@react-navigation/native';
 import { acceptWorkOrderFlow } from '../../api/aceptarProducto';
 import { registrarInconformidad } from '../../api/aceptarProducto';
@@ -23,8 +24,8 @@ const PrepressComponentAccept: React.FC<{ workOrder: any }> = ({ workOrder }) =>
   const [inconformidad, setInconformidad] = useState('');
 
   const lastCompleted = [...workOrder.workOrder.flow]
-    .reverse()
-    .find((item) => item.status === "Completado");
+  .reverse()
+  .find((item) => item.status === "Completado");
 
   useEffect(() => {
     if (lastCompleted?.areaResponse?.prepress) {
@@ -64,6 +65,9 @@ const PrepressComponentAccept: React.FC<{ workOrder: any }> = ({ workOrder }) =>
     }
   };
 
+  const cantidadHojasRaw = Number(workOrder?.workOrder.quantity) / 24;
+  const cantidadHojas = cantidadHojasRaw > 0 ? Math.ceil(cantidadHojasRaw) : 0;
+
   return (
     <ScrollView contentContainerStyle={styles.container}>
       <Text style={styles.title}>Área: {workOrder.area.name}</Text>
@@ -75,8 +79,11 @@ const PrepressComponentAccept: React.FC<{ workOrder: any }> = ({ workOrder }) =>
         <Text style={styles.label}>Presupuesto:</Text>
         <Text style={styles.value}>{workOrder.workOrder.mycard_id}</Text>
 
-        <Text style={styles.label}>Cantidad:</Text>
+        <Text style={styles.label}>Cantidad (TARJETAS):</Text>
         <Text style={styles.value}>{workOrder.workOrder.quantity}</Text>
+
+        <Text style={styles.label}>Cantidad (HOJAS):</Text>
+        <Text style={styles.value}>{cantidadHojas}</Text>
 
         <Text style={styles.label}>Área que lo envía:</Text>
         <Text style={styles.value}>{lastCompleted?.area?.name || 'No definida'}</Text>
@@ -132,6 +139,9 @@ const PrepressComponentAccept: React.FC<{ workOrder: any }> = ({ workOrder }) =>
               onChangeText={setInconformidad}
               placeholder="Escribe la inconformidad..."
               multiline
+              theme={{ roundness: 30 }}
+              mode="outlined"
+              activeOutlineColor="#000"
               style={styles.textarea}
             />
             <View style={styles.modalActions}>
@@ -200,8 +210,8 @@ const styles = StyleSheet.create({
     textAlignVertical: 'center',
   },
   textarea: {
-    backgroundColor: '#fff', padding: 12, borderRadius: 12,
-    borderColor: '#ccc', borderWidth: 1, textAlignVertical: 'top', height: 100
+    backgroundColor: '#fff', padding: 12,
+    textAlignVertical: 'top', height: 100
   },
   acceptButton: {
     backgroundColor: '#0038A8',

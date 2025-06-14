@@ -92,6 +92,10 @@ export default function CorteComponent({ workOrder }: Props) {
   };
   
   const handleSubmitInconformidad = async () => {
+    if (!inconformidad.trim()) {
+      alert('Debes ingresar una inconformidad antes de continuar.');
+      return;
+    }
     try {
       const res = await sendInconformidadCQM(workOrder.id, inconformidad);
       router.push('/recepcionCqm');
@@ -330,7 +334,7 @@ const Input = styled.input`
   transition: border 0.3s;
 
   &:focus {
-    border-color: #2563eb;
+    border-color: #0038A8;
   }
 `;
 
@@ -344,7 +348,7 @@ const ModalBox = styled.div`
 `;
 
 const ConfirmButton = styled.button`
-  background-color: #2563eb;
+  background-color: #0038A8;
   color: white;
   padding: 0.5rem 1.5rem;
   border-radius: 0.5rem;
@@ -392,14 +396,14 @@ const Textarea = styled.textarea`
   resize: vertical;
 
   &:focus {
-    border-color: #2563eb;
+    border-color: #0038A8;
     outline: none;
   }
 `;
 
 const AceptarButton = styled.button<{ disabled?: boolean }>`
   margin-top: 1.5rem;
-  background-color: #2563EB;
+  background-color: #0038A8;
   color: white;
   padding: 0.5rem 1.25rem;
   border-radius: 0.5rem;

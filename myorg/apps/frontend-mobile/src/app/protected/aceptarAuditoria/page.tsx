@@ -1,26 +1,45 @@
-"use client";
+'use client';
 
 import React, { useState } from 'react';
-import { getPendingOrders } from '../../../api/aceptarAuditoria'; 
-import { View, Text, FlatList, TouchableOpacity, StyleSheet, ActivityIndicator, Alert, Modal, Pressable } from 'react-native';
-import { CompositeNavigationProp, useNavigation } from '@react-navigation/native';
+import { getPendingOrders } from '../../../api/aceptarAuditoria';
+import {
+  View,
+  Text,
+  FlatList,
+  TouchableOpacity,
+  StyleSheet,
+  ActivityIndicator,
+  Alert,
+  Modal,
+  Pressable,
+} from 'react-native';
+import {
+  CompositeNavigationProp,
+  useNavigation,
+} from '@react-navigation/native';
 import { DrawerNavigationProp } from '@react-navigation/drawer';
 import { NavigationProp } from '@react-navigation/native';
 import { useFocusEffect } from '@react-navigation/native';
 import { useCallback } from 'react';
 import { RootStackParamList } from '../../../navigation/types';
+import { useAuth } from '../../../contexts/AuthContext';
 
 interface WorkOrder {
   id: number;
+  work_order_id: number;
   area_id: number;
+  status: string;
   workOrder: {
+    id: number;
     ot_id: string;
     priority: boolean;
     createdAt: string;
     mycard_id: string;
     quantity: number;
     flow: {
-      id: string;
+      id: number;
+      status: string;
+      assigned_user: number;
       area: {
         id: number;
         name: string;
@@ -30,6 +49,48 @@ interface WorkOrder {
       username: string;
     };
   };
+}
+
+type PartialRelease = {
+  validated: boolean;
+  quantity: number;
+};
+
+type WorkOrderFlow = {
+  id: number;
+  area_id: number;
+  status: string;
+  assigned_user: number | null;
+  work_order_id: number;
+  partialReleases?: PartialRelease[];
+};
+
+function puedeAceptarNuevaEtapa(
+  currentFlow: WorkOrderFlow,
+  allFlows: WorkOrderFlow[],
+  currentUserId: number
+): boolean {
+  const flujosAnterioresMismaAreaYUsuario = allFlows.filter(
+    (f) =>
+      f.area_id === currentFlow.area_id &&
+      f.id < currentFlow.id &&
+      f.assigned_user === currentUserId
+  );
+  if (flujosAnterioresMismaAreaYUsuario.length === 0) {
+    // ✅ Nunca participó antes: puede aceptar
+    return true;
+  }
+  for (const flujo of flujosAnterioresMismaAreaYUsuario) {
+    const pendiente =
+      ['Parcial', 'Listo'].includes(flujo.status) ||
+      (flujo.partialReleases || []).some((r) => !r.validated);
+    if (pendiente) {
+      console.log('⛔ Usuario ya participó y aún tiene pendientes:', flujo);
+      return false;
+    }
+  }
+  // ✅ Participó antes pero todo está liberado
+  return true;
 }
 
 type NavigationType = CompositeNavigationProp<
@@ -42,25 +103,59 @@ const AceptarAuditoriaScreen: React.FC = () => {
   const [loading, setLoading] = useState(true);
   const [modalVisible, setModalVisible] = useState(false);
   const [selectedOrder, setSelectedOrder] = useState<WorkOrder | null>(null);
+  const { user } = useAuth();
 
   const navigation = useNavigation<NavigationType>();
 
   const aceptarOT = async () => {
-    console.log("Aceptar OT");
+    console.log('Aceptar OT');
     if (!selectedOrder) return;
-    const flowItem = selectedOrder.workOrder.flow?.find(
-      (f) => f.area.id === selectedOrder.area_id
-    );
+    const flowItem = [...(selectedOrder?.workOrder.flow || [])]
+      .reverse()
+      .find(
+        (f) =>
+          f.area.id === selectedOrder.area_id &&
+          f.status === selectedOrder.status
+      );
+    if (!flowItem) {
+      Alert.alert('Error', 'No se encontró el flujo activo para esta área');
+      return;
+    }
     const flowId = flowItem?.id;
-    if (!flowId) {
-      Alert.alert("Error", "No se pudo encontrar el flujo de trabajo para esta orden.");
+    const mappedFlows = selectedOrder.workOrder.flow.map((f) => ({
+      id: f.id,
+      status: f.status,
+      area_id: f.area.id,
+      assigned_user: f.assigned_user ?? null,
+      work_order_id: selectedOrder.workOrder.id,
+      partialReleases: (f as any).partialReleases || [],
+    }));
+    const currentUserId = user?.sub;
+    if (!currentUserId) return;
+    const puedeAceptar = puedeAceptarNuevaEtapa(
+      {
+        ...flowItem,
+        area_id: selectedOrder.area_id,
+        assigned_user: currentUserId ?? null,
+        work_order_id: selectedOrder.work_order_id,
+      },
+      mappedFlows,
+      currentUserId
+    );
+    console.log('puedeAceptar:', puedeAceptar);
+    console.log('User', currentUserId);
+    if (!puedeAceptar) {
+      Alert.alert(
+        'Error',
+        'Debes liberar completamente tu participación anterior antes de aceptar esta etapa.'
+      );
       return;
     }
     if (selectedOrder.area_id !== 1) {
       closeModal();
       navigation.navigate('Principal', {
         screen: 'AceptarAuditoriaAuxScreen',
-        params: { flowId },
+        params: { flowId: flowId.toString() },
       });
       return;
     }
@@ -74,7 +169,10 @@ const AceptarAuditoriaScreen: React.FC = () => {
         const sorted = data.sort((a, b) => {
           if (a.workOrder.priority && !b.workOrder.priority) return -1;
           if (!a.workOrder.priority && b.workOrder.priority) return 1;
-          return new Date(a.workOrder.createdAt).getTime() - new Date(b.workOrder.createdAt).getTime();
+          return (
+            new Date(a.workOrder.createdAt).getTime() -
+            new Date(b.workOrder.createdAt).getTime()
+          );
         });
         setOrders(sorted);
       } else {
@@ -82,7 +180,7 @@ const AceptarAuditoriaScreen: React.FC = () => {
       }
     } catch (err) {
       console.error(err);
-      Alert.alert("Error", "No se pudieron cargar las órdenes pendientes");
+      Alert.alert('Error', 'No se pudieron cargar las órdenes pendientes');
     } finally {
       setLoading(false);
     }
@@ -104,71 +202,94 @@ const AceptarAuditoriaScreen: React.FC = () => {
     setModalVisible(false);
   };
   const renderItem = ({ item }: { item: WorkOrder }) => {
-      const fecha = new Date(item.workOrder.createdAt).toLocaleDateString('es-ES');
-      return (
-        <TouchableOpacity style={styles.card} onPress={() => openModal(item)}>
-          {item.workOrder.priority && <View style={styles.priorityBadge} />}
-          <View style={styles.cardContent}>
-            <Text style={styles.otId}>{item.workOrder.ot_id}</Text>
-            <View style={styles.row}>
-              <Text style={styles.bold}>{item.workOrder.mycard_id}</Text>
-              <Text style={[styles.bold, { marginLeft: 'auto' }]}>
-                Cantidad: {item.workOrder.quantity}
-              </Text>
-            </View>
-            <Text style={styles.text}>Creado por: {item.workOrder.user.username}</Text>
-            <Text style={styles.text}>Fecha de creación: {fecha}</Text>
+    const fecha = new Date(item.workOrder.createdAt).toLocaleDateString(
+      'es-ES'
+    );
+    return (
+      <TouchableOpacity style={styles.card} onPress={() => openModal(item)}>
+        {item.workOrder.priority && <View style={styles.priorityBadge} />}
+        <View style={styles.cardContent}>
+          <Text style={styles.otId}>{item.workOrder.ot_id}</Text>
+          <View style={styles.row}>
+            <Text style={styles.bold}>{item.workOrder.mycard_id}</Text>
+            <Text style={[styles.bold, { marginLeft: 'auto' }]}>
+              Cantidad: {item.workOrder.quantity}
+            </Text>
           </View>
-        </TouchableOpacity>
-      );
-    };
+          <Text style={styles.text}>
+            Creado por: {item.workOrder.user.username}
+          </Text>
+          <Text style={styles.text}>Fecha de creación: {fecha}</Text>
+        </View>
+      </TouchableOpacity>
+    );
+  };
 
   return (
     <View style={styles.container}>
-          {loading ? (
-            <ActivityIndicator size="large" />
-          ) : orders.length === 0 ? (
-            <View style={styles.emptyState}>
-              <Text style={styles.emptyText}>No hay órdenes pendientes.</Text>
-            </View>
-          ) : (
-            <FlatList
-              data={orders}
-              keyExtractor={(item) => item.id.toString()}
-              renderItem={renderItem}
-            />
-          )}
-    
-          <Modal
-            animationType="slide"
-            transparent={true}
-            visible={modalVisible}
-            onRequestClose={closeModal}
-          >
-            <View style={styles.modalOverlay}>
-              <View style={styles.modalContent}>
-                {selectedOrder && (
-                  <>
-                    <Text style={styles.modalTitle}>Orden: {selectedOrder.workOrder.ot_id}</Text>
-                    <Text style={styles.modalText}>ID MyCard: {selectedOrder.workOrder.mycard_id}</Text>
-                    <Text style={styles.modalText}>Cantidad: {selectedOrder.workOrder.quantity}</Text>
-                    <Text style={styles.modalText}>Prioridad: {selectedOrder.workOrder.priority ? 'Alta' : 'Normal'}</Text>
-                    <Text style={styles.modalText}>Creado por: {selectedOrder.workOrder.user.username}</Text>
-                    <Text style={styles.modalText}>Fecha: {new Date(selectedOrder.workOrder.createdAt).toLocaleDateString('es-ES')}</Text>
-                    <View style={styles.rowButtons}>
-                    <Pressable style={styles.modalButtonReject} onPress={closeModal}>
-                      <Text style={styles.modalButtonText}>Cerrar</Text>
-                    </Pressable>
-                    <Pressable style={styles.modalButton} onPress={aceptarOT}>
-                      <Text style={styles.modalButtonText}>Aceptar OT</Text>
-                    </Pressable>
-                    </View>
-                  </>
-                )}
-              </View>
-            </View>
-          </Modal>
+      {loading ? (
+        <ActivityIndicator size="large" />
+      ) : orders.length === 0 ? (
+        <View style={styles.emptyState}>
+          <Text style={styles.emptyText}>No hay órdenes pendientes.</Text>
         </View>
+      ) : (
+        <FlatList
+          data={orders}
+          keyExtractor={(item) => item.id.toString()}
+          renderItem={renderItem}
+        />
+      )}
+
+      <Modal
+        animationType="slide"
+        transparent={true}
+        visible={modalVisible}
+        onRequestClose={closeModal}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalContent}>
+            {selectedOrder && (
+              <>
+                <Text style={styles.modalTitle}>
+                  Orden: {selectedOrder.workOrder.ot_id}
+                </Text>
+                <Text style={styles.modalText}>
+                  ID MyCard: {selectedOrder.workOrder.mycard_id}
+                </Text>
+                <Text style={styles.modalText}>
+                  Cantidad: {selectedOrder.workOrder.quantity}
+                </Text>
+                <Text style={styles.modalText}>
+                  Prioridad:{' '}
+                  {selectedOrder.workOrder.priority ? 'Alta' : 'Normal'}
+                </Text>
+                <Text style={styles.modalText}>
+                  Creado por: {selectedOrder.workOrder.user.username}
+                </Text>
+                <Text style={styles.modalText}>
+                  Fecha:{' '}
+                  {new Date(
+                    selectedOrder.workOrder.createdAt
+                  ).toLocaleDateString('es-ES')}
+                </Text>
+                <View style={styles.rowButtons}>
+                  <Pressable
+                    style={styles.modalButtonReject}
+                    onPress={closeModal}
+                  >
+                    <Text style={styles.modalButtonText}>Cerrar</Text>
+                  </Pressable>
+                  <Pressable style={styles.modalButton} onPress={aceptarOT}>
+                    <Text style={styles.modalButtonText}>Aceptar OT</Text>
+                  </Pressable>
+                </View>
+              </>
+            )}
+          </View>
+        </View>
+      </Modal>
+    </View>
   );
 };
 
@@ -294,4 +415,3 @@ const styles = StyleSheet.create({
 });
 
 export default AceptarAuditoriaScreen;
-

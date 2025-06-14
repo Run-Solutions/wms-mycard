@@ -3,14 +3,13 @@ import {
   Modal,
   View,
   Text,
-  TextInput,
   StyleSheet,
   TouchableOpacity,
   ActivityIndicator,
   TouchableWithoutFeedback,
   Keyboard
 } from 'react-native';
-
+import { TextInput } from 'react-native-paper';
 interface UpdateUserModalProps {
   visible: boolean;
   loading: boolean;
@@ -66,6 +65,9 @@ const UpdateUserModal: React.FC<UpdateUserModalProps> = ({
           placeholder="Usuario"
           value={username}
           onChangeText={setUsername}
+          mode="outlined"
+          activeOutlineColor="#000"
+          theme={{ roundness: 30 }}
         />
         <TextInput
           style={styles.input}
@@ -74,6 +76,9 @@ const UpdateUserModal: React.FC<UpdateUserModalProps> = ({
           onChangeText={setEmail}
           keyboardType="email-address"
           autoCapitalize="none"
+          mode="outlined"
+          activeOutlineColor="#000"
+          theme={{ roundness: 30 }}
         />
         <TextInput
           style={styles.input}
@@ -81,6 +86,9 @@ const UpdateUserModal: React.FC<UpdateUserModalProps> = ({
           value={phone}
           onChangeText={setPhone}
           keyboardType="phone-pad"
+          mode="outlined"
+          activeOutlineColor="#000"
+          theme={{ roundness: 30 }}
         />
         <View style={styles.buttonsRow}>
           <TouchableOpacity
@@ -128,9 +136,6 @@ const styles = StyleSheet.create({
     marginBottom: 12,
   },
   input: {
-    borderWidth: 1,
-    borderColor: '#ccc',
-    borderRadius: 4,
     paddingVertical: 8,
     paddingHorizontal: 12,
     marginBottom: 12,

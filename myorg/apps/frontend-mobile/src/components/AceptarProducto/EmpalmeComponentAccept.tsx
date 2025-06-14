@@ -1,9 +1,10 @@
 // src/components/AceptarProducto/EmpalmeComponentAccept.tsx
 import React, { useEffect, useState } from 'react';
 import {
-  View, Text, TextInput, StyleSheet, TouchableOpacity,
+  View, Text, StyleSheet, TouchableOpacity,
   Modal, Alert, ScrollView, Platform
 } from 'react-native';
+import { TextInput } from 'react-native-paper';
 import { useNavigation } from '@react-navigation/native';
 import { acceptWorkOrderFlow } from '../../api/aceptarProducto';
 import { registrarInconformidad } from '../../api/aceptarProducto';
@@ -49,27 +50,28 @@ const EmpalmeComponentAccept: React.FC<{ workOrder: any }> = ({ workOrder }) => 
   console.log("El siguiente flujo (nextFlow)", nextFlow);
   console.log("Ultimo parcial o completado", lastCompletedOrPartial);
 
-    useEffect(() => {
-      // Al iniciar, configuramos los valores predeterminados y actuales
-      if (lastCompletedOrPartial?.areaResponse?.empalme && lastCompletedOrPartial?.partialReleases.length === 0) {
-        const vals: EmpalmeData = {
-          release_quantity: lastCompletedOrPartial.areaResponse.empalme.release_quantity || "",
-          comments: lastCompletedOrPartial.areaResponse.empalme.comments || "",
-        };
-        setDefaultValues(vals);
-      } else {
-        const firstUnvalidatedPartial = lastCompletedOrPartial.partialReleases.find(
-          (release: PartialRelease) => !release.validated
-        );
+  const isAcceptDisabled = () => lastCompletedOrPartial.status === 'Enviado a CQM' || lastCompletedOrPartial.status === 'En Inconformidad CQM' || lastCompletedOrPartial.status === 'En Calidad';
+  useEffect(() => {
+    // Al iniciar, configuramos los valores predeterminados y actuales
+    if (lastCompletedOrPartial?.areaResponse?.empalme && lastCompletedOrPartial?.partialReleases.length === 0) {
+      const vals: EmpalmeData = {
+        release_quantity: lastCompletedOrPartial.areaResponse.empalme.release_quantity || "",
+        comments: lastCompletedOrPartial.areaResponse.empalme.comments || "",
+      };
+      setDefaultValues(vals);
+    } else {
+      const firstUnvalidatedPartial = lastCompletedOrPartial.partialReleases.find(
+        (release: PartialRelease) => !release.validated
+      );
       
-        const vals: EmpalmeData = {
-          release_quantity: firstUnvalidatedPartial?.quantity || "",
-          comments: firstUnvalidatedPartial?.observation || "",
-        };
+      const vals: EmpalmeData = {
+        release_quantity: firstUnvalidatedPartial?.quantity || "",
+        comments: firstUnvalidatedPartial?.observation || "",
+      };
       
-        setDefaultValues(vals);
-      }
-    }, [workOrder]);
+      setDefaultValues(vals);
+    }
+  }, [workOrder]);
 
   const handleAceptar = async () => {
     try {
@@ -98,6 +100,9 @@ const EmpalmeComponentAccept: React.FC<{ workOrder: any }> = ({ workOrder }) => 
     }
   };
 
+  const cantidadHojasRaw = Number(workOrder?.workOrder.quantity) / 24;
+  const cantidadHojas = cantidadHojasRaw > 0 ? Math.ceil(cantidadHojasRaw) : 0;
+  const isAcceptButtonDisabled = isAcceptDisabled();
   return (
     <ScrollView contentContainerStyle={styles.container}>
       <Text style={styles.title}>Área: {workOrder.area.name}</Text>
@@ -109,8 +114,11 @@ const EmpalmeComponentAccept: React.FC<{ workOrder: any }> = ({ workOrder }) => 
         <Text style={styles.label}>Presupuesto:</Text>
         <Text style={styles.value}>{workOrder.workOrder.mycard_id}</Text>
 
-        <Text style={styles.label}>Cantidad:</Text>
+        <Text style={styles.label}>Cantidad (TARJETAS):</Text>
         <Text style={styles.value}>{workOrder.workOrder.quantity}</Text>
+
+        <Text style={styles.label}>Cantidad (HOJAS):</Text>
+        <Text style={styles.value}>{cantidadHojas}</Text>
 
         <Text style={styles.label}>Área que lo envía:</Text>
         <Text style={styles.value}>{lastCompletedOrPartial?.area?.name || 'No definida'}</Text>
@@ -128,10 +136,10 @@ const EmpalmeComponentAccept: React.FC<{ workOrder: any }> = ({ workOrder }) => 
       <Text style={styles.subtitle}>Comentarios</Text>
       <Text style={styles.input}>{defaultValues.comments}</Text>
       <View style={styles.modalActions}>
-        <TouchableOpacity style={styles.incoButton} onPress={() => setShowInconformidad(true)}>
+        <TouchableOpacity style={[styles.incoButton, isAcceptButtonDisabled && styles.disabledButton]} onPress={() => setShowInconformidad(true)} disabled={isAcceptDisabled()}>
           <Text style={styles.buttonText}>Inconformidad</Text>
         </TouchableOpacity>
-        <TouchableOpacity style={styles.acceptButton} onPress={() => setShowConfirm(true)}>
+        <TouchableOpacity style={[styles.acceptButton, isAcceptButtonDisabled && styles.disabledButton]} onPress={() => setShowConfirm(true)} disabled={isAcceptDisabled()}>
           <Text style={styles.buttonText}>Aceptar recepción de producto</Text>
         </TouchableOpacity>
       </View>
@@ -162,6 +170,9 @@ const EmpalmeComponentAccept: React.FC<{ workOrder: any }> = ({ workOrder }) => 
               onChangeText={setInconformidad}
               placeholder="Escribe la inconformidad..."
               multiline
+              theme={{ roundness: 30 }}
+              mode="outlined"
+              activeOutlineColor="#000"
               style={styles.textarea}
             />
             <View style={styles.modalActions}>
@@ -188,6 +199,10 @@ const styles = StyleSheet.create({
     paddingBottom: 32,
     paddingHorizontal: 8, 
     backgroundColor: '#fdfaf6', 
+  },
+  disabledButton: {
+    backgroundColor: '#9CA3AF', // gris como en web
+    opacity: 0.7,
   },
   title: { 
     fontSize: 20, 
@@ -230,8 +245,8 @@ const styles = StyleSheet.create({
     textAlignVertical: 'center',
   },
   textarea: {
-    backgroundColor: '#fff', padding: 12, borderRadius: 12,
-    borderColor: '#ccc', borderWidth: 1, textAlignVertical: 'top', height: 100
+    backgroundColor: '#fff', padding: 12,
+    textAlignVertical: 'top', height: 100
   },
   acceptButton: {
     backgroundColor: '#0038A8',

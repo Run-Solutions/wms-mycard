@@ -3,7 +3,6 @@ import React, { useState } from 'react';
 import {
   View,
   Text,
-  TextInput,
   StyleSheet,
   TouchableOpacity,
   Platform,
@@ -14,7 +13,7 @@ import {
   TouchableWithoutFeedback,
   Keyboard,
 } from 'react-native';
-import AsyncStorage from '@react-native-async-storage/async-storage';
+import { TextInput } from 'react-native-paper';
 import { useNavigation } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { RootStackParamList } from '../../navigation/types';
@@ -63,6 +62,9 @@ const PrePrensaComponent: React.FC<{ workOrder: any }> = ({ workOrder }) => {
       }
     };
 
+    const cantidadHojasRaw = Number(workOrder?.workOrder.quantity) / 24;
+  const cantidadHojas = cantidadHojasRaw > 0 ? Math.ceil(cantidadHojasRaw) : 0;
+
   return (
     <KeyboardAvoidingView
     style={{ flex: 1 }}
@@ -82,8 +84,11 @@ const PrePrensaComponent: React.FC<{ workOrder: any }> = ({ workOrder }) => {
               <Text style={styles.label}>ID del Presupuesto:</Text>
               <Text style={styles.value}>{workOrder.workOrder.mycard_id}</Text>
 
-              <Text style={styles.label}>Cantidad:</Text>
+              <Text style={styles.label}>Cantidad (TARJETAS):</Text>
               <Text style={styles.value}>{workOrder.workOrder.quantity}</Text>
+
+              <Text style={styles.label}>Cantidad (HOJAS):</Text>
+              <Text style={styles.value}>{cantidadHojas}</Text>
 
               <Text style={styles.label}>Comentarios:</Text>
               <Text style={styles.value}>{workOrder.workOrder.comments}</Text>
@@ -93,6 +98,9 @@ const PrePrensaComponent: React.FC<{ workOrder: any }> = ({ workOrder }) => {
 
             <TextInput
               style={styles.input}
+              theme={{ roundness: 30 }}
+              mode="outlined"
+              activeOutlineColor="#000"
               placeholder="Placas"
               keyboardType="numeric"
               value={plates}
@@ -100,6 +108,9 @@ const PrePrensaComponent: React.FC<{ workOrder: any }> = ({ workOrder }) => {
             />
             <TextInput
               style={styles.input}
+              theme={{ roundness: 30 }}
+              mode="outlined"
+              activeOutlineColor="#000"
               placeholder="Positivos"
               keyboardType="numeric"
               value={positives}
@@ -120,6 +131,9 @@ const PrePrensaComponent: React.FC<{ workOrder: any }> = ({ workOrder }) => {
             <Text style={styles.subtitle}>Comentarios adicionales</Text>
             <TextInput
               style={styles.textarea}
+              theme={{ roundness: 30 }}
+              mode="outlined"
+              activeOutlineColor="#000"
               placeholder="Agrega un comentario..."
               multiline
               value={comments}
@@ -185,22 +199,18 @@ const styles = StyleSheet.create({
   label: { fontWeight: '600', marginTop: 12 },
   value: { marginBottom: 8 },
   input: {
-    borderWidth: 1,
-    borderColor: '#ccc',
     borderRadius: 18,
     padding: 10,
     marginBottom: 12,
     backgroundColor: '#fff',
-    height: 50,
+    height: 30,
     fontSize: 16,
   },
   textarea: {
     backgroundColor: '#fff',
     borderRadius: 12,
     padding: 10,
-    borderWidth: 1,
-    borderColor: '#ccc',
-    minHeight: 100,
+    minHeight: 30,
     fontSize: 16,
     textAlignVertical: 'top',
   },

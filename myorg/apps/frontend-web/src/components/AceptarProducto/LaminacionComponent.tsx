@@ -5,12 +5,10 @@ import { useState, useEffect } from "react";
 import styled from "styled-components";
 import { acceptWorkOrderFlow, registrarInconformidad } from "@/api/aceptarProducto";
 
-
 type LaminacionData = {
   release_quantity: string;
   comments: string;
 };
-
 interface Props {
   workOrder: any;
 }
@@ -20,7 +18,6 @@ interface PartialRelease {
   validated: boolean;
   // otros campos si aplica
 }
-
 
 export default function LaminacionComponentAccept({ workOrder }: Props) {
   console.log('WorkOrder recibida', workOrder);
@@ -51,6 +48,7 @@ export default function LaminacionComponentAccept({ workOrder }: Props) {
   console.log("El siguiente flujo (nextFlow)", nextFlow);
   console.log("Ultimo parcial o completado", lastCompletedOrPartial);
 
+  const isAcceptDisabled = () => lastCompletedOrPartial.status === 'Enviado a CQM' || lastCompletedOrPartial.status === 'En Inconformidad CQM' || lastCompletedOrPartial.status === 'En Calidad';
   useEffect(() => {
     // Al iniciar, configuramos los valores predeterminados y actuales
     if (!workOrder) return;
@@ -93,6 +91,10 @@ export default function LaminacionComponentAccept({ workOrder }: Props) {
   const handleSubmitInconformidad = async () => {
     console.log(lastCompletedOrPartial.id);
     console.log(inconformidad);
+    if (!inconformidad.trim()) {
+      alert('Por favor, describe la inconformidad antes de continuar.');
+      return;
+    }
     try {
       await registrarInconformidad(lastCompletedOrPartial?.id, inconformidad);
       router.push('/aceptarProducto');
@@ -101,6 +103,8 @@ export default function LaminacionComponentAccept({ workOrder }: Props) {
       alert('Error al conectar con el servidor');
     }
   }
+  const cantidadHojasRaw = Number(workOrder?.workOrder.quantity) / 24;
+  const cantidadHojas = cantidadHojasRaw > 0 ? Math.ceil(cantidadHojasRaw) : 0;
 
   return (
     <Container>
@@ -116,8 +120,12 @@ export default function LaminacionComponentAccept({ workOrder }: Props) {
           <Value>{workOrder.workOrder.mycard_id}</Value>
         </InfoItem>
         <InfoItem>
-          <Label>Cantidad:</Label>
-          <Value>{workOrder.workOrder.quantity}</Value>
+          <Label>Cantidad (TARJETAS):</Label>
+          <Value>{workOrder.workOrder.quantity || "No definida"}</Value>
+        </InfoItem>
+        <InfoItem style={{ backgroundColor: '#eaeaf5', borderRadius: '8px'}}>
+          <Label>Cantidad (HOJAS):</Label>
+          <Value>{cantidadHojas}</Value>
         </InfoItem>
       </DataWrapper>
       <DataWrapper style={{ marginTop: '20px'}}>
@@ -142,14 +150,14 @@ export default function LaminacionComponentAccept({ workOrder }: Props) {
             <Label>Cantidad entregada:</Label>
             <Input type="number" name="release_quantity" value={defaultValues.release_quantity} disabled/>
           </InputGroup>
-          <InconformidadButton onClick={() => setShowInconformidad(true)}>Inconformidad</InconformidadButton>
+          <InconformidadButton onClick={() => setShowInconformidad(true)} disabled={isAcceptDisabled()}>Inconformidad</InconformidadButton>
         </NewDataWrapper>
         <InputGroup>
           <SectionTitle>Comentarios</SectionTitle>
           <Textarea value={defaultValues.comments} disabled />
         </InputGroup>
       </NewData>
-      <AceptarButton onClick={() => setShowConfirm(true)}>Aceptar recepción del producto</AceptarButton>
+      <AceptarButton onClick={() => setShowConfirm(true)} disabled={isAcceptDisabled()}>Aceptar recepción del producto</AceptarButton>
       {showConfirm && (
         <ModalOverlay>
           <ModalBox>
@@ -222,12 +230,12 @@ const SectionTitle = styled.h3`
 const DataWrapper = styled.div`
   display: flex;
   flex-wrap: wrap;
-  gap: 2rem;
 `;
 
 const InfoItem = styled.div`
   flex: 1;
-  min-width: 200px;
+  padding: 5px;
+  min-width: 150px;
 `;
 
 const Label = styled.label`
@@ -264,7 +272,7 @@ const Input = styled.input`
   transition: border 0.3s;
 
   &:focus {
-    border-color: #2563eb;
+    border-color: #0038A8;
   }
 `;
 
@@ -280,14 +288,14 @@ const Textarea = styled.textarea`
   resize: vertical;
 
   &:focus {
-    border-color: #2563eb;
+    border-color: #0038A8;
     outline: none;
   }
 `;
 
 const AceptarButton = styled.button<{ disabled?: boolean }>`
   margin-top: 2rem;
-  background-color: ${({ disabled }) => (disabled ? "#9CA3AF" : "#2563EB")};
+  background-color: ${({ disabled }) => (disabled ? "#9CA3AF" : "#0038A8")};
   color: white;
   padding: 0.75rem 2rem;
   border-radius: 0.5rem;
@@ -304,7 +312,7 @@ const AceptarButton = styled.button<{ disabled?: boolean }>`
 
 const InconformidadButton = styled.button<{ disabled?: boolean }>`
   height: 50px;
-  background-color: ${({ disabled }) => (disabled ? "#D1D5DB" : "#2563EB")};
+  background-color: ${({ disabled }) => (disabled ? "#D1D5DB" : "#A9A9A9")};
   color: white;
   padding: 0.75rem 2rem;
   border-radius: 0.5rem;
@@ -316,9 +324,10 @@ const InconformidadButton = styled.button<{ disabled?: boolean }>`
 
   &:hover {
     background-color: ${({ disabled }) =>
-      disabled ? "#D1D5DB" : "#1D4ED8"};
+      disabled ? "#D1D5DB" : "#8d8d92"};
   }
 `;
+
 
 const ModalOverlay = styled.div`
   position: fixed;
@@ -343,7 +352,7 @@ const ModalBox = styled.div`
 `;
 
 const ConfirmButton = styled.button`
-  background-color: #2563eb;
+  background-color: #0038A8;
   color: white;
   padding: 0.5rem 1.5rem;
   border-radius: 0.5rem;

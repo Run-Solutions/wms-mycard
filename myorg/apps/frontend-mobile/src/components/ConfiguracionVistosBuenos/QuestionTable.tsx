@@ -23,16 +23,23 @@ interface QuestionTableProps {
   onDelete: (id: number) => void;
 }
 
-export function QuestionTable({ title, questions, areaId, roleFilter, onEdit, onDelete }: QuestionTableProps) {
-  const [checked, setChecked] = React.useState<"unchecked" | "checked" | "indeterminate">("unchecked");
+export function QuestionTable({
+  title,
+  questions,
+  areaId,
+  roleFilter,
+  onEdit,
+  onDelete,
+}: QuestionTableProps) {
+  const [checked, setChecked] = React.useState<
+    'unchecked' | 'checked' | 'indeterminate'
+  >('unchecked');
   const filtered = questions.filter(
     (q) => q.role_id === roleFilter && q.areas.some((a) => a.id === areaId)
   );
 
-
-
   if (filtered.length === 0) return null;
-  
+
   return (
     <View style={styles.container}>
       <Text style={styles.sectionTitle}>{title}</Text>
@@ -44,7 +51,10 @@ export function QuestionTable({ title, questions, areaId, roleFilter, onEdit, on
             <TouchableOpacity onPress={() => onEdit(q)} style={styles.button}>
               <Text style={styles.buttonText}>Editar</Text>
             </TouchableOpacity>
-            <TouchableOpacity onPress={() => onDelete(q.id)} style={styles.button}>
+            <TouchableOpacity
+              onPress={() => onDelete(q.id)}
+              style={styles.button}
+            >
               <Text style={styles.buttonText}>Eliminar</Text>
             </TouchableOpacity>
           </View>

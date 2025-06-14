@@ -2,7 +2,6 @@ import React, { useState } from 'react';
 import {
   View,
   Text,
-  TextInput,
   TouchableOpacity,
   ScrollView,
   StyleSheet,
@@ -10,10 +9,15 @@ import {
   Platform,
   Modal,
 } from 'react-native';
+import { TextInput } from 'react-native-paper';
 import { useNavigation } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { RootStackParamList } from '../../navigation/types';
-import { submitToCQMMillingChip, releaseProductFromMillingChip } from '../../api/liberarProducto';
+import {
+  submitToCQMMillingChip,
+  releaseProductFromMillingChip,
+} from '../../api/liberarProducto';
+import { useAuth } from '../../contexts/AuthContext';
 
 interface PartialRelease {
   validated: boolean;
@@ -21,7 +25,8 @@ interface PartialRelease {
 }
 const MillingChipComponent = ({ workOrder }: { workOrder: any }) => {
   console.log('Order', workOrder);
-  const navigation = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
+  const navigation =
+    useNavigation<NativeStackNavigationProp<RootStackParamList>>();
   const [sampleQuantity, setSampleQuantity] = useState('');
   const [goodQuantity, setGoodQuantity] = useState('');
   const [badQuantity, setBadQuantity] = useState('');
@@ -34,107 +39,69 @@ const MillingChipComponent = ({ workOrder }: { workOrder: any }) => {
   const [revisarTecnologia, setRevisarTecnologia] = useState('');
   const [validarKVC, setValidarKVC] = useState('');
 
-  const questions = workOrder.area.formQuestions?.filter((q: any) => q.role_id === null) || [];
-  const qualityQuestions = workOrder.area.formQuestions?.filter((q: any) => q.role_id === 3) || [];
-  const isDisabled =
-  workOrder.status === 'En proceso';
+  const questions =
+    workOrder.area.formQuestions?.filter((q: any) => q.role_id === null) || [];
+  const qualityQuestions =
+    workOrder.area.formQuestions?.filter((q: any) => q.role_id === 3) || [];
+  const isDisabled = workOrder.status === 'En proceso';
+
   
-  console.log("El mismo workOrder (workOrder)", workOrder);
+  const { user } = useAuth();
+  const currentUserId = user?.sub;
   const flowList = [...workOrder.workOrder.flow];
-  // Índice del flow actual basado en su id
-  const currentIndex = flowList.findIndex((item) => item.id === workOrder.id);
-  console.log('el currentIndex', currentIndex);
-  // Flow actual
-  const currentFlow = currentIndex !== -1 ? flowList[currentIndex] : null;
-  // Anterior (si hay)
-  const lastCompletedOrPartial = currentIndex > 0 ? flowList[currentIndex - 1] : null;
-  // Siguiente (si hay)
-  const nextFlow = currentIndex !== -1 && currentIndex < flowList.length - 1
-    ? flowList[currentIndex + 1]
-    : null;
-  console.log("El flujo actual (currentFlow)", currentFlow);
-  console.log("El siguiente flujo (nextFlow)", nextFlow);
-  console.log("Ultimo parcial o completado", lastCompletedOrPartial);
-
-  const cantidadEntregadaLabel = lastCompletedOrPartial.areaResponse
-  ? 'Cantidad entregada:'
-  : lastCompletedOrPartial.partialReleases?.some((r: PartialRelease) => r.validated)
-    ? 'Cantidad entregada validada:'
-    : 'Cantidad faltante por liberar:';
-
-  const cantidadEntregadaValue = lastCompletedOrPartial.areaResponse
-    ? (
-      lastCompletedOrPartial.areaResponse.prepress?.plates ??
-      lastCompletedOrPartial.areaResponse.impression?.release_quantity ??
-      lastCompletedOrPartial.areaResponse.serigrafia?.release_quantity ??
-      lastCompletedOrPartial.areaResponse.empalme?.release_quantity ??
-      lastCompletedOrPartial.areaResponse.laminacion?.release_quantity ??
-      lastCompletedOrPartial.areaResponse.corte?.good_quantity ??
-      lastCompletedOrPartial.areaResponse.colorEdge?.good_quantity ??
-      lastCompletedOrPartial.areaResponse.hotStamping?.good_quantity ??
-      lastCompletedOrPartial.areaResponse.millingChip?.good_quantity ??
-      lastCompletedOrPartial.areaResponse.personalizacion?.good_quantity ??
-      'Sin cantidad'
-    )
-    : lastCompletedOrPartial.partialReleases?.some((r: PartialRelease) => r.validated)
-      ? lastCompletedOrPartial.partialReleases
-          .filter((r: PartialRelease) => r.validated)
-          .reduce((sum: number, r: { quantity: number }) => sum + r.quantity, 0)
-      : (lastCompletedOrPartial.workOrder?.quantity ?? 0) -
-        (lastCompletedOrPartial.partialReleases?.reduce((sum: number, r: { quantity: number }) => sum + r.quantity, 0) ?? 0);
-
-  const mostrarCantidadPorLiberar =
-    (workOrder?.partialReleases?.length ?? 0) > 0;
-
-  let cantidadPorLiberar = 0;
-  if (mostrarCantidadPorLiberar) {
-    if (lastCompletedOrPartial.area.name === 'preprensa') {
-      cantidadPorLiberar = workOrder.workOrder.quantity -
-        workOrder.partialReleases.reduce((sum: number, r: {quantity: number}) => sum + r.quantity, 0);
-    } else {
-      const validadas = lastCompletedOrPartial.partialReleases?.filter((release: { validated: boolean, quantity: number }) => release.validated) ?? [];
-      const sumaValidadas = validadas.reduce((sum: number, r: {quantity: number}) => sum + r.quantity, 0);
-      const sumaParciales = workOrder.partialReleases.reduce((sum: number, r: {quantity: number}) => sum + r.quantity, 0);
-      cantidadPorLiberar = validadas.length > 0
-        ? (sumaValidadas - sumaParciales)
-        : sumaParciales;
-    }
-  }
-
-  const allParcialsValidated = workOrder.partialReleases?.every(
-    (r: { validated: boolean }) => r.validated
+  const currentFlow = workOrder.workOrder.flow.find(
+    (f: any) =>
+      f.area_id === workOrder.area.id &&
+      [
+        'Pendiente',
+        'En proceso',
+        'Parcial',
+        'Pendiente parcial',
+        'Listo',
+        'Enviado a CQM',
+        'En Calidad',
+        'Enviado a auditoria parcial',
+      ].includes(f.status) &&
+      f.user?.id === currentUserId
   );
 
-  const disableLiberarButton = 
-    isDisabled ||
-    ['Enviado a CQM', 'En Calidad', 'Parcial', ].includes(workOrder.status) ||
-    (nextFlow && 
-      ['Listo', 'Enviado a CQM', 'En calidad', 'Parcial', 'Pendiente parcial'].includes(nextFlow?.status) &&
-      !allParcialsValidated);
-    const disableLiberarCQM = ['Enviado a CQM', 'En Calidad', 'Listo'].includes(workOrder.status);
-    const isListo = workOrder.status === 'Listo';
+  if (!currentFlow) {
+    alert('No tienes una orden activa para esta área.');
+    return;
+  }
+  const currentIndex = flowList.findIndex(
+    (item) => item.id === currentFlow?.id
+  );
+  console.log('el currentIndex', currentIndex);
+  // Anterior (si hay)
+  const lastCompletedOrPartial =
+    currentIndex > 0 ? flowList[currentIndex - 1] : null;
+  // Siguiente (si hay)
+  const nextFlow =
+    currentIndex !== -1 && currentIndex < flowList.length - 1
+      ? flowList[currentIndex + 1]
+      : null;
+  console.log('El flujo actual (currentFlow)', currentFlow);
+  console.log('El siguiente flujo (nextFlow)', nextFlow);
+  console.log('Ultimo parcial o completado', lastCompletedOrPartial);
 
-  const toggleCheckbox = (
-    id: number,
-    target: number[],
-    setter: React.Dispatch<React.SetStateAction<number[]>>
-  ) => {
-    setter(target.includes(id) ? target.filter(i => i !== id) : [...target, id]);
-  };
+  const allParcialsValidated = currentFlow.partialReleases?.every(
+    (r: PartialRelease) => r.validated
+  );
 
   const enviarACQM = async () => {
-    const isFrenteVueltaValid = checkedQuestion.length > 0 || checkedQuestion.length > 0;
-    const isSampleValid = Number(sampleQuantity) > 0;
-  
-    if (!questions.length || !isFrenteVueltaValid || !isSampleValid) {
+    const isFrenteVueltaValid =
+      checkedQuestion.length > 0 || checkedQuestion.length > 0;
+
+    if (!questions.length || !isFrenteVueltaValid) {
       Alert.alert('Completa todas las preguntas y cantidad de muestra.');
       return;
     }
-  
+
     const answeredQuestions = questions.filter((q: any) =>
       checkedQuestion.includes(q.id)
     );
-    
+
     const payload = {
       question_id: answeredQuestions.map((q: any) => q.id),
       work_order_flow_id: workOrder.id,
@@ -145,9 +112,9 @@ const MillingChipComponent = ({ workOrder }: { workOrder: any }) => {
       user_id: workOrder.assigned_user,
       sample_quantity: Number(sampleQuantity),
       revisar_tecnologia: revisarTecnologia,
-      validar_kvc: validarKVC
+      validar_kvc: validarKVC,
     };
-  
+
     try {
       await submitToCQMMillingChip(payload);
       Alert.alert('Formulario enviado a CQM');
@@ -163,7 +130,7 @@ const MillingChipComponent = ({ workOrder }: { workOrder: any }) => {
       Alert.alert('Cantidad de muestra inválida');
       return;
     }
-  
+
     const payload = {
       workOrderId: workOrder.workOrder.id,
       workOrderFlowId: currentFlow.id,
@@ -175,15 +142,173 @@ const MillingChipComponent = ({ workOrder }: { workOrder: any }) => {
       comments,
       formAnswerId: currentFlow.answers?.[0]?.id,
     };
-  
+
     try {
       await releaseProductFromMillingChip(payload);
       setShowConfirm(false);
       Alert.alert('Producto liberado correctamente');
-      navigation.navigate('liberarProducto')
+      navigation.navigate('liberarProducto');
     } catch (err) {
       Alert.alert('Error del servidor al liberar.');
     }
+  };
+
+  const cantidadEntregadaLabel =
+    lastCompletedOrPartial.areaResponse &&
+    lastCompletedOrPartial.partialReleases.length === 0
+      ? 'Cantidad entregada:'
+      : lastCompletedOrPartial.partialReleases?.some(
+          (r: PartialRelease) => r.validated
+        )
+      ? 'Cantidad entregada validada:'
+      : 'Cantidad faltante por liberar:';
+
+  const cantidadEntregadaValue =
+    lastCompletedOrPartial.areaResponse &&
+    lastCompletedOrPartial.partialReleases.length === 0
+      ? // Mostrar cantidad según sub-área disponible
+        lastCompletedOrPartial.areaResponse.prepress?.plates ??
+        lastCompletedOrPartial.areaResponse.impression?.release_quantity ??
+        lastCompletedOrPartial.areaResponse.serigrafia?.release_quantity ??
+        lastCompletedOrPartial.areaResponse.empalme?.release_quantity ??
+        lastCompletedOrPartial.areaResponse.laminacion?.release_quantity ??
+        lastCompletedOrPartial.areaResponse.corte?.good_quantity ??
+        lastCompletedOrPartial.areaResponse.colorEdge?.good_quantity ??
+        lastCompletedOrPartial.areaResponse.hotStamping?.good_quantity ??
+        lastCompletedOrPartial.areaResponse.millingChip?.good_quantity ??
+        lastCompletedOrPartial.areaResponse.personalizacion?.good_quantity ??
+        'Sin cantidad'
+      : lastCompletedOrPartial.partialReleases?.some(
+          (r: PartialRelease) => r.validated
+        )
+      ? lastCompletedOrPartial.partialReleases
+          .filter((release: PartialRelease) => release.validated)
+          .reduce(
+            (sum: number, release: PartialRelease) => sum + release.quantity,
+            0
+          )
+      : (lastCompletedOrPartial.workOrder?.quantity ?? 0) -
+        (lastCompletedOrPartial.partialReleases?.reduce(
+          (sum: number, release: PartialRelease) => sum + release.quantity,
+          0
+        ) ?? 0);
+
+  let cantidadporliberar = 0;
+  const totalLiberado =
+    currentFlow.partialReleases?.reduce(
+      (sum: number, release: PartialRelease) => sum + release.quantity,
+      0
+    ) ?? 0;
+  console.log('Total liberado:', totalLiberado);
+  const validados =
+    lastCompletedOrPartial.partialReleases
+      ?.filter((r: PartialRelease) => r.validated)
+      .reduce((sum: number, r: PartialRelease) => sum + r.quantity, 0) ?? 0;
+  console.log('Cantidad validada:', validados);
+  // ✅ 1. Preprensa tiene prioridad
+  if (lastCompletedOrPartial.area?.name === 'preprensa') {
+    cantidadporliberar = currentFlow.workOrder.quantity - totalLiberado;
+  }
+  // ✅ 2. Si hay validados en otras áreas
+  else if (validados > 0) {
+    let resta = validados - totalLiberado;
+    if (resta < 0) {
+      cantidadporliberar = 0;
+    } else {
+      cantidadporliberar = resta;
+    }
+  }
+  // ✅ 3. Si hay liberaciones sin validar
+  else if (totalLiberado > 0) {
+    cantidadporliberar = currentFlow.workOrder.quantity - totalLiberado;
+  }
+  // ✅ 4. Si no hay nada, usar la cantidad entregada
+  else {
+    cantidadporliberar =
+      lastCompletedOrPartial.areaResponse.prepress?.plates ??
+      lastCompletedOrPartial.areaResponse.impression?.release_quantity ??
+      lastCompletedOrPartial.areaResponse.serigrafia?.release_quantity ??
+      lastCompletedOrPartial.areaResponse.empalme?.release_quantity ??
+      lastCompletedOrPartial.areaResponse.laminacion?.release_quantity ??
+      lastCompletedOrPartial.areaResponse.corte?.good_quantity ??
+      lastCompletedOrPartial.areaResponse.colorEdge?.good_quantity ??
+      lastCompletedOrPartial.areaResponse.hotStamping?.good_quantity ??
+      lastCompletedOrPartial.areaResponse.millingChip?.good_quantity ??
+      lastCompletedOrPartial.areaResponse.personalizacion?.good_quantity ??
+      currentFlow.workOrder.quantity ??
+      0;
+  }
+  const shouldDisableLiberar = () => {
+    const currentInvalidStatuses = [
+      'Enviado a CQM',
+      'En Calidad',
+      'Parcial',
+      'En proceso',
+    ];
+    const nextInvalidStatuses = [
+      'Enviado a CQM',
+      'Listo',
+      'En Calidad',
+      'Enviado a auditoria parcial',
+      'En inconformidad CQM',
+    ];
+    const nextCorteStatuses = ['Enviado a auditoria parcial'];
+
+    const isCurrentInvalid = currentInvalidStatuses.includes(
+      currentFlow.status?.trim()
+    );
+    const isNextInvalid = nextInvalidStatuses.includes(
+      nextFlow?.status?.trim()
+    );
+    const afterCorte =
+      nextCorteStatuses.includes(currentFlow?.status?.trim()) &&
+      nextFlow?.area?.id >= 6;
+    const isNextInvalidAndNotValidated =
+      nextInvalidStatuses.includes(nextFlow?.status?.trim()) &&
+      !allParcialsValidated;
+
+    return (
+      isDisabled ||
+      isCurrentInvalid ||
+      afterCorte ||
+      isNextInvalidAndNotValidated ||
+      isNextInvalid
+    );
+  };
+  const shouldDisableCQM = () => {
+    const estadosBloqueados = [
+      'Enviado a CQM',
+      'En Calidad',
+      'Listo',
+      'Enviado a auditoria parcial',
+    ];
+    const estadosBloqueadosCQMAfterCorte = [
+      'Enviado a CQM',
+      'En Calidad',
+      'Listo',
+      'Enviado a auditoria parcial',
+      'Enviado a Auditoria',
+    ];
+    const isDisabled =
+      estadosBloqueados.includes(currentFlow.status) ||
+      estadosBloqueadosCQMAfterCorte.includes(lastCompletedOrPartial.status) ||
+      estadosBloqueados.includes(nextFlow?.status) || // nextFlow puede ser opcional
+      Number(cantidadporliberar) === 0;
+
+    return isDisabled;
+  };
+  const disableLiberarButton = shouldDisableLiberar();
+  const disableLiberarCQM = shouldDisableCQM();
+  const isListo = currentFlow.status === 'Listo';
+
+  const toggleCheckbox = (
+    id: number,
+    target: number[],
+    setter: React.Dispatch<React.SetStateAction<number[]>>
+  ) => {
+    setter(
+      target.includes(id) ? target.filter((i) => i !== id) : [...target, id]
+    );
   };
 
   return (
@@ -191,21 +316,28 @@ const MillingChipComponent = ({ workOrder }: { workOrder: any }) => {
       <Text style={styles.title}>Área: Milling Chip</Text>
 
       <View style={styles.cardDetail}>
-        <Text style={styles.labelDetail}>Área que lo envía: 
-          <Text style={styles.valueDetail}> {lastCompletedOrPartial.area.name}</Text>
+        <Text style={styles.labelDetail}>
+          Área que lo envía:
+          <Text style={styles.valueDetail}>
+            {' '}
+            {lastCompletedOrPartial.area.name}
+          </Text>
         </Text>
         <Text style={styles.labelDetail}>
-          Usuario del área previa: <Text style={styles.valueDetail}>{lastCompletedOrPartial.user.username}</Text>
+          Usuario del área previa:{' '}
+          <Text style={styles.valueDetail}>
+            {lastCompletedOrPartial.user.username}
+          </Text>
         </Text>
         <Text style={styles.labelDetail}>
           {cantidadEntregadaLabel}
-        <Text style={styles.valueDetail}> {cantidadEntregadaValue}</Text>
+          <Text style={styles.valueDetail}> {cantidadEntregadaValue}</Text>
         </Text>
-      
-        {mostrarCantidadPorLiberar && (
+
+        {workOrder?.partialReleases?.length > 0 && (
           <Text style={styles.labelDetail}>
             Cantidad por Liberar:
-            <Text style={styles.valueDetail}> {cantidadPorLiberar}</Text>
+            <Text style={styles.valueDetail}> {cantidadporliberar}</Text>
           </Text>
         )}
       </View>
@@ -214,6 +346,9 @@ const MillingChipComponent = ({ workOrder }: { workOrder: any }) => {
       <Text style={styles.label}>Buenas:</Text>
       <TextInput
         style={styles.input}
+        theme={{ roundness: 30 }}
+        mode="outlined"
+        activeOutlineColor="#000"
         keyboardType="numeric"
         placeholder="Ej: 100"
         value={goodQuantity}
@@ -222,6 +357,9 @@ const MillingChipComponent = ({ workOrder }: { workOrder: any }) => {
       <Text style={styles.label}>Malas:</Text>
       <TextInput
         style={styles.input}
+        theme={{ roundness: 30 }}
+        mode="outlined"
+        activeOutlineColor="#000"
         keyboardType="numeric"
         placeholder="Ej: 100"
         value={badQuantity}
@@ -230,6 +368,9 @@ const MillingChipComponent = ({ workOrder }: { workOrder: any }) => {
       <Text style={styles.label}>Excedente:</Text>
       <TextInput
         style={styles.input}
+        theme={{ roundness: 30 }}
+        mode="outlined"
+        activeOutlineColor="#000"
         keyboardType="numeric"
         placeholder="Ej: 100"
         value={excessQuantity}
@@ -239,6 +380,9 @@ const MillingChipComponent = ({ workOrder }: { workOrder: any }) => {
       <Text style={styles.label}>Comentarios:</Text>
       <TextInput
         style={styles.textarea}
+        theme={{ roundness: 30 }}
+        mode="outlined"
+        activeOutlineColor="#000"
         multiline
         placeholder="Agrega comentarios..."
         value={comments}
@@ -249,7 +393,7 @@ const MillingChipComponent = ({ workOrder }: { workOrder: any }) => {
         style={[
           styles.button,
           disableLiberarCQM && styles.disabledButton,
-          isListo && styles.greenDisabledButton
+          isListo && styles.greenDisabledButton,
         ]}
         onPress={() => !disableLiberarCQM && setShowCqmModal(true)}
         disabled={disableLiberarCQM}
@@ -260,7 +404,7 @@ const MillingChipComponent = ({ workOrder }: { workOrder: any }) => {
       <TouchableOpacity
         style={[
           styles.buttonSecondary,
-          disableLiberarButton && styles.disabledButton
+          disableLiberarButton && styles.disabledButton,
         ]}
         onPress={() => !disableLiberarButton && setShowConfirm(true)}
         disabled={disableLiberarButton}
@@ -268,44 +412,57 @@ const MillingChipComponent = ({ workOrder }: { workOrder: any }) => {
         <Text style={styles.buttonText}>Liberar Producto</Text>
       </TouchableOpacity>
 
-      <View style={{ marginBottom: 60}}></View>
+      <View style={{ marginBottom: 60 }}></View>
 
       {/* Modal CQM */}
       <Modal visible={showCqmModal} animationType="slide">
         <View style={{ flex: 1, backgroundColor: '#fdfaf6' }}>
-        <ScrollView contentContainerStyle={styles.modalScrollContent}>
-          <Text style={styles.modalTitle}>Preguntas del Área: {workOrder.area.name}</Text>
+          <ScrollView contentContainerStyle={styles.modalScrollContent}>
+            <Text style={styles.modalTitle}>
+              Preguntas del Área: {workOrder.area.name}
+            </Text>
 
-          {/* Encabezado estilo tabla */}
-          <View style={styles.tableHeader}>
-            <Text style={[styles.tableCell, { flex: 2 }]}>Pregunta</Text>
-            <Text style={styles.tableCell}>Respuesta</Text>
-          </View>
+            {/* Encabezado estilo tabla */}
+            <View style={styles.tableHeader}>
+              <Text style={[styles.tableCell, { flex: 2 }]}>Pregunta</Text>
+              <Text style={styles.tableCell}>Respuesta</Text>
+            </View>
 
-          {/* Preguntas normales */}
-          {questions.map((q: any) => (
-            <View key={q.id} style={styles.tableRow}>
-            {/* Pregunta */}
-            <View style={[styles.tableCell, { flex: 2 }]}>
-              <Text style={styles.questionText}>{q.title}</Text>
-            </View>
-          
-           {/* Respuesta */}
-            <View style={[styles.tableCell, { flex: 1, alignItems: 'center' }]}>
-              <TouchableOpacity
-                onPress={() => toggleCheckbox(q.id, checkedQuestion, setCheckedQuestion)}
-                style={styles.radioCircle}
-              >
-                {checkedQuestion.includes(q.id) && <View style={styles.radioDot} />}
-              </TouchableOpacity>
-            </View>
-          </View>
-          ))}
+            {/* Preguntas normales */}
+            {questions.map((q: any) => (
+              <View key={q.id} style={styles.tableRow}>
+                {/* Pregunta */}
+                <View style={[styles.tableCell, { flex: 2 }]}>
+                  <Text style={styles.questionText}>{q.title}</Text>
+                </View>
+
+                {/* Respuesta */}
+                <View
+                  style={[styles.tableCell, { flex: 1, alignItems: 'center' }]}
+                >
+                  <TouchableOpacity
+                    onPress={() =>
+                      toggleCheckbox(q.id, checkedQuestion, setCheckedQuestion)
+                    }
+                    style={styles.radioCircle}
+                  >
+                    {checkedQuestion.includes(q.id) && (
+                      <View style={styles.radioDot} />
+                    )}
+                  </TouchableOpacity>
+                </View>
+              </View>
+            ))}
 
             <View style={styles.inputGroup}>
-              <Text style={styles.label}>Revisar Tecnología De Chip y Color Vs Ot:</Text>
+              <Text style={styles.label}>
+                Revisar Tecnología De Chip y Color Vs Ot:
+              </Text>
               <TextInput
                 style={styles.input}
+                theme={{ roundness: 30 }}
+                mode="outlined"
+                activeOutlineColor="#000"
                 placeholder="Ej: "
                 value={revisarTecnologia}
                 onChangeText={setRevisarTecnologia}
@@ -314,65 +471,87 @@ const MillingChipComponent = ({ workOrder }: { workOrder: any }) => {
 
             <View style={styles.inputGroup}>
               <Text style={styles.label}>
-                Validar y Anotar KCV (Intercambio De Llaves), Carga De Aplicación o Prehabilitación (Si Aplica):
+                Validar y Anotar KCV (Intercambio De Llaves), Carga De
+                Aplicación o Prehabilitación (Si Aplica):
               </Text>
               <TextInput
                 style={styles.input}
+                theme={{ roundness: 30 }}
+                mode="outlined"
+                activeOutlineColor="#000"
                 placeholder="Ej: "
                 value={validarKVC}
                 onChangeText={setValidarKVC}
               />
             </View>
 
-          {/* Muestras */}
-          <Text style={styles.label}>Muestras:</Text>
-          <TextInput
-            style={styles.input}
-            keyboardType="numeric"
-            placeholder="Ej: 2"
-            value={sampleQuantity}
-            onChangeText={setSampleQuantity}
-          />
+            {/* Muestras */}
+            <Text style={styles.label}>Muestras:</Text>
+            <TextInput
+              style={styles.input}
+              theme={{ roundness: 30 }}
+              mode="outlined"
+              activeOutlineColor="#000"
+              keyboardType="numeric"
+              placeholder="Ej: 2"
+              value={sampleQuantity}
+              onChangeText={setSampleQuantity}
+            />
 
-          {/* Sección expandible de calidad */}
-          <TouchableOpacity onPress={() => setShowQuality(prev => !prev)} style={styles.toggleSection}>
-            <Text style={styles.subtitle}>
-              Preguntas de Calidad {showQuality ? '▼' : '▶'}
-            </Text>
-          </TouchableOpacity>
+            {/* Sección expandible de calidad */}
+            <TouchableOpacity
+              onPress={() => setShowQuality((prev) => !prev)}
+              style={styles.toggleSection}
+            >
+              <Text style={styles.subtitle}>
+                Preguntas de Calidad {showQuality ? '▼' : '▶'}
+              </Text>
+            </TouchableOpacity>
 
-          {showQuality && (
-            <>
-              {qualityQuestions.map((q: any) => (
-                <View key={q.id} style={styles.qualityRow}>
-                  <Text style={styles.qualityQuestion}>{q.title}</Text>
-                </View>
-              ))}
-              <Text style={styles.label}>Localización de Contactos:</Text>
+            {showQuality && (
+              <>
+                {qualityQuestions.map((q: any) => (
+                  <View key={q.id} style={styles.qualityRow}>
+                    <Text style={styles.qualityQuestion}>{q.title}</Text>
+                  </View>
+                ))}
+                <Text style={styles.label}>Localización de Contactos:</Text>
                 <TextInput
                   placeholder=""
                   style={styles.input}
+                  theme={{ roundness: 30 }}
+                  mode="outlined"
+                  activeOutlineColor="#000"
                   editable={false}
                 />
-              <Text style={styles.label}>Altura Chip Centro:</Text>
+                <Text style={styles.label}>Altura Chip Centro:</Text>
                 <TextInput
                   placeholder=""
                   style={styles.input}
+                  theme={{ roundness: 30 }}
+                  mode="outlined"
+                  activeOutlineColor="#000"
                   editable={false}
                 />
-            </>
-          )}
+              </>
+            )}
 
-          {/* Botones */}
-          <View style={styles.modalButtonRow}>
-            <TouchableOpacity style={styles.cancelButton} onPress={() => setShowCqmModal(false)}>
-              <Text style={styles.modalButtonText}>Cerrar</Text>
-            </TouchableOpacity>
-            <TouchableOpacity style={styles.confirmButton} onPress={enviarACQM}>
-              <Text style={styles.modalButtonText}>Enviar Respuestas</Text>
-            </TouchableOpacity>
-          </View>
-        </ScrollView>
+            {/* Botones */}
+            <View style={styles.modalButtonRow}>
+              <TouchableOpacity
+                style={styles.cancelButton}
+                onPress={() => setShowCqmModal(false)}
+              >
+                <Text style={styles.modalButtonText}>Cerrar</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={styles.confirmButton}
+                onPress={enviarACQM}
+              >
+                <Text style={styles.modalButtonText}>Enviar Respuestas</Text>
+              </TouchableOpacity>
+            </View>
+          </ScrollView>
         </View>
       </Modal>
 
@@ -405,24 +584,24 @@ const MillingChipComponent = ({ workOrder }: { workOrder: any }) => {
 export default MillingChipComponent;
 
 const styles = StyleSheet.create({
-  container: { 
+  container: {
     flex: 1,
     paddingTop: 16,
     paddingBottom: 2,
-    paddingHorizontal: 8, 
-    backgroundColor: '#fdfaf6', 
+    paddingHorizontal: 8,
+    backgroundColor: '#fdfaf6',
   },
-  title: { 
-    fontSize: 20, 
-    fontWeight: 'bold', 
+  title: {
+    fontSize: 20,
+    fontWeight: 'bold',
     marginBottom: 16,
     textAlign: 'center',
     color: 'black',
     padding: Platform.OS === 'ios' ? 10 : 0,
   },
-  subtitle: { 
-    fontSize: 16, 
-    fontWeight: 'bold', 
+  subtitle: {
+    fontSize: 16,
+    fontWeight: 'bold',
     marginTop: 20,
     marginBottom: 12,
   },
@@ -437,21 +616,18 @@ const styles = StyleSheet.create({
     fontSize: 16,
   },
   input: {
-    borderWidth: 1,
-    borderColor: '#ccc',
     borderRadius: 18,
     padding: 10,
+    marginBottom: 12,
     backgroundColor: '#fff',
-    height: 50,
+    height: 30,
     fontSize: 16,
   },
   textarea: {
     backgroundColor: '#fff',
     borderRadius: 12,
     padding: 10,
-    borderWidth: 1,
-    borderColor: '#ccc',
-    minHeight: 100,
+    minHeight: 30,
     fontSize: 16,
     textAlignVertical: 'top',
   },
@@ -654,7 +830,7 @@ const styles = StyleSheet.create({
     marginTop: 20,
   },
   greenDisabledButton: {
-    backgroundColor: '#4CAF50', 
-    opacity: 1, 
+    backgroundColor: '#4CAF50',
+    opacity: 1,
   },
 });

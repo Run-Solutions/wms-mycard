@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
-import { View, Text, TextInput, Button, Modal, StyleSheet, Alert, ScrollView } from 'react-native';
+import { View, Text, Button, Modal, StyleSheet, Alert, ScrollView, Pressable } from 'react-native';
+import { TextInput } from 'react-native-paper';
 import QuestionTable from './QuestionTable';
 import { deleteFormQuestion, updateFormQuestion } from '../../api/configVistosBuenos';
 
@@ -75,46 +76,48 @@ export default function MillingChipComponent({ formQuestion }: Props) {
       />
 
       <Text style={styles.label}>Revisar Tecnología De Chip Y Color Vs Ot</Text>
-      <TextInput style={styles.input} editable={false} />
+      <TextInput style={styles.input} theme={{ roundness: 30 }} mode="outlined" activeOutlineColor="#000" editable={false} />
 
       <Text style={styles.label}>Validar y anotar KCV, carga de app o prehabilitación</Text>
-      <TextInput style={styles.input} editable={false} />
+      <TextInput style={styles.input} theme={{ roundness: 30 }} mode="outlined" activeOutlineColor="#000" editable={false} />
 
       <Text style={styles.label}>Muestras entregadas</Text>
-      <TextInput style={styles.input} editable={false} />
+      <TextInput style={styles.input} theme={{ roundness: 30 }} mode="outlined" activeOutlineColor="#000" editable={false} />
 
       <Text style={styles.label}>Localización de Contactos</Text>
-      <TextInput style={styles.input} editable={false} />
+      <TextInput style={styles.input} theme={{ roundness: 30 }} mode="outlined" activeOutlineColor="#000" editable={false} />
 
       <Text style={styles.label}>Altura Chip Centro</Text>
-      <TextInput style={styles.input} editable={false} />
+      <TextInput style={styles.input} theme={{ roundness: 30 }} mode="outlined" activeOutlineColor="#000" editable={false} />
 
-      {/* Modales */}
-      <Modal visible={editingId !== null} transparent animationType="slide">
+{/* Edit Modal */}
+<Modal visible={editingId !== null} transparent animationType="fade">
         <View style={styles.modalOverlay}>
-          <View style={styles.modalContent}>
+          <View style={styles.modalBox}>
             <Text style={styles.modalTitle}>Editar Pregunta</Text>
             <TextInput
-              style={styles.input}
               value={newTitle}
               onChangeText={setNewTitle}
+              style={styles.input}
+              placeholder="Nuevo título"
             />
             <View style={styles.modalButtons}>
-              <Button title="Cancelar" onPress={() => setEditingId(null)} />
-              <Button title="Guardar" onPress={() => handleUpdateTitle(editingId!, newTitle)} />
+              <Pressable onPress={() => setEditingId(null)} style={styles.cancelButton}><Text>Cancelar</Text></Pressable>
+              <Pressable onPress={() => handleUpdateTitle(editingId!, newTitle)} style={styles.saveButton}><Text>Guardar</Text></Pressable>
             </View>
           </View>
         </View>
       </Modal>
 
-      <Modal visible={deletingId !== null} transparent animationType="slide">
+      {/* Delete Modal */}
+      <Modal visible={deletingId !== null} transparent animationType="fade">
         <View style={styles.modalOverlay}>
-          <View style={styles.modalContent}>
+          <View style={styles.modalBox}>
             <Text style={styles.modalTitle}>¿Eliminar esta pregunta?</Text>
             <Text>Esta acción no se puede deshacer.</Text>
             <View style={styles.modalButtons}>
-              <Button title="Cancelar" onPress={() => setDeletingId(null)} />
-              <Button title="Eliminar" color="#D9534F" onPress={() => handleDeleteQuestion(deletingId!)} />
+              <Pressable onPress={() => setDeletingId(null)} style={styles.cancelButton}><Text>Cancelar</Text></Pressable>
+              <Pressable onPress={() => handleDeleteQuestion(deletingId!)} style={styles.deleteButton}><Text>Eliminar</Text></Pressable>
             </View>
           </View>
         </View>
@@ -146,12 +149,11 @@ const styles = StyleSheet.create({
     color: '#374151',
   },
   input: {
-    borderWidth: 1,
-    borderColor: '#D1D5DB',
-    borderRadius: 8,
     padding: 10,
-    marginTop: 4,
-    backgroundColor: '#F3F4F6',
+    height: 20,
+    marginVertical: 8,
+    width: '90%',
+    backgroundColor: '#fff',
   },
   questionRow: {
     flexDirection: 'row',
@@ -171,26 +173,41 @@ const styles = StyleSheet.create({
     fontSize: 18,
     marginHorizontal: 6,
   },
+  modalButtons: {
+    flexDirection: 'row',
+    justifyContent: 'space-around',
+  },
+  cancelButton: {
+    padding: 10,
+    backgroundColor: '#BBBBBB',
+    borderRadius: 6,
+  },
+  saveButton: {
+    padding: 10,
+    backgroundColor: '#0070f3',
+    borderRadius: 6,
+  },
+  deleteButton: {
+    padding: 10,
+    backgroundColor: '#D9534F',
+    borderRadius: 6,
+  },
   modalOverlay: {
     flex: 1,
-    backgroundColor: '#000000aa',
+    backgroundColor: '#00000077',
     justifyContent: 'center',
     alignItems: 'center',
   },
-  modalContent: {
-    backgroundColor: 'white',
+  modalBox: {
+    width: '80%',
+    backgroundColor: '#FFF',
     padding: 20,
-    width: '85%',
-    borderRadius: 10,
+    borderRadius: 12,
+    elevation: 10,
   },
   modalTitle: {
-    fontSize: 18,
+    fontSize: 16,
     fontWeight: '600',
     marginBottom: 12,
-  },
-  modalButtons: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    marginTop: 16,
   },
 });
