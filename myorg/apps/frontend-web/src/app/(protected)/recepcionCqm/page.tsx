@@ -3,7 +3,7 @@
 
 import React, { useEffect, useState } from 'react';
 import styled, { useTheme } from 'styled-components';
-import WorkOrderTable from '@/components/RecepcionCqm/WorkOrderTable';
+import WorkOrderTable from '../../../../../../libs/shared/components/WorkOrderTable';
 import { getOrdersInCalidad } from '@/api/recepcionCQM';
 
 // Se define el tipo de datos
