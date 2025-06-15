@@ -188,7 +188,6 @@ const PersonalizacionComponent = ({ workOrder }: { workOrder: any }) => {
       <Text style={styles.label}>Tipo de Personalizacion:</Text>
       <TextInput
         style={styles.inputDetail}
-        keyboardType="numeric"
         value={workOrder?.answers[index].tipo_personalizacion ?? 'No se reconoce la muestra enviada'}
         editable={false}
         mode="outlined"
@@ -201,7 +200,6 @@ const PersonalizacionComponent = ({ workOrder }: { workOrder: any }) => {
           <Text style={styles.label}>Muestras entregadas:</Text>
           <TextInput
             style={styles.inputDetail}
-            keyboardType="numeric"
             value={workOrder?.answers[index].sample_quantity !== null
               ? String(workOrder?.answers[index].sample_quantity)
               : 'No se reconoce la muestra enviada'
@@ -249,7 +247,6 @@ const PersonalizacionComponent = ({ workOrder }: { workOrder: any }) => {
           <Text style={styles.label}>Color De Personalización:</Text>
           <TextInput
             style={styles.input}
-            keyboardType="numeric"
             value={workOrder?.answers[index].color_personalizacion ?? 'No se reconoce la muestra enviada'}
             editable={false}
             mode="outlined"
@@ -259,7 +256,6 @@ const PersonalizacionComponent = ({ workOrder }: { workOrder: any }) => {
           <Text style={styles.label}>Tipo de Código de Barras Que Se Personaliza:</Text>
           <TextInput
             style={styles.input}
-            keyboardType="numeric"
             value={workOrder?.answers[index].codigo_barras ?? 'No se reconoce la muestra enviada'}
             editable={false}
             mode="outlined"
@@ -270,7 +266,6 @@ const PersonalizacionComponent = ({ workOrder }: { workOrder: any }) => {
           <Text style={styles.label}>Muestras entregadas:</Text>
           <TextInput
             style={styles.input}
-            keyboardType="numeric"
             value={
               typeof workOrder?.answers?.[index]?.sample_quantity === 'number'
                 ? workOrder.answers[index].sample_quantity.toString()
@@ -320,7 +315,6 @@ const PersonalizacionComponent = ({ workOrder }: { workOrder: any }) => {
           <Text style={styles.label}>Verificar Tipo De Etiqueta Vs Ot Y Pegar Utilizada:</Text>
           <TextInput
             style={styles.input}
-            keyboardType="numeric"
             value={workOrder?.answers[index].verificar_etiqueta ?? 'No se reconoce la muestra enviada'}
             editable={false}
             mode="outlined"
@@ -330,7 +324,6 @@ const PersonalizacionComponent = ({ workOrder }: { workOrder: any }) => {
           <Text style={styles.label}>Muestras entregadas:</Text>
           <TextInput
             style={styles.input}
-            keyboardType="numeric"
             value={
               typeof workOrder?.answers?.[index]?.sample_quantity === 'number'
                 ? workOrder.answers[index].sample_quantity.toString()
@@ -377,31 +370,10 @@ const PersonalizacionComponent = ({ workOrder }: { workOrder: any }) => {
               </View>
             );
           })}
-          <Text style={styles.label}>Color De Personalización:</Text>
-          <TextInput
-            style={styles.input}
-            keyboardType="numeric"
-            value={workOrder?.answers[index].color_personalizacion ?? 'No se reconoce la muestra enviada'}
-            editable={false}
-            mode="outlined"
-            activeOutlineColor="#000"
-            theme={{ roundness: 30 }}
-          />
-          <Text style={styles.label}>Tipo de Código de Barras Que Se Personaliza:</Text>
-          <TextInput
-            style={styles.input}
-            keyboardType="numeric"
-            value={workOrder?.answers[index].codigo_barras ?? 'No se reconoce la muestra enviada'}
-            editable={false}
-            mode="outlined"
-            activeOutlineColor="#000"
-            theme={{ roundness: 30 }}
-          />
           {/* Muestras */}
           <Text style={styles.label}>Muestras entregadas:</Text>
           <TextInput
             style={styles.input}
-            keyboardType="numeric"
             value={
               typeof workOrder?.answers?.[index]?.sample_quantity === 'number'
                 ? workOrder.answers[index].sample_quantity.toString()
@@ -453,7 +425,6 @@ const PersonalizacionComponent = ({ workOrder }: { workOrder: any }) => {
           <Text style={styles.label}>Muestras entregadas:</Text>
           <TextInput
             style={styles.input}
-            keyboardType="numeric"
             value={
               typeof workOrder?.answers?.[index]?.sample_quantity === 'number'
                 ? workOrder.answers[index].sample_quantity.toString()
@@ -476,7 +447,7 @@ const PersonalizacionComponent = ({ workOrder }: { workOrder: any }) => {
           </View>
 
           {/* Preguntas normales */}
-          {questions.slice(24, 25).map((q: any) => {
+          {questions.slice(24, 26).map((q: any) => {
             const responses = workOrder.answers[index]?.FormAnswerResponse?.find(
               (resp: any) => resp.question_id === q.id
             );
@@ -500,31 +471,10 @@ const PersonalizacionComponent = ({ workOrder }: { workOrder: any }) => {
               </View>
             );
           })}
-          <Text style={styles.label}>Color De Personalización:</Text>
-          <TextInput
-            style={styles.input}
-            keyboardType="numeric"
-            value={workOrder?.answers[index].color_personalizacion ?? 'No se reconoce la muestra enviada'}
-            editable={false}
-            mode="outlined"
-            activeOutlineColor="#000"
-            theme={{ roundness: 30 }}
-          />
-          <Text style={styles.label}>Tipo de Código de Barras Que Se Personaliza:</Text>
-          <TextInput
-            style={styles.input}
-            keyboardType="numeric"
-            value={workOrder?.answers[index].codigo_barras ?? 'No se reconoce la muestra enviada'}
-            editable={false}
-            mode="outlined"
-            activeOutlineColor="#000"
-            theme={{ roundness: 30 }}
-          />
           {/* Muestras */}
           <Text style={styles.label}>Muestras entregadas:</Text>
           <TextInput
             style={styles.input}
-            keyboardType="numeric"
             value={
               typeof workOrder?.answers?.[index]?.sample_quantity === 'number'
                 ? workOrder.answers[index].sample_quantity.toString()
@@ -576,7 +526,6 @@ const PersonalizacionComponent = ({ workOrder }: { workOrder: any }) => {
           <Text style={styles.label}>Verificar Script / Layout Vs Ot / Autorizacion:</Text>
           <TextInput
             style={styles.input}
-            keyboardType="numeric"
             placeholder="Ej: 2"
             value={verificarScript}
             onChangeText={setVerificarScript}
@@ -587,7 +536,6 @@ const PersonalizacionComponent = ({ workOrder }: { workOrder: any }) => {
           <Text style={styles.label}>Validar, Anotar KVC (Llaves), Carga de Aplicación o Prehabilitación:</Text>
           <TextInput
             style={styles.input}
-            keyboardType="numeric"
             placeholder="Ej: 2"
             value={validarKVC}
             onChangeText={setValidarKVC}
@@ -598,7 +546,6 @@ const PersonalizacionComponent = ({ workOrder }: { workOrder: any }) => {
           <Text style={styles.label}>Describir Apariencia Del Quemado Del Laser (Color):</Text>
           <TextInput
             style={styles.input}
-            keyboardType="numeric"
             placeholder="Ej: 2"
             value={aparienciaQuemado}
             onChangeText={setAparienciaQuemado}
@@ -645,7 +592,6 @@ const PersonalizacionComponent = ({ workOrder }: { workOrder: any }) => {
           <Text style={styles.label}>Validar Carga De Aplicación (PersoMaster)</Text>
           <TextInput
             style={styles.input}
-            keyboardType="numeric"
             placeholder="Ej: 2"
             value={cargaAplicacion}
             onChangeText={setCargaAplicacion}
@@ -754,16 +700,13 @@ const styles = StyleSheet.create({
   input: {
     padding: 10,
     backgroundColor: '#fff',
-    height: 50,
+    height: 35,
     fontSize: 16,
   },
   inputDetail: {
-    borderWidth: 1,
-    borderColor: '#ccc',
-    borderRadius: 18,
     padding: 10,
     backgroundColor: '#fff',
-    height: 50,
+    height: 35,
     fontSize: 16,
     marginTop: 7,
     marginBottom: 15

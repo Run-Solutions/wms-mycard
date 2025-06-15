@@ -1,11 +1,24 @@
 // myorg/apps/frontend-web/src/components/CerrarOrdenDeTrabajo/WorkOrderTable.tsx
 
-import React, { useState } from "react";
-import { useRouter } from "next/navigation";
+import React, { useState } from 'react';
+import { useRouter } from 'next/navigation';
 import styled, { useTheme } from 'styled-components';
-import { Box, Table, TableBody, TableCell, TableContainer, TableHead, TableRow, Paper, Typography, IconButton } from "@mui/material";
+import {
+  Box,
+  Table,
+  TableBody,
+  TableCell,
+  TableContainer,
+  TableHead,
+  TableRow,
+  Paper,
+  Typography,
+  IconButton,
+  TextField,
+} from '@mui/material';
 import KeyboardArrowDownIcon from '@mui/icons-material/KeyboardArrowDown';
 import KeyboardArrowUpIcon from '@mui/icons-material/KeyboardArrowUp';
+import { getFileByName } from '@/api/seguimientoDeOts';
 
 interface WorkOrder {
   id: number;
@@ -18,8 +31,8 @@ interface WorkOrder {
   updatedAt: string;
   flow: {
     area: {
-      name: string,
-    }
+      name: string;
+    };
     id: number;
     work_order_id: number;
     area_id: number;
@@ -31,8 +44,8 @@ interface WorkOrder {
     updated_at: string;
   }[];
   files: {
-    file_path: string,
-  }[],
+    file_path: string;
+  }[];
 }
 
 interface Props {
@@ -41,162 +54,254 @@ interface Props {
   statusFilter: string;
 }
 
-const WorkOrderTable: React.FC<Props> = ({ orders, title, statusFilter}) => {
+const WorkOrderTable: React.FC<Props> = ({ orders, title, statusFilter }) => {
+  const [searchValue, setSearchValue] = useState('');
+  const handleSearchChange = (event: React.ChangeEvent<HTMLInputElement>) => {
+    setSearchValue(event.target.value);
+  };
   const [expanded, setExpanded] = useState(false);
   const router = useRouter();
+  const validOrders = Array.isArray(orders) ? orders : [];
 
-    // Filtra las órdenes que contienen al menos un flow con el status deseado
-  const filteredOrders = orders.filter(order =>
-    order.flow?.some(flow =>
-      flow.status.toLowerCase().includes(statusFilter.toLowerCase())
-    )
+
+  // Filtra las órdenes que contienen al menos un flow con el status deseado
+  const filteredOrders = validOrders.filter(
+    (order) =>
+      order.flow.some((flow) =>
+        flow.status.toLowerCase().includes(statusFilter.toLowerCase())
+      ) && order.ot_id.toLowerCase().includes(searchValue.toLowerCase())
   );
 
-  const displayedOrders = expanded ? filteredOrders : filteredOrders.slice(0, 2);
+  const displayedOrders = expanded
+    ? filteredOrders
+    : filteredOrders.slice(0, 2);
 
-    const downloadFile = async (filename: string) => {
-        const token = localStorage.getItem('token');
-        const res = await fetch(`http://localhost:3000/free-order-flow/file/${filename}`, {
-            headers: {
-                'Authorization': `Bearer ${token}`
-            }
-        });
-        if(!res.ok) {
-            const errorText = await res.text();
-            console.error('❌ Error desde el backend', errorText);
-            throw new Error('Error al cargar el file');
-        }
-        const blob = await res.blob();
-        const url = window.URL.createObjectURL(blob);
-        window.open(url, '_blank');
-
-        // Limpieza opcional después de unos segundos
-        setTimeout(() => window.URL.revokeObjectURL(url), 5000);
+  const downloadFile = async (filename: string) => {
+    try {
+      const arrayBuffer = await getFileByName(filename);
+      const blob = new Blob([arrayBuffer], { type: 'application/pdf' });
+      const url = window.URL.createObjectURL(blob);
+      window.open(url, '_blank');
+      setTimeout(() => window.URL.revokeObjectURL(url), 5000);
+    } catch (error) {
+      console.error('Error al abrir el archivo:', error);
     }
-    return (
-        <TableContainer component={Paper} sx={{ backgroundColor: 'white', padding: '2rem', mt: 4, borderRadius: '1rem', boxShadow: '0 4px 12px rgba(0,0,0,0.1)', maxWidth: '100%', minWidth: '800px', marginX: 'auto' }}>
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '10px'}}>
-            <Typography variant='h6' component='div' sx={{ p: 2, color: 'black' }}>{title}</Typography>
-            <Box display="flex" gap={2} flexWrap="wrap"  sx={{  }}>
-              <Box display="flex" alignItems="center" gap={1}>
-                <CircleLegend style={{ backgroundColor: '#22c55e' }} />
-                <Typography variant="body2" color="text.secondary">Completado</Typography>
-              </Box>
-              <Box display="flex" alignItems="center" gap={1}>
-                <CircleLegend style={{ backgroundColor: '#facc15' }} />
-                <Typography variant="body2" color="text.secondary">Enviado a CQM</Typography>
-              </Box>
-                <Box display="flex" alignItems="center" gap={1}>
-                <CircleLegend style={{ backgroundColor: '#4a90e2' }} />
-                <Typography variant="body2" color="text.secondary">En Proceso / Calidad</Typography>
-              </Box>
-              <Box display="flex" alignItems="center" gap={1}>
-                <CircleLegend style={{ backgroundColor: '#d1d5db' }} />
-                <Typography variant="body2" color="text.secondary">Sin Estado</Typography>
-              </Box>
+  };
+  return (
+    <TableContainer
+      component={Paper}
+      sx={{
+        backgroundColor: 'white',
+        padding: '2rem',
+        mt: 4,
+        borderRadius: '1rem',
+        boxShadow: '0 4px 12px rgba(0,0,0,0.1)',
+        maxWidth: '100%',
+        minWidth: '800px',
+        marginX: 'auto',
+      }}
+    >
+      <div
+        style={{
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+          padding: '10px',
+        }}
+      >
+        <Typography variant="h6" component="div" sx={{ p: 2, color: 'black' }}>
+          {title}
+        </Typography>
+        <TextField
+          label="Buscar OT"
+          variant="outlined"
+          size="small"
+          value={searchValue}
+          onChange={handleSearchChange}
+          sx={{
+            '& label': { color: 'black' },
+            '& .MuiOutlinedInput-root': {
+              '& fieldset': { borderColor: 'black' },
+              '&:hover fieldset': { borderColor: 'black' },
+              '&.Mui-focused fieldset': { borderColor: 'black' },
+              color: 'black',
+            },
+          }}
+        />
+        <Box display="flex" gap={2} flexWrap="wrap" sx={{}}>
+          <Box display="flex" alignItems="center" gap={1}>
+            <CircleLegend style={{ backgroundColor: '#22c55e' }} />
+            <Typography variant="body2" color="text.secondary">
+              Completado
+            </Typography>
+          </Box>
+          <Box display="flex" alignItems="center" gap={1}>
+            <CircleLegend style={{ backgroundColor: '#facc15' }} />
+            <Typography variant="body2" color="text.secondary">
+              Enviado a CQM
+            </Typography>
+          </Box>
+          <Box display="flex" alignItems="center" gap={1}>
+            <CircleLegend style={{ backgroundColor: '#4a90e2' }} />
+            <Typography variant="body2" color="text.secondary">
+              En Proceso / Calidad
+            </Typography>
+          </Box>
+          <Box display="flex" alignItems="center" gap={1}>
+            <CircleLegend style={{ backgroundColor: '#d1d5db' }} />
+            <Typography variant="body2" color="text.secondary">
+              Sin Estado
+            </Typography>
+          </Box>
+        </Box>
+      </div>
+      {filteredOrders.length === 0 ? (
+        <Typography sx={{ p: 2, color: 'black' }}>
+          No hay órdenes para mostrar.
+        </Typography>
+      ) : (
+        <>
+          <Table>
+            <TableHead>
+              <TableRow>
+                <TableCell sx={{ color: 'black' }}>Id OT</TableCell>
+                <TableCell sx={{ maxWidth: 110, color: 'black' }}>
+                  Id del presupuesto
+                </TableCell>
+                <TableCell sx={{ color: 'black' }}>Usuario</TableCell>
+                <TableCell sx={{ color: 'black' }}>Área</TableCell>
+                <TableCell sx={{ color: 'black' }}>Fecha</TableCell>
+                <TableCell sx={{ color: 'black' }}>Archivos</TableCell>
+              </TableRow>
+            </TableHead>
+            <TableBody>
+              {filteredOrders.map((orderFlow) => (
+                <TableRow key={orderFlow.id}>
+                  <TableCell
+                    onClick={() =>
+                      router.push(`/cerrarOrdenDeTrabajo/${orderFlow.ot_id}`)
+                    }
+                    sx={{
+                      color: 'black',
+                      cursor: 'pointer',
+                      '&:hover': { textDecoration: 'underline' },
+                    }}
+                  >
+                    {orderFlow.ot_id}
+                  </TableCell>
+                  <TableCell sx={{ color: 'black' }}>
+                    {orderFlow.mycard_id}
+                  </TableCell>
+                  <TableCell sx={{ color: 'black' }}>
+                    {orderFlow.mycard_id || 'Sin usuario'}
+                  </TableCell>
+                  <TableCell sx={{ maxWidth: 900, overflowX: 'hidden' }}>
+                    <Timeline>
+                      {orderFlow.flow?.map((flowStep, index) => {
+                        const isActive = [
+                          'proceso',
+                          'calidad',
+                          'listo',
+                          'audi',
+                        ].some((word) =>
+                          flowStep.status?.toLowerCase().includes(word)
+                        );
+                        const isCompleted = flowStep.status
+                          ?.toLowerCase()
+                          .includes('completado');
+                        const isLast = index === orderFlow.flow.length - 1;
+                        return (
+                          <TimelineItem key={index}>
+                            <Circle
+                              $isActive={isActive}
+                              $isCompleted={isCompleted}
+                            >
+                              {index + 1}
+                            </Circle>
+                            {!isLast && <Line $isLast={isLast} />}
+                            <AreaName $isActive={isActive}>
+                              {flowStep.area.name ?? 'Área desconocida'}
+                            </AreaName>
+                          </TimelineItem>
+                        );
+                      })}
+                    </Timeline>
+                  </TableCell>
+                  <TableCell sx={{ color: 'black' }}>
+                    {new Date(orderFlow.createdAt).toLocaleDateString()}
+                  </TableCell>
+                  <CustomTableCell>
+                    {orderFlow.files.length > 0 ? (
+                      <div
+                        style={{
+                          display: 'flex',
+                          flexDirection: 'column',
+                          flexWrap: 'wrap',
+                          gap: '0.5rem',
+                        }}
+                      >
+                        {orderFlow.files.map((file) => {
+                          const fileName = file.file_path.toLowerCase();
+                          const label = fileName.includes('ot')
+                            ? 'Ver OT'
+                            : fileName.includes('sku')
+                            ? 'Ver SKU'
+                            : fileName.includes('op')
+                            ? 'Ver OP'
+                            : 'Ver Archivo';
+                          return (
+                            <button
+                              key={file.file_path}
+                              onClick={() => downloadFile(file.file_path)}
+                              style={{
+                                border: '1px solid #c2c2c2',
+                                borderRadius: '20px',
+                                padding: '4px 12px',
+                                backgroundColor: '#f7f7f7',
+                                cursor: 'pointer',
+                                fontSize: '0.75rem',
+                                transition: 'all 0.2s ease-in-out',
+                              }}
+                              onMouseOver={(e) => {
+                                (
+                                  e.target as HTMLButtonElement
+                                ).style.backgroundColor = '#e0e0e0';
+                              }}
+                              onMouseOut={(e) => {
+                                (
+                                  e.target as HTMLButtonElement
+                                ).style.backgroundColor = '#f7f7f7';
+                              }}
+                            >
+                              {label}
+                            </button>
+                          );
+                        })}
+                      </div>
+                    ) : (
+                      'No hay archivos'
+                    )}
+                  </CustomTableCell>
+                </TableRow>
+              ))}
+            </TableBody>
+          </Table>
+          {filteredOrders.length > 2 && (
+            <Box display="flex" justifyContent="center" mt={2}>
+              <IconButton onClick={() => setExpanded(!expanded)}>
+                {expanded ? <KeyboardArrowUpIcon /> : <KeyboardArrowDownIcon />}
+              </IconButton>
             </Box>
-        </div>
-          {filteredOrders.length === 0 ? (
-            <Typography sx={{ p: 2, color:'black' }}>No hay órdenes para mostrar.</Typography>
-          ) : (
-            <>
-              <Table>
-                <TableHead>
-                  <TableRow>
-                    <TableCell sx={{ color: 'black' }}>Id OT</TableCell>
-                    <TableCell sx={{ maxWidth: 110, color: 'black' }}>Id del presupuesto</TableCell>
-                    <TableCell sx={{ color: 'black' }}>Usuario</TableCell>
-                    <TableCell sx={{ color: 'black' }}>Área</TableCell>
-                    <TableCell sx={{ color: 'black' }}>Fecha</TableCell>
-                    <TableCell sx={{ color: 'black' }}>Archivos</TableCell>
-                  </TableRow>
-                </TableHead>
-                <TableBody>
-                  {filteredOrders.map(order => (
-                    <TableRow key={order.id}>
-                      <TableCell onClick={() => router.push(`/cerrarOrdenDeTrabajo/${order.ot_id}`)} sx={{ color: 'black', cursor: 'pointer', '&:hover': { textDecoration: 'underline' } }}>
-                        {order.ot_id}
-                      </TableCell>
-                      <TableCell sx={{ color: 'black' }}>{order.mycard_id}</TableCell>
-                      <TableCell sx={{ color: 'black' }}>{order.mycard_id || 'Sin usuario'}</TableCell>
-                      <TableCell sx={{ maxWidth: 900, overflowX: 'hidden' }}>
-                        <Timeline>
-                          {order.flow?.map((flowStep, index) => {
-                            const isActive = ['proceso', 'calidad', 'listo', 'audi'].some(word => flowStep.status?.toLowerCase().includes(word));
-                            const isCompleted = flowStep.status?.toLowerCase().includes('completado');
-                            const isLast = index === order.flow.length - 1;
-                            return (
-                              <TimelineItem key={index}>
-                                <Circle $isActive={isActive} $isCompleted={isCompleted}>{index + 1}</Circle>
-                                {!isLast && <Line $isLast={isLast} />}
-                                <AreaName $isActive={isActive}>{flowStep.area.name ?? 'Área desconocida'}</AreaName>
-                              </TimelineItem>
-                            );
-                          })}
-                        </Timeline>
-                      </TableCell>
-                      <TableCell sx={{ color: 'black' }}>{new Date(order.createdAt).toLocaleDateString()}</TableCell>
-                      <CustomTableCell>
-                        {order.files.length > 0 ? (
-                          <div style={{ display: 'flex', flexDirection: 'column',flexWrap: 'wrap', gap: '0.5rem' }}>
-                            {order.files.map((file) => {
-                              const fileName = file.file_path.toLowerCase();
-                              const label = fileName.includes('ot')
-                                ? 'Ver OT'
-                                : fileName.includes('sku')
-                                ? 'Ver SKU'
-                                : fileName.includes('op')
-                                ? 'Ver OP'
-                                : 'Ver Archivo';
-                              return (
-                                <button
-                                  key={file.file_path}
-                                  onClick={() => downloadFile(file.file_path)}
-                                  style={{
-                                    border: '1px solid #c2c2c2',
-                                    borderRadius: '20px',
-                                    padding: '4px 12px',
-                                    backgroundColor: '#f7f7f7',
-                                    cursor: 'pointer',
-                                    fontSize: '0.75rem',
-                                    transition: 'all 0.2s ease-in-out',
-                                  }}
-                                  onMouseOver={(e) => {
-                                    (e.target as HTMLButtonElement).style.backgroundColor = '#e0e0e0';
-                                  }}
-                                  onMouseOut={(e) => {
-                                    (e.target as HTMLButtonElement).style.backgroundColor = '#f7f7f7';
-                                  }}
-                                >
-                                {label}
-                                </button>
-                              );
-                            })}
-                          </div>
-                        ) : (
-                          'No hay archivos'
-                        )}
-                      </CustomTableCell>
-                    </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
-              {filteredOrders.length > 2 && (
-                <Box display="flex" justifyContent="center" mt={2}>
-                <IconButton onClick={() => setExpanded(!expanded)}>
-                  {expanded ? <KeyboardArrowUpIcon /> : <KeyboardArrowDownIcon />}
-                </IconButton>
-              </Box>
-              )}
-            </>
           )}
-        </TableContainer>
-      );
+        </>
+      )}
+    </TableContainer>
+  );
 };
 export default WorkOrderTable;
 
 interface StyledProps {
-    $isActive: boolean;
+  $isActive: boolean;
 }
 
 const Timeline = styled.div`
@@ -206,7 +311,7 @@ const Timeline = styled.div`
   width: 100%;
   gap: 18px;
   box-sizing: border-box;
-  margin-right:0;
+  margin-right: 0;
 `;
 
 const TimelineItem = styled.div`
@@ -226,7 +331,8 @@ const Circle = styled.div.withConfig({
 })<StyledProps & { $isCompleted?: boolean }>`
   width: 30px;
   height: 30px;
-  background-color: ${({ $isCompleted, $isActive }) => ($isCompleted ? '#22c55e' : $isActive ? '#4a90e2' : '#d1d5db')};
+  background-color: ${({ $isCompleted, $isActive }) =>
+    $isCompleted ? '#22c55e' : $isActive ? '#4a90e2' : '#d1d5db'};
   border-radius: 50%;
   color: white;
   font-size: 12px;
@@ -235,7 +341,8 @@ const Circle = styled.div.withConfig({
   align-items: center;
   justify-content: center;
   z-index: 2;
-  box-shadow: ${({ $isCompleted, $isActive }) => ($isCompleted ? '0 0 5px #22c55e' : $isActive ? '0 0 5px #4a90e2' : 'none')};
+  box-shadow: ${({ $isCompleted, $isActive }) =>
+    $isCompleted ? '0 0 5px #22c55e' : $isActive ? '0 0 5px #4a90e2' : 'none'};
   transition: background-color 0.3s, box-shadow 0.3s;
 `;
 
@@ -251,7 +358,6 @@ const Line = styled.div.withConfig({
   z-index: 0;
   display: ${({ $isLast }) => ($isLast ? 'none' : 'block')};
 `;
-
 
 const AreaName = styled.span.withConfig({
   shouldForwardProp: (prop) => prop !== '$isActive',
@@ -270,7 +376,7 @@ const CircleLegend = styled.div`
   width: 16px;
   height: 16px;
   border-radius: 50%;
-  box-shadow: 0 0 2px rgba(0,0,0,0.3);
+  box-shadow: 0 0 2px rgba(0, 0, 0, 0.3);
 `;
 
 const CustomTableCell = styled(TableCell)`

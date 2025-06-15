@@ -153,14 +153,12 @@ const ColorEdgeComponent = ({ workOrder }: { workOrder: any }) => {
       <Text style={styles.label}>Color Edge:</Text>
       <TextInput
         style={styles.input}
-        keyboardType="numeric"
         value={workOrder?.answers?.[index]?.color_edge}
         editable={false}
       />
       <Text style={styles.label}>Muestras entregadas:</Text>
       <TextInput
         style={styles.input}
-        keyboardType="numeric"
         value={
           typeof workOrder?.answers?.[index]?.sample_quantity === 'number'
           ? workOrder.answers[index].sample_quantity.toString()

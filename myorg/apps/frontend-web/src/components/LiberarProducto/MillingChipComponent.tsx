@@ -107,10 +107,6 @@ export default function MillingChipComponent({ workOrder }: Props) {
   // Para Liberar el producto cuando ya ha pasado por CQM
   const [showConfirm, setShowConfirm] = useState(false); 
   const handleLiberarClick = () => {
-    if (Number(sampleQuantity) <= 0) {
-      alert('Por favor, ingresa una cantidad de muestra válida.');
-      return;
-    }
   
     if (lastCompletedOrPartial.partialReleases.length > 0) {
       const totalValidatedQuantity = lastCompletedOrPartial.partialReleases

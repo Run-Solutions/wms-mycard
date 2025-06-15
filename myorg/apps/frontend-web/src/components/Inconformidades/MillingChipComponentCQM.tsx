@@ -95,11 +95,11 @@ export default function MillingChipComponentCQM({ workOrder }: Props) {
           </Table>
           <InputGroup style={{ marginTop: '-7rem'}}>
               <Label>Revisar Tecnología De Chip y Color Vs Ot:</Label>
-              <Input type="number" value={workOrder?.answers[index].revisar_tecnologia ?? 'No se reconoce la muestra enviada' } readOnly />
+              <Input type="text" value={workOrder?.answers[index].revisar_tecnologia ?? 'No se reconoce la muestra enviada' } readOnly />
           </InputGroup>
           <InputGroup style={{ marginTop: '-7rem'}}>
               <Label>Validar y Anotar KCV (Intercambio De Llaves), Carga De Aplicación o Prehabilitación (Si Aplica):</Label>
-              <Input type="number" value={workOrder?.answers[index].validar_kvc ?? 'No se reconoce la muestra enviada' } readOnly />
+              <Input type="text" value={workOrder?.answers[index].validar_kvc ?? 'No se reconoce la muestra enviada' } readOnly />
           </InputGroup>
           <InputGroup style={{ marginTop: '-7rem'}}>
               <Label>Muestras entregadas:</Label>

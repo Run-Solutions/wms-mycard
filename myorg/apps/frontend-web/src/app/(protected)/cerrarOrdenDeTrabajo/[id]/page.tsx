@@ -1,213 +1,418 @@
-'use client'
+// myorg/apps/frontend-web/src/app/(protected)/seguimientoDeOts/[id]/page.tsx
+'use client';
 
-import { use, useEffect, useState } from 'react';
+import { use, useState, useEffect } from 'react';
+import { useRouter } from 'next/navigation';
 import styled from 'styled-components';
-import { fetchWorkOrderById, liberarWorkOrderAuditory } from '@/api/cerrarOrdenDeTrabajo';
+import {
+  fetchWorkOrderById,
+  liberarWorkOrderAuditory,
+} from '@/api/cerrarOrdenDeTrabajo';
 
 interface Props {
   params: Promise<{ id: string }>;
 }
 
-interface AreaTotals {
+type AreaData = {
+  id: number;
+  name: string;
+  status: string;
+  response: {
+    user: {
+      username: string;
+    };
+  };
+  answers: any;
+  usuario: string;
+  auditor: string;
   buenas: number;
   malas: number;
-  excedente: number;
   cqm: number;
+  excedente: number;
   muestras: number;
-}
+};
 
 export default function CloseWorkOrderAuxPage({ params }: Props) {
   const { id } = use(params);
+  const router = useRouter();
   const [workOrder, setWorkOrder] = useState<any>(null);
   const [showConfirm, setShowConfirm] = useState(false);
 
   useEffect(() => {
-    async function fetchData() {
+    const loadData = async () => {
       const data = await fetchWorkOrderById(id);
       setWorkOrder(data);
-    }
-    fetchData();
-  }, [id]);
-
-  const getAreaData = (areaId: number, areaResponse: any) => {
-    switch (areaId) {
-      case 6: return { ...areaResponse?.corte, usuario: areaResponse?.user?.username || '', auditor: areaResponse?.corte?.formAuditory?.user?.username || '' };
-      case 7: return { ...areaResponse?.colorEdge, usuario: areaResponse?.user?.username || '', auditor: areaResponse?.colorEdge?.formAuditory?.user?.username || '' };
-      case 8: return { ...areaResponse?.hotStamping, usuario: areaResponse?.user?.username || '', auditor: areaResponse?.hotStamping?.formAuditory?.user?.username || '' };
-      case 9: return { ...areaResponse?.millingChip, usuario: areaResponse?.user?.username || '', auditor: areaResponse?.millingChip?.formAuditory?.user?.username || '' };
-      case 10: return { ...areaResponse?.personalizacion, usuario: areaResponse?.user?.username || '', auditor: areaResponse?.personalizacion?.formAuditory?.user?.username || '' };
-      default: return { buenas: 0, malas: 0, excedente: 0, cqm: 0, muestras: 0, usuario: '', auditor: '' };
-    }
-  };
-
-  const areas = workOrder?.flow?.map((item: any) => {
-    const areaData = getAreaData(item.area_id, item.areaResponse);
-    return {
-      id: item.area_id,
-      name: item.area?.name || 'Sin nombre',
-      ...areaData,
-      buenas: areaData?.good_quantity || 0,
-      malas: areaData?.bad_quantity || 0,
-      excedente: areaData?.excess_quantity || 0,
-      cqm: areaData?.form_answer?.sample_quantity || 0,
-      muestras: areaData?.formAuditory?.sample_auditory || 0,
     };
-  }) || [];
-
-  const totals = areas.reduce(
-    (acc: AreaTotals, area: any): AreaTotals => {
-      acc.buenas += Number(area.buenas || 0);
-      acc.malas += Number(area.malas || 0);
-      acc.excedente += Number(area.excedente || 0);
-      acc.cqm += Number(area.cqm || 0);
-      acc.muestras += Number(area.muestras || 0);
-      return acc;
-    },
-    { buenas: 0, malas: 0, excedente: 0, cqm: 0, muestras: 0 }
-  );
+    loadData();
+  }, [id]);
 
   const handleCloseOrder = async () => {
     try {
-      const currentFlow = workOrder.flow.find((f: any) => f.status === 'En auditoria');
-      await liberarWorkOrderAuditory({
-        workOrderFlowId: currentFlow.id,
-        workOrderId: workOrder.id,
-      });
-      alert('La orden de trabajo ha sido cerrada.');
-      window.history.back();
+      await liberarWorkOrderAuditory(workOrder?.ot_id);
+      router.push('/seguimientoDeOts');
     } catch (error) {
-      console.error(error);
-      alert('No se pudo cerrar la orden.');
+      console.log('Error al enviar datos:', error);
     }
   };
 
-  if (!workOrder) return <div>Cargando...</div>;
+  const getAreaData = (areaId: number, areaResponse: any) => {
+    console.log('Area Response:', areaResponse);
+    switch (areaId) {
+      case 6:
+        return {
+          buenas: areaResponse?.corte?.good_quantity || 0,
+          malas: areaResponse?.corte?.bad_quantity || 0,
+          excedente: areaResponse?.corte?.excess_quantity || 0,
+          cqm: areaResponse?.corte?.form_answer?.sample_quantity ?? 0,
+          muestras: areaResponse?.corte?.formAuditory?.sample_auditory ?? 0,
+          usuario: areaResponse?.user?.username || '',
+          auditor: areaResponse?.corte?.formAuditory?.user?.username || '',
+        };
+      case 7:
+        return {
+          buenas: areaResponse?.colorEdge?.good_quantity || 0,
+          malas: areaResponse?.colorEdge?.bad_quantity || 0,
+          excedente: areaResponse?.colorEdge?.excess_quantity || 0,
+          cqm: areaResponse?.colorEdge?.form_answer?.sample_quantity || 0,
+          muestras: areaResponse?.colorEdge?.formAuditory?.sample_auditory ?? 0,
+          usuario: areaResponse?.user?.username || '',
+          auditor: areaResponse?.colorEdge?.formAuditory?.user?.username || '',
+        };
+      case 8:
+        return {
+          buenas: areaResponse?.hotStamping?.good_quantity || 0,
+          malas: areaResponse?.hotStamping?.bad_quantity || 0,
+          excedente: areaResponse?.hotStamping?.excess_quantity || 0,
+          cqm: areaResponse?.hotStamping?.form_answer?.sample_quantity || 0,
+          muestras:
+            areaResponse?.hotStamping?.formAuditory?.sample_auditory ?? 0,
+          usuario: areaResponse?.user?.username || '',
+          auditor:
+            areaResponse?.hotStamping?.formAuditory?.user?.username || '',
+        };
+      case 9:
+        return {
+          buenas: areaResponse?.millingChip?.good_quantity || 0,
+          malas: areaResponse?.millingChip?.bad_quantity || 0,
+          excedente: areaResponse?.millingChip?.excess_quantity || 0,
+          cqm: areaResponse?.millingChip?.form_answer?.sample_quantity || 0,
+          muestras:
+            areaResponse?.millingChip?.formAuditory?.sample_auditory ?? 0,
+          usuario: areaResponse?.user?.username || '',
+          auditor:
+            areaResponse?.millingChip?.formAuditory?.user?.username || '',
+        };
+      case 10:
+        return {
+          buenas: areaResponse?.personalizacion?.good_quantity || 0,
+          malas: areaResponse?.personalizacion?.bad_quantity || 0,
+          excedente: areaResponse?.personalizacion?.excess_quantity || 0,
+          cqm: areaResponse?.personalizacion?.form_answer?.sample_quantity || 0,
+          muestras:
+            areaResponse?.personalizacion?.formAuditory?.sample_auditory ?? 0,
+          usuario: areaResponse?.user?.username || '',
+          auditor:
+            areaResponse?.personalizacion?.formAuditory?.user?.username || '',
+        };
+      default:
+        return { buenas: 0, malas: 0, excedente: 0, cqm: 0, muestras: 0 };
+    }
+  };
 
+  const areas: AreaData[] =
+    workOrder?.workOrder.flow
+      ?.filter((item: any) => item.area_id >= 6)
+      .map((item: any) => ({
+        id: item.area_id,
+        name: item.area?.name || 'Sin nombre',
+        status: item.status || 'Desconocido',
+        response: item.areaResponse || {},
+        answers: item.answers?.[0] || {},
+        ...getAreaData(item.area_id, item.areaResponse),
+      })) || [];
+  const cantidadHojasRaw = Number(workOrder?.workOrder.quantity) / 24;
+  const cantidadHojas = cantidadHojasRaw > 0 ? Math.ceil(cantidadHojasRaw) : 0;
   return (
-    <PageContainer>
-      <h1>Información de la Orden #{id}</h1>
-      <Card>
-        <p><strong>OT:</strong> {workOrder.ot_id}</p>
-        <p><strong>Presupuesto:</strong> {workOrder.mycard_id}</p>
-        <p><strong>Cantidad:</strong> {workOrder.quantity}</p>
-        <p><strong>Comentarios:</strong> {workOrder.comments}</p>
-      </Card>
+    <>
+      <Container>
+        <Title>Información Complementaria Orden de Trabajo</Title>
 
-      <h2>Datos de Producción por Área</h2>
-      <TableWrapper>
-        <table>
-          <thead>
-            <tr>
-              <th>Área</th>
-              <th>Buenas</th>
-              <th>Malas</th>
-              <th>Excedente</th>
-              <th>CQM</th>
-              <th>Muestras</th>
-              <th>Usuario</th>
-            </tr>
-          </thead>
-          <tbody>
-            {areas.filter((a: any) => a.id >= 6).map((area: any, index: any) => (
-              <tr key={index}>
-                <td>{area.name}</td>
-                <td>{area.buenas}</td>
-                <td>{area.malas}</td>
-                <td>{area.excedente}</td>
-                <td>{area.cqm}</td>
-                <td>{area.muestras}</td>
-                <td>{area.usuario}</td>
-              </tr>
-            ))}
-            <tr style={{ backgroundColor: '#f0f0f0' }}>
-              <td><strong>Totales</strong></td>
-              <td>{totals.buenas}</td>
-              <td>{totals.malas}</td>
-              <td>{totals.excedente}</td>
-              <td>{totals.cqm}</td>
-              <td>{totals.muestras}</td>
-              <td>—</td>
-            </tr>
-          </tbody>
-        </table>
-      </TableWrapper>
+        <DataWrapper>
+          <InfoItem>
+            <Label>Número de Orden:</Label>
+            <Value>{workOrder?.workOrder.ot_id}</Value>
+          </InfoItem>
+          <InfoItem>
+            <Label>ID del Presupuesto:</Label>
+            <Value>{workOrder?.workOrder.mycard_id}</Value>
+          </InfoItem>
+          <InfoItem>
+            <Label>Cantidad (TARJETAS): </Label>
+            <Value>{workOrder?.workOrder.quantity}</Value>
+          </InfoItem>
+          <InfoItem>
+            <Label>Cantidad (HOJAS): </Label>
+            <Value>{cantidadHojas}</Value>
+          </InfoItem>
+        </DataWrapper>
 
-      {workOrder?.status !== 'Cerrado' && (
-        <>
-          <Button onClick={() => setShowConfirm(true)}>Cerrar Orden de Trabajo</Button>
-          {showConfirm && (
-            <ModalOverlay>
-              <ModalBox>
-                <p>¿Deseas cerrar esta Orden de Trabajo?</p>
-                <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: '1rem' }}>
-                  <button onClick={() => setShowConfirm(false)}>Cancelar</button>
-                  <button onClick={handleCloseOrder}>Confirmar</button>
-                </div>
-              </ModalBox>
-            </ModalOverlay>
+        <InfoItem>
+          <Label>Comentarios:</Label>
+          <Value>{workOrder?.workOrder.comments}</Value>
+        </InfoItem>
+
+        <Section>
+          <SectionTitle>Datos de Producción</SectionTitle>
+          <TableWrapper>
+            <Table>
+              <thead>
+                <tr>
+                  <th />
+                  {areas.map((area) => (
+                    <th key={area.id} title={`Estado: ${area.status}`}>
+                      <span>{area.name}</span>
+                    </th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody>
+                <tr>
+                  <td>Usuario</td>
+                  {areas.map((area) => (
+                    <td key={area.id}>{area.usuario}</td>
+                  ))}
+                </tr>
+                <tr>
+                  <td>Auditor</td>
+                  {areas.map((area) => (
+                    <td key={area.id}>{area.auditor}</td>
+                  ))}
+                </tr>
+                <tr>
+                  <td>Estado</td>
+                  {areas.map((area) => (
+                    <td key={area.id}>{area.status}</td>
+                  ))}
+                </tr>
+                <tr>
+                  <td>Buenas</td>
+                  {areas.map((area) => (
+                    <td key={area.id}>{area.buenas}</td>
+                  ))}
+                </tr>
+                <tr>
+                  <td>Malas</td>
+                  {areas.map((area) => (
+                    <td key={area.id}>{area.malas}</td>
+                  ))}
+                </tr>
+                <tr>
+                  <td>Excedente</td>
+                  {areas.map((area) => (
+                    <td key={area.id}>{area.excedente}</td>
+                  ))}
+                </tr>
+                <tr>
+                  <td>CQM</td>
+                  {areas.map((area) => (
+                    <td key={area.id}>{area.cqm}</td>
+                  ))}
+                </tr>
+                <tr>
+                  <td>Muestras</td>
+                  {areas.map((area) => (
+                    <td key={area.id}>{area.muestras}</td>
+                  ))}
+                </tr>
+                <tr>
+                  <td>SUMA TOTAL</td>
+                  {areas.map((area) => (
+                    <td key={area.id}>
+                      {area.buenas +
+                        area.malas +
+                        area.excedente +
+                        area.cqm +
+                        area.muestras}
+                    </td>
+                  ))}
+                </tr>
+              </tbody>
+            </Table>
+          </TableWrapper>
+          {workOrder?.status !== 'Cerrado' && (
+            <CloseButton onClick={() => setShowConfirm(true)}>
+              Cerrar Orden de Trabajo
+            </CloseButton>
           )}
-        </>
+        </Section>
+      </Container>
+
+      {showConfirm && (
+        <ModalOverlay>
+          <ModalBox>
+            <h4>¿Estás segura/o que deseas cerrar esta Orden de Trabajo?</h4>
+            <Actions>
+              <CancelButton onClick={() => setShowConfirm(false)}>
+                Cancelar
+              </CancelButton>
+              <ConfirmButton onClick={handleCloseOrder}>
+                Confirmar
+              </ConfirmButton>
+            </Actions>
+          </ModalBox>
+        </ModalOverlay>
       )}
-    </PageContainer>
+    </>
   );
 }
 
 // =================== Styled Components ===================
-const PageContainer = styled.div`
-  padding: 1rem 2rem;
-  background-color: #fdfaf6;
+
+const Container = styled.div`
+  padding: 20px 50px;
 `;
 
-const Card = styled.div`
+const Title = styled.h2`
+  margin-bottom: 1.5rem;
+  font-size: 2rem;
+  color: ${({ theme }) => theme.palette.text.primary};
+`;
+
+const DataWrapper = styled.div`
+  display: flex;
+  gap: 20px;
+  margin-bottom: 20px;
+`;
+
+const InfoItem = styled.div`
   background: white;
-  padding: 1.5rem;
-  margin-bottom: 2rem;
-  border-radius: 18px;
-  box-shadow: 0 2px 6px rgba(0,0,0,0.1);
+  padding: 1.25rem 1.5rem;
+  border-radius: 0.75rem;
+  box-shadow: 0 3px 6px rgba(0, 0, 0, 0.08);
+  flex: 1;
+`;
+
+const Label = styled.span`
+  font-weight: 600;
+  display: block;
+  margin-bottom: 0.25rem;
+`;
+
+const Value = styled.span`
+  font-size: 1.125rem;
+`;
+
+const Section = styled.div`
+  margin-top: 30px;
+`;
+
+const SectionTitle = styled.h3`
+  font-size: 1.5rem;
+  margin-bottom: 1rem;
+  color: ${({ theme }) => theme.palette.text.primary};
 `;
 
 const TableWrapper = styled.div`
   overflow-x: auto;
-  margin-top: 1rem;
-  table {
-    border-collapse: collapse;
-    width: 100%;
-    th, td {
-      padding: 0.75rem 1rem;
-      border: 1px solid #ccc;
-      text-align: center;
-    }
+  margin-bottom: 2rem;
+`;
+
+const Table = styled.table`
+  width: 100%;
+  border-collapse: collapse;
+  background: white;
+  border-radius: 0.75rem;
+  overflow: hidden;
+  box-shadow: 0 4px 10px rgba(0, 0, 0, 0.05);
+
+  th,
+  td {
+    padding: 0.75rem;
+    text-align: center;
+    border-bottom: 1px solid #e5e7eb;
+  }
+
+  th {
+    background: #f3f4f6;
+    font-weight: 600;
+    position: relative;
+  }
+
+  tr:nth-child(even) {
+    background: #fafafa;
   }
 `;
 
-const Button = styled.button`
-  background-color: #0038A8;
+const CloseButton = styled.button`
+  background: #2563eb;
   color: white;
-  padding: 0.75rem 1.5rem;
+  padding: 0.9rem 1.5rem;
   border: none;
-  border-radius: 18px;
-  font-weight: bold;
+  border-radius: 0.75rem;
+  font-size: 1rem;
   cursor: pointer;
-  margin-top: 2rem;
+  transition: background 0.3s;
+
+  &:hover {
+    background: #1d4ed8;
+  }
 `;
 
 const ModalOverlay = styled.div`
   position: fixed;
   top: 0;
   left: 0;
-  right: 0;
-  bottom: 0;
-  background-color: rgba(0,0,0,0.4);
+  width: 100%;
+  height: 100%;
+  background: rgba(0, 0, 0, 0.4);
   display: flex;
-  justify-content: center;
   align-items: center;
+  justify-content: center;
+  z-index: 999;
 `;
 
 const ModalBox = styled.div`
   background: white;
   padding: 2rem;
-  border-radius: 18px;
-  width: 90%;
+  border-radius: 1rem;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.2);
   max-width: 400px;
-  text-align: center;
+  width: 90%;
+`;
+
+const Actions = styled.div`
+  display: flex;
+  justify-content: flex-end;
+  gap: 1rem;
+  margin-top: 1rem;
+`;
+
+const ConfirmButton = styled.button`
+  background-color: #2563eb;
+  color: white;
+  padding: 0.5rem 1.5rem;
+  border-radius: 0.5rem;
+  font-weight: 600;
+  border: none;
+  cursor: pointer;
+  transition: background-color 0.3s ease;
+
+  &:hover {
+    background-color: #1e40af;
+  }
+`;
+
+const CancelButton = styled.button`
+  background-color: #bbbbbb;
+  color: white;
+  padding: 0.5rem 1.5rem;
+  border-radius: 0.5rem;
+  font-weight: 600;
+  border: none;
+  cursor: pointer;
+  transition: background-color 0.3s ease;
+
+  &:hover {
+    background-color: #a0a0a0;
+  }
 `;

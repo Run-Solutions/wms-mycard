@@ -95,7 +95,7 @@ export default function ColorEdgeComponentCQM({ workOrder }: Props) {
           </Table>
           <InputGroup style={{ marginTop: '-7rem'}}>
               <Label>Color Edge:</Label>
-              <Input type="number" value={workOrder?.answers[index].color_edge ?? 'No se reconoce la muestra enviada' } readOnly />
+              <Input type="text" value={workOrder?.answers?.[index].color_edge ?? 'No se reconoce la muestra enviada' } readOnly />
           </InputGroup>
           <InputGroup style={{ marginTop: '-7rem'}}>
               <Label>Muestras entregadas:</Label>

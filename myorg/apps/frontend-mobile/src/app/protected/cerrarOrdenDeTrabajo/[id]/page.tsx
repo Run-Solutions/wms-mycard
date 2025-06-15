@@ -123,18 +123,8 @@ const CerrarOrdenDeTrabajoAuxScreen: React.FC = () => {
     };
   }) || [];
 
-  const totals = areas.reduce(
-    (acc: AreaTotals, area: any): AreaTotals => {
-      acc.buenas += Number(area.buenas) || 0;
-      acc.malas += Number(area.malas) || 0;
-      acc.excedente += Number(area.excedente) || 0;
-      acc.cqm += Number(area.cqm) || 0;
-      acc.muestras += Number(area.muestras) || 0;
-      return acc;
-    },
-    { buenas: 0, malas: 0, excedente: 0, cqm: 0, muestras: 0 }
-  );
-
+  const cantidadHojasRaw = Number(workOrder?.quantity) / 24;
+  const cantidadHojas = cantidadHojasRaw > 0 ? Math.ceil(cantidadHojasRaw) : 0;
 
   const handleCloseOrder = async () => {
     try {
@@ -165,8 +155,11 @@ const CerrarOrdenDeTrabajoAuxScreen: React.FC = () => {
         <Text style={styles.label}>Presupuesto:</Text>
         <Text style={styles.value}>{workOrder?.mycard_id}</Text>
 
-        <Text style={styles.label}>Cantidad:</Text>
+        <Text style={styles.label}>Cantidad (TARJETAS): </Text>
         <Text style={styles.value}>{workOrder?.quantity}</Text>
+
+        <Text style={styles.label}>Cantidad (HOJAS): </Text>
+        <Text style={styles.value}>{cantidadHojas}</Text>
 
         <Text style={styles.label}>Comentarios:</Text>
         <Text style={styles.value}>{workOrder?.comments}</Text>

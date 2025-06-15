@@ -183,7 +183,6 @@ const EmpalmeComponent = ({ workOrder }: { workOrder: any }) => {
       <Text style={styles.label}>Muestras entregadas:</Text>
       <TextInput
         style={styles.input}
-        keyboardType="numeric"
         value={
           typeof workOrder?.answers?.[index]?.sample_quantity === 'number'
           ? workOrder.answers[index].sample_quantity.toString()
@@ -238,7 +237,6 @@ const EmpalmeComponent = ({ workOrder }: { workOrder: any }) => {
       <Text style={styles.label}>Validar Inlays Vs Ot (Anotarlo):</Text>
       <TextInput
         style={styles.input}
-        keyboardType="numeric"
         placeholder="Ej: 2"
         value={validarInLays}
         onChangeText={setValidarInlays}
@@ -275,7 +273,6 @@ const EmpalmeComponent = ({ workOrder }: { workOrder: any }) => {
       <Text style={styles.label}>Color:</Text>
       <TextInput
         style={styles.input}
-        keyboardType="numeric"
         placeholder="Ej: Blanco"
         value={color}
         onChangeText={setColor}
@@ -283,7 +280,6 @@ const EmpalmeComponent = ({ workOrder }: { workOrder: any }) => {
       <Text style={styles.label}>Tipo de Holografico:</Text>
       <TextInput
         style={styles.input}
-        keyboardType="numeric"
         placeholder=""
         value={holographicType}
         onChangeText={setHolographicType}

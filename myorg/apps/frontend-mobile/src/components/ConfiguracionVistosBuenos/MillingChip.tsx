@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { View, Text, TextInput, Button, Modal, StyleSheet, Alert, ScrollView } from 'react-native';
+import { View, Text, TextInput, Button, Modal, StyleSheet, Alert, ScrollView, Pressable } from 'react-native';
 import QuestionTable from './QuestionTable';
 import { deleteFormQuestion, updateFormQuestion } from '../../api/configVistosBuenos';
 
@@ -27,7 +27,7 @@ export default function MillingChipComponent({ formQuestion }: Props) {
       return;
     }
 
-    const updatedQuestions = formQuestions.map(q => 
+    const updatedQuestions = formQuestions.map(q =>
       q.id === id ? { ...q, title: updatedTitle } : q
     );
     setFormQuestions(updatedQuestions);
@@ -44,8 +44,8 @@ export default function MillingChipComponent({ formQuestion }: Props) {
     try {
       const res = await deleteFormQuestion(id);
       if (res) {
-      setFormQuestions(formQuestions.filter(q => q.id !== id));
-      setDeletingId(null);
+        setFormQuestions(formQuestions.filter(q => q.id !== id));
+        setDeletingId(null);
       }
     } catch (error) {
       console.error("Error eliminando la pregunta:", error);
@@ -89,36 +89,38 @@ export default function MillingChipComponent({ formQuestion }: Props) {
       <Text style={styles.label}>Altura Chip Centro</Text>
       <TextInput style={styles.input} editable={false} />
 
-      {/* Modales */}
-      <Modal visible={editingId !== null} transparent animationType="slide">
+      {/* Edit Modal */}
+      <Modal visible={editingId !== null} transparent animationType="fade">
         <View style={styles.modalOverlay}>
-          <View style={styles.modalContent}>
+          <View style={styles.modalBox}>
             <Text style={styles.modalTitle}>Editar Pregunta</Text>
             <TextInput
-              style={styles.input}
               value={newTitle}
               onChangeText={setNewTitle}
+              style={styles.input}
+              placeholder="Nuevo título"
             />
             <View style={styles.modalButtons}>
-              <Button title="Cancelar" onPress={() => setEditingId(null)} />
-              <Button title="Guardar" onPress={() => handleUpdateTitle(editingId!, newTitle)} />
+              <Pressable onPress={() => setEditingId(null)} style={styles.cancelButton}><Text>Cancelar</Text></Pressable>
+              <Pressable onPress={() => handleUpdateTitle(editingId!, newTitle)} style={styles.saveButton}><Text>Guardar</Text></Pressable>
             </View>
           </View>
         </View>
       </Modal>
 
-      <Modal visible={deletingId !== null} transparent animationType="slide">
+      {/* Delete Modal */}
+      <Modal visible={deletingId !== null} transparent animationType="fade">
         <View style={styles.modalOverlay}>
-          <View style={styles.modalContent}>
+          <View style={styles.modalBox}>
             <Text style={styles.modalTitle}>¿Eliminar esta pregunta?</Text>
             <Text>Esta acción no se puede deshacer.</Text>
             <View style={styles.modalButtons}>
-              <Button title="Cancelar" onPress={() => setDeletingId(null)} />
-              <Button title="Eliminar" color="#D9534F" onPress={() => handleDeleteQuestion(deletingId!)} />
+              <Pressable onPress={() => setDeletingId(null)} style={styles.cancelButton}><Text>Cancelar</Text></Pressable>
+              <Pressable onPress={() => handleDeleteQuestion(deletingId!)} style={styles.deleteButton}><Text>Eliminar</Text></Pressable>
             </View>
           </View>
         </View>
-      </Modal>
+      </Modal>  
     </ScrollView>
   );
 }
@@ -171,12 +173,6 @@ const styles = StyleSheet.create({
     fontSize: 18,
     marginHorizontal: 6,
   },
-  modalOverlay: {
-    flex: 1,
-    backgroundColor: '#000000aa',
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
   modalContent: {
     backgroundColor: 'white',
     padding: 20,
@@ -190,7 +186,35 @@ const styles = StyleSheet.create({
   },
   modalButtons: {
     flexDirection: 'row',
-    justifyContent: 'space-between',
+    justifyContent: 'space-around',
     marginTop: 16,
+  },
+  cancelButton: {
+    padding: 10,
+    backgroundColor: '#BBBBBB',
+    borderRadius: 6,
+  },
+  saveButton: {
+    padding: 10,
+    backgroundColor: '#0070f3',
+    borderRadius: 6,
+  },
+  deleteButton: {
+    padding: 10,
+    backgroundColor: '#D9534F',
+    borderRadius: 6,
+  },
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: '#00000077',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  modalBox: {
+    width: '80%',
+    backgroundColor: '#FFF',
+    padding: 20,
+    borderRadius: 12,
+    elevation: 10,
   },
 });

@@ -304,8 +304,7 @@ const ColorEdgeComponent = ({ workOrder }: { workOrder: any }) => {
           <Text style={styles.label}>Color Edge:</Text>
           <TextInput
             style={styles.input}
-            keyboardType="numeric"
-            placeholder="Ej: 2"
+            placeholder="Ej: Bueno"
             value={colorEdge}
             onChangeText={setColorEdge}
           />

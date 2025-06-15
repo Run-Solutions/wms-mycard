@@ -160,7 +160,6 @@ const LaminacionComponent = ({ workOrder }: { workOrder: any }) => {
       <Text style={styles.label}>Validar Acabado Vs Orden De Trabajo:</Text>
       <TextInput
         style={styles.input}
-        keyboardType="numeric"
         value={workOrder?.answers[index].finish_validation ?? 'No se reconoce la muestra enviada' }
         editable={false}
       />
@@ -168,7 +167,6 @@ const LaminacionComponent = ({ workOrder }: { workOrder: any }) => {
       <Text style={styles.label}>Muestras entregadas:</Text>
       <TextInput
         style={styles.input}
-        keyboardType="numeric"
         value={
           typeof workOrder?.answers?.[index]?.sample_quantity === 'number'
           ? workOrder.answers[index].sample_quantity.toString()

@@ -296,12 +296,13 @@ const PersonalizacionComponent = ({ workOrder }: { workOrder: any }) => {
           {/* Tabs */}
 
           <View style={styles.tabs}>
-            <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ gap: 8}}>
+            <ScrollView horizontal showsHorizontalScrollIndicator={false} >
               {['etiquetadora', 'persos', 'laser', 'packsmart', 'otto', 'embolsadora'].map((opt) => (
                 <TouchableOpacity
                   key={opt}
                   style={[
                     styles.tab,
+                    {marginRight: 10},
                     selectedOption === opt && styles.tabSelected
                   ]}
                   onPress={() => setSelectedOption(opt)}

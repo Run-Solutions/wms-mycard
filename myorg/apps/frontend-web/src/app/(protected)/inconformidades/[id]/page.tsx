@@ -50,8 +50,7 @@ export default function InconformidadesAuxPage({ params }: Props) {
 
   useEffect(() => {
     async function fetchWorkOrder() {
-      const res = await getWorkOrderInconformidadById(id);
-      const data = await res.json()
+      const data = await getWorkOrderInconformidadById(id);
       console.log('Orden:', data)
       setWorkOrder(data)
     }

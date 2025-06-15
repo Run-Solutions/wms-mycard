@@ -157,21 +157,18 @@ const MillingChipComponent = ({ workOrder }: { workOrder: any }) => {
       <Text style={styles.label}>Revisar Tecnología De Chip y Color Vs Ot:</Text>
       <TextInput
         style={styles.input}
-        keyboardType="numeric"
         value={workOrder?.answers[index].revisar_tecnologia ?? 'No se reconoce la muestra enviada' }
         editable={false}
       />
       <Text style={styles.label}>Validar y Anotar KCV (Intercambio De Llaves), Carga De Aplicación o Prehabilitación (Si Aplica):</Text>
       <TextInput
         style={styles.input}
-        keyboardType="numeric"
         value={workOrder?.answers[index].validar_kvc ?? 'No se reconoce la muestra enviada' }
         editable={false}
       />
       <Text style={styles.label}>Muestras entregadas:</Text>
       <TextInput
         style={styles.input}
-        keyboardType="numeric"
         value={
           typeof workOrder?.answers?.[index]?.sample_quantity === 'number'
           ? workOrder.answers[index].sample_quantity.toString()
@@ -224,7 +221,6 @@ const MillingChipComponent = ({ workOrder }: { workOrder: any }) => {
       <Text style={styles.label}>Localización De Contactos:</Text>
         <TextInput
           style={styles.input}
-          keyboardType="numeric"
           placeholder="Ej: 2"
           value={localizacionContactos}
           onChangeText={setLocalizacionContactos}
@@ -232,7 +228,6 @@ const MillingChipComponent = ({ workOrder }: { workOrder: any }) => {
       <Text style={styles.label}>Altura Chip Centro:</Text>
         <TextInput
           style={styles.input}
-          keyboardType="numeric"
           placeholder="Ej: 2"
           value={alturaChip}
           onChangeText={setAlturaChip}

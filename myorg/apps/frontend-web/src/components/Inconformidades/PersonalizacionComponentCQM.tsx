@@ -25,8 +25,8 @@ export default function PersonalizacionComponentCQM({ workOrder }: Props) {
 
   // Para obtener el ultimo FormAnswer 
   const index = workOrder?.answers
-  ?.map((a: Answer, i: number) => ({ ...a, index: i }))
-  .reverse().find((a: Answer) => a.reviewed === false)?.index;
+    ?.map((a: Answer, i: number) => ({ ...a, index: i }))
+    .reverse().find((a: Answer) => a.reviewed === false)?.index;
   console.log('el index', index);
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -42,157 +42,283 @@ export default function PersonalizacionComponentCQM({ workOrder }: Props) {
     }
   }
 
-  const lastIndex = workOrder.answers[index].inconformities.length > 1 
-  ? workOrder.answers[index].inconformities.length - 1 
-  : 0;
+  const lastIndex = workOrder.answers[index].inconformities.length > 1
+    ? workOrder.answers[index].inconformities.length - 1
+    : 0;
 
   return (
     <>
-    <FlexContainer>
-    <Container>
-      <NewData>
-        <SectionTitle>Entregaste:</SectionTitle>
-        <NewDataWrapper>
-        <InputGroup style={{ marginBottom: '10px', width: '70%'}}>
-            <Label>Tipo de Personalizacion:</Label>
-            <Input type="text" value={workOrder?.answers[index].tipo_personalizacion ?? 'No se reconoce la muestra enviada' } readOnly />
-        </InputGroup>
-        {workOrder?.answers[index].tipo_personalizacion === 'etiquetadora' && (
-          <>
-            <Table>
-              <thead>
-                <tr>
-                  <th>Pregunta</th>
-                  <th>Respuesta</th>
-                </tr>
-              </thead>
-              <tbody>
-                {workOrder.area.formQuestions.slice(0, 1)
-                .map((question: { id: number; title: string }) => {
-                  // Buscar la respuesta correspondiente a esta pregunta
-                  const answer = workOrder.answers[index]?.FormAnswerResponse?.find(
-                    (resp: any) => resp.question_id === question.id
-                  );
-                  
-                // Obtener la respuesta del operador (response_operator)
-                const operatorResponse = answer?.response_operator;
-                  return(
-                  <tr key={question.id}>
-                    <td>{question.title}</td>
-                    <td>
-                    {typeof operatorResponse === 'boolean' ? (
-                      <input 
-                        type="checkbox" 
-                        checked={operatorResponse} 
-                        disabled 
-                      />
-                    ) : (
-                      <span>{operatorResponse !== undefined && operatorResponse !== null 
-                        ? operatorResponse.toString() 
-                        : ''}</span>
-                    )}
-                  </td>
-                </tr>
-                );
-              })}
-              </tbody>
-            </Table>
-            <InputGroup style={{ marginTop: '10px', width: '70%'}}>
-              <Label>Verificar Tipo De Etiqueta Vs Ot Y Pegar Utilizada:</Label>
-              <Input type="text" value={workOrder?.answers[index].verificar_etiqueta ?? 'No se reconoce la muestra enviada' } readOnly />
-              <Label>Muestras entregadas:</Label>
-              <Input type="number" value={workOrder?.answers[index].sample_quantity ?? 'No se reconoce la muestra enviada' } readOnly />
+      <FlexContainer>
+        <Container>
+          <NewData>
+            <SectionTitle>Entregaste:</SectionTitle>
+            <NewDataWrapper>
+              <InputGroup style={{ marginBottom: '10px', width: '70%' }}>
+                <Label>Tipo de Personalizacion:</Label>
+                <Input type="text" value={workOrder?.answers[index].tipo_personalizacion ?? 'No se reconoce la muestra enviada'} readOnly />
+              </InputGroup>
+              {workOrder?.answers[index].tipo_personalizacion === 'etiquetadora' && (
+                <>
+                  <Table>
+                    <thead>
+                      <tr>
+                        <th>Pregunta</th>
+                        <th>Respuesta</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {workOrder.area.formQuestions.slice(0, 1)
+                        .map((question: { id: number; title: string }) => {
+                          // Buscar la respuesta correspondiente a esta pregunta
+                          const answer = workOrder.answers[index]?.FormAnswerResponse?.find(
+                            (resp: any) => resp.question_id === question.id
+                          );
+
+                          // Obtener la respuesta del operador (response_operator)
+                          const operatorResponse = answer?.response_operator;
+                          return (
+                            <tr key={question.id}>
+                              <td>{question.title}</td>
+                              <td>
+                                {typeof operatorResponse === 'boolean' ? (
+                                  <input
+                                    type="checkbox"
+                                    checked={operatorResponse}
+                                    disabled
+                                  />
+                                ) : (
+                                  <span>{operatorResponse !== undefined && operatorResponse !== null
+                                    ? operatorResponse.toString()
+                                    : ''}</span>
+                                )}
+                              </td>
+                            </tr>
+                          );
+                        })}
+                    </tbody>
+                  </Table>
+                  <InputGroup style={{ marginTop: '10px', width: '70%' }}>
+                    <Label>Verificar Tipo De Etiqueta Vs Ot Y Pegar Utilizada:</Label>
+                    <Input type="text" value={workOrder?.answers[index].verificar_etiqueta ?? 'No se reconoce la muestra enviada'} readOnly />
+                    <Label>Muestras entregadas:</Label>
+                    <Input type="number" value={workOrder?.answers[index].sample_quantity ?? 'No se reconoce la muestra enviada'} readOnly />
+                  </InputGroup>
+                </>
+              )}
+              {workOrder?.answers[index].tipo_personalizacion === 'persos' && (
+                <>
+                  <Table>
+                    <thead>
+                      <tr>
+                        <th>Pregunta</th>
+                        <th>Respuesta</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {workOrder.area.formQuestions.slice(1, 10)
+                        .map((question: { id: number; title: string }) => {
+                          // Buscar la respuesta correspondiente a esta pregunta
+                          const answer = workOrder.answers[index]?.FormAnswerResponse?.find(
+                            (resp: any) => resp.question_id === question.id
+                          );
+
+                          // Obtener la respuesta del operador (response_operator)
+                          const operatorResponse = answer?.response_operator;
+                          return (
+                            <tr key={question.id}>
+                              <td>{question.title}</td>
+                              <td>
+                                {typeof operatorResponse === 'boolean' ? (
+                                  <input
+                                    type="checkbox"
+                                    checked={operatorResponse}
+                                    disabled
+                                  />
+                                ) : (
+                                  <span>{operatorResponse !== undefined && operatorResponse !== null
+                                    ? operatorResponse.toString()
+                                    : ''}</span>
+                                )}
+                              </td>
+                            </tr>
+                          );
+                        })}
+                    </tbody>
+                  </Table>
+                  <InputGroup style={{ paddingTop: '10px', width: '70%' }}>
+                    <Label>Color De Personalización:</Label>
+                    <Input type="text" value={workOrder?.answers[index].color_personalizacion ?? 'No se reconoce la muestra enviada'} readOnly />
+                    <Label>Tipo de Código de Barras Que Se Personaliza:</Label>
+                    <Input type="text" value={workOrder?.answers[index].codigo_barras ?? 'No se reconoce la muestra enviada'} readOnly />
+                    <Label>Muestras entregadas:</Label>
+                    <Input type="number" value={workOrder?.answers[index].sample_quantity ?? 'No se reconoce la muestra enviada'} readOnly />
+                  </InputGroup>
+                </>
+              )}
+              {workOrder?.answers[index].tipo_personalizacion === 'laser' && (
+                <>
+                  <InputGroup style={{ width: '70%' }}>
+                    <Label>Muestras entregadas:</Label>
+                    <Input type="number" value={workOrder?.answers[index].sample_quantity ?? 'No se reconoce la muestra enviada'} readOnly />
+                  </InputGroup>
+                </>
+              )}
+              {workOrder?.answers[index].tipo_personalizacion === 'packsmart' && (
+                <>
+                  <Table>
+                    <thead>
+                      <tr>
+                        <th>Pregunta</th>
+                        <th>Respuesta</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {workOrder.area.formQuestions.slice(14, 20)
+                        .map((question: { id: number; title: string }) => {
+                          // Buscar la respuesta correspondiente a esta pregunta
+                          const answer = workOrder.answers[index]?.FormAnswerResponse?.find(
+                            (resp: any) => resp.question_id === question.id
+                          );
+
+                          // Obtener la respuesta del operador (response_operator)
+                          const operatorResponse = answer?.response_operator;
+                          return (
+                            <tr key={question.id}>
+                              <td>{question.title}</td>
+                              <td>
+                                {typeof operatorResponse === 'boolean' ? (
+                                  <input
+                                    type="checkbox"
+                                    checked={operatorResponse}
+                                    disabled
+                                  />
+                                ) : (
+                                  <span>{operatorResponse !== undefined && operatorResponse !== null
+                                    ? operatorResponse.toString()
+                                    : ''}</span>
+                                )}
+                              </td>
+                            </tr>
+                          );
+                        })}
+                    </tbody>
+                  </Table>
+                </>
+              )}
+              {workOrder?.answers[index].tipo_personalizacion === 'otto' && (
+                <>
+                  <Table>
+                    <thead>
+                      <tr>
+                        <th>Pregunta</th>
+                        <th>Respuesta</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {workOrder.area.formQuestions.slice(20, 28)
+                        .map((question: { id: number; title: string }) => {
+                          // Buscar la respuesta correspondiente a esta pregunta
+                          const answer = workOrder.answers[index]?.FormAnswerResponse?.find(
+                            (resp: any) => resp.question_id === question.id
+                          );
+
+                          // Obtener la respuesta del operador (response_operator)
+                          const operatorResponse = answer?.response_operator;
+                          return (
+                            <tr key={question.id}>
+                              <td>{question.title}</td>
+                              <td>
+                                {typeof operatorResponse === 'boolean' ? (
+                                  <input
+                                    type="checkbox"
+                                    checked={operatorResponse}
+                                    disabled
+                                  />
+                                ) : (
+                                  <span>{operatorResponse !== undefined && operatorResponse !== null
+                                    ? operatorResponse.toString()
+                                    : ''}</span>
+                                )}
+                              </td>
+                            </tr>
+                          );
+                        })}
+                    </tbody>
+                  </Table>
+                </>
+              )}
+              {workOrder?.answers[index].tipo_personalizacion === 'embolsadora' && (
+                <>
+                  <Table>
+                    <thead>
+                      <tr>
+                        <th>Pregunta</th>
+                        <th>Respuesta</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {workOrder.area.formQuestions.slice(28, 30)
+                        .map((question: { id: number; title: string }) => {
+                          // Buscar la respuesta correspondiente a esta pregunta
+                          const answer = workOrder.answers[index]?.FormAnswerResponse?.find(
+                            (resp: any) => resp.question_id === question.id
+                          );
+
+                          // Obtener la respuesta del operador (response_operator)
+                          const operatorResponse = answer?.response_operator;
+                          return (
+                            <tr key={question.id}>
+                              <td>{question.title}</td>
+                              <td>
+                                {typeof operatorResponse === 'boolean' ? (
+                                  <input
+                                    type="checkbox"
+                                    checked={operatorResponse}
+                                    disabled
+                                  />
+                                ) : (
+                                  <span>{operatorResponse !== undefined && operatorResponse !== null
+                                    ? operatorResponse.toString()
+                                    : ''}</span>
+                                )}
+                              </td>
+                            </tr>
+                          );
+                        })}
+                    </tbody>
+                  </Table>
+                </>
+              )}
+            </NewDataWrapper>
+          </NewData>
+        </Container>
+        <Container>
+          <NewData>
+            <SectionTitle>Inconformidad:</SectionTitle>
+            <InputGroup>
+              <Label>Respuesta de Usuario</Label>
+              <Input type="text" value={workOrder.answers[index].inconformities[lastIndex].user.username} disabled />
             </InputGroup>
-          </>
-        )}
-        {workOrder?.answers[index].tipo_personalizacion === 'persos' && (
-          <>
-            <Table>
-              <thead>
-                <tr>
-                  <th>Pregunta</th>
-                  <th>Respuesta</th>
-                </tr>
-              </thead>
-              <tbody>
-                {workOrder.area.formQuestions.slice(1, 10)
-                .map((question: { id: number; title: string }) => {
-                  // Buscar la respuesta correspondiente a esta pregunta
-                  const answer = workOrder.answers[index]?.FormAnswerResponse?.find(
-                    (resp: any) => resp.question_id === question.id
-                  );
-                  
-                  // Obtener la respuesta del operador (response_operator)
-                  const operatorResponse = answer?.response_operator;
-                  return(
-                  <tr key={question.id}>
-                    <td>{question.title}</td>
-                    <td>
-                    {typeof operatorResponse === 'boolean' ? (
-                        <input 
-                          type="checkbox" 
-                          checked={operatorResponse} 
-                          disabled 
-                        />
-                      ) : (
-                        <span>{operatorResponse !== undefined && operatorResponse !== null 
-                          ? operatorResponse.toString() 
-                          : ''}</span>
-                      )}
-                    </td>
-                  </tr>
-                  );
-                })}
-              </tbody>
-            </Table>
-            <InputGroup style={{ paddingTop: '10px', width: '70%'}}>
-              <Label>Color De Personalización:</Label>
-              <Input type="text" value={workOrder?.answers[index].color_personalizacion ?? 'No se reconoce la muestra enviada' } readOnly />
-              <Label>Tipo de Código de Barras Que Se Personaliza:</Label>
-              <Input type="text" value={workOrder?.answers[index].codigo_barras ?? 'No se reconoce la muestra enviada' } readOnly />
-              <Label>Muestras entregadas:</Label>
-              <Input type="number" value={workOrder?.answers[index].sample_quantity ?? 'No se reconoce la muestra enviada' } readOnly />
+            <InputGroup>
+              <Label>Comentarios</Label>
+              <Textarea value={workOrder.answers[index].inconformities[lastIndex].comments} disabled />
             </InputGroup>
-          </>
-        )}
-        {workOrder?.answers[index].tipo_personalizacion === 'laser' && (
-          <>
-            <InputGroup style={{width: '70%'}}>
-              <Label>Muestras entregadas:</Label>
-              <Input type="number" value={workOrder?.answers[index].sample_quantity ?? 'No se reconoce la muestra enviada' } readOnly />
-            </InputGroup>
-          </>
-        )}
-        </NewDataWrapper>
-      </NewData>
-    </Container>
-    <Container>
-      <NewData>
-        <SectionTitle>Inconformidad:</SectionTitle>
-        <InputGroup>
-          <Label>Respuesta de Usuario</Label>
-          <Input type="text" value={workOrder.answers[index].inconformities[lastIndex].user.username} disabled/>
-        </InputGroup>
-        <InputGroup>
-          <Label>Comentarios</Label>
-          <Textarea value={workOrder.answers[index].inconformities[lastIndex].comments} disabled/>
-        </InputGroup>
-      </NewData>
-    </Container>
-    </FlexContainer>
-    <CloseButton onClick={openModal}>Aceptar Inconformidad</CloseButton>
-    {showModal && (
-      <ModalOverlay>
-        <ModalBox>
-          <h4>¿Estás segura/o que deseas aceptar la inconformidad? Deberás liberar nuevamente</h4>
-          <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '1rem', marginTop: '1rem' }}>
-            <CancelButton onClick={closeModal}>Cancelar</CancelButton>
-            <ConfirmButton onClick={handleSubmit}>Confirmar</ConfirmButton>
-          </div>
-        </ModalBox>
-      </ModalOverlay>
-    )}
-  </>
+          </NewData>
+        </Container>
+      </FlexContainer>
+      <CloseButton onClick={openModal}>Aceptar Inconformidad</CloseButton>
+      {showModal && (
+        <ModalOverlay>
+          <ModalBox>
+            <h4>¿Estás segura/o que deseas aceptar la inconformidad? Deberás liberar nuevamente</h4>
+            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '1rem', marginTop: '1rem' }}>
+              <CancelButton onClick={closeModal}>Cancelar</CancelButton>
+              <ConfirmButton onClick={handleSubmit}>Confirmar</ConfirmButton>
+            </div>
+          </ModalBox>
+        </ModalOverlay>
+      )}
+    </>
   );
 }
 

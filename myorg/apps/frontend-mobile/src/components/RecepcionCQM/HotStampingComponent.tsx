@@ -154,28 +154,24 @@ const HotStampingComponent = ({ workOrder }: { workOrder: any }) => {
       <Text style={styles.label}>Color Foil:</Text>
       <TextInput
         style={styles.input}
-        keyboardType="numeric"
         value={workOrder?.answers[index].color_foil ?? 'No se reconoce la muestra enviada' }
         editable={false}
       />
       <Text style={styles.label}>Revisar Posición Vs Ot:</Text>
       <TextInput
         style={styles.input}
-        keyboardType="numeric"
         value={workOrder?.answers[index].revisar_posicion ?? 'No se reconoce la muestra enviada' }
         editable={false}
       />
       <Text style={styles.label}>Imagen de Holograma Vs Ot:</Text>
       <TextInput
         style={styles.input}
-        keyboardType="numeric"
         value={workOrder?.answers[index].imagen_holograma ?? 'No se reconoce la muestra enviada' }
         editable={false}
       />
       <Text style={styles.label}>Muestras entregadas:</Text>
       <TextInput
         style={styles.input}
-        keyboardType="numeric"
         value={
           typeof workOrder?.answers?.[index]?.sample_quantity === 'number'
           ? workOrder.answers[index].sample_quantity.toString()

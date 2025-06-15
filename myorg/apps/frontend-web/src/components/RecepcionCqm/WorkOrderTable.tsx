@@ -3,7 +3,7 @@
 import React, { useState } from "react";
 import { useRouter } from "next/navigation";
 import styled, { useTheme } from 'styled-components';
-import { Box, Table, TableBody, TableCell, TableContainer, TableHead, TableRow, Paper, Typography, IconButton } from "@mui/material";
+import { Box, Table, TableBody, TableCell, TableContainer, TableHead, TableRow, Paper, Typography, IconButton, TextField } from "@mui/material";
 import KeyboardArrowDownIcon from '@mui/icons-material/KeyboardArrowDown';
 import KeyboardArrowUpIcon from '@mui/icons-material/KeyboardArrowUp';
 import { getFileByName } from "@/api/seguimientoDeOts";
@@ -40,11 +40,13 @@ interface Props {
 }
 
 const WorkOrderTable: React.FC<Props> = ({ orders, title, statusFilter}) => {
+  const [searchValue, setSearchValue] = useState("");
+  
   const [expanded, setExpanded] = useState(false);
   const router = useRouter();
   const validOrders = Array.isArray(orders) ? orders : [];
   const filteredOrders = validOrders.filter(order =>
-      order.flow.some(flow => flow.status.toLowerCase().includes(statusFilter.toLowerCase()))
+      order.flow.some(flow => flow.status.toLowerCase().includes(statusFilter.toLowerCase())) && order.ot_id.toLowerCase().includes(searchValue.toLowerCase())
   );
 
   validOrders.forEach(order => {
@@ -54,7 +56,10 @@ const WorkOrderTable: React.FC<Props> = ({ orders, title, statusFilter}) => {
   });
 
   const displayedOrders = expanded ? filteredOrders : filteredOrders.slice(0, 2);
-
+  
+  const handleSearchChange = (event: React.ChangeEvent<HTMLInputElement>) => {
+    setSearchValue(event.target.value);
+  };
   const downloadFile = async (filename: string) => {
     try {
       const arrayBuffer = await getFileByName(filename);
@@ -69,6 +74,8 @@ const WorkOrderTable: React.FC<Props> = ({ orders, title, statusFilter}) => {
   return (
     <TableContainer component={Paper} sx={{ backgroundColor: 'white', padding: '2rem', mt: 4, borderRadius: '1rem', boxShadow: '0 4px 12px rgba(0,0,0,0.1)', maxWidth: '100%', minWidth: '800px', marginX: 'auto' }}>
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '10px'}}>
+        <TextField label="Buscar OT" variant="outlined" size="small" value={searchValue} onChange={handleSearchChange} sx={{ '& label': { color: 'black' }, '& .MuiOutlinedInput-root': { '& fieldset': { borderColor: 'black' }, '&:hover fieldset': { borderColor: 'black' }, '&.Mui-focused fieldset': { borderColor: 'black' }, color: 'black', }, }} />
+        
         <Typography variant='h6' component='div' sx={{ p: 2, color: 'black' }}>{title}</Typography>
         <Box display="flex" gap={2} flexWrap="wrap"  sx={{  }}>
           <Box display="flex" alignItems="center" gap={1}>

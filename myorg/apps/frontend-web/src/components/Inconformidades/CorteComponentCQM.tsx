@@ -70,7 +70,6 @@ export default function CorteComponentCQM({ workOrder }: Props) {
                 
                 // Obtener la respuesta del operador (response_operator)
                 const operatorResponse = answer?.response_operator;
-
                 return (
                   <tr key={question.id}>
                     <td>{question.title}</td>

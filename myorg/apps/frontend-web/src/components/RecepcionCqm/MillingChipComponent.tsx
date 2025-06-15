@@ -211,7 +211,7 @@ export default function MillingChipComponent({ workOrder }: Props) {
         
       </NewData>
       <div style={{ display: 'flex', gap: '1rem'}}>
-      <RechazarButton>Rechazar</RechazarButton>
+      <RechazarButton onClick={() => setShowInconformidad(true)}>Rechazar</RechazarButton>
       <AceptarButton onClick={() => setShowConfirmModal(true)}>Aprobado</AceptarButton>
       </div>
       {showConfirmModal && (

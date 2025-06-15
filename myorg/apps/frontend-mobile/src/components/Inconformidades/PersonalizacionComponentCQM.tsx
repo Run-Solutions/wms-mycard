@@ -1,14 +1,28 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, TextInput, Button, Alert, Modal, TouchableOpacity, ScrollView, StyleSheet, Platform } from 'react-native';
+import {
+  View,
+  Text,
+  TextInput,
+  Button,
+  Alert,
+  Modal,
+  TouchableOpacity,
+  ScrollView,
+  StyleSheet,
+  Platform,
+} from 'react-native';
 import { acceptCQMInconformity } from '../../api/inconformidades';
 import { useNavigation } from '@react-navigation/native';
 
 const PersonalizacionComponentCQM = ({ workOrder }: { workOrder: any }) => {
   const navigation = useNavigation();
   const [showModal, setShowModal] = useState(false);
-  const questions = workOrder.area.formQuestions?.filter((q: any) => q.role_id === null) || [];
-  const [responses, setResponses] = useState<{ questionId: number; answer: boolean }[]>([]);
-
+  const questions =
+    workOrder.area.formQuestions?.filter((q: any) => q.role_id === null) || [];
+  const [responses, setResponses] = useState<
+    { questionId: number; answer: boolean }[]
+  >([]);
+  console.log(questions.length);
   const index = workOrder?.answers
     ?.map((a: any, i: number) => ({ ...a, index: i }))
     .reverse()
@@ -43,161 +57,350 @@ const PersonalizacionComponentCQM = ({ workOrder }: { workOrder: any }) => {
     setResponses(initial);
   }, [tipoPersonalizacion]);
 
-  let selectedQuestions : { id: number, role_id: number | null }[] = [];
+  let selectedQuestions: { id: number; role_id: number | null }[] = [];
 
-  if (tipoPersonalizacion === 'laser'){
+  if (tipoPersonalizacion === 'laser') {
     selectedQuestions = workOrder.area.formQuestions.slice(9, 13);
-  } else if (tipoPersonalizacion === 'persos'){
+  } else if (tipoPersonalizacion === 'persos') {
     selectedQuestions = workOrder.area.formQuestions.slice(13, 17);
   }
 
   return (
     <View>
-      <ScrollView contentContainerStyle={[styles.container, { paddingBottom: 100 }]}>
+      <ScrollView
+        contentContainerStyle={[styles.container, { paddingBottom: 100 }]}
+      >
         <Text style={styles.sectionTitle}>Entregaste</Text>
         <Text style={styles.label}>Tipo de Personalizacion:</Text>
         <TextInput
           style={styles.inputDetail}
           keyboardType="numeric"
-          value={workOrder?.answers[index].tipo_personalizacion ?? 'No se reconoce la muestra enviada' }
+          value={
+            workOrder?.answers[index].tipo_personalizacion ??
+            'No se reconoce la muestra enviada'
+          }
           editable={false}
         />
 
-      {workOrder?.answers[index].tipo_personalizacion === 'laser' && (
-        <>
-          <Text style={styles.label}>Muestras entregadas:</Text>
-          <TextInput
-            style={styles.inputDetail}
-            keyboardType="numeric"
-            value={workOrder?.answers[index].sample_quantity !== null
-              ? String(workOrder?.answers[index].sample_quantity)
-              : 'No se reconoce la muestra enviada'
-            }
-            editable={false}
-          />
-        </>
-      )}
-      {workOrder?.answers[index].tipo_personalizacion === 'persos' && (
-        <>
-          {/* Encabezado estilo tabla */}
-      <View style={styles.tableHeader}>
-        <Text style={[styles.tableCell, { flex: 2 }]}>Pregunta</Text>
-        <Text style={styles.tableCell}>Respuesta</Text>
-      </View>
-
-      {/* Preguntas normales */}
-      {questions.slice(1, 10).map((q: any) => {
-        const responses = workOrder.answers[index]?.FormAnswerResponse?.find(
-          (resp: any) => resp.question_id === q.id
-        );
-        console.log(responses);
-        // Encuentra la respuesta del operador por pregunta_id
-        const operatorResponse = responses?.response_operator;
-
-        return (
-          <View key={q.id} style={styles.tableRow}>
-            {/* Pregunta */}
-            <View style={[styles.tableCell, { flex: 2 }]}>
-              <Text style={styles.questionText}>{q.title}</Text>
+        {workOrder?.answers[index].tipo_personalizacion === 'laser' && (
+          <>
+            <Text style={styles.label}>Muestras entregadas:</Text>
+            <TextInput
+              style={styles.inputDetail}
+              keyboardType="numeric"
+              value={
+                workOrder?.answers[index].sample_quantity !== null
+                  ? String(workOrder?.answers[index].sample_quantity)
+                  : 'No se reconoce la muestra enviada'
+              }
+              editable={false}
+            />
+          </>
+        )}
+        {workOrder?.answers[index].tipo_personalizacion === 'persos' && (
+          <>
+            {/* Encabezado estilo tabla */}
+            <View style={styles.tableHeader}>
+              <Text style={[styles.tableCell, { flex: 2 }]}>Pregunta</Text>
+              <Text style={styles.tableCell}>Respuesta</Text>
             </View>
 
-            {/* Respuesta */}
-            <View style={[styles.tableCell, { flex: 1, alignItems: 'center' }]}>
-              <View style={[styles.radioCircle, operatorResponse && styles.radioDisabled]}>
-                {operatorResponse && <View style={styles.radioDot} />}
-              </View>
+            {/* Preguntas normales */}
+            {questions.slice(1, 10).map((q: any) => {
+              const responses = workOrder.answers[
+                index
+              ]?.FormAnswerResponse?.find(
+                (resp: any) => resp.question_id === q.id
+              );
+              console.log(responses);
+              // Encuentra la respuesta del operador por pregunta_id
+              const operatorResponse = responses?.response_operator;
+
+              return (
+                <View key={q.id} style={styles.tableRow}>
+                  {/* Pregunta */}
+                  <View style={[styles.tableCell, { flex: 2 }]}>
+                    <Text style={styles.questionText}>{q.title}</Text>
+                  </View>
+
+                  {/* Respuesta */}
+                  <View
+                    style={[
+                      styles.tableCell,
+                      { flex: 1, alignItems: 'center' },
+                    ]}
+                  >
+                    <View
+                      style={[
+                        styles.radioCircle,
+                        operatorResponse && styles.radioDisabled,
+                      ]}
+                    >
+                      {operatorResponse && <View style={styles.radioDot} />}
+                    </View>
+                  </View>
+                </View>
+              );
+            })}
+            <Text style={styles.label}>Color De Personalización:</Text>
+            <TextInput
+              style={styles.input}
+              keyboardType="numeric"
+              value={
+                workOrder?.answers[index].color_personalizacion ??
+                'No se reconoce la muestra enviada'
+              }
+              editable={false}
+            />
+            <Text style={styles.label}>
+              Tipo de Código de Barras Que Se Personaliza:
+            </Text>
+            <TextInput
+              style={styles.input}
+              keyboardType="numeric"
+              value={
+                workOrder?.answers[index].codigo_barras ??
+                'No se reconoce la muestra enviada'
+              }
+              editable={false}
+            />
+            {/* Muestras */}
+            <Text style={styles.label}>Muestras entregadas:</Text>
+            <TextInput
+              style={styles.input}
+              keyboardType="numeric"
+              value={
+                typeof workOrder?.answers?.[index]?.sample_quantity === 'number'
+                  ? workOrder.answers[index].sample_quantity.toString()
+                  : ''
+              }
+              editable={false}
+            />
+          </>
+        )}
+
+        {workOrder?.answers[index].tipo_personalizacion === 'etiquetadora' && (
+          <>
+            {/* Encabezado estilo tabla */}
+            <View style={styles.tableHeader}>
+              <Text style={[styles.tableCell, { flex: 2 }]}>Pregunta</Text>
+              <Text style={styles.tableCell}>Respuesta</Text>
             </View>
-          </View>
-        );
-      })}
-      <Text style={styles.label}>Color De Personalización:</Text>
-      <TextInput
-        style={styles.input}
-        keyboardType="numeric"
-        value={workOrder?.answers[index].color_personalizacion ?? 'No se reconoce la muestra enviada' }
-        editable={false}
-      />
-      <Text style={styles.label}>Tipo de Código de Barras Que Se Personaliza:</Text>
-      <TextInput
-        style={styles.input}
-        keyboardType="numeric"
-        value={workOrder?.answers[index].codigo_barras ?? 'No se reconoce la muestra enviada' }
-        editable={false}
-      />
-      {/* Muestras */}
-      <Text style={styles.label}>Muestras entregadas:</Text>
-      <TextInput
-        style={styles.input}
-        keyboardType="numeric"
-        value={
-          typeof workOrder?.answers?.[index]?.sample_quantity === 'number'
-          ? workOrder.answers[index].sample_quantity.toString()
-          : ''
-        }
-        editable={false}
-      />
-        </>
-      )}
 
-      {workOrder?.answers[index].tipo_personalizacion === 'etiquetadora' && (
-        <>
-        {/* Encabezado estilo tabla */}
-      <View style={styles.tableHeader}>
-        <Text style={[styles.tableCell, { flex: 2 }]}>Pregunta</Text>
-        <Text style={styles.tableCell}>Respuesta</Text>
-      </View>
+            {/* Preguntas normales */}
+            {questions.slice(0, 1).map((q: any) => {
+              const responses = workOrder.answers[
+                index
+              ]?.FormAnswerResponse?.find(
+                (resp: any) => resp.question_id === q.id
+              );
+              console.log(responses);
+              // Encuentra la respuesta del operador por pregunta_id
+              const operatorResponse = responses?.response_operator;
 
-      {/* Preguntas normales */}
-      {questions.slice(0, 1).map((q: any) => {
-        const responses = workOrder.answers[index]?.FormAnswerResponse?.find(
-          (resp: any) => resp.question_id === q.id
-        );
-        console.log(responses);
-        // Encuentra la respuesta del operador por pregunta_id
-        const operatorResponse = responses?.response_operator;
+              return (
+                <View key={q.id} style={styles.tableRow}>
+                  {/* Pregunta */}
+                  <View style={[styles.tableCell, { flex: 2 }]}>
+                    <Text style={styles.questionText}>{q.title}</Text>
+                  </View>
 
-        return (
-          <View key={q.id} style={styles.tableRow}>
-            {/* Pregunta */}
-            <View style={[styles.tableCell, { flex: 2 }]}>
-              <Text style={styles.questionText}>{q.title}</Text>
+                  {/* Respuesta */}
+                  <View
+                    style={[
+                      styles.tableCell,
+                      { flex: 1, alignItems: 'center' },
+                    ]}
+                  >
+                    <View
+                      style={[
+                        styles.radioCircle,
+                        operatorResponse && styles.radioDisabled,
+                      ]}
+                    >
+                      {operatorResponse && <View style={styles.radioDot} />}
+                    </View>
+                  </View>
+                </View>
+              );
+            })}
+            <Text style={styles.label}>
+              Verificar Tipo De Etiqueta Vs Ot Y Pegar Utilizada:
+            </Text>
+            <TextInput
+              style={styles.input}
+              keyboardType="numeric"
+              value={
+                workOrder?.answers[index].verificar_etiqueta ??
+                'No se reconoce la muestra enviada'
+              }
+              editable={false}
+            />
+            <Text style={styles.label}>Muestras entregadas:</Text>
+            <TextInput
+              style={styles.input}
+              keyboardType="numeric"
+              value={
+                typeof workOrder?.answers?.[index]?.sample_quantity === 'number'
+                  ? workOrder.answers[index].sample_quantity.toString()
+                  : ''
+              }
+              editable={false}
+            />
+          </>
+        )}
+
+        {workOrder?.answers[index].tipo_personalizacion === 'packsmart' && (
+          <>
+            {/* Encabezado estilo tabla */}
+            <View style={styles.tableHeader}>
+              <Text style={[styles.tableCell, { flex: 2 }]}>Pregunta</Text>
+              <Text style={styles.tableCell}>Respuesta</Text>
             </View>
 
-            {/* Respuesta */}
-            <View style={[styles.tableCell, { flex: 1, alignItems: 'center' }]}>
-              <View style={[styles.radioCircle, operatorResponse && styles.radioDisabled]}>
-                {operatorResponse && <View style={styles.radioDot} />}
-              </View>
+            {/* Preguntas normales */}
+            {questions.slice(10, 16).map((q: any) => {
+              const responses = workOrder.answers[
+                index
+              ]?.FormAnswerResponse?.find(
+                (resp: any) => resp.question_id === q.id
+              );
+              console.log(responses);
+              // Encuentra la respuesta del operador por pregunta_id
+              const operatorResponse = responses?.response_operator;
+
+              return (
+                <View key={q.id} style={styles.tableRow}>
+                  {/* Pregunta */}
+                  <View style={[styles.tableCell, { flex: 2 }]}>
+                    <Text style={styles.questionText}>{q.title}</Text>
+                  </View>
+
+                  {/* Respuesta */}
+                  <View
+                    style={[
+                      styles.tableCell,
+                      { flex: 1, alignItems: 'center' },
+                    ]}
+                  >
+                    <View
+                      style={[
+                        styles.radioCircle,
+                        operatorResponse && styles.radioDisabled,
+                      ]}
+                    >
+                      {operatorResponse && <View style={styles.radioDot} />}
+                    </View>
+                  </View>
+                </View>
+              );
+            })}
+          </>
+        )}
+
+        {workOrder?.answers[index].tipo_personalizacion === 'otto' && (
+          <>
+            {/* Encabezado estilo tabla */}
+            <View style={styles.tableHeader}>
+              <Text style={[styles.tableCell, { flex: 2 }]}>Pregunta</Text>
+              <Text style={styles.tableCell}>Respuesta</Text>
             </View>
-          </View>
-        );
-      })}
-      <Text style={styles.label}>Verificar Tipo De Etiqueta Vs Ot Y Pegar Utilizada:</Text>
-      <TextInput
-        style={styles.input}
-        keyboardType="numeric"
-        value={workOrder?.answers[index].verificar_etiqueta ?? 'No se reconoce la muestra enviada' }
-        editable={false}
-      />
-      <Text style={styles.label}>Muestras entregadas:</Text>
-      <TextInput
-        style={styles.input}
-        keyboardType="numeric"
-        value={
-          typeof workOrder?.answers?.[index]?.sample_quantity === 'number'
-          ? workOrder.answers[index].sample_quantity.toString()
-          : ''
-        }
-        editable={false}
-      />
-        </>
-      )}
+
+            {/* Preguntas normales */}
+            {questions.slice(16, 24).map((q: any) => {
+              const responses = workOrder.answers[
+                index
+              ]?.FormAnswerResponse?.find(
+                (resp: any) => resp.question_id === q.id
+              );
+              console.log(responses);
+              // Encuentra la respuesta del operador por pregunta_id
+              const operatorResponse = responses?.response_operator;
+
+              return (
+                <View key={q.id} style={styles.tableRow}>
+                  {/* Pregunta */}
+                  <View style={[styles.tableCell, { flex: 2 }]}>
+                    <Text style={styles.questionText}>{q.title}</Text>
+                  </View>
+
+                  {/* Respuesta */}
+                  <View
+                    style={[
+                      styles.tableCell,
+                      { flex: 1, alignItems: 'center' },
+                    ]}
+                  >
+                    <View
+                      style={[
+                        styles.radioCircle,
+                        operatorResponse && styles.radioDisabled,
+                      ]}
+                    >
+                      {operatorResponse && <View style={styles.radioDot} />}
+                    </View>
+                  </View>
+                </View>
+              );
+            })}
+          </>
+        )}
+
+        {workOrder?.answers[index].tipo_personalizacion === 'embolsadora' && (
+          <>
+            {/* Encabezado estilo tabla */}
+            <View style={styles.tableHeader}>
+              <Text style={[styles.tableCell, { flex: 2 }]}>Pregunta</Text>
+              <Text style={styles.tableCell}>Respuesta</Text>
+            </View>
+
+            {/* Preguntas normales */}
+            {questions.slice(24, 26).map((q: any) => {
+              const responses = workOrder.answers[
+                index
+              ]?.FormAnswerResponse?.find(
+                (resp: any) => resp.question_id === q.id
+              );
+              console.log(responses);
+              // Encuentra la respuesta del operador por pregunta_id
+              const operatorResponse = responses?.response_operator;
+
+              return (
+                <View key={q.id} style={styles.tableRow}>
+                  {/* Pregunta */}
+                  <View style={[styles.tableCell, { flex: 2 }]}>
+                    <Text style={styles.questionText}>{q.title}</Text>
+                  </View>
+
+                  {/* Respuesta */}
+                  <View
+                    style={[
+                      styles.tableCell,
+                      { flex: 1, alignItems: 'center' },
+                    ]}
+                  >
+                    <View
+                      style={[
+                        styles.radioCircle,
+                        operatorResponse && styles.radioDisabled,
+                      ]}
+                    >
+                      {operatorResponse && <View style={styles.radioDot} />}
+                    </View>
+                  </View>
+                </View>
+              );
+            })}
+          </>
+        )}
 
         <Text style={styles.sectionTitle}>Inconformidad</Text>
         <View style={styles.card}>
           <Text style={styles.label}>Usuario:</Text>
           <TextInput
-            value={workOrder.answers[index].inconformities[lastIndex].user.username}
+            value={
+              workOrder.answers[index].inconformities[lastIndex].user.username
+            }
             editable={false}
             style={styles.input}
           />
@@ -210,7 +413,10 @@ const PersonalizacionComponentCQM = ({ workOrder }: { workOrder: any }) => {
           />
         </View>
 
-        <TouchableOpacity style={styles.button} onPress={() => setShowModal(true)}>
+        <TouchableOpacity
+          style={styles.button}
+          onPress={() => setShowModal(true)}
+        >
           <Text style={styles.buttonText}>Aceptar Inconformidad</Text>
         </TouchableOpacity>
 
@@ -220,12 +426,21 @@ const PersonalizacionComponentCQM = ({ workOrder }: { workOrder: any }) => {
         <Modal visible={showModal} transparent animationType="fade">
           <View style={styles.modalOverlay}>
             <View style={styles.modalBox}>
-              <Text style={styles.modalText}>¿Estás segura/o que deseas aceptar la inconformidad? Deberás liberar nuevamente.</Text>
+              <Text style={styles.modalText}>
+                ¿Estás segura/o que deseas aceptar la inconformidad? Deberás
+                liberar nuevamente.
+              </Text>
               <View style={styles.modalButtons}>
-                <TouchableOpacity style={styles.cancelButton} onPress={() => setShowModal(false)}>
+                <TouchableOpacity
+                  style={styles.cancelButton}
+                  onPress={() => setShowModal(false)}
+                >
                   <Text style={styles.modalButtonText}>Cancelar</Text>
                 </TouchableOpacity>
-                <TouchableOpacity style={styles.confirmButton} onPress={handleSubmit}>
+                <TouchableOpacity
+                  style={styles.confirmButton}
+                  onPress={handleSubmit}
+                >
                   <Text style={styles.modalButtonText}>Confirmar</Text>
                 </TouchableOpacity>
               </View>
@@ -240,11 +455,11 @@ const PersonalizacionComponentCQM = ({ workOrder }: { workOrder: any }) => {
 export default PersonalizacionComponentCQM;
 
 const styles = StyleSheet.create({
-  container: { 
+  container: {
     paddingTop: 16,
     paddingBottom: 32,
-    paddingHorizontal: 8, 
-    backgroundColor: '#fdfaf6', 
+    paddingHorizontal: 8,
+    backgroundColor: '#fdfaf6',
   },
   sectionTitle: {
     fontSize: 22,
@@ -262,7 +477,7 @@ const styles = StyleSheet.create({
     height: 50,
     fontSize: 16,
     marginTop: 7,
-    marginBottom: 15
+    marginBottom: 15,
   },
   tableHeader: {
     flexDirection: 'row',

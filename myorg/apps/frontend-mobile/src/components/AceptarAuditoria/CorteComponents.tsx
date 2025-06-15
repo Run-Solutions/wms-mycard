@@ -141,6 +141,8 @@ const CorteComponentAcceptAuditory: React.FC<{ workOrder: any }> = ({ workOrder 
       <Text style={styles.input}>{defaultValues.bad_quantity}</Text>
       <Text style={styles.subtitle}>Excedente:</Text>
       <Text style={styles.input}>{defaultValues.excess_quantity}</Text>
+      <Text style={styles.subtitle}>Muestras en CQM:</Text>
+      <Text style={styles.input}>{defaultValues.cqm_quantity}</Text>
       <Text style={styles.subtitle}>Muestras:</Text>
       <TextInput
         style={styles.inputActive}

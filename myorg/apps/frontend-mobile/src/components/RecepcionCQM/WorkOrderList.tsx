@@ -1,5 +1,5 @@
 // myorg/apps/frontend-mobile/src/components/RecepcionCQM/WorkOrderList.tsx
-"use client";
+'use client';
 
 import React from 'react';
 import { TouchableOpacity } from 'react-native';
@@ -10,8 +10,10 @@ import * as FileSystem from 'expo-file-system';
 import { Buffer } from 'buffer';
 import FileViewer from 'react-native-file-viewer';
 
-
-type Navigation = NavigationProp<InternalStackParamList, 'RecepcionCQMAuxScreen'>;
+type Navigation = NavigationProp<
+  InternalStackParamList,
+  'RecepcionCQMAuxScreen'
+>;
 
 import {
   View,
@@ -22,7 +24,8 @@ import {
   ScrollView,
 } from 'react-native';
 import { getFileByName } from '../../api/finalizacion';
-
+import styled from 'styled-components/native';
+import { TextInput } from 'react-native-paper';
 
 interface File {
   id: number;
@@ -56,7 +59,13 @@ interface Props {
 }
 
 const WorkOrderList: React.FC<Props> = ({ orders, onSelectOrder }) => {
+  const [searchValue, setSearchValue] = React.useState('');
   const navigation = useNavigation<any>();
+
+  const validOrders = Array.isArray(orders) ? orders : [];
+  const filteredOrders = validOrders.filter(order =>
+    order.ot_id.toLowerCase().includes(searchValue.toLowerCase())
+  );
   const downloadFile = async (filename: string) => {
     try {
       const res = await getFileByName(filename);
@@ -64,14 +73,14 @@ const WorkOrderList: React.FC<Props> = ({ orders, onSelectOrder }) => {
         console.error('❌ Error desde el backend');
         return;
       }
-  
+
       const base64Data = Buffer.from(res, 'binary').toString('base64');
       const fileUri = FileSystem.documentDirectory + filename;
-  
+
       await FileSystem.writeAsStringAsync(fileUri, base64Data, {
         encoding: FileSystem.EncodingType.Base64,
       });
-  
+
       await FileViewer.open(fileUri, {
         showOpenWithDialog: true,
         displayName: filename,
@@ -100,101 +109,134 @@ const WorkOrderList: React.FC<Props> = ({ orders, onSelectOrder }) => {
               <Text>Creado por: {item.user?.username}</Text>
             </View>
 
-
-          <View style={styles.filesBlock}>
-            {item.files.length > 0 ? (
-              item.files.map(file => {
-                const label = file.file_path.toLowerCase().includes('ot')
-                  ? 'Ver OT'
-                  : file.file_path.toLowerCase().includes('sku')
+            <View style={styles.filesBlock}>
+              {item.files.length > 0 ? (
+                item.files.map((file) => {
+                  const label = file.file_path.toLowerCase().includes('ot')
+                    ? 'Ver OT'
+                    : file.file_path.toLowerCase().includes('sku')
                     ? 'Ver SKU'
                     : file.file_path.toLowerCase().includes('op')
-                      ? 'Ver OP'
-                      : 'Ver Archivo';
-                return (
-                  <TouchableOpacity
-                    key={file.id}
-                    onPress={() => downloadFile(file.file_path)}
-                    style={styles.fileButton}
-                  >
-                    <Text style={styles.fileText}>{label}</Text>
-                  </TouchableOpacity>
-                );
-              })
-            ) : (
-              <Text style={styles.noFiles}>No hay archivos</Text>
-            )}
-          </View>
-        </View>
-      </TouchableOpacity>
-        
-
-      <Text style={styles.flowLine}>Áreas:</Text>
-      <ScrollView
-        horizontal
-        showsHorizontalScrollIndicator={false}
-        style={styles.flowLine}
-        contentContainerStyle={styles.timelineContainer}
-      >
-        {item.flow.map((step, index) => {
-          const isActive = step.status.toLowerCase().includes('proceso');
-          const isCompleted = step.status.toLowerCase().includes('completado');
-          const isParcial = step.status.toLowerCase() === 'parcial';
-          const isCalidad = ['calidad', 'cqm'].some(word => step.status.toLowerCase().includes(word));
-          const isLast = index === item.flow.length - 1;
-
-          const getColor = () => {
-            if (isCompleted) return '#22c55e';
-            if (isCalidad) return '#facc15';
-            if (isActive) return '#4a90e2';
-            if (isParcial) return '#f5945c';
-            return '#d1d5db';
-          };
-
-          return (
-            <View key={index} style={styles.stepItem}>
-              <View style={[styles.circle, { backgroundColor: getColor(), shadowColor: getColor() }]}>
-                <Text style={styles.circleText}>{index + 1}</Text>
-              </View>
-              <Text
-                style={[
-                  styles.areaLabel,
-                  {
-                    color: isCompleted
-                      ? '#22c55e'
-                      : isCalidad
-                      ? '#facc15'
-                      : isActive
-                      ? '#4a90e2'
-                      : isParcial
-                      ? '#f5945c'
-                      : '#6b7280',
-                    fontWeight: isActive ? 'bold' : 'normal',
-                  },
-                ]}
-              >
-                {step.area?.name ?? `Área ${step.area_id}`}
-              </Text>
-              {!isLast && <View style={styles.line} />}
+                    ? 'Ver OP'
+                    : 'Ver Archivo';
+                  return (
+                    <TouchableOpacity
+                      key={file.id}
+                      onPress={() => downloadFile(file.file_path)}
+                      style={styles.fileButton}
+                    >
+                      <Text style={styles.fileText}>{label}</Text>
+                    </TouchableOpacity>
+                  );
+                })
+              ) : (
+                <Text style={styles.noFiles}>No hay archivos</Text>
+              )}
             </View>
-          );
-        })}
-      </ScrollView>
-    </View>
+          </View>
+        </TouchableOpacity>
+
+        <Text style={styles.flowLine}>Áreas:</Text>
+        <ScrollView
+          horizontal
+          showsHorizontalScrollIndicator={false}
+          style={styles.flowLine}
+          contentContainerStyle={styles.timelineContainer}
+        >
+          {item.flow.map((step, index) => {
+            const isActive = step.status.toLowerCase().includes('proceso');
+            const isCompleted = step.status
+              .toLowerCase()
+              .includes('completado');
+            const isParcial = step.status.toLowerCase() === 'parcial';
+            const isCalidad = ['calidad', 'cqm'].some((word) =>
+              step.status.toLowerCase().includes(word)
+            );
+            const isLast = index === item.flow.length - 1;
+
+            const getColor = () => {
+              if (isCompleted) return '#22c55e';
+              if (isCalidad) return '#facc15';
+              if (isActive) return '#4a90e2';
+              if (isParcial) return '#f5945c';
+              return '#d1d5db';
+            };
+
+            return (
+              <View key={index} style={styles.stepItem}>
+                <View
+                  style={[
+                    styles.circle,
+                    { backgroundColor: getColor(), shadowColor: getColor() },
+                  ]}
+                >
+                  <Text style={styles.circleText}>{index + 1}</Text>
+                </View>
+                <Text
+                  style={[
+                    styles.areaLabel,
+                    {
+                      color: isCompleted
+                        ? '#22c55e'
+                        : isCalidad
+                        ? '#facc15'
+                        : isActive
+                        ? '#4a90e2'
+                        : isParcial
+                        ? '#f5945c'
+                        : '#6b7280',
+                      fontWeight: isActive ? 'bold' : 'normal',
+                    },
+                  ]}
+                >
+                  {step.area?.name ?? `Área ${step.area_id}`}
+                </Text>
+                {!isLast && <View style={styles.line} />}
+              </View>
+            );
+          })}
+        </ScrollView>
+      </View>
     );
   };
-    
+
   return (
-    <FlatList
-      data={orders}
-      keyExtractor={(item) => item.id.toString()}
-      renderItem={renderItem}
-      contentContainerStyle={styles.list}
-    />
+    <View style={{ flex: 1, padding: 5, backgroundColor: '#fdfaf6' }}>
+      <Container>
+        <Label>Buscar OT</Label>
+        <TextInput
+          label="Buscar OT"
+          value={searchValue}
+          onChangeText={setSearchValue}
+          mode="outlined"
+          activeOutlineColor="#000"
+          style={styles.input}
+          theme={{ roundness: 30 }}
+        />
+      </Container>
+      <FlatList
+        data={filteredOrders}
+        keyExtractor={(item) => item.id.toString()}
+        renderItem={renderItem}
+        contentContainerStyle={styles.list}
+      />
+    </View>
   );
 };
 
 export default WorkOrderList;
+
+const Container = styled.View`
+  margin-vertical: 8px;
+  margin-horizontal: 10px;
+`;
+
+const Label = styled.Text`
+  color: black;
+  margin-bottom: 4px;
+  font-size: 14px;
+  font-weight: bold;
+`;
 
 const styles = StyleSheet.create({
   list: {
@@ -213,6 +255,13 @@ const styles = StyleSheet.create({
     shadowRadius: 6,
     elevation: 3,
     flexDirection: 'column',
+  },
+  input: {
+    marginBottom: 16,
+    backgroundColor: '#fff',
+    borderRadius: 30,
+    fontSize: 14,
+    width: '90%',
   },
   title: {
     fontWeight: 'bold',
