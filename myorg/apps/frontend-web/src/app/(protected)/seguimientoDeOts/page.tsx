@@ -3,7 +3,7 @@
 
 import React, { useEffect, useState } from 'react';
 import styled, { useTheme } from 'styled-components';
-import WorkOrderTable from '@/components/SeguimientoDeOts/WorkOrderTable';
+import WorkOrderTable from '../../../../../../libs/shared/components/WorkOrderTable';
 import { fetchWorkOrdersInProgress } from '@/api/seguimientoDeOts';
 
 // Se define el tipo de datos

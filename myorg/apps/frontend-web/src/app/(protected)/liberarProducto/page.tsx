@@ -4,7 +4,7 @@
 import React, { useEffect, useState } from 'react';
 import styled, { useTheme } from 'styled-components';
 import { useRouter } from 'next/navigation';
-import WorkOrderTable from '@/components/LiberarProducto/WorkOrderTable';
+import WorkOrderTable from '../../../../../../libs/shared/components/WorkOrderTable';
 import { fetchWorkOrdersInProgress } from '@/api/liberarProducto';
 
 // Se define el tipo de datos

@@ -1,7 +1,7 @@
 // myorg/apps/frontend-web/src/app/(protected)/inconformidades/page.tsx
 'use client';
 
-import WorkOrderTable from '@/components/Inconformidades/WorkOrderTable';
+import WorkOrderTable from '../../../../../../libs/shared/components/WorkOrderTable';
 import React, { useEffect, useState } from 'react';
 import styled, { useTheme } from 'styled-components';
 import { getWorkOrdersWithInconformidad } from '@/api/inconformidades';
