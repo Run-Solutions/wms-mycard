@@ -128,8 +128,8 @@ export default function SeguimientoDeOtsAuxPage({ params }: Props) {
               <thead>
                 <tr>
                   <th />
-                  {areas.map((area) => (
-                    <th key={area.id} title={`Estado: ${area.status}`}>
+                  {areas.map((area, index) => (
+                    <th key={`${area.id}-${index}`} title={`Estado: ${area.status}`}>
                       <span>{area.name}</span>
                     </th>
                   ))}
@@ -138,56 +138,56 @@ export default function SeguimientoDeOtsAuxPage({ params }: Props) {
               <tbody>
                 <tr>
                   <td>Usuario</td>
-                  {areas.map((area) => (
-                    <td key={area.id}>{area.usuario}</td>
+                  {areas.map((area, index) => (
+                    <td key={`${area.id}-${index}`}>{area.usuario}</td>
                   ))}
                 </tr>
                 <tr>
                   <td>Auditor</td>
-                  {areas.map((area) => (
-                    <td key={area.id}>{area.auditor}</td>
+                  {areas.map((area, index) => (
+                    <td key={`${area.id}-${index}`}>{area.auditor}</td>
                   ))}
                 </tr>
                 <tr>
                   <td>Estado</td>
-                  {areas.map((area) => (
-                    <td key={area.id}>{area.status}</td>
+                  {areas.map((area, index) => (
+                    <td key={`${area.id}-${index}`}>{area.status}</td>
                   ))}
                 </tr>
                 <tr>
                   <td>Buenas</td>
-                  {areas.map((area) => (
-                    <td key={area.id}>{area.buenas}</td>
+                  {areas.map((area, index) => (
+                    <td key={`${area.id}-${index}`}>{area.buenas}</td>
                   ))}
                 </tr>
                 <tr>
                   <td>Malas</td>
-                  {areas.map((area) => (
-                    <td key={area.id}>{area.malas}</td>
+                  {areas.map((area, index) => (
+                    <td key={`${area.id}-${index}`}>{area.malas}</td>
                   ))}
                 </tr>
                 <tr>
                   <td>Excedente</td>
-                  {areas.map((area) => (
-                    <td key={area.id}>{area.excedente}</td>
+                  {areas.map((area, index) => (
+                    <td key={`${area.id}-${index}`}>{area.excedente}</td>
                   ))}
                 </tr>
                 <tr>
                   <td>CQM</td>
-                  {areas.map((area) => (
-                    <td key={area.id}>{area.cqm}</td>
+                  {areas.map((area, index) => (
+                    <td key={`${area.id}-${index}`}>{area.cqm}</td>
                   ))}
                 </tr>
                 <tr>
                   <td>Muestras</td>
-                  {areas.map((area) => (
-                    <td key={area.id}>{area.muestras}</td>
+                  {areas.map((area, index) => (
+                    <td key={`${area.id}-${index}`}>{area.muestras}</td>
                   ))}
                 </tr>
                 <tr>
                   <td>SUMA TOTAL</td>
-                  {areas.map((area) => (
-                    <td key={area.id}>
+                  {areas.map((area, index) => (
+                    <td key={`${area.id}-${index}`}>
                       {area.buenas +
                         area.malas +
                         area.excedente +
