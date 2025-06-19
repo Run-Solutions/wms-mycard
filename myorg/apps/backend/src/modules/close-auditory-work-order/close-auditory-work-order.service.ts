@@ -146,6 +146,7 @@ export class CloseAuditoryWorkOrderService {
         id: { in: filteredWorkOrderIds },
       },
       include: {
+        user: true,
         flow: {
           include: {
             user: true,

@@ -24,6 +24,10 @@ export class JwtAuthGuard implements CanActivate {
 
     canActivate(context: ExecutionContext): boolean {
         const request: RequestWithUser = context.switchToHttp().getRequest();
+
+        if (request.method === 'OPTIONS') {
+          return true;
+        }
         const authHeader = request.headers.authorization;
 
         console.log('Encabezado Authorization:', authHeader);

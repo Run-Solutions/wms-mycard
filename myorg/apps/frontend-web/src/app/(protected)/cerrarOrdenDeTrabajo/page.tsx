@@ -11,14 +11,16 @@ interface WorkOrder {
   ot_id: string;
   mycard_id: string;
   quantity: number;
+  status: string;
   created_by: number;
   validated: boolean;
   createdAt: string;
   updatedAt: string;
+  user: { username: string };
   flow: {
     area: {
-      name: string,
-    }
+      name: string;
+    };
     id: number;
     work_order_id: number;
     area_id: number;
@@ -30,19 +32,19 @@ interface WorkOrder {
     updated_at: string;
   }[];
   files: {
-    file_path: string,
-  }[],
+    file_path: string;
+  }[];
 }
 
 const CloseWorkOrderPage: React.FC = () => {
   const [WorkOrders, setWorkOrders] = useState<WorkOrder[]>([]);
   // Para obtener las ordenes que estan En auditoria
-  useEffect (() => {
+  useEffect(() => {
     async function fetchWorkOrdersInAuditory() {
       try {
         const data = await fetchWorkOrdersInProgress();
         console.log('Datos obtenidos de las Ordenes en Proceso: ', data);
-        const orders = data.map((item: any) => item.workOrder); 
+        const orders = data.map((item: any) => item.workOrder);
         console.log('Datos obtenidos de las Ordenes en Proceso: ', data);
         setWorkOrders(data);
       } catch (error) {
@@ -57,9 +59,12 @@ const CloseWorkOrderPage: React.FC = () => {
     <PageContainer>
       <TitleWrapper>
         <Title>Cerrar Ordenes de Trabajo</Title>
-        <WorkOrderTable orders={WorkOrders} title="Órdenes en Auditoria" statusFilter="En auditoria" />
+        <WorkOrderTable
+          orders={WorkOrders}
+          title="Órdenes en Auditoria"
+          statusFilter="En auditoria"
+        />
       </TitleWrapper>
-      
     </PageContainer>
   );
 };
@@ -85,5 +90,5 @@ const TitleWrapper = styled.div`
 const Title = styled.h1<{ theme: any }>`
   font-size: 2rem;
   font-weight: 500;
-  color: ${({ theme }) => theme.palette.text.primary}
+  color: ${({ theme }) => theme.palette.text.primary};
 `;

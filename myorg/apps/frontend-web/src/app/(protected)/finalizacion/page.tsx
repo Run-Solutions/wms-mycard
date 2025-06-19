@@ -63,8 +63,16 @@ const FinalizacionPage: React.FC = () => {
       <TitleWrapper>
         <Title>Finalización</Title>
       </TitleWrapper>
-      <WorkOrderTable orders={WorkOrders} title='Ordenes Pendientes por Cerrar' statusFilter='Listo'/>
-      <WorkOrderTable orders={WorkOrders} title='Ordenes Cerradas' statusFilter='Cerrado'/>
+      <WorkOrderTable
+        orders={WorkOrders}
+        title="Ordenes por Cerrar"
+        statusFilter="Listo"
+      />
+      <WorkOrderTable
+        orders={WorkOrders}
+        title="Ordenes Cerradas"
+        statusFilter="Cerrado"
+      />
     </PageContainer>
   );
 };
@@ -90,5 +98,5 @@ const TitleWrapper = styled.div`
 const Title = styled.h1<{ theme: any }>`
   font-size: 2rem;
   font-weight: 500;
-  color: ${({ theme }) => theme.palette.text.primary}
+  color: ${({ theme }) => theme.palette.text.primary};
 `;

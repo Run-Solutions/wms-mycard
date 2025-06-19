@@ -2,7 +2,7 @@
 
 import React, { useState } from 'react';
 import { useRouter } from 'next/navigation';
-import styled, { useTheme } from 'styled-components';
+import styled from 'styled-components';
 import {
   Box,
   Table,
@@ -13,18 +13,11 @@ import {
   TableRow,
   Paper,
   Typography,
-  IconButton,
+  TablePagination,
   TextField,
+  TableSortLabel,
 } from '@mui/material';
-import KeyboardArrowDownIcon from '@mui/icons-material/KeyboardArrowDown';
-import KeyboardArrowUpIcon from '@mui/icons-material/KeyboardArrowUp';
 import { getFileByName } from '@/api/seguimientoDeOts';
-
-interface File {
-  id: number;
-  type: string;
-  file_path: string;
-}
 
 interface WorkOrder {
   id: number;
@@ -45,25 +38,93 @@ interface WorkOrder {
   files: File[];
 }
 
+interface File {
+  id: number;
+  type: string;
+  file_path: string;
+}
+
 interface Props {
   orders: WorkOrder[];
   title: string;
   statusFilter: string;
 }
+type OrderDirection = 'asc' | 'desc';
+type SortableField = 'ot_id' | 'createdAt';
+const itemsPerPage = 20;
 
 const WorkOrderTable: React.FC<Props> = ({ orders, title, statusFilter }) => {
-  const [searchValue, setSearchValue] = useState('');
-  const handleSearchChange = (event: React.ChangeEvent<HTMLInputElement>) => {
-    setSearchValue(event.target.value);
-  };
-  const [expanded, setExpanded] = useState(false);
   const router = useRouter();
+  const [page, setPage] = useState(0);
+  const [searchValue, setSearchValue] = useState('');
+  const [activeArea, setActiveArea] = useState<string>('');
+  const [startDate, setStartDate] = useState<string>('');
+  const [endDate, setEndDate] = useState<string>('');
+  const [orderBy, setOrderBy] = useState<SortableField>('createdAt');
+
+  const [orderDirection, setOrderDirection] = useState<OrderDirection>('asc');
+  const handleSearchChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    setSearchValue(e.target.value);
+    setPage(0);
+  };
+  const handleAreaChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    setActiveArea(e.target.value);
+    setPage(0);
+  };
+  const handleStartDate = (e: React.ChangeEvent<HTMLInputElement>) => {
+    setStartDate(e.target.value);
+    setPage(0);
+  };
+  const handleEndDate = (e: React.ChangeEvent<HTMLInputElement>) => {
+    setEndDate(e.target.value);
+    setPage(0);
+  };
+  const handleChangePage = (
+    _: React.MouseEvent<HTMLButtonElement> | null,
+    newPage: number
+  ) => setPage(newPage);
+
+  const handleRequestSort = (property: SortableField) => {
+    const isAsc = orderBy === property && orderDirection === 'asc';
+    setOrderDirection(isAsc ? 'desc' : 'asc');
+    setOrderBy(property);
+    setPage(0);
+  };
   const validOrders = Array.isArray(orders) ? orders : [];
-  const filteredOrders = validOrders.filter(
-    (order) =>
-      order.flow.some((flow) =>
-        flow.status.toLowerCase().includes(statusFilter.toLowerCase())
-      ) && order.ot_id.toLowerCase().includes(searchValue.toLowerCase())
+  const filteredOrders = validOrders.filter((order) => {
+    const statusMatch =
+      order.status.toLowerCase().includes(statusFilter.toLowerCase()) ||
+      order.flow.some((f) =>
+        f.status.toLowerCase().includes(statusFilter.toLowerCase())
+      );
+    const searchMatch = order.ot_id
+      .toLowerCase()
+      .includes(searchValue.toLowerCase());
+    const areaMatch =
+      !activeArea ||
+      order.flow.some((f) =>
+        f.area?.name?.toLowerCase().includes(activeArea.toLowerCase())
+      );
+    const createdDate = new Date(order.createdAt);
+    const fromDate = startDate ? new Date(startDate) : null;
+    const toDate = endDate ? new Date(endDate) : null;
+    const dateMatch =
+      (!fromDate || createdDate >= fromDate) &&
+      (!toDate || createdDate <= toDate);
+    return statusMatch && searchMatch && areaMatch && dateMatch;
+  });
+  const sorted = filteredOrders.sort((a, b) => {
+    let cmp = 0;
+    if (orderBy === 'createdAt') {
+      cmp = new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime();
+    } else {
+      cmp = a.ot_id.localeCompare(b.ot_id);
+    }
+    return orderDirection === 'asc' ? cmp : -cmp;
+  });
+  const paginatedOrders = filteredOrders.slice(
+    page * itemsPerPage,
+    (page + 1) * itemsPerPage
   );
 
   validOrders.forEach((order) => {
@@ -71,10 +132,6 @@ const WorkOrderTable: React.FC<Props> = ({ orders, title, statusFilter }) => {
       console.log('status:', `"${flow.status}"`);
     });
   });
-
-  const displayedOrders = expanded
-    ? filteredOrders
-    : filteredOrders.slice(0, 2);
 
   const downloadFile = async (filename: string) => {
     try {
@@ -92,71 +149,179 @@ const WorkOrderTable: React.FC<Props> = ({ orders, title, statusFilter }) => {
       component={Paper}
       sx={{
         backgroundColor: 'white',
-        padding: '2rem',
+        p: 4,
         mt: 4,
         borderRadius: '1rem',
         boxShadow: '0 4px 12px rgba(0,0,0,0.1)',
-        maxWidth: '100%',
-        minWidth: '800px',
-        marginX: 'auto',
+        minWidth: 800,
+        mx: 'auto',
       }}
     >
-      <div
-        style={{
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'space-between',
-          padding: '10px',
-        }}
+      <Box
+        display="flex"
+        flexWrap="wrap"
+        alignItems="center"
+        justifyContent="flex-end"
+        gap={2}
+        mb={2}
       >
-        <Typography variant="h6" component="div" sx={{ p: 2, color: 'black' }}>
+        <Typography variant="h6" sx={{ color: 'black' }}>
           {title}
         </Typography>
-        <TextField
-          label="Buscar OT"
-          variant="outlined"
-          size="small"
-          value={searchValue}
-          onChange={handleSearchChange}
-          sx={{
-            '& label': { color: 'black' },
-            '& .MuiOutlinedInput-root': {
-              '& fieldset': { borderColor: 'black' },
-              '&:hover fieldset': { borderColor: 'black' },
-              '&.Mui-focused fieldset': { borderColor: 'black' },
-              color: 'black',
-            },
-          }}
-        />
-        <Box display="flex" gap={2} flexWrap="wrap" sx={{}}>
-          <Box display="flex" alignItems="center" gap={1}>
+        <Box display="flex" flexWrap="wrap" gap={'4px'} flexGrow={1}>
+          <TextField
+            label="Buscar OT"
+            size="small"
+            value={searchValue}
+            onChange={handleSearchChange}
+            type="search"
+            variant="outlined"
+            InputLabelProps={{ shrink: true }}
+            sx={{
+              maxWidth: 200,
+              '& .MuiInputBase-input': {
+                color: '#8a8686', // color del texto
+              },
+              '& .MuiInputLabel-root': {
+                color: '#8a8686', // color del label
+              },
+              '& .MuiOutlinedInput-root': {
+                '& fieldset': {
+                  borderColor: '#8a8686', // color del borde normal
+                },
+                '&:hover fieldset': {
+                  borderColor: '#b0adad', // color del borde al pasar el mouse
+                },
+                '&.Mui-focused fieldset': {
+                  borderColor: '#90caf9', // color del borde al enfocar (azul claro por accesibilidad)
+                },
+              },
+            }}
+          />
+          <TextField
+            label="Filtrar por Área"
+            size="small"
+            value={activeArea}
+            onChange={handleAreaChange}
+            InputLabelProps={{ shrink: true }}
+            sx={{
+              maxWidth: 200,
+              '& .MuiInputBase-input': {
+                color: '#8a8686', // color del texto
+              },
+              '& .MuiInputLabel-root': {
+                color: '#8a8686', // color del label
+              },
+              '& .MuiOutlinedInput-root': {
+                '& fieldset': {
+                  borderColor: '#8a8686', // color del borde normal
+                },
+                '&:hover fieldset': {
+                  borderColor: '#b0adad', // color del borde al pasar el mouse
+                },
+                '&.Mui-focused fieldset': {
+                  borderColor: '#90caf9', // color del borde al enfocar (azul claro por accesibilidad)
+                },
+              },
+            }}
+          />
+          <TextField
+            label="Desde"
+            type="date"
+            size="small"
+            value={startDate}
+            onChange={handleStartDate}
+            InputLabelProps={{ shrink: true }}
+            sx={{
+              maxWidth: 200,
+              '& .MuiInputBase-input': {
+                color: '#8a8686', // color del texto
+              },
+              '& .MuiInputLabel-root': {
+                color: '#8a8686', // color del label
+              },
+              '& .MuiOutlinedInput-root': {
+                '& fieldset': {
+                  borderColor: '#8a8686', // color del borde normal
+                },
+                '&:hover fieldset': {
+                  borderColor: '#b0adad', // color del borde al pasar el mouse
+                },
+                '&.Mui-focused fieldset': {
+                  borderColor: '#90caf9', // color del borde al enfocar (azul claro por accesibilidad)
+                },
+              },
+            }}
+          />
+          <TextField
+            label="Hasta"
+            type="date"
+            size="small"
+            value={endDate}
+            onChange={handleEndDate}
+            InputLabelProps={{ shrink: true }}
+            sx={{
+              maxWidth: 200,
+              '& .MuiInputBase-input': {
+                color: '#8a8686', // color del texto
+              },
+              '& .MuiInputLabel-root': {
+                color: '#8a8686', // color del label
+              },
+              '& .MuiOutlinedInput-root': {
+                '& fieldset': {
+                  borderColor: '#8a8686', // color del borde normal
+                },
+                '&:hover fieldset': {
+                  borderColor: '#b0adad', // color del borde al pasar el mouse
+                },
+                '&.Mui-focused fieldset': {
+                  borderColor: '#90caf9', // color del borde al enfocar (azul claro por accesibilidad)
+                },
+              },
+            }}
+          />
+        </Box>
+        <Box
+          display="flex"
+          gap={'3px'}
+          flexWrap="wrap"
+          justifyContent="flex-end"
+        >
+          <Box display="flex" alignItems="center" gap={'2px'}>
             <CircleLegend style={{ backgroundColor: '#22c55e' }} />
-            <Typography variant="body2" color="black">
+            <Typography variant="caption" color="black">
               Completado
             </Typography>
           </Box>
-          <Box display="flex" alignItems="center" gap={1}>
+          <Box display="flex" alignItems="center" gap={'2px'}>
             <CircleLegend style={{ backgroundColor: '#facc15' }} />
-            <Typography variant="body2" color="black">
-              Enviado a CQM
+            <Typography variant="caption" color="black">
+              Enviado a CQM / En Calidad
             </Typography>
           </Box>
-          <Box display="flex" alignItems="center" gap={1}>
+          <Box display="flex" alignItems="center" gap={'2px'}>
+            <CircleLegend style={{ backgroundColor: '#f5945c' }} />
+            <Typography variant="caption" sx={{ color: 'black' }}>
+              Parcial / Pendiente Parcial
+            </Typography>
+          </Box>
+          <Box display="flex" alignItems="center" gap={'2px'}>
             <CircleLegend style={{ backgroundColor: '#4a90e2' }} />
-            <Typography variant="body2" color="black">
-              En Proceso / Calidad
+            <Typography variant="caption" color="black">
+              En Proceso
             </Typography>
           </Box>
-          <Box display="flex" alignItems="center" gap={1}>
+          <Box display="flex" alignItems="center" gap={'2px'}>
             <CircleLegend style={{ backgroundColor: '#d1d5db' }} />
-            <Typography variant="body2" color="black">
-              Sin Estado
+            <Typography variant="caption" color="black">
+              Listo / Sin Estado
             </Typography>
           </Box>
         </Box>
-      </div>
+      </Box>
 
-      {filteredOrders.length === 0 ? (
+      {sorted.length === 0 ? (
         <Typography sx={{ p: 2, color: 'black' }}>
           No hay órdenes para mostrar.
         </Typography>
@@ -165,18 +330,69 @@ const WorkOrderTable: React.FC<Props> = ({ orders, title, statusFilter }) => {
           <Table>
             <TableHead>
               <TableRow>
-                <TableCell sx={{ color: 'black' }}>Id OT</TableCell>
-                <TableCell sx={{ color: 'black', maxWidth: 110 }}>
+                <CustomTableCell
+                  sortDirection={orderBy === 'ot_id' ? orderDirection : false}
+                >
+                  <TableSortLabel
+                    active={orderBy === 'ot_id'}
+                    direction={orderBy === 'ot_id' ? orderDirection : 'asc'}
+                    onClick={() => handleRequestSort('ot_id')}
+                    hideSortIcon={false}
+                    sx={{
+                      color: 'black', // texto por defecto
+                      '&.Mui-active': {
+                        color: 'black', // ❗ fuerza el color cuando está activo
+                        '& .MuiTableSortLabel-icon': {
+                          color: 'black',
+                          opacity: 1,
+                        },
+                      },
+                      '& .MuiTableSortLabel-icon': {
+                        color: 'black',
+                        opacity: 1,
+                      },
+                    }}
+                  >
+                    Id OT
+                  </TableSortLabel>
+                </CustomTableCell>
+                <CustomTableCell sx={{ color: 'black', maxWidth: 110 }}>
                   Id del presupuesto
-                </TableCell>
-                <TableCell sx={{ color: 'black' }}>Usuario</TableCell>
-                <TableCell sx={{ color: 'black' }}>Área</TableCell>
-                <TableCell sx={{ color: 'black' }}>Fecha</TableCell>
-                <TableCell sx={{ color: 'black' }}>Archivos</TableCell>
+                </CustomTableCell>
+                <CustomTableCell>Usuario</CustomTableCell>
+                <CustomTableCell>Área</CustomTableCell>
+                <CustomTableCell
+                  sortDirection={
+                    orderBy === 'createdAt' ? orderDirection : false
+                  }
+                >
+                  <TableSortLabel
+                    active={orderBy === 'createdAt'}
+                    direction={orderBy === 'createdAt' ? orderDirection : 'asc'}
+                    onClick={() => handleRequestSort('createdAt')}
+                    sx={{
+                      color: 'black', // texto por defecto
+                      '&.Mui-active': {
+                        color: 'black', // ❗ fuerza el color cuando está activo
+                        '& .MuiTableSortLabel-icon': {
+                          color: 'black',
+                          opacity: 1,
+                        },
+                      },
+                      '& .MuiTableSortLabel-icon': {
+                        color: 'black',
+                        opacity: 1,
+                      },
+                    }}
+                  >
+                    Fecha
+                  </TableSortLabel>
+                </CustomTableCell>
+                <CustomTableCell>Archivos</CustomTableCell>
               </TableRow>
             </TableHead>
             <TableBody>
-              {filteredOrders.map((orderFlow) => (
+              {paginatedOrders.map((orderFlow) => (
                 <TableRow key={orderFlow.id}>
                   <TableCell
                     onClick={() =>
@@ -290,13 +506,26 @@ const WorkOrderTable: React.FC<Props> = ({ orders, title, statusFilter }) => {
               ))}
             </TableBody>
           </Table>
-          {filteredOrders.length > 2 && (
-            <Box display="flex" justifyContent="center" mt={2}>
-              <IconButton onClick={() => setExpanded(!expanded)}>
-                {expanded ? <KeyboardArrowUpIcon /> : <KeyboardArrowDownIcon />}
-              </IconButton>
-            </Box>
-          )}
+          <TablePagination
+            rowsPerPageOptions={[itemsPerPage]}
+            component="div"
+            count={sorted.length}
+            rowsPerPage={itemsPerPage}
+            page={page}
+            onPageChange={handleChangePage}
+            sx={{
+              color: 'black',
+              '& .MuiTablePagination-actions svg': {
+                color: 'black',
+              },
+              '& .MuiInputBase-root': {
+                color: 'black',
+              },
+              '& .MuiSelect-icon': {
+                color: 'black',
+              },
+            }}
+          />
         </>
       )}
     </TableContainer>
@@ -414,4 +643,9 @@ const CircleLegend = styled.div`
   height: 16px;
   border-radius: 50%;
   box-shadow: 0 0 2px rgba(0, 0, 0, 0.3);
+`;
+
+const CustomTableCell = styled(TableCell)`
+  color: black !important;
+  font-size: 1rem;
 `;

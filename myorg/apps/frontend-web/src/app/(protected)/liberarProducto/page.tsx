@@ -16,12 +16,12 @@ interface WorkOrder {
   assigned_at: string;
   created_at: string;
   updated_at: string;
-  workOrder: {   
+  workOrder: {
     id: number;
     ot_id: string;
     mycard_id: string;
     quantity: number;
-    created_by: number;  
+    created_by: number;
     validated: boolean;
     createdAt: string;
     updatedAt: string;
@@ -38,8 +38,8 @@ interface WorkOrder {
       id: number;
       area: {
         name: string;
-      }
-      status: 'Pendiente' | 'En Proceso' ;
+      };
+      status: 'Pendiente' | 'En Proceso';
     }[];
   };
 }
@@ -52,7 +52,7 @@ const FreeProductPage: React.FC = () => {
   const [WorkOrders, setWorkOrders] = useState<WorkOrder[]>([]);
   const [currentAreaId, setCurrentAreaId] = useState<number | null>(null);
 
-  useEffect (() => {
+  useEffect(() => {
     async function fetchWorkOrders() {
       try {
         const data = await fetchWorkOrdersInProgress();
@@ -63,17 +63,25 @@ const FreeProductPage: React.FC = () => {
       }
     }
     fetchWorkOrders();
-  },[]);
+  }, []);
 
   return (
     <PageContainer>
       <TitleWrapper>
         <Title>Mis Ordenes</Title>
       </TitleWrapper>
-      <WorkOrderTable orders={WorkOrders} title="Órdenes en Proceso" statusFilter={["En Proceso", "Enviado a CQM", 'En Calidad', 'Parcial']} />
-      {currentAreaId !==1 && (
+      <WorkOrderTable
+        orders={WorkOrders}
+        title="Órdenes en Proceso"
+        statusFilter={['En Proceso', 'Enviado a CQM', 'En Calidad', 'Parcial']}
+      />
+      {currentAreaId !== 1 && (
         <>
-        <WorkOrderTable orders={WorkOrders} title="Órdenes pendientes por Liberar" statusFilter={["Listo", "Parcial"]}/>
+          <WorkOrderTable
+            orders={WorkOrders}
+            title="Órdenes por Liberar"
+            statusFilter={['Listo', 'Parcial']}
+          />
         </>
       )}
     </PageContainer>
@@ -105,7 +113,7 @@ const TitleWrapper = styled.div`
 const Title = styled.h1<{ theme: any }>`
   font-size: 2rem;
   font-weight: 500;
-  color: ${({ theme }) => theme.palette.text.primary}
+  color: ${({ theme }) => theme.palette.text.primary};
 `;
 
 const Timeline = styled.div`
@@ -115,7 +123,7 @@ const Timeline = styled.div`
   width: 100%;
   gap: 18px;
   box-sizing: border-box;
-  margin-right:0;
+  margin-right: 0;
 `;
 
 const TimelineItem = styled.div`
@@ -161,7 +169,6 @@ const Line = styled.div.withConfig({
   display: ${({ $isLast }) => ($isLast ? 'none' : 'block')};
 `;
 
-
 const AreaName = styled.span.withConfig({
   shouldForwardProp: (prop) => prop !== '$isActive',
 })<StyledProps>`
@@ -174,4 +181,3 @@ const AreaName = styled.span.withConfig({
   text-transform: capitalize;
   transition: color 0.3s, font-weight 0.3s;
 `;
-

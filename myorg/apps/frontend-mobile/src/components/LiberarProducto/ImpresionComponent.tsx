@@ -97,13 +97,13 @@ const ImpresionComponent = ({ workOrder }: { workOrder: any }) => {
 
     const payload = {
       question_id: questions.map((q: any) => q.id),
-      work_order_flow_id: workOrder.id,
-      work_order_id: workOrder.workOrder.id,
-      area_id: workOrder.area.id,
+      work_order_flow_id: currentFlow.id,
+      work_order_id: currentFlow.workOrder.id,
+      area_id: currentFlow.area.id,
       frente: questions.map((q: any) => checkedFrente.includes(q.id)),
       vuelta: questions.map((q: any) => checkedVuelta.includes(q.id)),
       reviewed: false,
-      user_id: workOrder.assigned_user,
+      user_id: currentFlow.assigned_user,
       sample_quantity: Number(sampleQuantity),
     };
 
@@ -264,7 +264,11 @@ const ImpresionComponent = ({ workOrder }: { workOrder: any }) => {
       estadosBloqueados.includes(nextFlow?.status) || // nextFlow puede ser opcional
       Number(cantidadporliberar) === 0;
 
-    return isDisabled;
+    const algunoBloqueado = workOrder.workOrder.flow.some((flow:any) =>
+      estadosBloqueados.includes(flow.status)
+    );
+  
+    return isDisabled || algunoBloqueado;
   };
   const disableLiberarButton = shouldDisableLiberar();
   const disableLiberarCQM = shouldDisableCQM();

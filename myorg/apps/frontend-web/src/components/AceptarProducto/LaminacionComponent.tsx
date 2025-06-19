@@ -1,12 +1,15 @@
-'use client'
+'use client';
 
-import { useRouter } from "next/navigation";
-import { useState, useEffect } from "react";
-import styled from "styled-components";
-import { acceptWorkOrderFlow, registrarInconformidad } from "@/api/aceptarProducto";
+import { useRouter } from 'next/navigation';
+import { useState, useEffect } from 'react';
+import styled from 'styled-components';
+import {
+  acceptWorkOrderFlow,
+  registrarInconformidad,
+} from '@/api/aceptarProducto';
 
 type LaminacionData = {
-  release_quantity: string;
+  release_quantity: number;
   comments: string;
 };
 interface Props {
@@ -27,11 +30,11 @@ export default function LaminacionComponentAccept({ workOrder }: Props) {
   const [inconformidad, setInconformidad] = useState<string>('');
 
   const [defaultValues, setDefaultValues] = useState<LaminacionData>({
-    release_quantity: "",
-    comments: "",
+    release_quantity: 0,
+    comments: '',
   });
 
-  console.log("El mismo workOrder (workOrder)", workOrder);
+  console.log('El mismo workOrder (workOrder)', workOrder);
   const flowList = [...workOrder.workOrder.flow];
   // Índice del flow actual basado en su id
   const currentIndex = flowList.findIndex((item) => item.id === workOrder.id);
@@ -39,34 +42,57 @@ export default function LaminacionComponentAccept({ workOrder }: Props) {
   // Flow actual
   const currentFlow = currentIndex !== -1 ? flowList[currentIndex] : null;
   // Anterior (si hay)
-  const lastCompletedOrPartial = currentIndex > 0 ? flowList[currentIndex - 1] : null;
+  const lastCompletedOrPartial =
+    currentIndex > 0 ? flowList[currentIndex - 1] : null;
   // Siguiente (si hay)
-  const nextFlow = currentIndex !== -1 && currentIndex < flowList.length - 1
-    ? flowList[currentIndex + 1]
-    : null;
-  console.log("El flujo actual (currentFlow)", currentFlow);
-  console.log("El siguiente flujo (nextFlow)", nextFlow);
-  console.log("Ultimo parcial o completado", lastCompletedOrPartial);
+  const nextFlow =
+    currentIndex !== -1 && currentIndex < flowList.length - 1
+      ? flowList[currentIndex + 1]
+      : null;
+  console.log('El flujo actual (currentFlow)', currentFlow);
+  console.log('El siguiente flujo (nextFlow)', nextFlow);
+  console.log('Ultimo parcial o completado', lastCompletedOrPartial);
 
-  const isAcceptDisabled = () => lastCompletedOrPartial.status === 'Enviado a CQM' || lastCompletedOrPartial.status === 'En Inconformidad CQM' || lastCompletedOrPartial.status === 'En Calidad';
+  const isAcceptDisabled = () =>
+    lastCompletedOrPartial.status === 'Enviado a CQM' ||
+    lastCompletedOrPartial.status === 'En Inconformidad CQM' ||
+    lastCompletedOrPartial.status === 'En Calidad';
   useEffect(() => {
-    // Al iniciar, configuramos los valores predeterminados y actuales
-    if (!workOrder) return;
-    if (lastCompletedOrPartial?.areaResponse?.laminacion && lastCompletedOrPartial?.partialReleases.length === 0) {
+    if (!lastCompletedOrPartial) return;
+
+    const laminacion = lastCompletedOrPartial.areaResponse?.laminacion;
+    const partials = lastCompletedOrPartial.partialReleases;
+
+    const allValidated =
+      partials.length > 0 && partials.every((p: any) => p.validated);
+
+    if (laminacion && partials.length === 0) {
+      // Caso original: hay laminacion pero no hay parciales
       const vals: LaminacionData = {
-        release_quantity: lastCompletedOrPartial.areaResponse?.laminacion?.release_quantity || "",
-        comments: lastCompletedOrPartial.areaResponse?.laminacion?.comments || "",
+        release_quantity: laminacion.release_quantity || '',
+        comments: laminacion.comments || '',
       };
       setDefaultValues(vals);
-    } else if ( lastCompletedOrPartial && ['Parcial', 'Listo', 'Enviado a CQM', 'En calidad', 'Completado'].includes(lastCompletedOrPartial?.status)) {
-      // Sumar cantidades de partialReleases
-      const firstUnvalidatedPartial = lastCompletedOrPartial.partialReleases.find(
-        (release: PartialRelease) => !release.validated
+    } else if (laminacion && allValidated) {
+      // Nuevo caso: todos los parciales están validados y hay laminacion
+      const totalParciales = partials.reduce(
+        (acc: any, curr: any) => acc + (curr.quantity || 0),
+        0
       );
-      
+      const restante = (laminacion.release_quantity || 0) - totalParciales;
+
       const vals: LaminacionData = {
-        release_quantity: firstUnvalidatedPartial?.quantity || "",
-        comments: firstUnvalidatedPartial?.observation || "",
+        release_quantity: restante > 0 ? restante : 0,
+        comments: '', // puedes ajustar si quieres comentarios por defecto
+      };
+      setDefaultValues(vals);
+    } else {
+      // Caso original: se busca el primer parcial sin validar
+      const firstUnvalidatedPartial = partials.find((p: any) => !p.validated);
+
+      const vals: LaminacionData = {
+        release_quantity: firstUnvalidatedPartial?.quantity || '',
+        comments: firstUnvalidatedPartial?.observation || '',
       };
       setDefaultValues(vals);
     }
@@ -75,7 +101,9 @@ export default function LaminacionComponentAccept({ workOrder }: Props) {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!defaultValues.release_quantity) {
-      alert('Por favor, asegurate de que no haya inconformidades con las cantidades entregadas.');
+      alert(
+        'Por favor, asegurate de que no haya inconformidades con las cantidades entregadas.'
+      );
       return;
     }
     const flowId = workOrder?.id;
@@ -86,7 +114,7 @@ export default function LaminacionComponentAccept({ workOrder }: Props) {
       console.error(error);
       alert('Error al conectar con el servidor');
     }
-  }
+  };
 
   const handleSubmitInconformidad = async () => {
     console.log(lastCompletedOrPartial.id);
@@ -102,13 +130,13 @@ export default function LaminacionComponentAccept({ workOrder }: Props) {
       console.error(error);
       alert('Error al conectar con el servidor');
     }
-  }
+  };
   const cantidadHojasRaw = Number(workOrder?.workOrder.quantity) / 24;
   const cantidadHojas = cantidadHojasRaw > 0 ? Math.ceil(cantidadHojasRaw) : 0;
 
   return (
     <Container>
-      <Title>Área: {workOrder?.area.name || "No definida"}</Title>
+      <Title>Área: {workOrder?.area.name || 'No definida'}</Title>
 
       <DataWrapper>
         <InfoItem>
@@ -121,49 +149,75 @@ export default function LaminacionComponentAccept({ workOrder }: Props) {
         </InfoItem>
         <InfoItem>
           <Label>Cantidad (TARJETAS):</Label>
-          <Value>{workOrder.workOrder.quantity || "No definida"}</Value>
+          <Value>{workOrder.workOrder.quantity || 'No definida'}</Value>
         </InfoItem>
-        <InfoItem style={{ backgroundColor: '#eaeaf5', borderRadius: '8px'}}>
+        <InfoItem style={{ backgroundColor: '#eaeaf5', borderRadius: '8px' }}>
           <Label>Cantidad (HOJAS):</Label>
           <Value>{cantidadHojas}</Value>
         </InfoItem>
       </DataWrapper>
-      <DataWrapper style={{ marginTop: '20px'}}>
+      <DataWrapper style={{ marginTop: '20px' }}>
         <InfoItem>
           <Label>Área que lo envía:</Label>
-          <Value>{lastCompletedOrPartial?.area.name || "No definida"}</Value>
+          <Value>{lastCompletedOrPartial?.area.name || 'No definida'}</Value>
         </InfoItem>
         <InfoItem>
           <Label>Usuario que lo envía:</Label>
-          <Value>{lastCompletedOrPartial?.user?.username || "No definida"}</Value>
+          <Value>
+            {lastCompletedOrPartial?.user?.username || 'No definida'}
+          </Value>
         </InfoItem>
       </DataWrapper>
-        <InfoItem>
-          <Label>Comentarios:</Label>
-          <Value>{workOrder.workOrder.comments}</Value>
-        </InfoItem>
+      <InfoItem>
+        <Label>Comentarios:</Label>
+        <Value>{workOrder.workOrder.comments}</Value>
+      </InfoItem>
 
       <NewData>
         <SectionTitle>Datos de Producción</SectionTitle>
         <NewDataWrapper>
           <InputGroup>
             <Label>Cantidad entregada:</Label>
-            <Input type="number" name="release_quantity" value={defaultValues.release_quantity} disabled/>
+            <Input
+              type="number"
+              name="release_quantity"
+              value={defaultValues.release_quantity}
+              disabled
+            />
           </InputGroup>
-          <InconformidadButton onClick={() => setShowInconformidad(true)} disabled={isAcceptDisabled()}>Inconformidad</InconformidadButton>
+          <InconformidadButton
+            onClick={() => setShowInconformidad(true)}
+            disabled={isAcceptDisabled()}
+          >
+            Inconformidad
+          </InconformidadButton>
         </NewDataWrapper>
         <InputGroup>
           <SectionTitle>Comentarios</SectionTitle>
           <Textarea value={defaultValues.comments} disabled />
         </InputGroup>
       </NewData>
-      <AceptarButton onClick={() => setShowConfirm(true)} disabled={isAcceptDisabled()}>Aceptar recepción del producto</AceptarButton>
+      <AceptarButton
+        onClick={() => setShowConfirm(true)}
+        disabled={isAcceptDisabled()}
+      >
+        Aceptar recepción del producto
+      </AceptarButton>
       {showConfirm && (
         <ModalOverlay>
           <ModalBox>
             <h4>¿Estás segura/o que deseas liberar este producto?</h4>
-            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '1rem', marginTop: '1rem' }}>
-              <CancelButton onClick={() => setShowConfirm(false)}>Cancelar</CancelButton>
+            <div
+              style={{
+                display: 'flex',
+                justifyContent: 'flex-end',
+                gap: '1rem',
+                marginTop: '1rem',
+              }}
+            >
+              <CancelButton onClick={() => setShowConfirm(false)}>
+                Cancelar
+              </CancelButton>
               <ConfirmButton onClick={handleSubmit}>Confirmar</ConfirmButton>
             </div>
           </ModalBox>
@@ -173,30 +227,48 @@ export default function LaminacionComponentAccept({ workOrder }: Props) {
         <ModalOverlay>
           <ModalBox>
             <h4>Registrar Inconformidad</h4>
-            <h3>Por favor, describe la inconformidad detectada con la cantidad entregada.</h3>
+            <h3>
+              Por favor, describe la inconformidad detectada con la cantidad
+              entregada.
+            </h3>
             <Textarea
               value={inconformidad}
               onChange={(e) => setInconformidad(e.target.value)}
               placeholder="Escribe aquí la inconformidad..."
             />
-            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '1rem', marginTop: '1rem' }}>
-              <CancelButton onClick={() => setShowInconformidad(false)}>Cancelar</CancelButton>
-              <ConfirmButton onClick={() => {
-                console.log('Hpli');
-                if (!inconformidad.trim()) {
-                  alert('Debes ingresar una inconformidad antes de continuar.');
-                  return;
-                }
-                handleSubmitInconformidad();
-                setShowInconformidad(false);
-              }}>Guardar</ConfirmButton>
+            <div
+              style={{
+                display: 'flex',
+                justifyContent: 'flex-end',
+                gap: '1rem',
+                marginTop: '1rem',
+              }}
+            >
+              <CancelButton onClick={() => setShowInconformidad(false)}>
+                Cancelar
+              </CancelButton>
+              <ConfirmButton
+                onClick={() => {
+                  console.log('Hpli');
+                  if (!inconformidad.trim()) {
+                    alert(
+                      'Debes ingresar una inconformidad antes de continuar.'
+                    );
+                    return;
+                  }
+                  handleSubmitInconformidad();
+                  setShowInconformidad(false);
+                }}
+              >
+                Guardar
+              </ConfirmButton>
             </div>
           </ModalBox>
         </ModalOverlay>
       )}
     </Container>
   );
-};
+}
 
 // =================== Styled Components ===================
 
@@ -272,7 +344,7 @@ const Input = styled.input`
   transition: border 0.3s;
 
   &:focus {
-    border-color: #0038A8;
+    border-color: #0038a8;
   }
 `;
 
@@ -288,46 +360,43 @@ const Textarea = styled.textarea`
   resize: vertical;
 
   &:focus {
-    border-color: #0038A8;
+    border-color: #0038a8;
     outline: none;
   }
 `;
 
 const AceptarButton = styled.button<{ disabled?: boolean }>`
   margin-top: 2rem;
-  background-color: ${({ disabled }) => (disabled ? "#9CA3AF" : "#0038A8")};
+  background-color: ${({ disabled }) => (disabled ? '#9CA3AF' : '#0038A8')};
   color: white;
   padding: 0.75rem 2rem;
   border-radius: 0.5rem;
   font-weight: 600;
   transition: background 0.3s;
-  cursor: ${({ disabled }) => (disabled ? "not-allowed" : "pointer")};
+  cursor: ${({ disabled }) => (disabled ? 'not-allowed' : 'pointer')};
   opacity: ${({ disabled }) => (disabled ? 0.7 : 1)};
 
   &:hover {
-    background-color: ${({ disabled }) =>
-      disabled ? "#9CA3AF" : "#1D4ED8"};
+    background-color: ${({ disabled }) => (disabled ? '#9CA3AF' : '#1D4ED8')};
   }
 `;
 
 const InconformidadButton = styled.button<{ disabled?: boolean }>`
   height: 50px;
-  background-color: ${({ disabled }) => (disabled ? "#D1D5DB" : "#A9A9A9")};
+  background-color: ${({ disabled }) => (disabled ? '#D1D5DB' : '#A9A9A9')};
   color: white;
   padding: 0.75rem 2rem;
   border-radius: 0.5rem;
   font-weight: 600;
   transition: background 0.3s;
   align-self: flex-end;
-  cursor: ${({ disabled }) => (disabled ? "not-allowed" : "pointer")};
+  cursor: ${({ disabled }) => (disabled ? 'not-allowed' : 'pointer')};
   opacity: ${({ disabled }) => (disabled ? 0.7 : 1)};
 
   &:hover {
-    background-color: ${({ disabled }) =>
-      disabled ? "#D1D5DB" : "#8d8d92"};
+    background-color: ${({ disabled }) => (disabled ? '#D1D5DB' : '#8d8d92')};
   }
 `;
-
 
 const ModalOverlay = styled.div`
   position: fixed;
@@ -336,7 +405,7 @@ const ModalOverlay = styled.div`
   left: 0;
   width: 100%;
   height: 100%;
-  background: rgba(0,0,0,0.3);
+  background: rgba(0, 0, 0, 0.3);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -346,13 +415,13 @@ const ModalBox = styled.div`
   background: white;
   padding: 2rem;
   border-radius: 1rem;
-  box-shadow: 0 8px 24px rgba(0,0,0,0.2);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.2);
   max-width: 400px;
   width: 90%;
 `;
 
 const ConfirmButton = styled.button`
-  background-color: #0038A8;
+  background-color: #0038a8;
   color: white;
   padding: 0.5rem 1.5rem;
   border-radius: 0.5rem;
@@ -371,7 +440,7 @@ const ConfirmButton = styled.button`
 `;
 
 const CancelButton = styled.button`
-  background-color: #BBBBBB;
+  background-color: #bbbbbb;
   color: white;
   padding: 0.5rem 1.5rem;
   border-radius: 0.5rem;

@@ -2,7 +2,7 @@
 
 import React, { useState } from 'react';
 import { useRouter } from 'next/navigation';
-import styled, { useTheme } from 'styled-components';
+import styled from 'styled-components';
 import {
   Box,
   Table,
@@ -14,10 +14,10 @@ import {
   Paper,
   Typography,
   IconButton,
+  TablePagination,
   TextField,
+  TableSortLabel,
 } from '@mui/material';
-import KeyboardArrowDownIcon from '@mui/icons-material/KeyboardArrowDown';
-import KeyboardArrowUpIcon from '@mui/icons-material/KeyboardArrowUp';
 import { getFileByName } from '@/api/seguimientoDeOts';
 
 interface WorkOrder {
@@ -61,41 +61,89 @@ interface Props {
   statusFilter: string | string[];
 }
 
-const WorkOrderTable: React.FC<Props> = ({ orders, title, statusFilter }) => {
-  const [searchValue, setSearchValue] = useState('');
-  const handleSearchChange = (event: React.ChangeEvent<HTMLInputElement>) => {
-    setSearchValue(event.target.value);
-  };
-  const [expanded, setExpanded] = useState(false);
-  const router = useRouter();
+type OrderDirection = 'asc' | 'desc';
+type SortableField = 'ot_id' | 'createdAt';
+const itemsPerPage = 5;
 
+const WorkOrderTable: React.FC<Props> = ({ orders, title, statusFilter }) => {
+  const router = useRouter();
+  const [page, setPage] = useState(0);
+  const [searchValue, setSearchValue] = useState('');
+  const [activeArea, setActiveArea] = useState<string>('');
+  const [startDate, setStartDate] = useState<string>('');
+  const [endDate, setEndDate] = useState<string>('');
+  const [orderBy, setOrderBy] = useState<SortableField>('createdAt');
+  const [orderDirection, setOrderDirection] = useState<OrderDirection>('asc');
+
+  const handleSearchChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    setSearchValue(e.target.value);
+    setPage(0);
+  };
+  const handleAreaChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    setActiveArea(e.target.value);
+    setPage(0);
+  };
+  const handleChangePage = (
+    _: React.MouseEvent<HTMLButtonElement> | null,
+    newPage: number
+  ) => setPage(newPage);
+
+  const handleRequestSort = (property: SortableField) => {
+    const isAsc = orderBy === property && orderDirection === 'asc';
+    setOrderDirection(isAsc ? 'desc' : 'asc');
+    setOrderBy(property);
+    setPage(0);
+  };
   const validOrders = Array.isArray(orders) ? orders : [];
-  const filteredOrders = validOrders.filter((order) =>
-    order.workOrder.flow.some((flow) => {
-      if (Array.isArray(statusFilter)) {
-        return (
-          statusFilter.some((status) =>
-            flow.status.toLowerCase().includes(status.toLowerCase())
-          ) &&
-          order.workOrder.ot_id
-            .toLowerCase()
-            .includes(searchValue.toLowerCase())
-        );
-      } else {
-        return flow.status.toLowerCase().includes(statusFilter.toLowerCase());
-      }
-    })
-  );
+  const filteredOrders = validOrders.filter((order) => {
+    const filters = Array.isArray(statusFilter) ? statusFilter : [statusFilter];
+    const filtersLower = filters.map((f) => f.toLowerCase());
+
+    const statusMatch = filtersLower.some(
+      (f) =>
+        order.status.toLowerCase().includes(f) ||
+        order.workOrder.flow.some((flowStep) =>
+          flowStep.status.toLowerCase().includes(f)
+        )
+    );
+    const searchMatch = order.workOrder.ot_id
+      .toLowerCase()
+      .includes(searchValue.toLowerCase());
+    const areaMatch =
+      !activeArea ||
+      order.workOrder.flow.some((f) =>
+        f.area?.name?.toLowerCase().includes(activeArea.toLowerCase())
+      );
+    const createdDate = new Date(order.workOrder.createdAt);
+    const fromDate = startDate ? new Date(startDate) : null;
+    const toDate = endDate ? new Date(endDate) : null;
+    const dateMatch =
+      (!fromDate || createdDate >= fromDate) &&
+      (!toDate || createdDate <= toDate);
+    return statusMatch && searchMatch && areaMatch && dateMatch;
+  });
+
+  const sorted = filteredOrders.sort((a, b) => {
+    let cmp = 0;
+    if (orderBy === 'createdAt') {
+      cmp =
+        new Date(a.workOrder.createdAt).getTime() -
+        new Date(b.workOrder.createdAt).getTime();
+    } else {
+      cmp = a.workOrder.ot_id.localeCompare(b.workOrder.ot_id);
+    }
+    return orderDirection === 'asc' ? cmp : -cmp;
+  });
 
   validOrders.forEach((order) => {
     order.workOrder.flow?.forEach((flow) => {
       console.log('status:', `"${flow.status}"`);
     });
   });
-
-  const displayedOrders = expanded
-    ? filteredOrders
-    : filteredOrders.slice(0, 2);
+  const paginatedOrders = filteredOrders.slice(
+    page * itemsPerPage,
+    (page + 1) * itemsPerPage
+  );
 
   const downloadFile = async (filename: string) => {
     try {
@@ -122,55 +170,103 @@ const WorkOrderTable: React.FC<Props> = ({ orders, title, statusFilter }) => {
         marginX: 'auto',
       }}
     >
-      <div
-        style={{
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'space-between',
-          padding: '10px',
-        }}
+      <Box
+        display="flex"
+        flexWrap="wrap"
+        alignItems="center"
+        justifyContent="flex-end"
+        gap={2}
+        mb={2}
       >
-        <Typography variant="h6" component="div" sx={{ p: 2, color: 'black' }}>
+        <Typography variant="h6" sx={{ color: 'black' }}>
           {title}
         </Typography>
-        <TextField
-          label="Buscar OT"
-          variant="outlined"
-          size="small"
-          value={searchValue}
-          onChange={handleSearchChange}
-          sx={{
-            '& label': { color: 'black' },
-            '& .MuiOutlinedInput-root': {
-              '& fieldset': { borderColor: 'black' },
-              '&:hover fieldset': { borderColor: 'black' },
-              '&.Mui-focused fieldset': { borderColor: 'black' },
-              color: 'black',
-            },
-          }}
-        />
-        <Box display="flex" gap={2} flexWrap="wrap" sx={{}}>
+        <Box display="flex" flexWrap="wrap" gap={'4px'} flexGrow={1}>
+          <TextField
+            label="Buscar OT"
+            size="small"
+            value={searchValue}
+            onChange={handleSearchChange}
+            type="search"
+            variant="outlined"
+            InputLabelProps={{ shrink: true }}
+            sx={{
+              maxWidth: 200,
+              '& .MuiInputBase-input': {
+                color: '#8a8686', // color del texto
+              },
+              '& .MuiInputLabel-root': {
+                color: '#8a8686', // color del label
+              },
+              '& .MuiOutlinedInput-root': {
+                '& fieldset': {
+                  borderColor: '#8a8686', // color del borde normal
+                },
+                '&:hover fieldset': {
+                  borderColor: '#b0adad', // color del borde al pasar el mouse
+                },
+                '&.Mui-focused fieldset': {
+                  borderColor: '#90caf9', // color del borde al enfocar (azul claro por accesibilidad)
+                },
+              },
+            }}
+          />
+          <TextField
+            label="Filtrar por Área"
+            size="small"
+            value={activeArea}
+            onChange={handleAreaChange}
+            InputLabelProps={{ shrink: true }}
+            sx={{
+              maxWidth: 200,
+              '& .MuiInputBase-input': {
+                color: '#8a8686', // color del texto
+              },
+              '& .MuiInputLabel-root': {
+                color: '#8a8686', // color del label
+              },
+              '& .MuiOutlinedInput-root': {
+                '& fieldset': {
+                  borderColor: '#8a8686', // color del borde normal
+                },
+                '&:hover fieldset': {
+                  borderColor: '#b0adad', // color del borde al pasar el mouse
+                },
+                '&.Mui-focused fieldset': {
+                  borderColor: '#90caf9', // color del borde al enfocar (azul claro por accesibilidad)
+                },
+              },
+            }}
+          />
+        </Box>
+
+        <Box
+          display="flex"
+          gap={'3px'}
+          flexWrap="wrap"
+          justifyContent="flex-end"
+        >
           <Box display="flex" alignItems="center" gap={1}>
             <CircleLegend style={{ backgroundColor: '#22c55e' }} />
-            <Typography variant="body2" sx={{ color: 'black' }}>
+            <Typography variant="caption" sx={{ color: 'black' }}>
               Completado
             </Typography>
           </Box>
           <Box display="flex" alignItems="center" gap={1}>
             <CircleLegend style={{ backgroundColor: '#facc15' }} />
-            <Typography variant="body2" sx={{ color: 'black' }}>
+            <Typography variant="caption" sx={{ color: 'black' }}>
               Enviado a CQM / En Calidad
             </Typography>
           </Box>
           <Box display="flex" alignItems="center" gap={1}>
             <CircleLegend style={{ backgroundColor: '#f5945c' }} />
-            <Typography variant="body2" sx={{ color: 'black' }}>
-              Parcial
+            <Typography variant="caption" sx={{ color: 'black' }}>
+              Parcial / Pendiente Parcial
             </Typography>
           </Box>
           <Box display="flex" alignItems="center" gap={1}>
             <CircleLegend style={{ backgroundColor: '#4a90e2' }} />
-            <Typography variant="body2" sx={{ color: 'black' }}>
+            <Typography variant="caption" sx={{ color: 'black' }}>
               En Proceso / Listo
             </Typography>
           </Box>
@@ -181,8 +277,8 @@ const WorkOrderTable: React.FC<Props> = ({ orders, title, statusFilter }) => {
             </Typography>
           </Box>
         </Box>
-      </div>
-      {filteredOrders.length === 0 ? (
+      </Box>
+      {sorted.length === 0 ? (
         <Typography sx={{ p: 2, color: 'black' }}>
           No hay órdenes para mostrar.
         </Typography>
@@ -191,18 +287,69 @@ const WorkOrderTable: React.FC<Props> = ({ orders, title, statusFilter }) => {
           <Table>
             <TableHead>
               <TableRow>
-                <CustomTableCell>Id OT</CustomTableCell>
+                <CustomTableCell
+                  sortDirection={orderBy === 'ot_id' ? orderDirection : false}
+                >
+                  <TableSortLabel
+                    active={orderBy === 'ot_id'}
+                    direction={orderBy === 'ot_id' ? orderDirection : 'asc'}
+                    onClick={() => handleRequestSort('ot_id')}
+                    hideSortIcon={false}
+                    sx={{
+                      color: 'black', // texto por defecto
+                      '&.Mui-active': {
+                        color: 'black', // ❗ fuerza el color cuando está activo
+                        '& .MuiTableSortLabel-icon': {
+                          color: 'black',
+                          opacity: 1,
+                        },
+                      },
+                      '& .MuiTableSortLabel-icon': {
+                        color: 'black',
+                        opacity: 1,
+                      },
+                    }}
+                  >
+                    Id OT
+                  </TableSortLabel>
+                </CustomTableCell>
                 <CustomTableCell sx={{ maxWidth: 110, overflowX: 'hidden' }}>
-                  Id del presupuesto
+                  Id Presupuesto
                 </CustomTableCell>
                 <CustomTableCell>Usuario</CustomTableCell>
                 <CustomTableCell>Área</CustomTableCell>
-                <CustomTableCell>Fecha</CustomTableCell>
+                <CustomTableCell
+                  sortDirection={
+                    orderBy === 'createdAt' ? orderDirection : false
+                  }
+                >
+                  <TableSortLabel
+                    active={orderBy === 'createdAt'}
+                    direction={orderBy === 'createdAt' ? orderDirection : 'asc'}
+                    onClick={() => handleRequestSort('createdAt')}
+                    sx={{
+                      color: 'black', // texto por defecto
+                      '&.Mui-active': {
+                        color: 'black', // ❗ fuerza el color cuando está activo
+                        '& .MuiTableSortLabel-icon': {
+                          color: 'black',
+                          opacity: 1,
+                        },
+                      },
+                      '& .MuiTableSortLabel-icon': {
+                        color: 'black',
+                        opacity: 1,
+                      },
+                    }}
+                  >
+                    Fecha
+                  </TableSortLabel>
+                </CustomTableCell>
                 <CustomTableCell>Archivos</CustomTableCell>
               </TableRow>
             </TableHead>
             <TableBody>
-              {displayedOrders.map((orderFlow) => (
+              {paginatedOrders.map((orderFlow) => (
                 <TableRow key={orderFlow.id}>
                   <TableCell
                     onClick={() =>
@@ -327,13 +474,26 @@ const WorkOrderTable: React.FC<Props> = ({ orders, title, statusFilter }) => {
               ))}
             </TableBody>
           </Table>
-          {filteredOrders.length > 2 && (
-            <Box display="flex" justifyContent="center" mt={2}>
-              <IconButton onClick={() => setExpanded(!expanded)}>
-                {expanded ? <KeyboardArrowUpIcon /> : <KeyboardArrowDownIcon />}
-              </IconButton>
-            </Box>
-          )}
+          <TablePagination
+            rowsPerPageOptions={[itemsPerPage]}
+            component="div"
+            count={sorted.length}
+            rowsPerPage={itemsPerPage}
+            page={page}
+            onPageChange={handleChangePage}
+            sx={{
+              color: 'black',
+              '& .MuiTablePagination-actions svg': {
+                color: 'black',
+              },
+              '& .MuiInputBase-root': {
+                color: 'black',
+              },
+              '& .MuiSelect-icon': {
+                color: 'black',
+              },
+            }}
+          />
         </>
       )}
     </TableContainer>

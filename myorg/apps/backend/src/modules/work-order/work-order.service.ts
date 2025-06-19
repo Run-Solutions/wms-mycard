@@ -129,6 +129,7 @@ export class WorkOrderService {
         user: true,
         flow: {
           include: {
+            user: true,
             partialReleases: {
               include: {
                 inconformities: {

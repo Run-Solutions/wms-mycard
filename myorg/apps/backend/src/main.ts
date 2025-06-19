@@ -1,3 +1,4 @@
+// myorg/apps/backend/src/main.ts
 import { NestFactory } from '@nestjs/core';
 import { AppModule } from './app.module';
 import { IoAdapter } from '@nestjs/platform-socket.io';
@@ -15,7 +16,7 @@ async function bootstrap() {
   app.useWebSocketAdapter(new IoAdapter(app) as any);
 
   app.enableCors({
-    origin: ['http://localhost:3001', 'http://64.23.225.99:3002'],
+    origin: [ 'http://localhost:3001', 'http://64.23.225.99:3002', 'https://64.23.225.99:3002', 'https://mycard.runsolutions-services.com'],
     methods: 'GET,HEAD,PUT,PATCH,POST,DELETE',
     credentials: true,
   });

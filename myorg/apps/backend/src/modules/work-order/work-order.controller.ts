@@ -30,7 +30,7 @@ const multerOptions = {
             callback(null, newFilename)
         }
     }),
-    limits: { fileSize: 5 * 1024 * 1024 }, // Para poner uhn limite de 5MB por archivo
+    limits: { fileSize: 20 * 1024 * 1024 }, // Para poner uhn limite de 5MB por archivo
 };
 
 @Controller('work-orders')

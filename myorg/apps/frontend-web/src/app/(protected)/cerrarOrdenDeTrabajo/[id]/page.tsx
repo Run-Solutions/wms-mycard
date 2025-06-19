@@ -1,4 +1,4 @@
-// myorg/apps/frontend-web/src/app/(protected)/seguimientoDeOts/[id]/page.tsx
+// myorg/apps/frontend-web/src/app/(protected)/cerrarOrdenDeTrabajo/[id]/page.tsx
 'use client';
 
 import { use, useState, useEffect } from 'react';
@@ -47,88 +47,107 @@ export default function CloseWorkOrderAuxPage({ params }: Props) {
   }, [id]);
 
   const handleCloseOrder = async () => {
+    const payload = {
+      workOrderFlowId: workOrder.id,
+      workOrderId: workOrder.workOrder.id,
+    };
+    console.log('Payload to send:', payload);
     try {
-      await liberarWorkOrderAuditory(workOrder?.ot_id);
-      router.push('/seguimientoDeOts');
+      await liberarWorkOrderAuditory(payload);
+      router.push('/cerrarOrdenDeTrabajo');
     } catch (error) {
       console.log('Error al enviar datos:', error);
     }
   };
 
-  const getAreaData = (areaId: number, areaResponse: any) => {
-    console.log('Area Response:', areaResponse);
+  console.log('Work Order Data:', workOrder);
+
+  const getAreaData = (
+    areaId: number,
+    areaResponse: any,
+    partialReleases: any[] = [],
+    flowUser: any = null,
+    index: number = -1
+  ) => {
+    const sumFromPartials = () => {
+      return partialReleases.reduce(
+        (acc: any, curr: any) => {
+          acc.buenas += curr.quantity || 0;
+          acc.malas += curr.bad_quantity || 0;
+          acc.excedente += curr.excess_quantity || 0;
+          return acc;
+        },
+        { buenas: 0, malas: 0, excedente: 0 }
+      );
+    };
+
+    const getCommonData = (areaKey: string) => {
+      const hasResponse = !!areaResponse?.[areaKey];
+      const usuario = areaResponse?.user?.username || flowUser?.username || '';
+      const auditor =
+        areaResponse?.[areaKey]?.formAuditory?.user?.username || '';
+
+      if (!hasResponse && partialReleases.length > 0) {
+        const resumen = sumFromPartials();
+        console.log('[PARCIAL DETECTADO]', areaKey, resumen);
+        return { ...resumen, cqm: 0, muestras: 0, usuario, auditor: '' };
+      }
+
+      return {
+        buenas:
+          areaResponse?.[areaKey]?.good_quantity ||
+          areaResponse?.[areaKey]?.release_quantity ||
+          areaResponse?.[areaKey]?.plates ||
+          0,
+        malas: areaResponse?.[areaKey]?.bad_quantity || 0,
+        excedente: areaResponse?.[areaKey]?.excess_quantity || 0,
+        cqm: areaResponse?.[areaKey]?.form_answer?.sample_quantity ?? 0,
+        muestras: areaResponse?.[areaKey]?.formAuditory?.sample_auditory ?? 0,
+        usuario,
+        auditor,
+      };
+    };
+
     switch (areaId) {
       case 6:
-        return {
-          buenas: areaResponse?.corte?.good_quantity || 0,
-          malas: areaResponse?.corte?.bad_quantity || 0,
-          excedente: areaResponse?.corte?.excess_quantity || 0,
-          cqm: areaResponse?.corte?.form_answer?.sample_quantity ?? 0,
-          muestras: areaResponse?.corte?.formAuditory?.sample_auditory ?? 0,
-          usuario: areaResponse?.user?.username || '',
-          auditor: areaResponse?.corte?.formAuditory?.user?.username || '',
-        };
+        return getCommonData('corte');
       case 7:
-        return {
-          buenas: areaResponse?.colorEdge?.good_quantity || 0,
-          malas: areaResponse?.colorEdge?.bad_quantity || 0,
-          excedente: areaResponse?.colorEdge?.excess_quantity || 0,
-          cqm: areaResponse?.colorEdge?.form_answer?.sample_quantity || 0,
-          muestras: areaResponse?.colorEdge?.formAuditory?.sample_auditory ?? 0,
-          usuario: areaResponse?.user?.username || '',
-          auditor: areaResponse?.colorEdge?.formAuditory?.user?.username || '',
-        };
+        return getCommonData('colorEdge');
       case 8:
-        return {
-          buenas: areaResponse?.hotStamping?.good_quantity || 0,
-          malas: areaResponse?.hotStamping?.bad_quantity || 0,
-          excedente: areaResponse?.hotStamping?.excess_quantity || 0,
-          cqm: areaResponse?.hotStamping?.form_answer?.sample_quantity || 0,
-          muestras:
-            areaResponse?.hotStamping?.formAuditory?.sample_auditory ?? 0,
-          usuario: areaResponse?.user?.username || '',
-          auditor:
-            areaResponse?.hotStamping?.formAuditory?.user?.username || '',
-        };
+        return getCommonData('hotStamping');
       case 9:
-        return {
-          buenas: areaResponse?.millingChip?.good_quantity || 0,
-          malas: areaResponse?.millingChip?.bad_quantity || 0,
-          excedente: areaResponse?.millingChip?.excess_quantity || 0,
-          cqm: areaResponse?.millingChip?.form_answer?.sample_quantity || 0,
-          muestras:
-            areaResponse?.millingChip?.formAuditory?.sample_auditory ?? 0,
-          usuario: areaResponse?.user?.username || '',
-          auditor:
-            areaResponse?.millingChip?.formAuditory?.user?.username || '',
-        };
+        return getCommonData('millingChip');
       case 10:
-        return {
-          buenas: areaResponse?.personalizacion?.good_quantity || 0,
-          malas: areaResponse?.personalizacion?.bad_quantity || 0,
-          excedente: areaResponse?.personalizacion?.excess_quantity || 0,
-          cqm: areaResponse?.personalizacion?.form_answer?.sample_quantity || 0,
-          muestras:
-            areaResponse?.personalizacion?.formAuditory?.sample_auditory ?? 0,
-          usuario: areaResponse?.user?.username || '',
-          auditor:
-            areaResponse?.personalizacion?.formAuditory?.user?.username || '',
-        };
+        return getCommonData('personalizacion');
       default:
-        return { buenas: 0, malas: 0, excedente: 0, cqm: 0, muestras: 0 };
+        return {
+          buenas: 0,
+          malas: 0,
+          excedente: 0,
+          cqm: 0,
+          muestras: 0,
+          usuario: '',
+          auditor: '',
+        };
     }
   };
 
   const areas: AreaData[] =
     workOrder?.workOrder.flow
-      ?.filter((item: any) => item.area_id >= 6)
-      .map((item: any) => ({
+      ?.filter((item: any, index: any) => item.area_id >= 6)
+      .map((item: any, index: any) => ({
         id: item.area_id,
         name: item.area?.name || 'Sin nombre',
         status: item.status || 'Desconocido',
         response: item.areaResponse || {},
         answers: item.answers?.[0] || {},
-        ...getAreaData(item.area_id, item.areaResponse),
+        ...getAreaData(
+          item.area_id,
+          item.areaResponse,
+          item.partialReleases,
+          item.user,
+          index
+        ),
       })) || [];
   const cantidadHojasRaw = Number(workOrder?.workOrder.quantity) / 24;
   const cantidadHojas = cantidadHojasRaw > 0 ? Math.ceil(cantidadHojasRaw) : 0;
@@ -168,8 +187,11 @@ export default function CloseWorkOrderAuxPage({ params }: Props) {
               <thead>
                 <tr>
                   <th />
-                  {areas.map((area) => (
-                    <th key={area.id} title={`Estado: ${area.status}`}>
+                  {areas.map((area, index) => (
+                    <th
+                      key={`${area.id}-${index}`}
+                      title={`Estado: ${area.status}`}
+                    >
                       <span>{area.name}</span>
                     </th>
                   ))}
@@ -178,61 +200,69 @@ export default function CloseWorkOrderAuxPage({ params }: Props) {
               <tbody>
                 <tr>
                   <td>Usuario</td>
-                  {areas.map((area) => (
-                    <td key={area.id}>{area.usuario}</td>
+                  {areas.map((area, index) => (
+                    <td key={`${area.id}-${index}`}>{area.usuario}</td>
                   ))}
                 </tr>
                 <tr>
                   <td>Auditor</td>
-                  {areas.map((area) => (
-                    <td key={area.id}>{area.auditor}</td>
+                  {areas.map((area, index) => (
+                    <td key={`${area.id}-${index}`}>{area.auditor}</td>
                   ))}
                 </tr>
                 <tr>
                   <td>Estado</td>
-                  {areas.map((area) => (
-                    <td key={area.id}>{area.status}</td>
+                  {areas.map((area, index) => (
+                    <td key={`${area.id}-${index}`}>{area.status}</td>
                   ))}
                 </tr>
                 <tr>
                   <td>Buenas</td>
-                  {areas.map((area) => (
-                    <td key={area.id}>{area.buenas}</td>
+                  {areas.map((area, index) => (
+                    <td key={`${area.id}-${index}`}>{area.buenas}</td>
                   ))}
                 </tr>
                 <tr>
                   <td>Malas</td>
-                  {areas.map((area) => (
-                    <td key={area.id}>{area.malas}</td>
+                  {areas.map((area, index) => (
+                    <td key={`${area.id}-${index}`}>{area.malas}</td>
                   ))}
                 </tr>
                 <tr>
                   <td>Excedente</td>
-                  {areas.map((area) => (
-                    <td key={area.id}>{area.excedente}</td>
+                  {areas.map((area, index) => (
+                    <td key={`${area.id}-${index}`}>{area.excedente}</td>
                   ))}
                 </tr>
                 <tr>
                   <td>CQM</td>
-                  {areas.map((area) => (
-                    <td key={area.id}>{area.cqm}</td>
+                  {areas.map((area, index) => (
+                    <td key={`${area.id}-${index}`}>{area.cqm}</td>
                   ))}
                 </tr>
                 <tr>
                   <td>Muestras</td>
-                  {areas.map((area) => (
-                    <td key={area.id}>{area.muestras}</td>
+                  {areas.map((area, index) => (
+                    <td key={`${area.id}-${index}`}>{area.muestras}</td>
                   ))}
                 </tr>
                 <tr>
                   <td>SUMA TOTAL</td>
-                  {areas.map((area) => (
-                    <td key={area.id}>
+                  {areas.map((area, index) => (
+                    <td key={`${area.id}-${index}`}>
                       {area.buenas +
                         area.malas +
                         area.excedente +
                         area.cqm +
                         area.muestras}
+                    </td>
+                  ))}
+                </tr>
+                <tr style={{ backgroundColor: '#d7e6d1' }}>
+                  <td>BUENAS + EXCEDENTE</td>
+                  {areas.map((area, idx) => (
+                    <td key={`${area.id}-${idx}`}>
+                      {area.id >= 6 ? area.buenas + area.excedente : ''}
                     </td>
                   ))}
                 </tr>
