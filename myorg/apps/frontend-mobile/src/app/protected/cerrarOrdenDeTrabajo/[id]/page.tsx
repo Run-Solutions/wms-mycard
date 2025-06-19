@@ -24,6 +24,24 @@ type AreaTotals = {
   cqm: number;
   muestras: number;
 };
+type AreaData = {
+  id: number;
+  name: string;
+  status: string;
+  response: {
+    user: {
+      username: string;
+    };
+  };
+  answers: any;
+  usuario: string;
+  auditor: string;
+  buenas: number;
+  malas: number;
+  cqm: number;
+  excedente: number;
+  muestras: number;
+};
 
 const CerrarOrdenDeTrabajoAuxScreen: React.FC = () => {
   const route = useRoute<WorkOrderDetailRouteProp>();
@@ -42,75 +60,76 @@ const CerrarOrdenDeTrabajoAuxScreen: React.FC = () => {
   console.log(workOrder);
 
   // Función para obtener los datos específicos de cada área
-  const getAreaData = (areaId: number, areaResponse: any) => {
-    console.log("user", areaResponse?.user?.username);
+  const getAreaData = (
+    areaId: number,
+    areaResponse: any,
+    partialReleases: any[] = [],
+    flowUser: any = null,
+    index: number = -1
+  ) => {
+    const sumFromPartials = () => {
+      return partialReleases.reduce(
+        (acc: any, curr: any) => {
+          acc.buenas += curr.quantity || 0;
+          acc.malas += curr.bad_quantity || 0;
+          acc.excedente += curr.excess_quantity || 0;
+          return acc;
+        },
+        { buenas: 0, malas: 0, excedente: 0 }
+      );
+    };
+  
+    const getCommonData = (areaKey: string) => {
+      const hasResponse = !!areaResponse?.[areaKey];
+      const usuario = areaResponse?.user?.username || flowUser?.username ||'';
+      const auditor = areaResponse?.[areaKey]?.formAuditory?.user?.username || '';
+  
+      if (!hasResponse && partialReleases.length > 0) {
+        const resumen = sumFromPartials();
+        console.log('[PARCIAL DETECTADO]', areaKey, resumen);
+        return { ...resumen, cqm: 0, muestras: 0, usuario, auditor: '' };
+      }
+  
+      return {
+        buenas:
+          areaResponse?.[areaKey]?.good_quantity ||
+          areaResponse?.[areaKey]?.release_quantity ||
+          areaResponse?.[areaKey]?.plates ||
+          0,
+        malas: areaResponse?.[areaKey]?.bad_quantity || 0,
+        excedente: areaResponse?.[areaKey]?.excess_quantity || 0,
+        cqm: areaResponse?.[areaKey]?.form_answer?.sample_quantity ?? 0,
+        muestras: areaResponse?.[areaKey]?.formAuditory?.sample_auditory ?? 0,
+        usuario,
+        auditor,
+      };
+    };
+  
     switch (areaId) {
-      case 6: // corte
-        return {
-          buenas: areaResponse?.corte?.good_quantity || 0,
-          malas: areaResponse?.corte?.bad_quantity || 0,
-          excedente: areaResponse?.corte?.excess_quantity || 0,
-          cqm: areaResponse?.corte?.form_answer?.sample_quantity ?? 0,
-          muestras: areaResponse?.corte?.formAuditory?.sample_auditory ?? '',
-          usuario: areaResponse?.user?.username || '',
-          auditor: areaResponse?.corte?.formAuditory?.user?.username || '',
-        };
-      case 7: // color-edge
-        return {
-          buenas: areaResponse?.colorEdge?.good_quantity || 0,
-          malas: areaResponse?.colorEdge?.bad_quantity || 0,
-          excedente: areaResponse?.colorEdge?.excess_quantity || 0,
-          cqm: areaResponse?.colorEdge?.form_answer?.sample_quantity || 0,
-          muestras: areaResponse?.colorEdge?.formAuditory?.sample_auditory ?? '',
-          usuario: areaResponse?.user?.username || '',
-          auditor: areaResponse?.colorEdge?.formAuditory?.user?.username || '',
-        };
-      case 8: // hot-stamping
-        return {
-          buenas: areaResponse?.hotStamping?.good_quantity || 0,
-          malas: areaResponse?.hotStamping?.bad_quantity || 0,
-          excedente: areaResponse?.hotStamping?.excess_quantity || 0,
-          cqm: areaResponse?.hotStamping?.form_answer?.sample_quantity || 0,
-          muestras: areaResponse?.hotStamping?.formAuditory?.sample_auditory ?? '',
-          usuario: areaResponse?.user?.username || '',
-          auditor: areaResponse?.hotStamping?.formAuditory?.user?.username || '',
-
-        };
-      case 9: // milling-chip
-        console.log(areaResponse?.millingChip);
-        return {
-          buenas: areaResponse?.millingChip?.good_quantity || 0,
-          malas: areaResponse?.millingChip?.bad_quantity || 0,
-          excedente: areaResponse?.millingChip?.excess_quantity || 0,
-          cqm: areaResponse?.millingChip?.form_answer?.sample_quantity || 0,
-          muestras: areaResponse?.millingChip?.formAuditory?.sample_auditory ?? '',
-          usuario: areaResponse?.user?.username || '',
-          auditor: areaResponse?.millingChip?.formAuditory?.user?.username || '',
-        };
-      case 10: // personalizacion
-        return {
-          buenas: areaResponse?.personalizacion?.good_quantity || 0,
-          malas: areaResponse?.personalizacion?.bad_quantity || 0,
-          excedente: areaResponse?.personalizacion?.excess_quantity || 0,
-          cqm: areaResponse?.personalizacion?.form_answer?.sample_quantity || 0,
-          muestras: areaResponse?.personalizacion?.formAuditory?.sample_auditory ?? '',
-          usuario: areaResponse?.user?.username || '',
-          auditor: areaResponse?.personalizacion?.formAuditory?.user?.username || '',
-        };
+      case 6:
+        return getCommonData('corte');
+      case 7:
+        return getCommonData('colorEdge');
+      case 8:
+        return getCommonData('hotStamping');
+      case 9:
+        return getCommonData('millingChip');
+      case 10:
+        return getCommonData('personalizacion');
       default:
         return {
           buenas: 0,
           malas: 0,
           excedente: 0,
-          muestras: 0,
           cqm: 0,
+          muestras: 0,
           usuario: '',
-          auditor: ''
+          auditor: '',
         };
     }
   };
 
-  const areas = workOrder?.flow?.map((item: any) => {
+  const areas = workOrder?.flow?.map((item: any, index: any) => {
     const areaData = getAreaData(item.area_id, item.areaResponse);
     console.log('areaData', areaData.usuario);
     return {
@@ -119,7 +138,7 @@ const CerrarOrdenDeTrabajoAuxScreen: React.FC = () => {
       status: item.status || 'Desconocido',
       response: item.areaResponse || {},
       answers: item.answers?.[0] || {},
-      ...areaData,
+      ...getAreaData(item.area_id, item.areaResponse, item.partialReleases, item.user, index),
     };
   }) || [];
 

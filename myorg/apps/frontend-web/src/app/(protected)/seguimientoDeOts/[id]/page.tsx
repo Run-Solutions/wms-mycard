@@ -1,10 +1,10 @@
 // myorg/apps/frontend-web/src/app/(protected)/seguimientoDeOts/[id]/page.tsx
-'use client'
+'use client';
 
-import { use, useState, useEffect } from "react";
-import { useRouter } from "next/navigation";
-import styled from "styled-components";
-import { fetchWorkOrderById, closeWorkOrder } from "@/api/seguimientoDeOts";
+import { use, useState, useEffect } from 'react';
+import { useRouter } from 'next/navigation';
+import styled from 'styled-components';
+import { fetchWorkOrderById, closeWorkOrder } from '@/api/seguimientoDeOts';
 
 interface Props {
   params: Promise<{ id: string }>;
@@ -17,7 +17,7 @@ type AreaData = {
   response: {
     user: {
       username: string;
-    }
+    };
   };
   answers: any;
   usuario: string;
@@ -33,7 +33,7 @@ export default function SeguimientoDeOtsAuxPage({ params }: Props) {
   const { id } = use(params);
   const router = useRouter();
   const [workOrder, setWorkOrder] = useState<any>(null);
-  const [showConfirm, setShowConfirm] = useState(false); 
+  const [showConfirm, setShowConfirm] = useState(false);
 
   useEffect(() => {
     const loadData = async () => {
@@ -50,45 +50,105 @@ export default function SeguimientoDeOtsAuxPage({ params }: Props) {
     } catch (error) {
       console.log('Error al enviar datos:', error);
     }
-  }
+  };
 
   // Función para obtener los datos específicos de cada área
-  const getAreaData = (areaId: number, areaResponse: any) => {
+  // Ahora acepta partialReleases como argumento externo
+  const getAreaData = (
+    areaId: number,
+    areaResponse: any,
+    partialReleases: any[] = [],
+    flowUser: any = null,
+    index: number = -1
+  ) => {
+    const sumFromPartials = () => {
+      return partialReleases.reduce(
+        (acc: any, curr: any) => {
+          acc.buenas += curr.quantity || 0;
+          acc.malas += curr.bad_quantity || 0;
+          acc.excedente += curr.excess_quantity || 0;
+          return acc;
+        },
+        { buenas: 0, malas: 0, excedente: 0 }
+      );
+    };
+
+    const getCommonData = (areaKey: string) => {
+      const hasResponse = !!areaResponse?.[areaKey];
+      const usuario = areaResponse?.user?.username || flowUser?.username || '';
+      const auditor =
+        areaResponse?.[areaKey]?.formAuditory?.user?.username || '';
+
+      if (!hasResponse && partialReleases.length > 0) {
+        const resumen = sumFromPartials();
+        console.log('[PARCIAL DETECTADO]', areaKey, resumen);
+        return { ...resumen, cqm: 0, muestras: 0, usuario, auditor: '' };
+      }
+
+      return {
+        buenas:
+          areaResponse?.[areaKey]?.good_quantity ||
+          areaResponse?.[areaKey]?.release_quantity ||
+          areaResponse?.[areaKey]?.plates ||
+          0,
+        malas: areaResponse?.[areaKey]?.bad_quantity || 0,
+        excedente: areaResponse?.[areaKey]?.excess_quantity || 0,
+        cqm: areaResponse?.[areaKey]?.form_answer?.sample_quantity ?? 0,
+        muestras: areaResponse?.[areaKey]?.formAuditory?.sample_auditory ?? 0,
+        usuario,
+        auditor,
+      };
+    };
+
     switch (areaId) {
       case 1:
-        return { buenas: areaResponse?.prepress?.plates || 0, malas: areaResponse?.prepress?.bad_quantity || 0, excedente: areaResponse?.prepress?.excess_quantity || 0, cqm: 0, muestras: 0, usuario: areaResponse?.user?.username || '', auditor: '' };
+        return getCommonData('prepress');
       case 2:
-        return { buenas: areaResponse?.impression?.release_quantity || 0, malas: areaResponse?.impression?.bad_quantity || 0, excedente: areaResponse?.impression?.excess_quantity || 0, cqm: areaResponse?.impression?.form_answer?.sample_quantity ?? 0, muestras: 0,usuario: areaResponse?.user?.username || '', auditor: '' };
+        return getCommonData('impression');
       case 3:
-        return { buenas: areaResponse?.serigrafia?.release_quantity || 0, malas: areaResponse?.serigrafia?.bad_quantity || 0, excedente: areaResponse?.serigrafia?.excess_quantity || 0, cqm: areaResponse?.serigrafia?.form_answer?.sample_quantity ?? 0, muestras: 0,usuario: areaResponse?.user?.username || '', auditor: '' };
+        return getCommonData('serigrafia');
       case 4:
-        return { buenas: areaResponse?.empalme?.release_quantity || 0, malas: areaResponse?.empalme?.bad_quantity || 0, excedente: areaResponse?.empalme?.excess_quantity || 0, cqm: areaResponse?.empalme?.form_answer?.sample_quantity ?? 0, muestras: 0,usuario: areaResponse?.user?.username || '', auditor: '' };
+        return getCommonData('empalme');
       case 5:
-        return { buenas: areaResponse?.laminacion?.release_quantity || 0, malas: areaResponse?.laminacion?.bad_quantity || 0, excedente: areaResponse?.laminacion?.excess_quantity || 0, cqm: areaResponse?.laminacion?.form_answer?.sample_quantity ?? 0, muestras: 0,usuario: areaResponse?.user?.username || '', auditor: '' };
+        return getCommonData('laminacion');
       case 6:
-        return { buenas: areaResponse?.corte?.good_quantity || 0, malas: areaResponse?.corte?.bad_quantity || 0, excedente: areaResponse?.corte?.excess_quantity || 0, cqm: areaResponse?.corte?.form_answer?.sample_quantity ?? 0, muestras: areaResponse?.corte?.formAuditory?.sample_auditory ?? 0,usuario: areaResponse?.user?.username || '', auditor: areaResponse?.corte?.formAuditory?.user?.username || '' };
+        return getCommonData('corte');
       case 7:
-        return { buenas: areaResponse?.colorEdge?.good_quantity || 0, malas: areaResponse?.colorEdge?.bad_quantity || 0, excedente: areaResponse?.colorEdge?.excess_quantity || 0, cqm: areaResponse?.colorEdge?.form_answer?.sample_quantity || 0, muestras: areaResponse?.colorEdge?.formAuditory?.sample_auditory ?? 0,usuario: areaResponse?.user?.username || '', auditor: areaResponse?.colorEdge?.formAuditory?.user?.username || '' };
+        return getCommonData('colorEdge');
       case 8:
-        return { buenas: areaResponse?.hotStamping?.good_quantity || 0, malas: areaResponse?.hotStamping?.bad_quantity || 0, excedente: areaResponse?.hotStamping?.excess_quantity || 0, cqm: areaResponse?.hotStamping?.form_answer?.sample_quantity || 0, muestras: areaResponse?.hotStamping?.formAuditory?.sample_auditory ?? 0,usuario: areaResponse?.user?.username || '', auditor: areaResponse?.hotStamping?.formAuditory?.user?.username || '' };
+        return getCommonData('hotStamping');
       case 9:
-        return { buenas: areaResponse?.millingChip?.good_quantity || 0, malas: areaResponse?.millingChip?.bad_quantity || 0, excedente: areaResponse?.millingChip?.excess_quantity || 0, cqm: areaResponse?.millingChip?.form_answer?.sample_quantity || 0, muestras: areaResponse?.millingChip?.formAuditory?.sample_auditory ?? 0,usuario: areaResponse?.user?.username || '', auditor: areaResponse?.millingChip?.formAuditory?.user?.username || '' };
+        return getCommonData('millingChip');
       case 10:
-        return { buenas: areaResponse?.personalizacion?.good_quantity || 0, malas: areaResponse?.personalizacion?.bad_quantity || 0, excedente: areaResponse?.personalizacion?.excess_quantity || 0, cqm: areaResponse?.personalizacion?.form_answer?.sample_quantity || 0, muestras: areaResponse?.personalizacion?.formAuditory?.sample_auditory ?? 0,usuario: areaResponse?.user?.username || '', auditor: areaResponse?.personalizacion?.formAuditory?.user?.username || '' };
+        return getCommonData('personalizacion');
       default:
-        return { buenas: 0, malas: 0, excedente: 0, cqm: 0, muestras: 0 };
+        return {
+          buenas: 0,
+          malas: 0,
+          excedente: 0,
+          cqm: 0,
+          muestras: 0,
+          usuario: '',
+          auditor: '',
+        };
     }
   };
 
-  const areas: AreaData[] = workOrder?.flow?.map((item: any) => ({
-    id: item.area_id,
-    name: item.area?.name || 'Sin nombre',
-    status: item.status || 'Desconocido',
-    response: item.areaResponse || {},
-    answers: item.answers?.[0] || {},
-    ...getAreaData(item.area_id, item.areaResponse)
-  })) || [];
-
+  const areas: AreaData[] =
+    workOrder?.flow?.map((item: any, index: number) => ({
+      id: item.area_id,
+      name: item.area?.name || 'Sin nombre',
+      status: item.status || 'Desconocido',
+      response: item.areaResponse || {},
+      answers: item.answers?.[0] || {},
+      ...getAreaData(
+        item.area_id,
+        item.areaResponse,
+        item.partialReleases,
+        item.user,
+        index
+      ),
+    })) || [];
 
   const cantidadHojasRaw = Number(workOrder?.quantity) / 24;
   const cantidadHojas = cantidadHojasRaw > 0 ? Math.ceil(cantidadHojasRaw) : 0;
@@ -115,21 +175,28 @@ export default function SeguimientoDeOtsAuxPage({ params }: Props) {
             <Label>Cantidad (HOJAS): </Label>
             <Value>{cantidadHojas}</Value>
           </InfoItem>
-        </DataWrapper>
           <InfoItem>
-            <Label>Comentarios: </Label>
-            <Value>{workOrder?.comments}</Value>
+            <Label>Fecha de Creación: </Label>
+            <Value>{new Date(workOrder?.createdAt).toLocaleDateString()}</Value>
           </InfoItem>
+        </DataWrapper>
+        <InfoItem>
+          <Label>Comentarios: </Label>
+          <Value>{workOrder?.comments}</Value>
+        </InfoItem>
 
         <Section>
           <SectionTitle>Datos de Producción</SectionTitle>
           <TableWrapper>
-          <Table>
+            <Table>
               <thead>
                 <tr>
                   <th />
                   {areas.map((area, index) => (
-                    <th key={`${area.id}-${index}`} title={`Estado: ${area.status}`}>
+                    <th
+                      key={`${area.id}-${index}`}
+                      title={`Estado: ${area.status}`}
+                    >
                       <span>{area.name}</span>
                     </th>
                   ))}
@@ -196,11 +263,21 @@ export default function SeguimientoDeOtsAuxPage({ params }: Props) {
                     </td>
                   ))}
                 </tr>
+                <tr style={{ backgroundColor: '#d7e6d1' }}>
+                  <td>BUENAS + EXCEDENTE</td>
+                  {areas.map((area, idx) => (
+                    <td key={`${area.id}-${idx}`}>
+                      {area.id >= 6 ? area.buenas + area.excedente : ''}
+                    </td>
+                  ))}
+                </tr>
               </tbody>
             </Table>
           </TableWrapper>
           {workOrder?.status !== 'Cerrado' && (
-            <CloseButton onClick={() => setShowConfirm(true)}>Cerrar Orden de Trabajo</CloseButton>
+            <CloseButton onClick={() => setShowConfirm(true)}>
+              Cerrar Orden de Trabajo
+            </CloseButton>
           )}
         </Section>
       </Container>
@@ -208,16 +285,27 @@ export default function SeguimientoDeOtsAuxPage({ params }: Props) {
         <ModalOverlay>
           <ModalBox>
             <h4>¿Estás segura/o que deseas cerrar esta Orden de Trabajo?</h4>
-            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '1rem', marginTop: '1rem' }}>
-              <CancelButton onClick={() => setShowConfirm(false)}>Cancelar</CancelButton>
-              <ConfirmButton onClick={handleCloseOrder}>Confirmar</ConfirmButton>
+            <div
+              style={{
+                display: 'flex',
+                justifyContent: 'flex-end',
+                gap: '1rem',
+                marginTop: '1rem',
+              }}
+            >
+              <CancelButton onClick={() => setShowConfirm(false)}>
+                Cancelar
+              </CancelButton>
+              <ConfirmButton onClick={handleCloseOrder}>
+                Confirmar
+              </ConfirmButton>
             </div>
           </ModalBox>
         </ModalOverlay>
       )}
     </>
   );
-};
+}
 
 // =================== Styled Components ===================
 
@@ -228,7 +316,7 @@ const Container = styled.div`
 const Title = styled.h2`
   margin-bottom: 1.5rem;
   font-size: 2rem;
-  color: ${({ theme }) => theme.palette.text.primary}
+  color: ${({ theme }) => theme.palette.text.primary};
 `;
 
 const DataWrapper = styled.div`
@@ -241,7 +329,7 @@ const InfoItem = styled.div`
   background: white;
   padding: 1.25rem 1.5rem;
   border-radius: 0.75rem;
-  box-shadow: 0 3px 6px rgba(0,0,0,0.08);
+  box-shadow: 0 3px 6px rgba(0, 0, 0, 0.08);
   flex: 1;
 `;
 
@@ -252,7 +340,7 @@ const Label = styled.span`
 `;
 
 const Value = styled.span`
-  font-size: 1.125rem;  
+  font-size: 1.125rem;
   margin-top: 5px;
   color: black;
 `;
@@ -264,7 +352,7 @@ const Section = styled.div`
 const SectionTitle = styled.h3`
   font-size: 1.5rem;
   margin-bottom: 1rem;
-  color: ${({ theme }) => theme.palette.text.primary}
+  color: ${({ theme }) => theme.palette.text.primary};
 `;
 
 const TableWrapper = styled.div`
@@ -278,12 +366,13 @@ const Table = styled.table`
   background: white;
   border-radius: 0.75rem;
   overflow: hidden;
-  box-shadow: 0 4px 10px rgba(0,0,0,0.05);
+  box-shadow: 0 4px 10px rgba(0, 0, 0, 0.05);
 
-  th, td {
+  th,
+  td {
     padding: 0.75rem;
     text-align: center;
-    color:rgb(4, 4, 4);
+    color: rgb(4, 4, 4);
     border-bottom: 1px solid #e5e7eb;
   }
 
@@ -306,11 +395,11 @@ const CloseButton = styled.button`
   border-radius: 0.75rem;
   font-size: 1rem;
   cursor: pointer;
-  box-shadow: 0 3px 6px rgba(0,0,0,0.08);
+  box-shadow: 0 3px 6px rgba(0, 0, 0, 0.08);
   transition: background 0.3s;
 
   &:hover {
-    background: #1D4ED8;
+    background: #1d4ed8;
   }
 `;
 
@@ -321,7 +410,7 @@ const ModalOverlay = styled.div`
   color: black;
   width: 100%;
   height: 100%;
-  background: rgba(0,0,0,0.4);
+  background: rgba(0, 0, 0, 0.4);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -332,13 +421,13 @@ const ModalBox = styled.div`
   background: white;
   padding: 2rem;
   border-radius: 1rem;
-  box-shadow: 0 8px 24px rgba(0,0,0,0.2);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.2);
   max-width: 400px;
   width: 90%;
 `;
 
 const ConfirmButton = styled.button`
-  background-color: #0038A8;
+  background-color: #0038a8;
   color: white;
   padding: 0.5rem 1.5rem;
   border-radius: 0.5rem;
@@ -357,7 +446,7 @@ const ConfirmButton = styled.button`
 `;
 
 const CancelButton = styled.button`
-  background-color: #BBBBBB;
+  background-color: #bbbbbb;
   color: white;
   padding: 0.5rem 1.5rem;
   border-radius: 0.5rem;

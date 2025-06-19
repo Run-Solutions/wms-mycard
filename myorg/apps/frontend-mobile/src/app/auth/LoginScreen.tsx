@@ -152,7 +152,7 @@ const LoginScreen: React.FC = () => {
           theme={{ roundness: 30 }}
         />
         {error && <Text style={styles.error}>{error}</Text>}
-        <Button mode="contained" onPress={handleBiometricLogin} style={styles.button}>
+        <Button mode="contained" onPress={handleLogin} style={styles.button}>
           Iniciar Sesión
         </Button>
         <Button

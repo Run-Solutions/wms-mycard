@@ -1,15 +1,18 @@
-'use client'
+'use client';
 
-import { useRouter } from "next/navigation";
-import { useState, useEffect } from "react";
-import styled from "styled-components";
-import { acceptWorkOrderFlowColorEdgeAuditory, registrarInconformidadAuditory } from "@/api/aceptarAuditoria";
+import { useRouter } from 'next/navigation';
+import { useState, useEffect } from 'react';
+import styled from 'styled-components';
+import {
+  acceptWorkOrderFlowColorEdgeAuditory,
+  registrarInconformidadAuditory,
+} from '@/api/aceptarAuditoria';
 
 // Define un tipo para los valores del formulario
 type ColorEdgeData = {
-  good_quantity: string;
-  bad_quantity: string;
-  excess_quantity: string;
+  good_quantity: number;
+  bad_quantity: number;
+  excess_quantity: number;
   cqm_quantity: string;
   comments: string;
 };
@@ -24,7 +27,7 @@ type PartialRelease = {
   excess_quantity: string;
   observation: string;
   validated: boolean;
-}
+};
 
 export default function ColorEdgeComponentAcceptAuditory({ workOrder }: Props) {
   const router = useRouter();
@@ -40,11 +43,11 @@ export default function ColorEdgeComponentAcceptAuditory({ workOrder }: Props) {
   if (workOrder.area_id >= 2) {
     // Estados tipados para los valores predeterminados y actuales
     const [defaultValues, setDefaultValues] = useState<ColorEdgeData>({
-      good_quantity: "",
-      bad_quantity: "",
-      excess_quantity: "",
-      cqm_quantity: "",
-      comments: "",
+      good_quantity: 0,
+      bad_quantity: 0,
+      excess_quantity: 0,
+      cqm_quantity: '',
+      comments: '',
     });
     const cqm_quantity = workOrder.answers.reduce(
       (total: number, answer: { sample_quantity?: number | string }) => {
@@ -54,19 +57,55 @@ export default function ColorEdgeComponentAcceptAuditory({ workOrder }: Props) {
     );
 
     useEffect(() => {
-      if (workOrder?.areaResponse?.colorEdge && workOrder?.partialReleases?.length === 0) {
+      if (!workOrder) return;
+
+      const colorEdge = workOrder.areaResponse?.colorEdge;
+      const partials = workOrder.partialReleases;
+
+      const allValidated =
+        partials.length > 0 && partials.every((p: any) => p.validated);
+
+      if (colorEdge && partials.length === 0) {
+        // Caso original: hay empalme pero no hay parciales
         const vals: ColorEdgeData = {
-          good_quantity: workOrder.areaResponse.colorEdge.good_quantity || "0",
-          bad_quantity: workOrder.areaResponse.colorEdge.bad_quantity || "0",
-          excess_quantity: workOrder.areaResponse.colorEdge.excess_quantity || "0",
-          cqm_quantity: cqm_quantity || "0",
-          comments: workOrder.areaResponse.colorEdge.comments || "",
+          good_quantity: colorEdge.good_quantity || '',
+          bad_quantity: colorEdge.bad_quantity || '',
+          excess_quantity: colorEdge.excess_quantity || '',
+          cqm_quantity: cqm_quantity || '',
+          comments: colorEdge.comments || '',
+        };
+        setDefaultValues(vals);
+      } else if (colorEdge && allValidated) {
+        // Nuevo caso: todos los parciales están validados y hay empalme
+        const totalParciales = partials.reduce(
+          (acc: any, curr: any) => acc + (curr.quantity || 0),
+          0
+        );
+        const totalParcialesbad = partials.reduce(
+          (acc: any, curr: any) => acc + (curr.bad_quantity || 0),
+          0
+        );
+        const totalParcialesexec = partials.reduce(
+          (acc: any, curr: any) => acc + (curr.excess_quantity || 0),
+          0
+        );
+        const restante = (colorEdge.good_quantity || 0) - totalParciales;
+        const restantebad = (colorEdge.bad_quantity || 0) - totalParcialesbad;
+        const restanteexc =
+          (colorEdge.excess_quantity || 0) - totalParcialesexec;
+
+        const vals: ColorEdgeData = {
+          good_quantity: restante > 0 ? restante : 0,
+          bad_quantity: restantebad > 0 ? restantebad : 0,
+          excess_quantity: restanteexc > 0 ? restanteexc : 0,
+          cqm_quantity: cqm_quantity || '',
+          comments: '', // puedes ajustar si quieres comentarios por defecto
         };
         setDefaultValues(vals);
       } else {
-        const firstUnvalidatedPartial = workOrder.partialReleases.find(
-          (release: PartialRelease) => !release.validated
-        );
+        // Caso original: se busca el primer parcial sin validar
+        const firstUnvalidatedPartial = partials.find((p: any) => !p.validated);
+
         const vals: ColorEdgeData = {
           good_quantity: firstUnvalidatedPartial.quantity || '',
           bad_quantity: firstUnvalidatedPartial.bad_quantity || '',
@@ -85,7 +124,8 @@ export default function ColorEdgeComponentAcceptAuditory({ workOrder }: Props) {
         return;
       }
       // Envío siempre colorEdge.id si existe; si no, workOrder.id
-      const ColorEdgeId = workOrder?.areaResponse?.colorEdge?.id ?? workOrder.id;
+      const ColorEdgeId =
+        workOrder?.areaResponse?.colorEdge?.id ?? workOrder.id;
       try {
         await acceptWorkOrderFlowColorEdgeAuditory(ColorEdgeId, sampleAuditory);
         router.push('/aceptarAuditoria');
@@ -93,7 +133,7 @@ export default function ColorEdgeComponentAcceptAuditory({ workOrder }: Props) {
         console.error(error);
         alert('Error al conectar con el servidor');
       }
-    }
+    };
 
     const handleSubmitInconformidad = async () => {
       if (!inconformidad.trim()) {
@@ -107,11 +147,11 @@ export default function ColorEdgeComponentAcceptAuditory({ workOrder }: Props) {
         console.error(error);
         alert('Error al conectar con el servidor');
       }
-    }
+    };
 
     return (
       <Container>
-        <Title>Área: {workOrder?.area.name || "No definida"}</Title>
+        <Title>Área: {workOrder?.area.name || 'No definida'}</Title>
         <DataWrapper>
           <InfoItem>
             <Label>Número de Orden:</Label>
@@ -123,21 +163,21 @@ export default function ColorEdgeComponentAcceptAuditory({ workOrder }: Props) {
           </InfoItem>
           <InfoItem>
             <Label>Cantidad:</Label>
-            <Value>{workOrder?.workOrder.quantity || "No definida"}</Value>
+            <Value>{workOrder?.workOrder.quantity || 'No definida'}</Value>
           </InfoItem>
           <InfoItem>
             <Label>Área que lo envía:</Label>
-            <Value>{workOrder?.area.name || "No definida"}</Value>
+            <Value>{workOrder?.area.name || 'No definida'}</Value>
           </InfoItem>
           <InfoItem>
             <Label>Usuario que lo envía:</Label>
-            <Value>{workOrder?.user.username || "No definida"}</Value>
+            <Value>{workOrder?.user.username || 'No definida'}</Value>
           </InfoItem>
         </DataWrapper>
         <DataWrapper>
           <InfoItem>
             <Label>Comentarios:</Label>
-            <Value>{workOrder?.workOrder.comments || "No definida"}</Value>
+            <Value>{workOrder?.workOrder.comments || 'No definida'}</Value>
           </InfoItem>
         </DataWrapper>
         <NewData>
@@ -145,33 +185,67 @@ export default function ColorEdgeComponentAcceptAuditory({ workOrder }: Props) {
           <NewDataWrapper>
             <InputGroup>
               <Label>Buenas:</Label>
-              <Input type="number" name="good_quantity" value={defaultValues.good_quantity} disabled/>
+              <Input
+                type="number"
+                name="good_quantity"
+                value={defaultValues.good_quantity}
+                disabled
+              />
               <Label>Malas:</Label>
-              <Input type="number" name="bad_quantity" value={defaultValues.bad_quantity} disabled/>
+              <Input
+                type="number"
+                name="bad_quantity"
+                value={defaultValues.bad_quantity}
+                disabled
+              />
               <Label>Excedente:</Label>
-              <Input type="number" name="excess_quantity" value={defaultValues.excess_quantity} disabled/>
+              <Input
+                type="number"
+                name="excess_quantity"
+                value={defaultValues.excess_quantity}
+                disabled
+              />
               <Label>Muestras en CQM:</Label>
-              <Input type="number" name="excess_quantity" value={defaultValues.cqm_quantity} disabled/>
+              <Input
+                type="number"
+                name="excess_quantity"
+                value={defaultValues.cqm_quantity}
+                disabled
+              />
               <Label>Muestras:</Label>
-              <Input type="number" value={sampleAuditory} onChange={(e) => setSampleQuantity(e.target.value)}/>
+              <Input
+                type="number"
+                value={sampleAuditory}
+                onChange={(e) => setSampleQuantity(e.target.value)}
+              />
             </InputGroup>
-            <InconformidadButton onClick={() => setShowInconformidad(true)}>Inconformidad</InconformidadButton>
+            <InconformidadButton onClick={() => setShowInconformidad(true)}>
+              Inconformidad
+            </InconformidadButton>
           </NewDataWrapper>
           <InputGroup>
             <SectionTitle>Comentarios</SectionTitle>
-            <Textarea
-              value={defaultValues.comments}
-              disabled={isDisabled}
-            />
+            <Textarea value={defaultValues.comments} disabled={isDisabled} />
           </InputGroup>
         </NewData>
-        <AceptarButton onClick={() => setShowConfirm(true)}>Aceptar recepción del producto</AceptarButton>
+        <AceptarButton onClick={() => setShowConfirm(true)}>
+          Aceptar recepción del producto
+        </AceptarButton>
         {showConfirm && (
           <ModalOverlay>
             <ModalBox>
               <h4>¿Estás segura/o que deseas liberar este producto?</h4>
-              <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '1rem', marginTop: '1rem' }}>
-                <CancelButton onClick={() => setShowConfirm(false)}>Cancelar</CancelButton>
+              <div
+                style={{
+                  display: 'flex',
+                  justifyContent: 'flex-end',
+                  gap: '1rem',
+                  marginTop: '1rem',
+                }}
+              >
+                <CancelButton onClick={() => setShowConfirm(false)}>
+                  Cancelar
+                </CancelButton>
                 <ConfirmButton onClick={handleSubmit}>Confirmar</ConfirmButton>
               </div>
             </ModalBox>
@@ -181,23 +255,41 @@ export default function ColorEdgeComponentAcceptAuditory({ workOrder }: Props) {
           <ModalOverlay>
             <ModalBox>
               <h4>Registrar Inconformidad</h4>
-              <h3>Por favor, describe la inconformidad detectada con la cantidad entregada.</h3>
+              <h3>
+                Por favor, describe la inconformidad detectada con la cantidad
+                entregada.
+              </h3>
               <Textarea
                 value={inconformidad}
                 onChange={(e) => setInconformidad(e.target.value)}
                 placeholder="Escribe aquí la inconformidad..."
               />
-              <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '1rem', marginTop: '1rem' }}>
-                <CancelButton onClick={() => setShowInconformidad(false)}>Cancelar</CancelButton>
-                <ConfirmButton onClick={() => {
-                  console.log('Hpli');
-                  if (!inconformidad.trim()) {
-                    alert('Debes ingresar una inconformidad antes de continuar.');
-                    return;
-                  }
-                  handleSubmitInconformidad();
-                  setShowInconformidad(false);
-                }}>Guardar</ConfirmButton>
+              <div
+                style={{
+                  display: 'flex',
+                  justifyContent: 'flex-end',
+                  gap: '1rem',
+                  marginTop: '1rem',
+                }}
+              >
+                <CancelButton onClick={() => setShowInconformidad(false)}>
+                  Cancelar
+                </CancelButton>
+                <ConfirmButton
+                  onClick={() => {
+                    console.log('Hpli');
+                    if (!inconformidad.trim()) {
+                      alert(
+                        'Debes ingresar una inconformidad antes de continuar.'
+                      );
+                      return;
+                    }
+                    handleSubmitInconformidad();
+                    setShowInconformidad(false);
+                  }}
+                >
+                  Guardar
+                </ConfirmButton>
               </div>
             </ModalBox>
           </ModalOverlay>
@@ -288,7 +380,7 @@ const Input = styled.input`
   transition: border 0.3s;
 
   &:focus {
-    border-color: #0038A8;
+    border-color: #0038a8;
   }
 `;
 
@@ -304,43 +396,41 @@ const Textarea = styled.textarea`
   resize: vertical;
 
   &:focus {
-    border-color: #0038A8;
+    border-color: #0038a8;
     outline: none;
   }
 `;
 
 const AceptarButton = styled.button<{ disabled?: boolean }>`
   margin-top: 2rem;
-  background-color: ${({ disabled }) => (disabled ? "#9CA3AF" : "#0038A8")};
+  background-color: ${({ disabled }) => (disabled ? '#9CA3AF' : '#0038A8')};
   color: white;
   padding: 0.75rem 2rem;
   border-radius: 0.5rem;
   font-weight: 600;
   transition: background 0.3s;
-  cursor: ${({ disabled }) => (disabled ? "not-allowed" : "pointer")};
+  cursor: ${({ disabled }) => (disabled ? 'not-allowed' : 'pointer')};
   opacity: ${({ disabled }) => (disabled ? 0.7 : 1)};
 
   &:hover {
-    background-color: ${({ disabled }) =>
-      disabled ? "#9CA3AF" : "#1D4ED8"};
+    background-color: ${({ disabled }) => (disabled ? '#9CA3AF' : '#1D4ED8')};
   }
 `;
 
 const InconformidadButton = styled.button<{ disabled?: boolean }>`
   height: 50px;
-  background-color: ${({ disabled }) => (disabled ? "#D1D5DB" : "#A9A9A9")};
+  background-color: ${({ disabled }) => (disabled ? '#D1D5DB' : '#A9A9A9')};
   color: white;
   padding: 0.75rem 2rem;
   border-radius: 0.5rem;
   font-weight: 600;
   transition: background 0.3s;
   align-self: flex-end;
-  cursor: ${({ disabled }) => (disabled ? "not-allowed" : "pointer")};
+  cursor: ${({ disabled }) => (disabled ? 'not-allowed' : 'pointer')};
   opacity: ${({ disabled }) => (disabled ? 0.7 : 1)};
 
   &:hover {
-    background-color: ${({ disabled }) =>
-      disabled ? "#D1D5DB" : "#8d8d92"};
+    background-color: ${({ disabled }) => (disabled ? '#D1D5DB' : '#8d8d92')};
   }
 `;
 
@@ -351,7 +441,7 @@ const ModalOverlay = styled.div`
   left: 0;
   width: 100%;
   height: 100%;
-  background: rgba(0,0,0,0.3);
+  background: rgba(0, 0, 0, 0.3);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -361,13 +451,13 @@ const ModalBox = styled.div`
   background: white;
   padding: 2rem;
   border-radius: 1rem;
-  box-shadow: 0 8px 24px rgba(0,0,0,0.2);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.2);
   max-width: 400px;
   width: 90%;
 `;
 
 const ConfirmButton = styled.button`
-  background-color: #0038A8;
+  background-color: #0038a8;
   color: white;
   padding: 0.5rem 1.5rem;
   border-radius: 0.5rem;
@@ -386,7 +476,7 @@ const ConfirmButton = styled.button`
 `;
 
 const CancelButton = styled.button`
-  background-color: #BBBBBB;
+  background-color: #bbbbbb;
   color: white;
   padding: 0.5rem 1.5rem;
   border-radius: 0.5rem;

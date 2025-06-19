@@ -644,98 +644,53 @@ export class FreeWorkOrderService {
   // Para guardar respuesta de liberacion de Impresion
   async createImpressResponse(dto: CreateImpressResponseDto) {
     return this.prisma.$transaction(async (tx) => {
-      // Buscar el siguiente flujo (por id mayor y mismo work_order)
+      // Obtener el siguiente flujo (mayor id del mismo work_order)
       const nextFlow = await tx.workOrderFlow.findFirst({
         where: {
           work_order_id: dto.workOrderId,
-          id: {
-            gt: dto.workOrderFlowId,
-          },
+          id: { gt: dto.workOrderFlowId },
         },
-        orderBy: {
-          id: 'asc',
-        },
+        orderBy: { id: 'asc' },
       });
-      // Obtener cantidad solicitada de la WorkOrder
+      // Obtener cantidad solicitada de la orden
       const workOrder = await tx.workOrder.findUnique({
-        where: {
-          id: dto.workOrderId,
-        },
-        select: {
-          quantity: true,
-        },    
+        where: { id: dto.workOrderId },
+        select: { quantity: true },
       });
       if (!workOrder) throw new Error('Work Order no encontrada');
-      // Sumar liberaciones parciales existentes
+      // Obtener liberaciones parciales previas
       const partials = await tx.partialRelease.findMany({
-        where: {
-          work_order_flow_id: dto.workOrderFlowId,
-        },
+        where: { work_order_flow_id: dto.workOrderFlowId },
       });
-      const totalLiberadoPrevio = partials.reduce((total, partial) => total + partial.quantity, 0);
-      // Sumar liberado previo + nuevo liberado
-      const totalLiberadoActual = totalLiberadoPrevio + dto.releaseQuantity;
-      // Si no alcanza la cantidad solicitada agregar partial release
-      if (partials.length > 0) {
-        await tx.partialRelease.create({
-          data: {
-            work_order_flow_id: dto.workOrderFlowId,
-            quantity: dto.releaseQuantity,
-            observation: dto.comments,
-          },
-        });
-        if (totalLiberadoActual < workOrder.quantity) {
-          await tx.partialRelease.create({
-            data: {
-              work_order_flow_id: dto.workOrderFlowId,
-              quantity: dto.releaseQuantity,
-              observation: dto.comments,
-            },
-          });
-          await tx.workOrderFlow.update({
-            where: { id: dto.workOrderFlowId },
-            data: {
-              status: 'Parcial',
-            },
-          });
-          if(nextFlow) {
-            await tx.workOrderFlow.update({
-              where: {
-                id: nextFlow.id,
-              },
-              data: {
-                status: 'Pendiente parcial',
-              },
-            });
-          }
-          return { message: 'Liberación parcial registrada con éxito' };
-        }
-      }
-      if (partials.length === 0 && totalLiberadoActual < workOrder.quantity) {
-        await tx.partialRelease.create({
-          data: {
-            work_order_flow_id: dto.workOrderFlowId,
-            quantity: dto.releaseQuantity,
-            observation: dto.comments,
-          },
-        });
   
+      const totalLiberadoPrevio = partials.reduce(
+        (total, partial) => total + (partial.quantity ?? 0),
+        0,
+      );
+      const totalLiberadoActual = totalLiberadoPrevio + dto.releaseQuantity;
+      // 🟡 Caso parcial: aún no se completa la orden
+      if (totalLiberadoActual < workOrder.quantity) {
+        await tx.partialRelease.create({
+          data: {
+            work_order_flow_id: dto.workOrderFlowId,
+            quantity: dto.releaseQuantity,
+            observation: dto.comments,
+          },
+        });
         await tx.workOrderFlow.update({
           where: { id: dto.workOrderFlowId },
           data: { status: 'Parcial' },
         });
-   
         if (nextFlow) {
           await tx.workOrderFlow.update({
             where: { id: nextFlow.id },
             data: { status: 'Pendiente parcial' },
           });
         }
-  
         return { message: 'Liberación parcial registrada con éxito' };
       }
-      // Si ya alcanza o supera → crear AreasResponse y ImpressResponse
-      // Crear AreasResponse
+      // ✅ Caso completo: ya se alcanzó o superó la cantidad
+      // Crear o recuperar AreasResponse
       let response = await tx.areasResponse.findFirst({
         where: {
           work_order_id: dto.workOrderId,
@@ -743,7 +698,6 @@ export class FreeWorkOrderService {
           area_id: dto.areaId,
         },
       });
-      // Crear AreasResponse si no existe
       if (!response) {
         response = await tx.areasResponse.create({
           data: {
@@ -754,84 +708,65 @@ export class FreeWorkOrderService {
           },
         });
       }
-      // Asociar el área response con el work order flow
+      // Asociar AreaResponse al flujo
       await tx.workOrderFlow.update({
-        where: {
-          id: dto.workOrderFlowId,
-        },
-        data: {
-          area_response_id: response.id,
-        },
+        where: { id: dto.workOrderFlowId },
+        data: { area_response_id: response.id },
       });
-      // Crear ImpressionResponse
+      // Crear impressionResponse
       await tx.impressionResponse.create({
         data: {
           release_quantity: totalLiberadoActual,
           comments: dto.comments,
-          form_answer_id: dto.formAnswerId,  // Pasamos el ID de FormAnswer
+          form_answer_id: dto.formAnswerId,
           areas_response_id: response.id,
         },
       });
-      // Actualizar el estado del WorkOrderFlow a Completado
+      // Marcar flujo como Completado
       await tx.workOrderFlow.update({
-        where: {
-          id: dto.workOrderFlowId,
-        },
-        data: {
-          status: 'Completado',
-        },
+        where: { id: dto.workOrderFlowId },
+        data: { status: 'Completado' },
       });
-      // Si hay un siguiente flujo, se actualiza a pendiente 
-      if(nextFlow) {
+      // Si hay siguiente flujo, marcarlo como Pendiente
+      if (nextFlow) {
         await tx.workOrderFlow.update({
-          where: {
-            id: nextFlow.id,
-          },
-          data: {
-            status: 'Pendiente',
-          },
+          where: { id: nextFlow.id },
+          data: { status: 'Pendiente' },
         });
       }
-      return { message: 'Respuesta guardada con exito'};
-    })
-  } 
+      return { message: 'Respuesta guardada con éxito' };
+    });
+  }
   
   // Para guardar respuesta de liberacion de Impresion
   async createSerigrafiaResponse(dto: CreateImpressResponseDto) {
     return this.prisma.$transaction(async (tx) => {
-      // Buscar el siguiente flujo (por id mayor y mismo work_order)
+      // Obtener el siguiente flujo (mayor id del mismo work_order)
       const nextFlow = await tx.workOrderFlow.findFirst({
         where: {
           work_order_id: dto.workOrderId,
-          id: {
-            gt: dto.workOrderFlowId,
-          },
+          id: { gt: dto.workOrderFlowId },
         },
-        orderBy: {
-          id: 'asc',
-        }, 
+        orderBy: { id: 'asc' },
       });
-      // Obtener cantidad solicitada de la WorkOrder
+      // Obtener cantidad solicitada de la orden
       const workOrder = await tx.workOrder.findUnique({
-        where: {
-          id: dto.workOrderId,
-        },
-        select: {
-          quantity: true,
-        }, 
+        where: { id: dto.workOrderId },
+        select: { quantity: true },
       });
       if (!workOrder) throw new Error('Work Order no encontrada');
-      // Sumar liberaciones parciales existentes
+      // Obtener liberaciones parciales previas
       const partials = await tx.partialRelease.findMany({
-        where: {
-          work_order_flow_id: dto.workOrderFlowId,
-        },
+        where: { work_order_flow_id: dto.workOrderFlowId },
       });
-      const totalLiberadoPrevio = partials.reduce((total, partial) => total + partial.quantity, 0);
-      // Sumar liberado previo + nuevo liberado
+  
+      const totalLiberadoPrevio = partials.reduce(
+        (total, partial) => total + (partial.quantity ?? 0),
+        0,
+      );
       const totalLiberadoActual = totalLiberadoPrevio + dto.releaseQuantity;
-      // Si no alcanza la cantidad solicitada agregar partial release
-      if (partials.length > 0) {
+      // 🟡 Caso parcial: aún no se completa la orden
+      if (totalLiberadoActual < workOrder.quantity) {
         await tx.partialRelease.create({
           data: {
             work_order_flow_id: dto.workOrderFlowId,
@@ -839,40 +774,6 @@ export class FreeWorkOrderService {
             observation: dto.comments,
           },
         });
-        if (totalLiberadoActual < workOrder.quantity) {
-          await tx.partialRelease.create({
-            data: {
-              work_order_flow_id: dto.workOrderFlowId,
-              quantity: dto.releaseQuantity,
-              observation: dto.comments,
-            },
-          });
-          await tx.workOrderFlow.update({
-            where: { id: dto.workOrderFlowId },
-            data: { status: 'Parcial' },
-          });
-          if(nextFlow) {
-            await tx.workOrderFlow.update({
-              where: {
-                id: nextFlow.id,
-              },
-              data: {
-                status: 'Pendiente parcial',
-              },
-            });
-          }
-          return { message: 'Liberación parcial registrada con éxito' };
-        }
-      }
-      if (partials.length === 0 && totalLiberadoActual < workOrder.quantity) {
-        await tx.partialRelease.create({
-          data: {
-            work_order_flow_id: dto.workOrderFlowId,
-            quantity: dto.releaseQuantity,
-            observation: dto.comments,
-          },
-        });
-
         await tx.workOrderFlow.update({
           where: { id: dto.workOrderFlowId },
           data: { status: 'Parcial' },
@@ -885,7 +786,8 @@ export class FreeWorkOrderService {
         }
         return { message: 'Liberación parcial registrada con éxito' };
       }
-      // Si ya alcanza o supera → crear AreasResponse y SerigrafiaResponse
+      // ✅ Caso completo: ya se alcanzó o superó la cantidad
+      // Crear o recuperar AreasResponse
       let response = await tx.areasResponse.findFirst({
         where: {
           work_order_id: dto.workOrderId,
@@ -893,7 +795,6 @@ export class FreeWorkOrderService {
           area_id: dto.areaId,
         },
       });
-      // Crear AreasResponse
       if (!response) {
         response = await tx.areasResponse.create({
           data: {
@@ -904,144 +805,86 @@ export class FreeWorkOrderService {
           },
         });
       }
-
-      // Asociar el área response con el work order flow
+      // Asociar AreaResponse al flujo
       await tx.workOrderFlow.update({
-        where: {
-          id: dto.workOrderFlowId,
-        },
-        data: {
-          area_response_id: response.id,
-        },
+        where: { id: dto.workOrderFlowId },
+        data: { area_response_id: response.id },
       });
-      // Crear SerigrafiaResponse
+      // Crear serigrafiaResponse
       await tx.serigrafiaResponse.create({
         data: {
           release_quantity: totalLiberadoActual,
           comments: dto.comments,
-          form_answer_id: dto.formAnswerId,  // Pasamos el ID de FormAnswer
+          form_answer_id: dto.formAnswerId,
           areas_response_id: response.id,
         },
       });
-      // Actualizar el estado del WorkOrderFlow a Completado
+      // Marcar flujo como Completado
       await tx.workOrderFlow.update({
-        where: {
-          id: dto.workOrderFlowId,
-        },
-        data: {
-          status: 'Completado',
-        },
+        where: { id: dto.workOrderFlowId },
+        data: { status: 'Completado' },
       });
-      // Si hay un siguiente flujo, se actualiza a pendiente 
-      if(nextFlow) {
+      // Si hay siguiente flujo, marcarlo como Pendiente
+      if (nextFlow) {
         await tx.workOrderFlow.update({
-          where: {
-            id: nextFlow.id,
-          },
-          data: {
-            status: 'Pendiente',
-          },
+          where: { id: nextFlow.id },
+          data: { status: 'Pendiente' },
         });
       }
-      return { message: 'Respuesta guardada con exito'};
-    })
-  } 
+      return { message: 'Respuesta guardada con éxito' };
+    });
+  }
 
   // Para guardar respuesta de liberacion de Preprensa
   async createEmpalmeResponse(dto: CreateEmpalmeResponseDto) {
     return this.prisma.$transaction(async (tx) => {
-      // Buscar el siguiente flujo (por id mayor y mismo work_order)
+      // Obtener el siguiente flujo (mayor id del mismo work_order)
       const nextFlow = await tx.workOrderFlow.findFirst({
         where: {
           work_order_id: dto.workOrderId,
-          id: {
-            gt: dto.workOrderFlowId,
-          },
+          id: { gt: dto.workOrderFlowId },
         },
-        orderBy: {
-          id: 'asc',
-        },
+        orderBy: { id: 'asc' },
       });
-      // Obtener cantidad solicitada de la WorkOrder
+      // Obtener cantidad solicitada de la orden
       const workOrder = await tx.workOrder.findUnique({
-        where: {
-          id: dto.workOrderId,
-        },
-        select: {
-          quantity: true,
-        },    
+        where: { id: dto.workOrderId },
+        select: { quantity: true },
       });
       if (!workOrder) throw new Error('Work Order no encontrada');
-      // Sumar liberaciones parciales existentes
+      // Obtener liberaciones parciales previas
       const partials = await tx.partialRelease.findMany({
-        where: {
-          work_order_flow_id: dto.workOrderFlowId,
-        },
+        where: { work_order_flow_id: dto.workOrderFlowId },
       });
-      const totalLiberadoPrevio = partials.reduce((total, partial) => total + partial.quantity, 0);
-      // Sumar liberado previo + nuevo liberado
-      const totalLiberadoActual = totalLiberadoPrevio + dto.releaseQuantity;
-      // Si no alcanza la cantidad solicitada agregar partial release
-      if (partials.length > 0){
-        await tx.partialRelease.create({
-          data: {
-            work_order_flow_id: dto.workOrderFlowId,
-            quantity: dto.releaseQuantity,
-            observation: dto.comments,
-          },
-        });
-        if (totalLiberadoActual < workOrder.quantity) {
-          await tx.partialRelease.create({
-            data: {
-              work_order_flow_id: dto.workOrderFlowId,
-              quantity: dto.releaseQuantity,
-              observation: dto.comments,
-            },
-          });
-          await tx.workOrderFlow.update({
-            where: { id: dto.workOrderFlowId },
-            data: {
-              status: 'Parcial',
-            },
-          });
-          if(nextFlow) {
-            await tx.workOrderFlow.update({
-              where: {
-                id: nextFlow.id,
-              },
-              data: {
-                status: 'Pendiente parcial',
-              },
-            });
-          }
-          return { message: 'Liberación parcial registrada con éxito' };
-        }
-      }
-      if(partials.length === 0 && totalLiberadoActual < workOrder.quantity){
-        await tx.partialRelease.create({
-          data: {
-            work_order_flow_id: dto.workOrderFlowId,
-            quantity: dto.releaseQuantity,
-            observation: dto.comments,
-          },
-        });
   
+      const totalLiberadoPrevio = partials.reduce(
+        (total, partial) => total + (partial.quantity ?? 0),
+        0,
+      );
+      const totalLiberadoActual = totalLiberadoPrevio + dto.releaseQuantity;
+      // 🟡 Caso parcial: aún no se completa la orden
+      if (totalLiberadoActual < workOrder.quantity) {
+        await tx.partialRelease.create({
+          data: {
+            work_order_flow_id: dto.workOrderFlowId,
+            quantity: dto.releaseQuantity,
+            observation: dto.comments,
+          },
+        });
         await tx.workOrderFlow.update({
           where: { id: dto.workOrderFlowId },
           data: { status: 'Parcial' },
         });
-   
         if (nextFlow) {
           await tx.workOrderFlow.update({
             where: { id: nextFlow.id },
             data: { status: 'Pendiente parcial' },
           });
         }
-  
         return { message: 'Liberación parcial registrada con éxito' };
       }
-      // Si ya alcanza o supera → crear AreasResponse y PrepressResponse
-      // Crear AreasResponse
+      // ✅ Caso completo: ya se alcanzó o superó la cantidad
+      // Crear o recuperar AreasResponse
       let response = await tx.areasResponse.findFirst({
         where: {
           work_order_id: dto.workOrderId,
@@ -1049,7 +892,6 @@ export class FreeWorkOrderService {
           area_id: dto.areaId,
         },
       });
-      // Crear AreasResponse si no existe
       if (!response) {
         response = await tx.areasResponse.create({
           data: {
@@ -1060,119 +902,65 @@ export class FreeWorkOrderService {
           },
         });
       }
-      // Asociar el área response con el work order flow
+      // Asociar AreaResponse al flujo
       await tx.workOrderFlow.update({
-        where: {
-          id: dto.workOrderFlowId,
-        },
-        data: {
-          area_response_id: response.id,
-        },
+        where: { id: dto.workOrderFlowId },
+        data: { area_response_id: response.id },
       });
-      // Crear EmpalmeResponse
+      // Crear empalmeResponse
       await tx.empalmeResponse.create({
         data: {
           release_quantity: totalLiberadoActual,
           comments: dto.comments,
-          form_answer_id: dto.formAnswerId,  // Pasamos el ID de FormAnswer
+          form_answer_id: dto.formAnswerId,
           areas_response_id: response.id,
         },
-      }); 
-      // Actualizar el estado del WorkOrderFlow a Completado
-      await tx.workOrderFlow.update({
-        where: {
-          id: dto.workOrderFlowId,
-        },
-        data: {
-          status: 'Completado',
-        },
       });
-      // Si hay un siguiente flujo, se actualiza a pendiente 
-      if(nextFlow) {
+      // Marcar flujo como Completado
+      await tx.workOrderFlow.update({
+        where: { id: dto.workOrderFlowId },
+        data: { status: 'Completado' },
+      });
+      // Si hay siguiente flujo, marcarlo como Pendiente
+      if (nextFlow) {
         await tx.workOrderFlow.update({
-          where: {
-            id: nextFlow.id,
-          },
-          data: {
-            status: 'Pendiente',
-          },
+          where: { id: nextFlow.id },
+          data: { status: 'Pendiente' },
         });
       }
-      return { message: 'Respuesta guardada con exito'};
-    })
-  } 
+      return { message: 'Respuesta guardada con éxito' };
+    });
+  }
   
   // Para guardar respuesta de liberacion de Preprensa
   async createLaminacionResponse(dto: CreateLaminacionResponseDto) {
     return this.prisma.$transaction(async (tx) => {
-      // Buscar el siguiente flujo (por id mayor y mismo work_order)
+      // Obtener el siguiente flujo (mayor id del mismo work_order)
       const nextFlow = await tx.workOrderFlow.findFirst({
         where: {
           work_order_id: dto.workOrderId,
-          id: {
-            gt: dto.workOrderFlowId,
-          },
-        }, 
-        orderBy: {
-          id: 'asc',
+          id: { gt: dto.workOrderFlowId },
         },
+        orderBy: { id: 'asc' },
       });
-      // Obtener cantidad solicitada de la WorkOrder
+      // Obtener cantidad solicitada de la orden
       const workOrder = await tx.workOrder.findUnique({
-        where: {
-          id: dto.workOrderId,
-        }, 
-        select: {
-          quantity: true,
-        },
+        where: { id: dto.workOrderId },
+        select: { quantity: true },
       });
       if (!workOrder) throw new Error('Work Order no encontrada');
-      // Sumar liberaciones parciales existentes
+      // Obtener liberaciones parciales previas
       const partials = await tx.partialRelease.findMany({
-        where: {
-          work_order_flow_id: dto.workOrderFlowId,
-        },
+        where: { work_order_flow_id: dto.workOrderFlowId },
       });
-      const totalLiberadoPrevio = partials.reduce((total, partial) => total + partial.quantity, 0);
-      // Sumar liberado previo + nuevo liberado
+  
+      const totalLiberadoPrevio = partials.reduce(
+        (total, partial) => total + (partial.quantity ?? 0),
+        0,
+      );
       const totalLiberadoActual = totalLiberadoPrevio + dto.releaseQuantity;
-      // Si no alcanza la cantidad solicitada agregar partial release
-      if (partials.length > 0) {
-        await tx.partialRelease.create({
-          data: {
-            work_order_flow_id: dto.workOrderFlowId,
-            quantity: dto.releaseQuantity,
-            observation: dto.comments,
-          },
-        });
-        if (totalLiberadoActual < workOrder.quantity) {
-          await tx.partialRelease.create({
-            data: {
-              work_order_flow_id: dto.workOrderFlowId,
-              quantity: dto.releaseQuantity,
-              observation: dto.comments,
-            },
-          });
-          await tx.workOrderFlow.update({
-            where: { id: dto.workOrderFlowId },
-            data: {
-              status: 'Parcial',
-            },
-          });
-          if(nextFlow) {
-            await tx.workOrderFlow.update({
-              where: {
-                id: nextFlow.id,
-              },
-              data: {
-                status: 'Pendiente parcial',
-              },
-            });
-          }
-          return { message: 'Liberación parcial registrada con éxito' };
-        }
-      }
-      if (partials.length === 0 && totalLiberadoActual < workOrder.quantity) {
+      // 🟡 Caso parcial: aún no se completa la orden
+      if (totalLiberadoActual < workOrder.quantity) {
         await tx.partialRelease.create({
           data: {
             work_order_flow_id: dto.workOrderFlowId,
@@ -1192,8 +980,8 @@ export class FreeWorkOrderService {
         }
         return { message: 'Liberación parcial registrada con éxito' };
       }
-      // Si ya alcanza o supera → crear AreasResponse y LaminacionResponse
-      // Crear AreasResponse
+      // ✅ Caso completo: ya se alcanzó o superó la cantidad
+      // Crear o recuperar AreasResponse
       let response = await tx.areasResponse.findFirst({
         where: {
           work_order_id: dto.workOrderId,
@@ -1201,7 +989,6 @@ export class FreeWorkOrderService {
           area_id: dto.areaId,
         },
       });
-      // Crear AreasResponse si no existe
       if (!response) {
         response = await tx.areasResponse.create({
           data: {
@@ -1212,76 +999,58 @@ export class FreeWorkOrderService {
           },
         });
       }
-      // Asociar el área response con el work order flow
+      // Asociar AreaResponse al flujo
       await tx.workOrderFlow.update({
-        where: {
-          id: dto.workOrderFlowId,
-        },
-        data: {
-          area_response_id: response.id,
-        },
+        where: { id: dto.workOrderFlowId },
+        data: { area_response_id: response.id },
       });
       // Crear LaminacionResponse
       await tx.laminacionResponse.create({
         data: {
           release_quantity: totalLiberadoActual,
           comments: dto.comments,
-          form_answer_id: dto.formAnswerId,  // Pasamos el ID de FormAnswer
+          form_answer_id: dto.formAnswerId,
           areas_response_id: response.id,
         },
       });
-      // Actualizar el estado del WorkOrderFlow a Completado
+      // Marcar flujo como Completado
       await tx.workOrderFlow.update({
-        where: {
-          id: dto.workOrderFlowId,
-        },
-        data: {
-          status: 'Completado',
-        },
+        where: { id: dto.workOrderFlowId },
+        data: { status: 'Completado' },
       });
-      // Si hay un siguiente flujo, se actualiza a pendiente 
-      if(nextFlow) {
+      // Si hay siguiente flujo, marcarlo como Pendiente
+      if (nextFlow) {
         await tx.workOrderFlow.update({
-          where: {
-            id: nextFlow.id,
-          },
-          data: {
-            status: 'Pendiente',
-          },
+          where: { id: nextFlow.id },
+          data: { status: 'Pendiente' },
         });
       }
-      return { message: 'Respuesta guardada con exito'};
-    })
-  } 
+      return { message: 'Respuesta guardada con éxito' };
+    });
+  }
   
   // Para guardar respuesta de liberacion de Preprensa
   async createCorteResponse(dto: CreateCorteResponseDto) {
     return this.prisma.$transaction(async (tx) => {
-      // Obtener cantidad solicitada de la WorkOrder
+      // 1. Obtener cantidad de la orden
       const workOrder = await tx.workOrder.findUnique({
-        where: {
-          id: dto.workOrderId,
-        },
-        select: {
-          quantity: true,
-        },
+        where: { id: dto.workOrderId },
+        select: { quantity: true },
       });
       if (!workOrder) throw new Error('Work Order no encontrada');
-      // Sumar liberaciones parciales existentes
+      // 2. Calcular totales previos
       const partials = await tx.partialRelease.findMany({
-        where: {
-          work_order_flow_id: dto.workOrderFlowId,
-        },
+        where: { work_order_flow_id: dto.workOrderFlowId },
       });
-      const totalLiberadoPrevio = partials.reduce((total, partial) => total + (partial.quantity ?? 0), 0);
-      const TotalLiberadoBadPrevio = partials.reduce((total, partial) => total + (partial.bad_quantity ?? 0), 0);
-      const TotalLiberadoExcessPrevio = partials.reduce((total, partial) => total + (partial.excess_quantity ?? 0), 0);
-      // Sumar liberado previo + nuevo liberado
+      const totalLiberadoPrevio = partials.reduce((sum, p) => sum + (p.quantity ?? 0), 0);
+      const totalBadPrevio = partials.reduce((sum, p) => sum + (p.bad_quantity ?? 0), 0);
+      const totalExcessPrevio = partials.reduce((sum, p) => sum + (p.excess_quantity ?? 0), 0);
+      // 3. Calcular nuevos totales
       const totalLiberadoActual = totalLiberadoPrevio + dto.goodQuantity;
-      const totalLiberadoBadActual = TotalLiberadoBadPrevio + dto.badQuantity;
-      const totalLiberadoExcessActual = TotalLiberadoExcessPrevio + dto.excessQuantity;
-      // Si no alcanza la cantidad solicitada agregar partial release
-      if (partials.length > 0) {
+      const totalBadActual = totalBadPrevio + dto.badQuantity;
+      const totalExcessActual = totalExcessPrevio + dto.excessQuantity;
+      // 4. Si NO se alcanza la cantidad solicitada => solo crear liberación parcial
+      if (totalLiberadoActual < workOrder.quantity) {
         await tx.partialRelease.create({
           data: {
             work_order_flow_id: dto.workOrderFlowId,
@@ -1291,43 +1060,16 @@ export class FreeWorkOrderService {
             observation: dto.comments,
           },
         });
-        if (totalLiberadoActual < workOrder.quantity) {
-          await tx.partialRelease.create({
-            data: {
-              work_order_flow_id: dto.workOrderFlowId,
-              quantity: dto.goodQuantity,
-              bad_quantity: dto.badQuantity,
-              excess_quantity: dto.excessQuantity,
-              observation: dto.comments,
-            },
-          });
-          await tx.workOrderFlow.update({
-            where: { id: dto.workOrderFlowId },
-            data: {
-              status: 'Enviado a auditoria parcial',
-            },
-          });
-          return { message: 'Liberación parcial registrada con éxito' };
-        }
-      }
-      if (partials.length === 0 && totalLiberadoActual < workOrder.quantity) {
-        await tx.partialRelease.create({
-          data: {
-            work_order_flow_id: dto.workOrderFlowId,
-            quantity: dto.goodQuantity,
-            bad_quantity: dto.badQuantity,
-            excess_quantity: dto.excessQuantity,
-            observation: dto.comments,
-          },
-        });
+  
         await tx.workOrderFlow.update({
           where: { id: dto.workOrderFlowId },
           data: { status: 'Enviado a auditoria parcial' },
         });
+  
         return { message: 'Liberación parcial registrada con éxito' };
       }
-      // Si ya alcanza o supera → crear AreasResponse y EmpalmeResponse
-      // Crear AreasResponse
+      // 5. Si ya se alcanzó o superó la cantidad => crear respuestas finales
+      // Buscar o crear AreasResponse
       let response = await tx.areasResponse.findFirst({
         where: {
           work_order_id: dto.workOrderId,
@@ -1335,7 +1077,6 @@ export class FreeWorkOrderService {
           area_id: dto.areaId,
         },
       });
-      // Crear AreasResponse si no existe
       if (!response) {
         response = await tx.areasResponse.create({
           data: {
@@ -1346,45 +1087,36 @@ export class FreeWorkOrderService {
           },
         });
       }
-      // Asociar el área response con el work order flow
+      // Asociar AreaResponse al flujo
       await tx.workOrderFlow.update({
-        where: {
-          id: dto.workOrderFlowId,
-        },
-        data: {
-          area_response_id: response.id,
-        },
+        where: { id: dto.workOrderFlowId },
+        data: { area_response_id: response.id },
       });
-      //Crear el formauditory
+      // Crear FormAuditory
       const formAuditory = await tx.formAuditory.create({
-        data: {
-          reviewed_by_id: null,
-        }
+        data: { reviewed_by_id: null },
       });
       // Crear CorteResponse
       await tx.corteResponse.create({
         data: {
           good_quantity: totalLiberadoActual,
-          bad_quantity: totalLiberadoBadActual,
-          excess_quantity: totalLiberadoExcessActual,
+          bad_quantity: totalBadActual,
+          excess_quantity: totalExcessActual,
           comments: dto.comments,
-          form_answer_id: dto.formAnswerId,  // Pasamos el ID de FormAnswer
+          form_answer_id: dto.formAnswerId,
           areas_response_id: response.id,
           form_auditory_id: formAuditory.id,
         },
       });
-      // Actualizar el estado del WorkOrderFlow a Completado
+      // Actualizar estado final
       await tx.workOrderFlow.update({
-        where: {
-          id: dto.workOrderFlowId,
-        },
-        data: {
-          status: 'Enviado a Auditoria',
-        },
+        where: { id: dto.workOrderFlowId },
+        data: { status: 'Enviado a Auditoria' },
       });
-      return { message: 'Respuesta guardada con exito'};
-    })
-  } 
+  
+      return { message: 'Respuesta guardada con éxito' };
+    });
+  }
 
   // Guardar las respuestas del formulario
   async saveFormAnswersColorEdge(dto: CreateFormAnswerImpressionDto) {
@@ -1467,31 +1199,25 @@ export class FreeWorkOrderService {
   // Para guardar respuesta de liberacion de Preprensa
   async createColorEdgeResponse(dto: CreateCorteResponseDto) {
     return this.prisma.$transaction(async (tx) => {
-      // Obtener cantidad solicitada de la WorkOrder
+      // 1. Obtener cantidad de la orden
       const workOrder = await tx.workOrder.findUnique({
-        where: {
-          id: dto.workOrderId,
-        },
-        select: {
-          quantity: true,
-        },
+        where: { id: dto.workOrderId },
+        select: { quantity: true },
       });
       if (!workOrder) throw new Error('Work Order no encontrada');
-      // Sumar liberaciones parciales existentes
+      // 2. Calcular totales previos
       const partials = await tx.partialRelease.findMany({
-        where: {
-          work_order_flow_id: dto.workOrderFlowId,
-        },
+        where: { work_order_flow_id: dto.workOrderFlowId },
       });
-      const totalLiberadoPrevio = partials.reduce((total, partial) => total + (partial.quantity ?? 0), 0);
-      const TotalLiberadoBadPrevio = partials.reduce((total, partial) => total + (partial.bad_quantity ?? 0), 0);
-      const TotalLiberadoExcessPrevio = partials.reduce((total, partial) => total + (partial.excess_quantity ?? 0), 0);
-      // Sumar liberado previo + nuevo liberado
+      const totalLiberadoPrevio = partials.reduce((sum, p) => sum + (p.quantity ?? 0), 0);
+      const totalBadPrevio = partials.reduce((sum, p) => sum + (p.bad_quantity ?? 0), 0);
+      const totalExcessPrevio = partials.reduce((sum, p) => sum + (p.excess_quantity ?? 0), 0);
+      // 3. Calcular nuevos totales
       const totalLiberadoActual = totalLiberadoPrevio + dto.goodQuantity;
-      const totalLiberadoBadActual = TotalLiberadoBadPrevio + dto.badQuantity;
-      const totalLiberadoExcessActual = TotalLiberadoExcessPrevio + dto.excessQuantity;
-      // Si no alcanza la cantidad solicitada agregar partial release
-      if (partials.length > 0) {
+      const totalBadActual = totalBadPrevio + dto.badQuantity;
+      const totalExcessActual = totalExcessPrevio + dto.excessQuantity;
+      // 4. Si NO se alcanza la cantidad solicitada => solo crear liberación parcial
+      if (totalLiberadoActual < workOrder.quantity) {
         await tx.partialRelease.create({
           data: {
             work_order_flow_id: dto.workOrderFlowId,
@@ -1501,43 +1227,16 @@ export class FreeWorkOrderService {
             observation: dto.comments,
           },
         });
-        if (totalLiberadoActual < workOrder.quantity) {
-          await tx.partialRelease.create({
-            data: {
-              work_order_flow_id: dto.workOrderFlowId,
-              quantity: dto.goodQuantity,
-              bad_quantity: dto.badQuantity,
-              excess_quantity: dto.excessQuantity,
-              observation: dto.comments,
-            },
-          });
-          await tx.workOrderFlow.update({
-            where: { id: dto.workOrderFlowId },
-            data: {
-              status: 'Enviado a auditoria parcial',
-            },
-          });
-          return { message: 'Liberación parcial registrada con éxito' };
-        }
-      }
-      if (partials.length === 0 && totalLiberadoActual < workOrder.quantity) {
-        await tx.partialRelease.create({
-          data: {
-            work_order_flow_id: dto.workOrderFlowId,
-            quantity: dto.goodQuantity,
-            bad_quantity: dto.badQuantity,
-            excess_quantity: dto.excessQuantity,
-            observation: dto.comments,
-          },
-        });
+  
         await tx.workOrderFlow.update({
           where: { id: dto.workOrderFlowId },
           data: { status: 'Enviado a auditoria parcial' },
         });
+  
         return { message: 'Liberación parcial registrada con éxito' };
       }
-      // Si ya alcanza o supera → crear AreasResponse y EmpalmeResponse 
-      // Crear AreasResponse
+      // 5. Si ya se alcanzó o superó la cantidad => crear respuestas finales
+      // Buscar o crear AreasResponse
       let response = await tx.areasResponse.findFirst({
         where: {
           work_order_id: dto.workOrderId,
@@ -1545,7 +1244,6 @@ export class FreeWorkOrderService {
           area_id: dto.areaId,
         },
       });
-      // Crear AreasResponse si no existe
       if (!response) {
         response = await tx.areasResponse.create({
           data: {
@@ -1556,76 +1254,59 @@ export class FreeWorkOrderService {
           },
         });
       }
-
-      // Asociar el área response con el work order flow
+      // Asociar AreaResponse al flujo
       await tx.workOrderFlow.update({
-        where: {
-          id: dto.workOrderFlowId,
-        },
-        data: {
-          area_response_id: response.id,
-        },
+        where: { id: dto.workOrderFlowId },
+        data: { area_response_id: response.id },
       });
-
-      //Crear el formauditory
+      // Crear FormAuditory
       const formAuditory = await tx.formAuditory.create({
-        data: {
-          reviewed_by_id: null,
-        }
+        data: { reviewed_by_id: null },
       });
-      // Crear ColorEdgeResponse
+      // Crear PersonalizacionResponse
       await tx.colorEdgeResponse.create({
         data: {
           good_quantity: totalLiberadoActual,
-          bad_quantity: totalLiberadoBadActual,
-          excess_quantity: totalLiberadoExcessActual,
+          bad_quantity: totalBadActual,
+          excess_quantity: totalExcessActual,
           comments: dto.comments,
-          form_answer_id: dto.formAnswerId,  // Pasamos el ID de FormAnswer
+          form_answer_id: dto.formAnswerId,
           areas_response_id: response.id,
           form_auditory_id: formAuditory.id,
         },
       });
-      // Actualizar el estado del WorkOrderFlow a Completado
+      // Actualizar estado final
       await tx.workOrderFlow.update({
-        where: {
-          id: dto.workOrderFlowId,
-        },
-        data: {
-          status: 'Enviado a Auditoria',
-        },
+        where: { id: dto.workOrderFlowId },
+        data: { status: 'Enviado a Auditoria' },
       });
-      return { message: 'Respuesta guardada con exito'};
-    })
-  } 
+  
+      return { message: 'Respuesta guardada con éxito' };
+    });
+  }
   
   // Para guardar respuesta de liberacion de Preprensa
   async createHotStampingResponse(dto: CreateCorteResponseDto) {
     return this.prisma.$transaction(async (tx) => {
-      // Obtener cantidad solicitada de la WorkOrder
+      // 1. Obtener cantidad de la orden
       const workOrder = await tx.workOrder.findUnique({
-        where: {
-          id: dto.workOrderId,
-        },
-        select: {
-          quantity: true,
-        },
+        where: { id: dto.workOrderId },
+        select: { quantity: true },
       });
       if (!workOrder) throw new Error('Work Order no encontrada');
-      // Sumar liberaciones parciales existentes
+      // 2. Calcular totales previos
       const partials = await tx.partialRelease.findMany({
-        where: {
-          work_order_flow_id: dto.workOrderFlowId,
-        },
+        where: { work_order_flow_id: dto.workOrderFlowId },
       });
-      const totalLiberadoPrevio = partials.reduce((total, partial) => total + (partial.quantity ?? 0), 0);
-      const TotalLiberadoBadPrevio = partials.reduce((total, partial) => total + (partial.bad_quantity ?? 0), 0);
-      const TotalLiberadoExcessPrevio = partials.reduce((total, partial) => total + (partial.excess_quantity ?? 0), 0);
-      // Sumar liberado previo + nuevo liberado
+      const totalLiberadoPrevio = partials.reduce((sum, p) => sum + (p.quantity ?? 0), 0);
+      const totalBadPrevio = partials.reduce((sum, p) => sum + (p.bad_quantity ?? 0), 0);
+      const totalExcessPrevio = partials.reduce((sum, p) => sum + (p.excess_quantity ?? 0), 0);
+      // 3. Calcular nuevos totales
       const totalLiberadoActual = totalLiberadoPrevio + dto.goodQuantity;
-      const totalLiberadoBadActual = TotalLiberadoBadPrevio + dto.badQuantity;
-      const totalLiberadoExcessActual = TotalLiberadoExcessPrevio + dto.excessQuantity;
-      // Si no alcanza la cantidad solicitada agregar partial release
-      if (partials.length > 0) {
+      const totalBadActual = totalBadPrevio + dto.badQuantity;
+      const totalExcessActual = totalExcessPrevio + dto.excessQuantity;
+      // 4. Si NO se alcanza la cantidad solicitada => solo crear liberación parcial
+      if (totalLiberadoActual < workOrder.quantity) {
         await tx.partialRelease.create({
           data: {
             work_order_flow_id: dto.workOrderFlowId,
@@ -1635,43 +1316,16 @@ export class FreeWorkOrderService {
             observation: dto.comments,
           },
         });
-        if (totalLiberadoActual < workOrder.quantity) {
-          await tx.partialRelease.create({
-            data: {
-              work_order_flow_id: dto.workOrderFlowId,
-              quantity: dto.goodQuantity,
-              bad_quantity: dto.badQuantity,
-              excess_quantity: dto.excessQuantity,
-              observation: dto.comments,
-            },
-          });
-          await tx.workOrderFlow.update({
-            where: { id: dto.workOrderFlowId },
-            data: {
-              status: 'Enviado a auditoria parcial',
-            },
-          });
-          return { message: 'Liberación parcial registrada con éxito' };
-        }
-      }
-      if (partials.length === 0 && totalLiberadoActual < workOrder.quantity) {
-        await tx.partialRelease.create({
-          data: {
-            work_order_flow_id: dto.workOrderFlowId,
-            quantity: dto.goodQuantity,
-            bad_quantity: dto.badQuantity,
-            excess_quantity: dto.excessQuantity,
-            observation: dto.comments,
-          },
-        });
+  
         await tx.workOrderFlow.update({
           where: { id: dto.workOrderFlowId },
           data: { status: 'Enviado a auditoria parcial' },
         });
+  
         return { message: 'Liberación parcial registrada con éxito' };
       }
-      // Si ya alcanza o supera → crear AreasResponse y EmpalmeResponse
-      // Crear AreasResponse
+      // 5. Si ya se alcanzó o superó la cantidad => crear respuestas finales
+      // Buscar o crear AreasResponse
       let response = await tx.areasResponse.findFirst({
         where: {
           work_order_id: dto.workOrderId,
@@ -1679,7 +1333,6 @@ export class FreeWorkOrderService {
           area_id: dto.areaId,
         },
       });
-      // Crear AreasResponse si no existe
       if (!response) {
         response = await tx.areasResponse.create({
           data: {
@@ -1690,74 +1343,59 @@ export class FreeWorkOrderService {
           },
         });
       }
-      // Asociar el área response con el work order flow
+      // Asociar AreaResponse al flujo
       await tx.workOrderFlow.update({
-        where: {
-          id: dto.workOrderFlowId,
-        },
-        data: {
-          area_response_id: response.id,
-        },
+        where: { id: dto.workOrderFlowId },
+        data: { area_response_id: response.id },
       });
-      //Crear el formauditory
+      // Crear FormAuditory
       const formAuditory = await tx.formAuditory.create({
-        data: {
-          reviewed_by_id: null,
-        }
+        data: { reviewed_by_id: null },
       });
-      // Crear HotStampingResponse
+      // Crear PersonalizacionResponse
       await tx.hotStampingResponse.create({
         data: {
           good_quantity: totalLiberadoActual,
-          bad_quantity: totalLiberadoBadActual,
-          excess_quantity: totalLiberadoExcessActual,
+          bad_quantity: totalBadActual,
+          excess_quantity: totalExcessActual,
           comments: dto.comments,
-          form_answer_id: dto.formAnswerId,  // Pasamos el ID de FormAnswer
+          form_answer_id: dto.formAnswerId,
           areas_response_id: response.id,
           form_auditory_id: formAuditory.id,
         },
       });
-      // Actualizar el estado del WorkOrderFlow a Completado
+      // Actualizar estado final
       await tx.workOrderFlow.update({
-        where: {
-          id: dto.workOrderFlowId,
-        },
-        data: {
-          status: 'Enviado a Auditoria',
-        },
+        where: { id: dto.workOrderFlowId },
+        data: { status: 'Enviado a Auditoria' },
       });
-      return { message: 'Respuesta guardada con exito'};
-    })
-  } 
+  
+      return { message: 'Respuesta guardada con éxito' };
+    });
+  }
   
   // Para guardar respuesta de liberacion de Preprensa
   async createMillingChipResponse(dto: CreateCorteResponseDto) {
     return this.prisma.$transaction(async (tx) => {
-      // Obtener cantidad solicitada de la WorkOrder
+      // 1. Obtener cantidad de la orden
       const workOrder = await tx.workOrder.findUnique({
-        where: {
-          id: dto.workOrderId,
-        },
-        select: {
-          quantity: true,
-        },
+        where: { id: dto.workOrderId },
+        select: { quantity: true },
       });
       if (!workOrder) throw new Error('Work Order no encontrada');
-      // Sumar liberaciones parciales existentes
+      // 2. Calcular totales previos
       const partials = await tx.partialRelease.findMany({
-        where: {
-          work_order_flow_id: dto.workOrderFlowId,
-        },
+        where: { work_order_flow_id: dto.workOrderFlowId },
       });
-      const totalLiberadoPrevio = partials.reduce((total, partial) => total + (partial.quantity ?? 0), 0);
-      const TotalLiberadoBadPrevio = partials.reduce((total, partial) => total + (partial.bad_quantity ?? 0), 0);
-      const TotalLiberadoExcessPrevio = partials.reduce((total, partial) => total + (partial.excess_quantity ?? 0), 0);
-      // Sumar liberado previo + nuevo liberado
+      const totalLiberadoPrevio = partials.reduce((sum, p) => sum + (p.quantity ?? 0), 0);
+      const totalBadPrevio = partials.reduce((sum, p) => sum + (p.bad_quantity ?? 0), 0);
+      const totalExcessPrevio = partials.reduce((sum, p) => sum + (p.excess_quantity ?? 0), 0);
+      // 3. Calcular nuevos totales
       const totalLiberadoActual = totalLiberadoPrevio + dto.goodQuantity;
-      const totalLiberadoBadActual = TotalLiberadoBadPrevio + dto.badQuantity;
-      const totalLiberadoExcessActual = TotalLiberadoExcessPrevio + dto.excessQuantity;
-      // Si no alcanza la cantidad solicitada agregar partial release
-      if (partials.length > 0) {
+      const totalBadActual = totalBadPrevio + dto.badQuantity;
+      const totalExcessActual = totalExcessPrevio + dto.excessQuantity;
+      // 4. Si NO se alcanza la cantidad solicitada => solo crear liberación parcial
+      if (totalLiberadoActual < workOrder.quantity) {
         await tx.partialRelease.create({
           data: {
             work_order_flow_id: dto.workOrderFlowId,
@@ -1767,43 +1405,16 @@ export class FreeWorkOrderService {
             observation: dto.comments,
           },
         });
-        if (totalLiberadoActual < workOrder.quantity) {
-          await tx.partialRelease.create({
-            data: {
-              work_order_flow_id: dto.workOrderFlowId,
-              quantity: dto.goodQuantity,
-              bad_quantity: dto.badQuantity,
-              excess_quantity: dto.excessQuantity,
-              observation: dto.comments,
-            },
-          });
-          await tx.workOrderFlow.update({
-            where: { id: dto.workOrderFlowId },
-            data: {
-              status: 'Enviado a auditoria parcial',
-            },
-          });
-          return { message: 'Liberación parcial registrada con éxito' };
-        }
-      }
-      if (partials.length === 0 && totalLiberadoActual < workOrder.quantity) {
-        await tx.partialRelease.create({
-          data: {
-            work_order_flow_id: dto.workOrderFlowId,
-            quantity: dto.goodQuantity,
-            bad_quantity: dto.badQuantity,
-            excess_quantity: dto.excessQuantity,
-            observation: dto.comments,
-          },
-        });
+  
         await tx.workOrderFlow.update({
           where: { id: dto.workOrderFlowId },
           data: { status: 'Enviado a auditoria parcial' },
         });
+  
         return { message: 'Liberación parcial registrada con éxito' };
       }
-      // Si ya alcanza o supera → crear AreasResponse y EmpalmeResponse
-      // Crear AreasResponse
+      // 5. Si ya se alcanzó o superó la cantidad => crear respuestas finales
+      // Buscar o crear AreasResponse
       let response = await tx.areasResponse.findFirst({
         where: {
           work_order_id: dto.workOrderId,
@@ -1811,7 +1422,6 @@ export class FreeWorkOrderService {
           area_id: dto.areaId,
         },
       });
-      // Crear AreasResponse si no existe
       if (!response) {
         response = await tx.areasResponse.create({
           data: {
@@ -1822,76 +1432,59 @@ export class FreeWorkOrderService {
           },
         });
       }
-
-      // Asociar el área response con el work order flow
+      // Asociar AreaResponse al flujo
       await tx.workOrderFlow.update({
-        where: {
-          id: dto.workOrderFlowId,
-        },
-        data: {
-          area_response_id: response.id,
-        },
+        where: { id: dto.workOrderFlowId },
+        data: { area_response_id: response.id },
       });
-
-      //Crear el formauditory
+      // Crear FormAuditory
       const formAuditory = await tx.formAuditory.create({
-        data: {
-          reviewed_by_id: null,
-        }
+        data: { reviewed_by_id: null },
       });
-      // Crear MillingChipResponse
+      // Crear PersonalizacionResponse
       await tx.millingChipResponse.create({
         data: {
           good_quantity: totalLiberadoActual,
-          bad_quantity: totalLiberadoBadActual,
-          excess_quantity: totalLiberadoExcessActual,
+          bad_quantity: totalBadActual,
+          excess_quantity: totalExcessActual,
           comments: dto.comments,
-          form_answer_id: dto.formAnswerId,  // Pasamos el ID de FormAnswer
+          form_answer_id: dto.formAnswerId,
           areas_response_id: response.id,
           form_auditory_id: formAuditory.id,
         },
       });
-      // Actualizar el estado del WorkOrderFlow a Completado
+      // Actualizar estado final
       await tx.workOrderFlow.update({
-        where: {
-          id: dto.workOrderFlowId,
-        },
-        data: {
-          status: 'Enviado a Auditoria',
-        },
+        where: { id: dto.workOrderFlowId },
+        data: { status: 'Enviado a Auditoria' },
       });
-      return { message: 'Respuesta guardada con exito'};
-    })
-  } 
+  
+      return { message: 'Respuesta guardada con éxito' };
+    });
+  }
 
   // Para guardar respuesta de liberacion de Preprensa
   async createPersonalizacionResponse(dto: CreateCorteResponseDto) {
     return this.prisma.$transaction(async (tx) => {
-      // Obtener cantidad solicitada de la WorkOrder
+      // 1. Obtener cantidad de la orden
       const workOrder = await tx.workOrder.findUnique({
-        where: {
-          id: dto.workOrderId,
-        },
-        select: {
-          quantity: true,
-        },
+        where: { id: dto.workOrderId },
+        select: { quantity: true },
       });
       if (!workOrder) throw new Error('Work Order no encontrada');
-      // Sumar liberaciones parciales existentes
+      // 2. Calcular totales previos
       const partials = await tx.partialRelease.findMany({
-        where: {
-          work_order_flow_id: dto.workOrderFlowId,
-        },
+        where: { work_order_flow_id: dto.workOrderFlowId },
       });
-      const totalLiberadoPrevio = partials.reduce((total, partial) => total + (partial.quantity ?? 0), 0);
-      const TotalLiberadoBadPrevio = partials.reduce((total, partial) => total + (partial.bad_quantity ?? 0), 0);
-      const TotalLiberadoExcessPrevio = partials.reduce((total, partial) => total + (partial.excess_quantity ?? 0), 0);
-      // Sumar liberado previo + nuevo liberado
+      const totalLiberadoPrevio = partials.reduce((sum, p) => sum + (p.quantity ?? 0), 0);
+      const totalBadPrevio = partials.reduce((sum, p) => sum + (p.bad_quantity ?? 0), 0);
+      const totalExcessPrevio = partials.reduce((sum, p) => sum + (p.excess_quantity ?? 0), 0);
+      // 3. Calcular nuevos totales
       const totalLiberadoActual = totalLiberadoPrevio + dto.goodQuantity;
-      const totalLiberadoBadActual = TotalLiberadoBadPrevio + dto.badQuantity;
-      const totalLiberadoExcessActual = TotalLiberadoExcessPrevio + dto.excessQuantity;
-      // Si no alcanza la cantidad solicitada agregar partial release
-      if (partials.length > 0) {
+      const totalBadActual = totalBadPrevio + dto.badQuantity;
+      const totalExcessActual = totalExcessPrevio + dto.excessQuantity;
+      // 4. Si NO se alcanza la cantidad solicitada => solo crear liberación parcial
+      if (totalLiberadoActual < workOrder.quantity) {
         await tx.partialRelease.create({
           data: {
             work_order_flow_id: dto.workOrderFlowId,
@@ -1901,43 +1494,16 @@ export class FreeWorkOrderService {
             observation: dto.comments,
           },
         });
-        if (totalLiberadoActual < workOrder.quantity) {
-          await tx.partialRelease.create({
-            data: {
-              work_order_flow_id: dto.workOrderFlowId,
-              quantity: dto.goodQuantity,
-              bad_quantity: dto.badQuantity,
-              excess_quantity: dto.excessQuantity,
-              observation: dto.comments,
-            },
-          });
-          await tx.workOrderFlow.update({
-            where: { id: dto.workOrderFlowId },
-            data: {
-              status: 'Enviado a auditoria parcial',
-            },
-          });
-          return { message: 'Liberación parcial registrada con éxito' };
-        }
-      }
-      if (partials.length === 0 && totalLiberadoActual < workOrder.quantity) {
-        await tx.partialRelease.create({
-          data: {
-            work_order_flow_id: dto.workOrderFlowId,
-            quantity: dto.goodQuantity,
-            bad_quantity: dto.badQuantity,
-            excess_quantity: dto.excessQuantity,
-            observation: dto.comments,
-          },
-        });
+  
         await tx.workOrderFlow.update({
           where: { id: dto.workOrderFlowId },
           data: { status: 'Enviado a auditoria parcial' },
         });
+  
         return { message: 'Liberación parcial registrada con éxito' };
       }
-      // Si ya alcanza o supera → crear AreasResponse y EmpalmeResponse
-      // Crear AreasResponse
+      // 5. Si ya se alcanzó o superó la cantidad => crear respuestas finales
+      // Buscar o crear AreasResponse
       let response = await tx.areasResponse.findFirst({
         where: {
           work_order_id: dto.workOrderId,
@@ -1945,7 +1511,6 @@ export class FreeWorkOrderService {
           area_id: dto.areaId,
         },
       });
-      // Crear AreasResponse si no existe
       if (!response) {
         response = await tx.areasResponse.create({
           data: {
@@ -1956,44 +1521,35 @@ export class FreeWorkOrderService {
           },
         });
       }
-      // Asociar el área response con el work order flow
+      // Asociar AreaResponse al flujo
       await tx.workOrderFlow.update({
-        where: {
-          id: dto.workOrderFlowId,
-        },
-        data: {
-          area_response_id: response.id,
-        },
+        where: { id: dto.workOrderFlowId },
+        data: { area_response_id: response.id },
       });
-      //Crear el formauditory
+      // Crear FormAuditory
       const formAuditory = await tx.formAuditory.create({
-        data: {
-          reviewed_by_id: null,
-        }
+        data: { reviewed_by_id: null },
       });
       // Crear PersonalizacionResponse
       await tx.personalizacionResponse.create({
         data: {
           good_quantity: totalLiberadoActual,
-          bad_quantity: totalLiberadoBadActual,
-          excess_quantity: totalLiberadoExcessActual,
+          bad_quantity: totalBadActual,
+          excess_quantity: totalExcessActual,
           comments: dto.comments,
-          form_answer_id: dto.formAnswerId,  // Pasamos el ID de FormAnswer
+          form_answer_id: dto.formAnswerId,
           areas_response_id: response.id,
           form_auditory_id: formAuditory.id,
         },
       });
-      // Actualizar el estado del WorkOrderFlow a Completado
+      // Actualizar estado final
       await tx.workOrderFlow.update({
-        where: {
-          id: dto.workOrderFlowId,
-        },
-        data: {
-          status: 'Enviado a Auditoria',
-        },
+        where: { id: dto.workOrderFlowId },
+        data: { status: 'Enviado a Auditoria' },
       });
-      return { message: 'Respuesta guardada con exito'};
-    })
-  } 
+  
+      return { message: 'Respuesta guardada con éxito' };
+    });
+  }
   
 }
