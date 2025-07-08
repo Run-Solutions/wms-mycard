@@ -25,6 +25,7 @@ package-lock.json
 
 # Archivo de Docker Compose con credenciales sensibles (usa el de ejemplo en su lugar)
 docker-compose.yml
+**/docker-compose.prod.yml
 
 # Archivos de compilación TypeScript
 *.tsbuildinfo
