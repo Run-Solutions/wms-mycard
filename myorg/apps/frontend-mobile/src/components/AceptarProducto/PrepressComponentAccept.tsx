@@ -1,8 +1,14 @@
 // src/components/AceptarProducto/PrepressComponentAccept.tsx
 import React, { useEffect, useState } from 'react';
 import {
-  View, Text, StyleSheet, TouchableOpacity,
-  Modal, Alert, ScrollView, Platform
+  View,
+  Text,
+  StyleSheet,
+  TouchableOpacity,
+  Modal,
+  Alert,
+  ScrollView,
+  Platform,
 } from 'react-native';
 import { TextInput } from 'react-native-paper';
 import { useNavigation } from '@react-navigation/native';
@@ -11,8 +17,11 @@ import { registrarInconformidad } from '../../api/aceptarProducto';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { RootStackParamList } from '../../navigation/types';
 
-const PrepressComponentAccept: React.FC<{ workOrder: any }> = ({ workOrder }) => {
-  const navigation = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
+const PrepressComponentAccept: React.FC<{ workOrder: any }> = ({
+  workOrder,
+}) => {
+  const navigation =
+    useNavigation<NativeStackNavigationProp<RootStackParamList>>();
   const [defaultValues, setDefaultValues] = useState({
     plates: '',
     positives: '',
@@ -24,12 +33,13 @@ const PrepressComponentAccept: React.FC<{ workOrder: any }> = ({ workOrder }) =>
   const [inconformidad, setInconformidad] = useState('');
 
   const lastCompleted = [...workOrder.workOrder.flow]
-  .reverse()
-  .find((item) => item.status === "Completado");
+    .reverse()
+    .find((item) => item.status === 'Completado');
 
   useEffect(() => {
     if (lastCompleted?.areaResponse?.prepress) {
-      const { plates, positives, testType, comments } = lastCompleted.areaResponse.prepress;
+      const { plates, positives, testType, comments } =
+        lastCompleted.areaResponse.prepress;
       setDefaultValues({
         plates: String(plates || ''),
         positives: String(positives || ''),
@@ -42,26 +52,26 @@ const PrepressComponentAccept: React.FC<{ workOrder: any }> = ({ workOrder }) =>
   const handleAceptar = async () => {
     try {
       await acceptWorkOrderFlow(workOrder.id);
-      Alert.alert("Recepción aceptada");
+      Alert.alert('Recepción aceptada');
       navigation.goBack();
     } catch (err) {
       console.error(err);
-      Alert.alert("Error", "No se pudo aceptar la orden");
+      Alert.alert('Error', 'No se pudo aceptar la orden');
     }
   };
 
   const handleInconformidad = async () => {
     if (!inconformidad.trim()) {
-      Alert.alert("Por favor describe la inconformidad.");
+      Alert.alert('Por favor describe la inconformidad.');
       return;
     }
     try {
       await registrarInconformidad(lastCompleted?.id, inconformidad);
-      Alert.alert("Inconformidad registrada");
+      Alert.alert('Inconformidad registrada');
       navigation.navigate('aceptarProducto');
     } catch (err) {
       console.error(err);
-      Alert.alert("Error al enviar inconformidad");
+      Alert.alert('Error al enviar inconformidad');
     }
   };
 
@@ -73,24 +83,28 @@ const PrepressComponentAccept: React.FC<{ workOrder: any }> = ({ workOrder }) =>
       <Text style={styles.title}>Área: {workOrder.area.name}</Text>
 
       <View style={styles.card}>
-        <Text style={styles.label}>OT:</Text>
+        <Text style={styles.label}>Número de Orden:</Text>
         <Text style={styles.value}>{workOrder.workOrder.ot_id}</Text>
 
-        <Text style={styles.label}>Presupuesto:</Text>
+        <Text style={styles.label}>ID del Presupuesto:</Text>
         <Text style={styles.value}>{workOrder.workOrder.mycard_id}</Text>
 
         <Text style={styles.label}>Cantidad (TARJETAS):</Text>
         <Text style={styles.value}>{workOrder.workOrder.quantity}</Text>
 
-        <Text style={styles.label}>Cantidad (HOJAS):</Text>
+        <Text style={styles.label}>Cantidad (KITS):</Text>
         <Text style={styles.value}>{cantidadHojas}</Text>
 
         <Text style={styles.label}>Área que lo envía:</Text>
-        <Text style={styles.value}>{lastCompleted?.area?.name || 'No definida'}</Text>
+        <Text style={styles.value}>
+          {lastCompleted?.area?.name || 'No definida'}
+        </Text>
 
-        <Text style={styles.label}>Usuario:</Text>
-        <Text style={styles.value}>{lastCompleted?.user?.username || 'No definido'}</Text>
-        
+        <Text style={styles.label}>Usuario que lo envía:</Text>
+        <Text style={styles.value}>
+          {lastCompleted?.user?.username || 'No definido'}
+        </Text>
+
         <Text style={styles.label}>Comentarios:</Text>
         <Text style={styles.value}>{workOrder.workOrder.comments}</Text>
       </View>
@@ -105,10 +119,16 @@ const PrepressComponentAccept: React.FC<{ workOrder: any }> = ({ workOrder }) =>
       <Text style={styles.subtitle}>Comentarios</Text>
       <Text style={styles.input}>{defaultValues.comments}</Text>
       <View style={styles.modalActions}>
-        <TouchableOpacity style={styles.incoButton} onPress={() => setShowInconformidad(true)}>
+        <TouchableOpacity
+          style={styles.incoButton}
+          onPress={() => setShowInconformidad(true)}
+        >
           <Text style={styles.buttonText}>Inconformidad</Text>
         </TouchableOpacity>
-        <TouchableOpacity style={styles.acceptButton} onPress={() => setShowConfirm(true)}>
+        <TouchableOpacity
+          style={styles.acceptButton}
+          onPress={() => setShowConfirm(true)}
+        >
           <Text style={styles.buttonText}>Aceptar recepción de producto</Text>
         </TouchableOpacity>
       </View>
@@ -116,12 +136,20 @@ const PrepressComponentAccept: React.FC<{ workOrder: any }> = ({ workOrder }) =>
       <Modal visible={showConfirm} transparent animationType="fade">
         <View style={styles.modalOverlay}>
           <View style={styles.modalBox}>
-            <Text style={styles.modalText}>¿Deseas aceptar la recepción del producto?</Text>
+            <Text style={styles.modalText}>
+              ¿Deseas aceptar la recepción del producto?
+            </Text>
             <View style={styles.modalActions}>
-              <TouchableOpacity style={styles.cancelButton} onPress={() => setShowConfirm(false)}>
+              <TouchableOpacity
+                style={styles.cancelButton}
+                onPress={() => setShowConfirm(false)}
+              >
                 <Text style={styles.modalButtonText}>Cancelar</Text>
               </TouchableOpacity>
-              <TouchableOpacity style={styles.confirmButton} onPress={handleAceptar}>
+              <TouchableOpacity
+                style={styles.confirmButton}
+                onPress={handleAceptar}
+              >
                 <Text style={styles.modalButtonText}>Confirmar</Text>
               </TouchableOpacity>
             </View>
@@ -145,10 +173,16 @@ const PrepressComponentAccept: React.FC<{ workOrder: any }> = ({ workOrder }) =>
               style={styles.textarea}
             />
             <View style={styles.modalActions}>
-              <TouchableOpacity style={styles.cancelButton} onPress={() => setShowInconformidad(false)}>
+              <TouchableOpacity
+                style={styles.cancelButton}
+                onPress={() => setShowInconformidad(false)}
+              >
                 <Text style={styles.modalButtonText}>Cancelar</Text>
               </TouchableOpacity>
-              <TouchableOpacity style={styles.confirmButton} onPress={handleInconformidad}>
+              <TouchableOpacity
+                style={styles.confirmButton}
+                onPress={handleInconformidad}
+              >
                 <Text style={styles.modalButtonText}>Enviar</Text>
               </TouchableOpacity>
             </View>
@@ -162,16 +196,16 @@ const PrepressComponentAccept: React.FC<{ workOrder: any }> = ({ workOrder }) =>
 export default PrepressComponentAccept;
 
 const styles = StyleSheet.create({
-  container: { 
+  container: {
     flex: 1,
     paddingTop: 16,
     paddingBottom: 32,
-    paddingHorizontal: 8, 
-    backgroundColor: '#fdfaf6', 
+    paddingHorizontal: 8,
+    backgroundColor: '#fdfaf6',
   },
-  title: { 
-    fontSize: 20, 
-    fontWeight: 'bold', 
+  title: {
+    fontSize: 20,
+    fontWeight: 'bold',
     marginBottom: 16,
     textAlign: 'center',
     color: 'black',
@@ -192,9 +226,9 @@ const styles = StyleSheet.create({
     color: '#374151',
   },
   value: { marginBottom: 6 },
-  subtitle: { 
-    fontSize: 16, 
-    fontWeight: 'bold', 
+  subtitle: {
+    fontSize: 16,
+    fontWeight: 'bold',
     marginTop: 20,
     marginBottom: 10,
   },
@@ -210,8 +244,10 @@ const styles = StyleSheet.create({
     textAlignVertical: 'center',
   },
   textarea: {
-    backgroundColor: '#fff', padding: 12,
-    textAlignVertical: 'top', height: 100
+    backgroundColor: '#fff',
+    padding: 12,
+    textAlignVertical: 'top',
+    height: 100,
   },
   acceptButton: {
     backgroundColor: '#0038A8',
@@ -229,19 +265,23 @@ const styles = StyleSheet.create({
   },
   buttonText: { color: '#fff', fontWeight: 'bold' },
   modalOverlay: {
-    flex: 1, backgroundColor: 'rgba(0,0,0,0.4)',
-    justifyContent: 'center', alignItems: 'center'
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.4)',
+    justifyContent: 'center',
+    alignItems: 'center',
   },
   modalBox: {
-    backgroundColor: '#fff', padding: 24,
-    borderRadius: 16, width: '85%'
+    backgroundColor: '#fff',
+    padding: 24,
+    borderRadius: 16,
+    width: '85%',
   },
   modalText: { fontSize: 16, marginBottom: 16, textAlign: 'center' },
   modalActions: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     marginTop: 10,
-    gap: 10
+    gap: 10,
   },
   cancelButton: {
     backgroundColor: '#A9A9A9',

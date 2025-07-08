@@ -21,6 +21,7 @@ export class AcceptReviewsService {
             files: true,
             flow: {
               include: {
+                answers: true,
                 area: true,
                 areaResponse: true,
               },
@@ -37,13 +38,13 @@ export class AcceptReviewsService {
       },
     });
 
-    if(pendingOrders.length === 0) {
-      return { message: 'No hay ordenes pendientes por revisar.'}
+    if (pendingOrders.length === 0) {
+      return { message: 'No hay ordenes pendientes por revisar.' };
     }
     console.log('Ordenes pendientes desde accept-reviews service');
     return pendingOrders;
   }
-  
+
   // Para obtener los WorkOrderFlowPendientes
   async getFormQuestions() {
     console.log('Buscando ordenes pendientes...');
@@ -53,8 +54,8 @@ export class AcceptReviewsService {
         areas: true,
       },
     });
-    if(pendingForms.length === 0) {
-      return { message: 'No hay ordenes pendientes por revisar.'}
+    if (pendingForms.length === 0) {
+      return { message: 'No hay ordenes pendientes por revisar.' };
     }
     console.log('Ordenes pendientes desde accept-reviews service');
     return pendingForms;
@@ -75,14 +76,14 @@ export class AcceptReviewsService {
         areas: true,
       },
     });
-  
+
     if (!AreaFormQuestions.length) {
       return { message: 'No se encontraron formularios para esta área.' };
     }
-  
+
     return AreaFormQuestions;
   }
-  
+
   async updateQuestionTitleById(id: number, updatedTitle: string) {
     const FormQuestionTitle = await this.prisma.formQuestion.findFirst({
       where: {
@@ -103,7 +104,7 @@ export class AcceptReviewsService {
     });
     return updatedQuestion;
   }
-  
+
   async deleteQuestionById(id: number) {
     const question = await this.prisma.formQuestion.findFirst({
       where: { id },
@@ -118,7 +119,7 @@ export class AcceptReviewsService {
   }
 
   // Para que el operador calidad acepte la orden
-  async acceptWorkOrderFlowCQM(id: number, userId: number){
+  async acceptWorkOrderFlowCQM(id: number, userId: number) {
     console.log('Asignando orden al operador...');
 
     // Se actualiza el formAnswer
@@ -132,9 +133,9 @@ export class AcceptReviewsService {
       },
       include: {
         reviewer: true,
-      }
+      },
     });
-    
+
     // Se actualiza el status del WorkOrderFlow
     await this.prisma.workOrderFlow.update({
       where: {
@@ -142,7 +143,7 @@ export class AcceptReviewsService {
       },
       data: {
         status: 'En Calidad',
-      }
+      },
     });
     return updated;
   }

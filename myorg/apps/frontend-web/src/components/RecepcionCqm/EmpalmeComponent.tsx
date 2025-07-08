@@ -1,9 +1,9 @@
-'use client'
+'use client';
 
-import { useRouter } from "next/navigation";
-import { useState } from "react";
-import styled from "styled-components";
-import { submitExtraEmpalme, sendInconformidadCQM } from "@/api/recepcionCQM";
+import { useRouter } from 'next/navigation';
+import { useState } from 'react';
+import styled from 'styled-components';
+import { submitExtraEmpalme, sendInconformidadCQM } from '@/api/recepcionCQM';
 
 interface Props {
   workOrder: any;
@@ -19,22 +19,25 @@ export default function EmpalmeComponent({ workOrder }: Props) {
   const [showInconformidad, setShowInconformidad] = useState(false);
   const [inconformidad, setInconformidad] = useState<string>('');
 
-  // Para obtener el ultimo FormAnswer 
+  // Para obtener el ultimo FormAnswer
   const index = workOrder?.answers
-  ?.map((a: Answer, i: number) => ({ ...a, index: i }))
-  .reverse().find((a: Answer) => a.reviewed === false)?.index;
+    ?.map((a: Answer, i: number) => ({ ...a, index: i }))
+    .reverse()
+    .find((a: Answer) => a.reviewed === false)?.index;
   console.log('el index', index);
 
   // Para mostrar formulario de CQM y enviarlo
   const [showConfirmModal, setShowConfirmModal] = useState(false);
 
-  //Para guardar las respuestas 
-  const [responses, setResponses] = useState<{questionId: number, answer: boolean}[]>(
+  //Para guardar las respuestas
+  const [responses, setResponses] = useState<
+    { questionId: number; answer: boolean }[]
+  >(
     workOrder.area.formQuestions
-      .filter((question: {role_id: number | null}) => question.role_id === 3)
-      .map((question: {id: number}) => ({
+      .filter((question: { role_id: number | null }) => question.role_id === 3)
+      .map((question: { id: number }) => ({
         questionId: question.id,
-        answer: false
+        answer: false,
       }))
   );
   const [color, setColor] = useState('');
@@ -46,30 +49,29 @@ export default function EmpalmeComponent({ workOrder }: Props) {
   // Para controlar qué preguntas están marcadas
   const [checkedQuestions, setCheckedQuestions] = useState<number[]>([]);
   const handleCheckboxChange = (questionId: number, isChecked: boolean) => {
-    setResponses(prevResponses => 
-      prevResponses.map(response =>
-        response.questionId === questionId 
-          ? {...response, answer: isChecked}
+    setResponses((prevResponses) =>
+      prevResponses.map((response) =>
+        response.questionId === questionId
+          ? { ...response, answer: isChecked }
           : response
       )
     );
-  
+
     // Actualizar visualmente el checkbox
-    setCheckedQuestions(prev =>
-      isChecked ? [...prev, questionId] : prev.filter(id => id !== questionId)
+    setCheckedQuestions((prev) =>
+      isChecked ? [...prev, questionId] : prev.filter((id) => id !== questionId)
     );
   };
 
-  
   const handleSubmit = async () => {
     const formAnswerId = workOrder.answers[index]?.id; // id de FormAnswer
     if (!formAnswerId) {
-      alert("No se encontró el ID del formulario.");
+      alert('No se encontró el ID del formulario.');
       return;
     }
     const checkboxPayload = responses.map(({ questionId, answer }) => ({
       question_id: questionId,
-      answer: answer,     
+      answer: answer,
     }));
     const payload = {
       form_answer_id: formAnswerId,
@@ -82,13 +84,13 @@ export default function EmpalmeComponent({ workOrder }: Props) {
         color: color,
         holographic_type: holographicType,
         validar_inlays: validarInLays,
-      }
+      },
     };
     try {
       const res = await submitExtraEmpalme(payload);
-      router.push("/recepcionCqm");
+      router.push('/recepcionCqm');
     } catch (error) {
-      console.log("Error al guardar la respuesta: ", error);
+      console.log('Error al guardar la respuesta: ', error);
     }
   };
 
@@ -104,7 +106,7 @@ export default function EmpalmeComponent({ workOrder }: Props) {
       console.error(error);
       alert('Error al conectar con el servidor');
     }
-  }
+  };
 
   const cantidadHojasRaw = Number(workOrder?.workOrder.quantity) / 24;
   const cantidadHojas = cantidadHojasRaw > 0 ? Math.ceil(cantidadHojasRaw) : 0;
@@ -124,10 +126,10 @@ export default function EmpalmeComponent({ workOrder }: Props) {
         </InfoItem>
         <InfoItem>
           <Label>Cantidad (TARJETAS):</Label>
-          <Value>{workOrder.workOrder.quantity || "No definida"}</Value>
+          <Value>{workOrder.workOrder.quantity || 'No definida'}</Value>
         </InfoItem>
-        <InfoItem style={{ backgroundColor: '#eaeaf5', borderRadius: '8px'}}>
-          <Label>Cantidad (HOJAS):</Label>
+        <InfoItem style={{ backgroundColor: '#eaeaf5', borderRadius: '8px' }}>
+          <Label>Cantidad (KITS):</Label>
           <Value>{cantidadHojas}</Value>
         </InfoItem>
       </DataWrapper>
@@ -154,43 +156,58 @@ export default function EmpalmeComponent({ workOrder }: Props) {
             </thead>
             <tbody>
               {workOrder.area.formQuestions
-              .filter((question: { role_id: number | null }) => question.role_id === null)
-              .map((question: { id: number; title: string }) => {
-                // Buscar la respuesta correspondiente a esta pregunta
-                const answer = workOrder.answers[index]?.FormAnswerResponse?.find(
-                  (resp: any) => resp.question_id === question.id
-                );
-                
-                // Obtener la respuesta del operador (response_operator)
-                const operatorResponse = answer?.response_operator;
+                .filter(
+                  (question: { role_id: number | null }) =>
+                    question.role_id === null
+                )
+                .map((question: { id: number; title: string }) => {
+                  // Buscar la respuesta correspondiente a esta pregunta
+                  const answer = workOrder.answers[
+                    index
+                  ]?.FormAnswerResponse?.find(
+                    (resp: any) => resp.question_id === question.id
+                  );
 
-                return (
-                  <tr key={question.id}>
-                    <td>{question.title}</td>
-                    <td>
-                      {typeof operatorResponse === 'boolean' ? (
-                        <input 
-                          type="checkbox" 
-                          checked={operatorResponse} 
-                          disabled 
-                        />
-                      ) : (
-                        <span>{operatorResponse !== undefined && operatorResponse !== null 
-                          ? operatorResponse.toString() 
-                          : ''}</span>
-                      )}
-                    </td>
-                  </tr>
-                );
-              })}
+                  // Obtener la respuesta del operador (response_operator)
+                  const operatorResponse = answer?.response_operator;
+
+                  return (
+                    <tr key={question.id}>
+                      <td>{question.title}</td>
+                      <td>
+                        {typeof operatorResponse === 'boolean' ? (
+                          <input
+                            type="checkbox"
+                            checked={operatorResponse}
+                            disabled
+                          />
+                        ) : (
+                          <span>
+                            {operatorResponse !== undefined &&
+                            operatorResponse !== null
+                              ? operatorResponse.toString()
+                              : ''}
+                          </span>
+                        )}
+                      </td>
+                    </tr>
+                  );
+                })}
             </tbody>
           </Table>
-          <InputGroup style={{ width: '50%'}}>
-              <Label>Muestras entregadas:</Label>
-              <Input type="number" value={workOrder?.answers[index].sample_quantity ?? 'No se reconoce la muestra enviada' } readOnly />
+          <InputGroup style={{ width: '50%' }}>
+            <Label>Muestras entregadas:</Label>
+            <Input
+              type="number"
+              value={
+                workOrder?.answers[index].sample_quantity ??
+                'No se reconoce la muestra enviada'
+              }
+              readOnly
+            />
           </InputGroup>
         </NewDataWrapper>
-        
+
         <SectionTitle>Mis respuestas</SectionTitle>
         <NewDataWrapper>
           <Table>
@@ -202,102 +219,176 @@ export default function EmpalmeComponent({ workOrder }: Props) {
             </thead>
             <tbody>
               {workOrder.area.formQuestions
-              .filter((question: { role_id: number | null }) => question.role_id === 3)
-              .map((question: { id: number; title: string }) => {
-                // Buscar la respuesta correspondiente a esta pregunta
-                const answer = workOrder.answers[index]?.FormAnswerResponse?.find(
-                  (resp: any) => resp.question_id === question.id
-                );
-                return (
-                  <tr key={question.id}>
-                    <td>{question.title}</td>
-                    <td>
-                      <input type="checkbox" checked={checkedQuestions.includes(question.id)} onChange={(e) => handleCheckboxChange(question.id, e.target.checked)}/>
-                    </td>
-                  </tr>
-                );
-              })}
+                .filter(
+                  (question: { role_id: number | null }) =>
+                    question.role_id === 3
+                )
+                .map((question: { id: number; title: string }) => {
+                  // Buscar la respuesta correspondiente a esta pregunta
+                  const answer = workOrder.answers[
+                    index
+                  ]?.FormAnswerResponse?.find(
+                    (resp: any) => resp.question_id === question.id
+                  );
+                  return (
+                    <tr key={question.id}>
+                      <td>{question.title}</td>
+                      <td>
+                        <input
+                          type="checkbox"
+                          checked={checkedQuestions.includes(question.id)}
+                          onChange={(e) =>
+                            handleCheckboxChange(question.id, e.target.checked)
+                          }
+                        />
+                      </td>
+                    </tr>
+                  );
+                })}
             </tbody>
           </Table>
-          <InputGroup style={{ width: '50%'}}>
+          <InputGroup style={{ width: '50%' }}>
             <Label>Validar Inlays Vs Ot (Anotarlo):</Label>
-            <Input type="text" value={validarInLays} onChange={(e) => setValidarInlays(e.target.value)}/>
+            <Input
+              type="text"
+              value={validarInLays}
+              onChange={(e) => setValidarInlays(e.target.value)}
+            />
           </InputGroup>
-          <InputGroup style={{ width: '50%'}}>
+          <InputGroup style={{ width: '50%' }}>
             <Label>Validar tipo de banda magnetica:</Label>
             <RadioGroup>
               <RadioLabel>
-                <Radio type="radio" name="hico_loco" value="hico" onChange={(e) => setMagneticBandType(e.target.value)}/>
+                <Radio
+                  type="radio"
+                  name="hico_loco"
+                  value="hico"
+                  onChange={(e) => setMagneticBandType(e.target.value)}
+                />
                 Hico
               </RadioLabel>
               <RadioLabel>
-                <Radio type="radio" name="hico_loco" value="loco" onChange={(e) => setMagneticBandType(e.target.value)}/>
+                <Radio
+                  type="radio"
+                  name="hico_loco"
+                  value="loco"
+                  onChange={(e) => setMagneticBandType(e.target.value)}
+                />
                 Loco
               </RadioLabel>
             </RadioGroup>
             <RadioGroup>
               <RadioLabel>
-                <Radio type="radio" name="tracks" value="dos_tracks" onChange={(e) => setTrackType(e.target.value)}/>
+                <Radio
+                  type="radio"
+                  name="tracks"
+                  value="dos_tracks"
+                  onChange={(e) => setTrackType(e.target.value)}
+                />
                 2 Tracks
               </RadioLabel>
               <RadioLabel>
-                <Radio type="radio" name="tracks" value="tres_tracks" onChange={(e) => setTrackType(e.target.value)}/>
+                <Radio
+                  type="radio"
+                  name="tracks"
+                  value="tres_tracks"
+                  onChange={(e) => setTrackType(e.target.value)}
+                />
                 3 Tracks
               </RadioLabel>
             </RadioGroup>
           </InputGroup>
-          <InputGroup style={{ width: '50%'}}>
+          <InputGroup style={{ width: '50%' }}>
             <Label>Color:</Label>
-            <Input type="text" value={color} onChange={(e) => setColor(e.target.value)} />
+            <Input
+              type="text"
+              value={color}
+              onChange={(e) => setColor(e.target.value)}
+            />
           </InputGroup>
-          <InputGroup style={{ width: '50%'}}>
+          <InputGroup style={{ width: '50%' }}>
             <Label>Tipo de Holografico:</Label>
-            <Input type="text" value={holographicType} onChange={(e) => setHolographicType(e.target.value)}/>
+            <Input
+              type="text"
+              value={holographicType}
+              onChange={(e) => setHolographicType(e.target.value)}
+            />
           </InputGroup>
         </NewDataWrapper>
       </NewData>
-      <div style={{ display: 'flex', gap: '1rem'}}>
-      <RechazarButton onClick={() => setShowInconformidad(true)}>Rechazar</RechazarButton>
-      <AceptarButton onClick={() => setShowConfirmModal(true)}>Aprobado</AceptarButton>
+      <div style={{ display: 'flex', gap: '1rem' }}>
+        <RechazarButton onClick={() => setShowInconformidad(true)}>
+          Rechazar
+        </RechazarButton>
+        <AceptarButton onClick={() => setShowConfirmModal(true)}>
+          Aprobado
+        </AceptarButton>
       </div>
       {showConfirmModal && (
         <ModalOverlay>
           <ModalContent>
             <ModalTitle>¿Estás segura de aprobar?</ModalTitle>
             <ModalActions>
-              <Button style={{ backgroundColor: '#BBBBBB'}} onClick={() => setShowConfirmModal(false)}>Cancelar</Button>
-              <Button onClick={() => {
-                setShowConfirmModal(false);
-                handleSubmit();
-              }}>Sí, aprobar</Button>
+              <Button
+                style={{ backgroundColor: '#BBBBBB' }}
+                onClick={() => setShowConfirmModal(false)}
+              >
+                Cancelar
+              </Button>
+              <Button
+                onClick={() => {
+                  setShowConfirmModal(false);
+                  handleSubmit();
+                }}
+              >
+                Sí, aprobar
+              </Button>
             </ModalActions>
           </ModalContent>
         </ModalOverlay>
       )}
       {showInconformidad && (
-          <ModalOverlay>
-            <ModalBox>
-              <h4>Registrar Inconformidad</h4>
-              <h3>Por favor, describe la inconformidad detectada con las respuestas entregadas.</h3>
-              <Textarea
-                value={inconformidad}
-                onChange={(e) => setInconformidad(e.target.value)}
-                placeholder="Escribe aquí la inconformidad..."
-              />
-              <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '1rem', marginTop: '1rem' }}>
-                <CancelButton onClick={() => setShowInconformidad(false)}>Cancelar</CancelButton>
-                <ConfirmButton onClick={() => {
+        <ModalOverlay>
+          <ModalBox>
+            <h4>Registrar Inconformidad</h4>
+            <h3>
+              Por favor, describe la inconformidad detectada con las respuestas
+              entregadas.
+            </h3>
+            <Textarea
+              value={inconformidad}
+              onChange={(e) => setInconformidad(e.target.value)}
+              placeholder="Escribe aquí la inconformidad..."
+            />
+            <div
+              style={{
+                display: 'flex',
+                justifyContent: 'flex-end',
+                gap: '1rem',
+                marginTop: '1rem',
+              }}
+            >
+              <CancelButton onClick={() => setShowInconformidad(false)}>
+                Cancelar
+              </CancelButton>
+              <ConfirmButton
+                onClick={() => {
                   if (!inconformidad.trim()) {
-                    alert('Debes ingresar una inconformidad antes de continuar.');
+                    alert(
+                      'Debes ingresar una inconformidad antes de continuar.'
+                    );
                     return;
                   }
                   handleSubmitInconformidad();
                   setShowInconformidad(false);
-                }}>Guardar</ConfirmButton>
-              </div>
-            </ModalBox>
-          </ModalOverlay>
-        )}
+                }}
+              >
+                Guardar
+              </ConfirmButton>
+            </div>
+          </ModalBox>
+        </ModalOverlay>
+      )}
     </Container>
   );
 }
@@ -309,7 +400,7 @@ const Container = styled.div`
   padding: 2rem;
   margin-top: 1.5rem;
   border-radius: 1rem;
-  box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
   max-width: 800px;
   margin-left: auto;
   margin-right: auto;
@@ -322,9 +413,7 @@ const Title = styled.h2`
   color: #1f2937;
 `;
 
-const NewData = styled.div`
-  
-`;
+const NewData = styled.div``;
 
 const SectionTitle = styled.h3`
   font-size: 1.25rem;
@@ -378,7 +467,7 @@ const Input = styled.input`
   transition: border 0.3s;
 
   &:focus {
-    border-color: #0038A8;
+    border-color: #0038a8;
   }
 `;
 
@@ -397,7 +486,7 @@ const RadioLabel = styled.label`
 `;
 
 const Radio = styled.input`
-  accent-color: #0038A8;
+  accent-color: #0038a8;
 `;
 
 const Textarea = styled.textarea`
@@ -411,14 +500,14 @@ const Textarea = styled.textarea`
   resize: vertical;
 
   &:focus {
-    border-color: #0038A8;
+    border-color: #0038a8;
     outline: none;
   }
 `;
 
 const AceptarButton = styled.button<{ disabled?: boolean }>`
   margin-top: 1.5rem;
-  background-color: #0038A8;
+  background-color: #0038a8;
   color: white;
   padding: 0.5rem 1.25rem;
   border-radius: 0.5rem;
@@ -428,16 +517,16 @@ const AceptarButton = styled.button<{ disabled?: boolean }>`
   cursor: pointer;
 
   transition: background-color 0.3s ease, color 0.3s ease;
-  
+
   &:hover {
-    background-color: #1D4ED8;
-    outline: none
+    background-color: #1d4ed8;
+    outline: none;
   }
 `;
 
 const RechazarButton = styled.button<{ disabled?: boolean }>`
   margin-top: 1.5rem;
-  background-color: #BBBBBB;
+  background-color: #bbbbbb;
   color: white;
   padding: 0.5rem 1.25rem;
   border-radius: 0.5rem;
@@ -450,7 +539,7 @@ const RechazarButton = styled.button<{ disabled?: boolean }>`
 
   &:hover {
     background-color: #a0a0a0;
-    outline: none
+    outline: none;
   }
 `;
 
@@ -458,7 +547,8 @@ const Table = styled.table`
   width: 100%;
   border-collapse: collapse;
   color: black;
-  th, td {
+  th,
+  td {
     padding: 0.75rem;
     text-align: left;
     border-bottom: 1px solid #e5e7eb;
@@ -504,7 +594,7 @@ const ModalActions = styled.div`
 
 const Button = styled.button`
   padding: 0.5rem 1rem;
-  background-color: #2563EB;
+  background-color: #2563eb;
   color: white;
   border: none;
   border-radius: 8px;
@@ -519,13 +609,13 @@ const ModalBox = styled.div`
   background: white;
   padding: 2rem;
   border-radius: 1rem;
-  box-shadow: 0 8px 24px rgba(0,0,0,0.2);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.2);
   max-width: 400px;
   width: 90%;
 `;
 
 const CancelButton = styled.button`
-  background-color: #BBBBBB;
+  background-color: #bbbbbb;
   color: white;
   padding: 0.5rem 1.5rem;
   border-radius: 0.5rem;
@@ -544,7 +634,7 @@ const CancelButton = styled.button`
 `;
 
 const ConfirmButton = styled.button`
-  background-color: #0038A8;
+  background-color: #0038a8;
   color: white;
   padding: 0.5rem 1.5rem;
   border-radius: 0.5rem;

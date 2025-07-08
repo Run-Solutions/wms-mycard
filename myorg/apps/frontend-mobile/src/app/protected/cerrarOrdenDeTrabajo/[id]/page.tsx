@@ -15,7 +15,10 @@ import { InternalStackParamList } from '../../../../navigation/types';
 import { liberarWorkOrderAuditory } from '../../../../api/cerrarOrdenDeTrabajo';
 import { fetchWorkOrderById } from '../../../../api/seguimientoDeOts';
 
-type WorkOrderDetailRouteProp = RouteProp<InternalStackParamList, 'CerrarOrdenDeTrabajoAuxScreen'>;
+type WorkOrderDetailRouteProp = RouteProp<
+  InternalStackParamList,
+  'CerrarOrdenDeTrabajoAuxScreen'
+>;
 
 type AreaTotals = {
   buenas: number;
@@ -78,18 +81,19 @@ const CerrarOrdenDeTrabajoAuxScreen: React.FC = () => {
         { buenas: 0, malas: 0, excedente: 0 }
       );
     };
-  
+
     const getCommonData = (areaKey: string) => {
       const hasResponse = !!areaResponse?.[areaKey];
-      const usuario = areaResponse?.user?.username || flowUser?.username ||'';
-      const auditor = areaResponse?.[areaKey]?.formAuditory?.user?.username || '';
-  
+      const usuario = areaResponse?.user?.username || flowUser?.username || '';
+      const auditor =
+        areaResponse?.[areaKey]?.formAuditory?.user?.username || '';
+
       if (!hasResponse && partialReleases.length > 0) {
         const resumen = sumFromPartials();
         console.log('[PARCIAL DETECTADO]', areaKey, resumen);
         return { ...resumen, cqm: 0, muestras: 0, usuario, auditor: '' };
       }
-  
+
       return {
         buenas:
           areaResponse?.[areaKey]?.good_quantity ||
@@ -104,7 +108,7 @@ const CerrarOrdenDeTrabajoAuxScreen: React.FC = () => {
         auditor,
       };
     };
-  
+
     switch (areaId) {
       case 6:
         return getCommonData('corte');
@@ -129,25 +133,52 @@ const CerrarOrdenDeTrabajoAuxScreen: React.FC = () => {
     }
   };
 
-  const areas = workOrder?.flow?.map((item: any, index: any) => {
-    const areaData = getAreaData(item.area_id, item.areaResponse);
-    console.log('areaData', areaData.usuario);
-    return {
-      id: item.area_id,
-      name: item.area?.name || 'Sin nombre',
-      status: item.status || 'Desconocido',
-      response: item.areaResponse || {},
-      answers: item.answers?.[0] || {},
-      ...getAreaData(item.area_id, item.areaResponse, item.partialReleases, item.user, index),
-    };
-  }) || [];
+  const areas =
+    workOrder?.flow?.map((item: any, index: any) => {
+      const areaData = getAreaData(item.area_id, item.areaResponse);
+      console.log('areaData', areaData.usuario);
+      return {
+        id: item.area_id,
+        name: item.area?.name || 'Sin nombre',
+        status: item.status || 'Desconocido',
+        response: item.areaResponse || {},
+        answers: item.answers?.[0] || {},
+        ...getAreaData(
+          item.area_id,
+          item.areaResponse,
+          item.partialReleases,
+          item.user,
+          index
+        ),
+      };
+    }) || [];
 
   const cantidadHojasRaw = Number(workOrder?.quantity) / 24;
   const cantidadHojas = cantidadHojasRaw > 0 ? Math.ceil(cantidadHojasRaw) : 0;
+  const ultimaArea = areas[areas.length - 1];
+  const totalMalas = areas.reduce((acc: any, area: any) => acc + (area.malas || 0), 0);
+  const totalCqm = areas
+    .filter((area: any) => area.id >= 6)
+    .reduce((acc: any, area: any) => acc + (area.cqm || 0), 0);
+  const totalMuestras = areas.reduce(
+    (acc: any, area: any) => acc + (area.muestras || 0),
+    0
+  );
+  const totalUltimaBuenas = ultimaArea?.buenas || 0;
+  const totalUltimaExcedente = ultimaArea?.excedente || 0;
+
+  const totalGeneral =
+    totalUltimaBuenas +
+    totalUltimaExcedente +
+    totalMalas +
+    totalCqm +
+    totalMuestras;
 
   const handleCloseOrder = async () => {
     try {
-      const currentFlow = workOrder.flow.find((f: any) => f.status === 'En auditoria');
+      const currentFlow = workOrder.flow.find(
+        (f: any) => f.status === 'En auditoria'
+      );
 
       const payload = {
         workOrderFlowId: currentFlow.id,
@@ -162,6 +193,9 @@ const CerrarOrdenDeTrabajoAuxScreen: React.FC = () => {
       Alert.alert('Error', 'No se pudo cerrar la orden.');
     }
   };
+  const currentFlow = workOrder.flow.find(
+    (f: any) => f.status === 'En auditoria'
+  );
 
   return (
     <ScrollView contentContainerStyle={styles.container}>
@@ -177,7 +211,7 @@ const CerrarOrdenDeTrabajoAuxScreen: React.FC = () => {
         <Text style={styles.label}>Cantidad (TARJETAS): </Text>
         <Text style={styles.value}>{workOrder?.quantity}</Text>
 
-        <Text style={styles.label}>Cantidad (HOJAS): </Text>
+        <Text style={styles.label}>Cantidad (KITS): </Text>
         <Text style={styles.value}>{cantidadHojas}</Text>
 
         <Text style={styles.label}>Comentarios:</Text>
@@ -198,24 +232,69 @@ const CerrarOrdenDeTrabajoAuxScreen: React.FC = () => {
             <Text style={styles.cellUser}>Usuario</Text>
             <Text style={styles.cellUser}>Auditor</Text>
           </View>
-          {areas.filter((area: any) => area.id >= 6).map((area: any, index: number) => (
-            <View key={index} style={styles.row}>
-              <Text style={styles.cellUser}>{area.name}</Text>
-              <Text style={styles.cell}>{area.buenas}</Text>
-              <Text style={styles.cell}>{area.malas}</Text>
-              <Text style={styles.cell}>{area.excedente}</Text>
-              <Text style={styles.cell}>{area.cqm}</Text>
-              <Text style={styles.cell}>{area.muestras}</Text>
-              <Text style={styles.cell}>{Number(area.buenas) + Number(area.malas) + Number(area.excedente) + Number(area.cqm) + Number(area.muestras)}</Text>
-              <Text style={styles.cellUser}>{area?.usuario}</Text>
-              <Text style={styles.cellUser}>{area?.auditor}</Text>
-            </View>
-          ))}
+          {areas
+            .filter((area: any) => area.id >= 6)
+            .map((area: any, index: number) => (
+              <View key={index} style={styles.row}>
+                <Text style={styles.cellUser}>{area.name}</Text>
+                <Text style={styles.cell}>{area.buenas}</Text>
+                <Text style={styles.cell}>{area.malas}</Text>
+                <Text style={styles.cell}>{area.excedente}</Text>
+                <Text style={styles.cell}>{area.cqm}</Text>
+                <Text style={styles.cell}>{area.muestras}</Text>
+                <Text style={styles.cell}>
+                  {Number(area.buenas) +
+                    Number(area.malas) +
+                    Number(area.excedente) +
+                    Number(area.cqm) +
+                    Number(area.muestras)}
+                </Text>
+                <Text style={styles.cellUser}>{area?.usuario}</Text>
+                <Text style={styles.cellUser}>{area?.auditor}</Text>
+              </View>
+            ))}
         </View>
       </ScrollView>
 
+      {currentFlow?.status !== 'En proceso' && (
+        <>
+          <Text style={styles.subtitle}>Cuadres</Text>
+          <View style={styles.tableCuadres}>
+            <View style={styles.row}>
+              <Text style={styles.cellLabel}>Buenas Última Operación</Text>
+              <Text style={styles.cellValue}>{ultimaArea?.buenas ?? ''}</Text>
+            </View>
+            <View style={styles.row}>
+              <Text style={styles.cellLabel}>Excedente Última Operación</Text>
+              <Text style={styles.cellValue}>
+                {ultimaArea?.excedente ?? ''}
+              </Text>
+            </View>
+            <View style={styles.row}>
+              <Text style={styles.cellLabel}>Total Malas</Text>
+              <Text style={styles.cellValue}>{totalMalas}</Text>
+            </View>
+            <View style={styles.row}>
+              <Text style={styles.cellLabel}>Total CQM</Text>
+              <Text style={styles.cellValue}>{totalCqm}</Text>
+            </View>
+            <View style={styles.row}>
+              <Text style={styles.cellLabel}>Total Muestras</Text>
+              <Text style={styles.cellValue}>{totalMuestras}</Text>
+            </View>
+            <View style={styles.row}>
+              <Text style={styles.cellLabel}>TOTAL</Text>
+              <Text style={styles.cellValue}>{totalGeneral}</Text>
+            </View>
+          </View>
+        </>
+      )}
+
       {workOrder?.status !== 'Cerrado' && (
-        <TouchableOpacity style={styles.button} onPress={() => setShowConfirm(true)}>
+        <TouchableOpacity
+          style={styles.button}
+          onPress={() => setShowConfirm(true)}
+        >
           <Text style={styles.buttonText}>Cerrar Orden de Trabajo</Text>
         </TouchableOpacity>
       )}
@@ -223,12 +302,20 @@ const CerrarOrdenDeTrabajoAuxScreen: React.FC = () => {
       <Modal visible={showConfirm} transparent animationType="fade">
         <View style={styles.modalOverlay}>
           <View style={styles.modalBox}>
-            <Text style={styles.modalText}>¿Deseas cerrar esta Orden de Trabajo?</Text>
+            <Text style={styles.modalText}>
+              ¿Deseas cerrar esta Orden de Trabajo?
+            </Text>
             <View style={styles.modalActions}>
-              <TouchableOpacity onPress={() => setShowConfirm(false)} style={styles.cancelButton}>
+              <TouchableOpacity
+                onPress={() => setShowConfirm(false)}
+                style={styles.cancelButton}
+              >
                 <Text style={styles.modalButtonText}>Cancelar</Text>
               </TouchableOpacity>
-              <TouchableOpacity onPress={handleCloseOrder} style={styles.confirmButton}>
+              <TouchableOpacity
+                onPress={handleCloseOrder}
+                style={styles.confirmButton}
+              >
                 <Text style={styles.modalButtonText}>Confirmar</Text>
               </TouchableOpacity>
             </View>
@@ -245,6 +332,29 @@ const styles = StyleSheet.create({
   container: {
     padding: 16,
     backgroundColor: '#fdfaf6',
+  },
+  cellHeader: {
+    flex: 1,
+    fontWeight: 'bold',
+    textAlign: 'left',
+    paddingVertical: 8,
+    backgroundColor: '#f0f0f0',
+  },
+  cellLabel: {
+    flex: 1,
+    fontWeight: '600',
+    textAlign: 'left',
+    width: 180,
+  },
+  cellUser: {
+    flex: 1,
+    minWidth: 90,
+    textAlign: 'left',
+  },
+  cellValue: {
+    flex: 1,
+    minWidth: 30,
+    textAlign: 'right',
   },
   title: {
     fontSize: 20,
@@ -275,6 +385,11 @@ const styles = StyleSheet.create({
     padding: 10,
     backgroundColor: '#fff',
   },
+  tableCuadres: {
+    padding: 10,
+    backgroundColor: '#fff',
+    maxWidth: '76%',
+  },
   headerRow: {
     flexDirection: 'row',
     backgroundColor: '#fff',
@@ -291,17 +406,13 @@ const styles = StyleSheet.create({
     paddingHorizontal: 10,
     textAlign: 'center',
   },
-  cellUser: {
-    width: 120,
-    paddingHorizontal: 10
-  },
   button: {
     backgroundColor: '#0038A8',
     padding: 12,
     borderRadius: 18,
     alignItems: 'center',
     marginBottom: 20,
-    marginTop: 20
+    marginTop: 20,
   },
   buttonText: {
     color: '#fff',

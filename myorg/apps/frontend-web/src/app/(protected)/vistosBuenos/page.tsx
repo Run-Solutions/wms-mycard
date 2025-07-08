@@ -4,8 +4,9 @@
 import { useRouter } from 'next/navigation';
 import React, { useEffect, useState } from 'react';
 import styled, { useTheme } from 'styled-components';
-import { getFileByName } from "@/api/seguimientoDeOts";
+import { getFileByName } from '@/api/seguimientoDeOts';
 import { fetchPendingOrders, acceptWorkOrder } from '@/api/vistosBuenos';
+import { useAuthContext } from '@/context/AuthContext';
 
 // Se define el tipo de datos
 interface CQMWorkOrder {
@@ -24,18 +25,18 @@ interface CQMWorkOrder {
   user: {
     id: number;
     username: string;
-  }
+  };
   area: {
     name: string;
-  }
-  workOrder: {   
+  };
+  workOrder: {
     id: number;
     ot_id: string;
     mycard_id: string;
     priority: string;
     quantity: number;
     comments: string;
-    created_by: number;  
+    created_by: number;
     validated: boolean;
     createdAt: string;
     updatedAt: string;
@@ -50,10 +51,17 @@ interface CQMWorkOrder {
     }[];
     flow: {
       id: number;
+      status: string;
+      assigned_user: number;
       area: {
         id: number;
         name: string;
-      }
+      };
+      answers?: {
+        id: number;
+        reviewed_by_id: number;
+        reviewed: boolean;
+      }[];
     }[];
   };
   areaResponse: {
@@ -64,13 +72,56 @@ interface CQMWorkOrder {
       positives: number;
       testType: string;
       comments: string;
-    }
+    };
   };
 }
+type WorkOrderFlow = {
+  id: number;
+  area_id: number;
+  status: string;
+  assigned_user: number | null;
+  work_order_id: number;
+  area: {
+    id: number;
+    name: string;
+  };
+  answers?: {
+    id: number;
+    reviewed_by_id: number;
+    reviewed: boolean;
+  }[];
+};
 
-const UsersPage: React.FC = () => {
+function puedeAceptarOTCQM(
+  selectedOrder: CQMWorkOrder,
+  currentUserId: number
+): boolean {
+  const flujos = selectedOrder.workOrder.flow;
+
+  for (const flujo of flujos) {
+    if (flujo.status === 'En Calidad' && flujo.answers?.length) {
+      const lastAnswer = flujo.answers[flujo.answers.length - 1];
+
+      const estaAsignadoAUsuario = lastAnswer.reviewed_by_id === currentUserId;
+      const noHaRevisado = lastAnswer.reviewed === false;
+
+      if (estaAsignadoAUsuario && noHaRevisado) {
+        console.log(
+          '⛔ Usuario ya tiene otro flujo en calidad pendiente:',
+          flujo
+        );
+        return false;
+      }
+    }
+  }
+
+  return true; // ✅ No hay bloqueos, puede aceptar
+}
+
+const VistosBuenosPage: React.FC = () => {
   const theme = useTheme();
   const router = useRouter();
+  const { user } = useAuthContext();
 
   // Para obtener Ordenes Pendientes
   const [CQMWorkOrders, setCQMWorkOrders] = useState<CQMWorkOrder[]>([]);
@@ -78,9 +129,23 @@ const UsersPage: React.FC = () => {
   // Para mostar toda la información de la OT
   const [selectedOrder, setSelectedOrder] = useState<CQMWorkOrder | null>(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
-  
+
   const handleCardClick = (order: CQMWorkOrder) => {
-    console.log("Clic en OT:", order.workOrder.ot_id);
+    console.log('Clic en OT:', order.workOrder.ot_id);
+    let index: number = 0;
+
+    if (order.answers?.length) {
+      for (let i = order.answers.length - 1; i >= 0; i--) {
+        const accepted = order.answers[i].accepted;
+        if (accepted === false || accepted === null || accepted === undefined) {
+          index = i;
+          break;
+        }
+      }
+    }
+
+    const flowId = order.answers?.[index]?.id;
+    console.log(flowId);
     setSelectedOrder(order);
     setIsModalOpen(true);
   };
@@ -88,22 +153,66 @@ const UsersPage: React.FC = () => {
   const closeModal = () => {
     setIsModalOpen(false);
     setSelectedOrder(null);
-  }
+  };
+
+  const puedeAceptar =
+    selectedOrder && user ? puedeAceptarOTCQM(selectedOrder, user.id) : false;
+
+  console.log('✅ ¿Puede aceptar?:', puedeAceptar);
+
+  const aceptarOT = async () => {
+    console.log('Se hizo clic en Aceptar OT');
+
+    if (
+      !selectedOrder ||
+      !selectedOrder.answers ||
+      selectedOrder.answers.length === 0 ||
+      puedeAceptar === false
+    ) {
+      console.log('No hay respuestas disponibles en la orden.');
+      alert(
+        'Debes liberar completamente tu participación anterior antes de aceptar esta etapa.'
+      );
+      return;
+    }
+
+    try {
+      await acceptWorkOrder(selectedOrder);
+      window.location.reload();
+    } catch (error) {
+      console.error('Error al aceptar la OT:', error);
+      alert('Error al conectar con el servidor');
+    }
+  };
+  const downloadFile = async (filename: string) => {
+    try {
+      const arrayBuffer = await getFileByName(filename);
+      const blob = new Blob([arrayBuffer], { type: 'application/pdf' });
+      const url = window.URL.createObjectURL(blob);
+      window.open(url, '_blank');
+      setTimeout(() => window.URL.revokeObjectURL(url), 5000);
+    } catch (error) {
+      console.error('Error al abrir el archivo:', error);
+    }
+  };
 
   useEffect(() => {
     async function fetchCQMWorkOrders() {
       try {
         const data = await fetchPendingOrders();
-        console.log('Ordenes de trabajo pendientes por revisar y asignar', data);
+        console.log(
+          'Ordenes de trabajo pendientes por revisar y asignar',
+          data
+        );
         // Ordenar las OTs: primero las marcadas como prioridad, luego por fecha
-        if (data && Array.isArray(data)){
-          const sortedOrders = data.sort((a: CQMWorkOrder, b: CQMWorkOrder) => {
-            // Si a es prioritario y b no, a va primero
+        if (data && Array.isArray(data)) {
+          const sortedOrders = data.sort((a, b) => {
             if (a.workOrder.priority && !b.workOrder.priority) return -1;
-            // Si b es prioritario y a no, b va primero
             if (!a.workOrder.priority && b.workOrder.priority) return 1;
-            // Si ambos tienen la misma prioridad, ordenar por fecha (más reciente primero)
-            return new Date(a.workOrder.createdAt).getTime() - new Date(b.workOrder.createdAt).getTime();
+            return (
+              new Date(a.workOrder.createdAt).getTime() -
+              new Date(b.workOrder.createdAt).getTime()
+            );
           });
           setCQMWorkOrders(sortedOrders);
         } else {
@@ -117,115 +226,129 @@ const UsersPage: React.FC = () => {
     fetchCQMWorkOrders();
   }, []);
 
-  const downloadFile = async (filename: string) => {
-    try {
-      const arrayBuffer = await getFileByName(filename);
-      const blob = new Blob([arrayBuffer], { type: 'application/pdf' });
-      const url = window.URL.createObjectURL(blob);
-      window.open(url, '_blank');
-      setTimeout(() => window.URL.revokeObjectURL(url), 5000);
-    } catch (error) {
-      console.error('Error al abrir el archivo:', error);
-    }
-  };
-
-  const aceptarOT = async () => {
-    console.log("Se hizo clic en Aceptar OT");
-  
-    if (!selectedOrder || !selectedOrder.answers || selectedOrder.answers.length === 0) {
-      console.error('No hay respuestas disponibles en la orden.');
-      return;
-    }
-    try {
-      await acceptWorkOrder(selectedOrder);
-      window.location.reload();
-    } catch (error) {
-      console.error('Error al aceptar la OT:', error);
-      alert('Error al conectar con el servidor');
-    }
-  };
-
   return (
     <>
-    {isModalOpen && selectedOrder && (
-      <ModalOverlay onClick={closeModal}>
-        <ModalContent onClick={(e) => e.stopPropagation()}>
-          <h2>Orden: {selectedOrder.workOrder.ot_id}</h2>
-          <ModalBody>
-            <ModalInfo>
-              <p><strong>Id del Presupuesto:</strong> {selectedOrder.workOrder.mycard_id}</p>
-              <p><strong>Cantidad:</strong> {selectedOrder.workOrder.quantity}</p>
-              <p><strong>Creado por:</strong> {selectedOrder.workOrder.user?.username}</p>
-              <p><strong>Prioritario:</strong> {selectedOrder.workOrder.priority ? 'Sí' : 'No'}</p>
-              <p><strong>Comentario:</strong> {selectedOrder.workOrder.comments}</p>
-              <p><strong>Enviado por:</strong> {selectedOrder.user?.username}</p>
-              <p><strong>Area de evaluacion:</strong> {selectedOrder.area?.name}</p>
-              <p><strong>Archivos:</strong></p>
-              <div style={{ display: 'flex', flexDirection: 'row',}}>
-                {selectedOrder.workOrder.files.map((file) => (
-                  <div key={file.file_path}>
-                    <button onClick={() => downloadFile(file.file_path)}>
-                      {file.file_path.toLowerCase().includes('ot') ? 'Ver OT' : 
-                      file.file_path.toLowerCase().includes('sku') ? 'Ver SKU' : 
-                      file.file_path.toLowerCase().includes('op') ? 'Ver OP' : 
-                      'Ver Archivo'}
-                    </button>
-                  </div>
-                ))}
-              </div>
-            </ModalInfo>
-            <ModalFlow>
+      {isModalOpen && selectedOrder && (
+        <ModalOverlay onClick={closeModal}>
+          <ModalContent onClick={(e) => e.stopPropagation()}>
+            <h2>Orden: {selectedOrder.workOrder.ot_id}</h2>
+            <ModalBody>
+              <ModalInfo>
+                <p>
+                  <strong>Id del Presupuesto:</strong>{' '}
+                  {selectedOrder.workOrder.mycard_id}
+                </p>
+                <p>
+                  <strong>Cantidad:</strong> {selectedOrder.workOrder.quantity}
+                </p>
+                <p>
+                  <strong>Creado por:</strong>{' '}
+                  {selectedOrder.workOrder.user?.username}
+                </p>
+                <p>
+                  <strong>Prioritario:</strong>{' '}
+                  {selectedOrder.workOrder.priority ? 'Sí' : 'No'}
+                </p>
+                <p>
+                  <strong>Comentario:</strong>{' '}
+                  {selectedOrder.workOrder.comments}
+                </p>
+                <p>
+                  <strong>Enviado por:</strong> {selectedOrder.user?.username}
+                </p>
+                <p>
+                  <strong>Area de evaluacion:</strong>{' '}
+                  {selectedOrder.area?.name}
+                </p>
+                <p>
+                  <strong>Archivos:</strong>
+                </p>
+                <div style={{ display: 'flex', flexDirection: 'row' }}>
+                  {selectedOrder.workOrder.files.map((file) => (
+                    <div key={file.file_path}>
+                      <button onClick={() => downloadFile(file.file_path)}>
+                        {file.file_path.toLowerCase().includes('ot')
+                          ? 'Ver OT'
+                          : file.file_path.toLowerCase().includes('sku')
+                          ? 'Ver SKU'
+                          : file.file_path.toLowerCase().includes('op')
+                          ? 'Ver OP'
+                          : 'Ver Archivo'}
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              </ModalInfo>
+              <ModalFlow>
                 <strong>Flujos:</strong>
                 <Timeline>
                   {selectedOrder.workOrder.flow.map((f, index) => (
                     <TimelineItem key={index}>
                       <Circle>{index + 1}</Circle>
                       <AreaName>{f.area.name ?? 'Area Desconocida'}</AreaName>
-                      {index < selectedOrder.workOrder.flow.length -1 && <Line/>}
+                      {index < selectedOrder.workOrder.flow.length - 1 && (
+                        <Line />
+                      )}
                     </TimelineItem>
                   ))}
                 </Timeline>
-            </ModalFlow>
-          </ModalBody>
-          <button style={{ marginTop: '20px'}} onClick={closeModal}>Cerrar</button>
-          <button style={{ marginTop: '20px'}} onClick={aceptarOT}>Aceptar OT</button>
-        </ModalContent>
-      </ModalOverlay>
-    )}
+              </ModalFlow>
+            </ModalBody>
+            <button style={{ marginTop: '20px' }} onClick={closeModal}>
+              Cerrar
+            </button>
+            <button style={{ marginTop: '20px' }} onClick={aceptarOT}>
+              Aceptar OT
+            </button>
+          </ModalContent>
+        </ModalOverlay>
+      )}
 
-    <PageContainer>
-      <TitleWrapper>
-        <Title theme={theme}>Vistos Buenos</Title>
-      </TitleWrapper>
-      <CardsContainer>
-        {Array.isArray(CQMWorkOrders) && CQMWorkOrders.length > 0 ? (
-          CQMWorkOrders.map((order, index) => {
-            console.log(`Orden ${index + 1}:`, order);
-            const workOrder = order.workOrder;
-            if(!workOrder) return null;
-            return(
-              <WorkOrderCard key={order.id} onClick={()=> { handleCardClick(order)}}>
-                <CardTitle>{workOrder.priority && <PriorityBadge />}{workOrder.ot_id}</CardTitle>
-                <InfoItem>
-                  <p>{workOrder.mycard_id}</p>
-                  <p>Cantidad: {workOrder.quantity}</p>
-                </InfoItem>
-                <Info style={{ paddingTop: '10px' }}>Creado por: {workOrder.user.username}</Info>
-                <Info>Fecha de creación: {new Date(workOrder.createdAt).toLocaleDateString()}</Info>
-              </WorkOrderCard>
-            );
-          })
-        ) : (
-          <Message>No hay ordenes pendientes por asignar.</Message>
-        )}
-      </CardsContainer>
-      
-    </PageContainer>
+      <PageContainer>
+        <TitleWrapper>
+          <Title theme={theme}>Vistos Buenos</Title>
+        </TitleWrapper>
+        <CardsContainer>
+          {Array.isArray(CQMWorkOrders) && CQMWorkOrders.length > 0 ? (
+            CQMWorkOrders.map((order, index) => {
+              console.log(`Orden ${index + 1}:`, order);
+              const workOrder = order.workOrder;
+              if (!workOrder) return null;
+              return (
+                <WorkOrderCard
+                  key={order.id}
+                  onClick={() => {
+                    handleCardClick(order);
+                  }}
+                >
+                  <CardTitle>
+                    {workOrder.priority && <PriorityBadge />}
+                    {workOrder.ot_id}
+                  </CardTitle>
+                  <InfoItem>
+                    <p>{workOrder.mycard_id}</p>
+                    <p>Cantidad: {workOrder.quantity}</p>
+                  </InfoItem>
+                  <Info style={{ paddingTop: '10px' }}>
+                    Creado por: {workOrder.user.username}
+                  </Info>
+                  <Info>
+                    Fecha de creación:{' '}
+                    {new Date(workOrder.createdAt).toLocaleDateString()}
+                  </Info>
+                </WorkOrderCard>
+              );
+            })
+          ) : (
+            <Message>No hay ordenes pendientes por asignar.</Message>
+          )}
+        </CardsContainer>
+      </PageContainer>
     </>
   );
 };
 
-export default UsersPage;
+export default VistosBuenosPage;
 
 // =================== Styled Components ===================
 
@@ -246,7 +369,7 @@ const TitleWrapper = styled.div`
 const Title = styled.h1<{ theme: any }>`
   font-size: 2rem;
   font-weight: 500;
-  color: ${({ theme }) => theme.palette.text.primary}
+  color: ${({ theme }) => theme.palette.text.primary};
 `;
 
 const WorkOrderCard = styled.div`
@@ -259,9 +382,9 @@ const WorkOrderCard = styled.div`
   background-color: ${(props) => props.theme.palette.primary.main};
   cursor: pointer;
   box-shadow: 0px 4px 10px rgba(0, 0, 0, 0.1);
-  transition: border-color 0.3s cubic-bezier(0.25, 0.01, 0.25, 1), 
-              color 0.3s cubic-bezier(0.25, 0.01, 0.25, 1), 
-              background 0.2s cubic-bezier(0.25, 0.01, 0.25, 1);
+  transition: border-color 0.3s cubic-bezier(0.25, 0.01, 0.25, 1),
+    color 0.3s cubic-bezier(0.25, 0.01, 0.25, 1),
+    background 0.2s cubic-bezier(0.25, 0.01, 0.25, 1);
 
   &::placeholder {
     color: #aaa;
@@ -371,31 +494,31 @@ const ModalContent = styled.div`
   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.25);
 
   h2 {
-      font-size: 1.8rem;
-      margin-bottom: 1rem;
+    font-size: 1.8rem;
+    margin-bottom: 1rem;
   }
   button {
     padding: 0.5rem 1rem;
     border: none;
     border-radius: 0.5rem;
-    background-color: #F9FAFB;
+    background-color: #f9fafb;
     color: black;
     cursor: pointer;
     margin: 5px;
-    transition: border-color 0.3s cubic-bezier(0.25, 0.01, 0.25, 1), 
-              color 0.3s cubic-bezier(0.25, 0.01, 0.25, 1), 
-              background 0.2s cubic-bezier(0.25, 0.01, 0.25, 1);
+    transition: border-color 0.3s cubic-bezier(0.25, 0.01, 0.25, 1),
+      color 0.3s cubic-bezier(0.25, 0.01, 0.25, 1),
+      background 0.2s cubic-bezier(0.25, 0.01, 0.25, 1);
 
-  &::placeholder {
-    color: #aaa;
-    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen,
-      Ubuntu, Cantarell, 'Open Sans', 'Helvetica Neue', sans-serif;
-  }
+    &::placeholder {
+      color: #aaa;
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen,
+        Ubuntu, Cantarell, 'Open Sans', 'Helvetica Neue', sans-serif;
+    }
 
-  &:hover,
-  &:focus {
-    border-color: #05060f;
-  }
+    &:hover,
+    &:focus {
+      border-color: #05060f;
+    }
   }
 `;
 
@@ -465,14 +588,14 @@ const PriorityBadge = styled.span`
   display: inline-block;
   width: 14px;
   height: 14px;
-  background-color: #FFD700;
+  background-color: #ffd700;
   border-radius: 50%;
   margin-left: 8px;
   box-shadow: 0 0 4px rgba(255, 215, 0, 0.7);
   position: relative;
   top: -4px;
   margin-right: 5px;
-  
+
   /* Efecto de brillo opcional */
   &:after {
     content: '';

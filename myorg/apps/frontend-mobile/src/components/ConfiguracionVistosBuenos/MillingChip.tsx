@@ -66,15 +66,6 @@ export default function MillingChipComponent({ formQuestion }: Props) {
         onDelete={(e) => setDeletingId(e)}
       />
 
-      <QuestionTable
-        title='Mis respuestas'
-        questions={formQuestions}
-        areaId={9}
-        roleFilter={3}
-        onEdit={(e) => { setEditingId(e.id); setNewTitle(e.title) }}
-        onDelete={(e) => setDeletingId(e)}
-      />
-
       <Text style={styles.label}>Revisar Tecnología De Chip Y Color Vs Ot</Text>
       <TextInput style={styles.input} theme={{ roundness: 30 }} mode="outlined" activeOutlineColor="#000" editable={false} />
 
@@ -83,6 +74,14 @@ export default function MillingChipComponent({ formQuestion }: Props) {
 
       <Text style={styles.label}>Muestras entregadas</Text>
       <TextInput style={styles.input} theme={{ roundness: 30 }} mode="outlined" activeOutlineColor="#000" editable={false} />
+      <QuestionTable
+        title='Mis respuestas'
+        questions={formQuestions}
+        areaId={9}
+        roleFilter={3}
+        onEdit={(e) => { setEditingId(e.id); setNewTitle(e.title) }}
+        onDelete={(e) => setDeletingId(e)}
+      />
 
       <Text style={styles.label}>Localización de Contactos</Text>
       <TextInput style={styles.input} theme={{ roundness: 30 }} mode="outlined" activeOutlineColor="#000" editable={false} />

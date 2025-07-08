@@ -7,7 +7,7 @@ import {
   StyleSheet,
   ActivityIndicator,
   ScrollView,
-  Platform
+  Platform,
 } from 'react-native';
 import { useRoute, RouteProp } from '@react-navigation/native';
 import { InternalStackParamList } from '../../../../navigation/types';
@@ -25,7 +25,10 @@ import HotStampingComponent from '../../../../components/LiberarProducto/HotStam
 import MillingChipComponent from '../../../../components/LiberarProducto/MillingChipComponent';
 import PersonalizacionComponent from '../../../../components/LiberarProducto/PersonalizacionComponent';
 
-type RouteParams = RouteProp<InternalStackParamList, 'LiberarProductoAuxScreen'>;
+type RouteParams = RouteProp<
+  InternalStackParamList,
+  'LiberarProductoAuxScreen'
+>;
 
 const LiberarProductoAuxScreen: React.FC = () => {
   const route = useRoute<RouteParams>();
@@ -53,27 +56,27 @@ const LiberarProductoAuxScreen: React.FC = () => {
     if (!workOrder) return null;
 
     switch (workOrder.area_id) {
-      case 1: 
+      case 1:
         return <PrePrensaComponent workOrder={workOrder} />;
-      case 2: 
+      case 2:
         return <ImpresionComponent workOrder={workOrder} />;
-      case 3: 
+      case 3:
         return <SerigrafiaComponent workOrder={workOrder} />;
-      case 4: 
+      case 4:
         return <EmpalmeComponent workOrder={workOrder} />;
-      case 5: 
+      case 5:
         return <LaminacionComponent workOrder={workOrder} />;
-      case 6: 
+      case 6:
         return <CorteComponent workOrder={workOrder} />;
-      case 7: 
+      case 7:
         return <ColorEdgeComponent workOrder={workOrder} />;
-      case 8: 
+      case 8:
         return <HotStampingComponent workOrder={workOrder} />;
-      case 9: 
+      case 9:
         return <MillingChipComponent workOrder={workOrder} />;
-      case 10: 
-        return <PersonalizacionComponent workOrder={workOrder} />;    
-      default: 
+      case 10:
+        return <PersonalizacionComponent workOrder={workOrder} />;
+      default:
         return <Text style={styles.title}>Área no reconocida.</Text>;
     }
   };
@@ -90,19 +93,23 @@ const LiberarProductoAuxScreen: React.FC = () => {
           <Text style={styles.header}>Información de la OT</Text>
           <View style={styles.card}>
             <Text style={styles.label}>
-              OT: <Text style={styles.value}>{workOrder.workOrder.ot_id}</Text>
+              Número de Orden:{' '}
+              <Text style={styles.value}>{workOrder.workOrder.ot_id}</Text>
             </Text>
             <Text style={styles.label}>
-              Presupuesto: <Text style={styles.value}>{workOrder.workOrder.mycard_id}</Text>
+              ID del Presupuesto:{' '}
+              <Text style={styles.value}>{workOrder.workOrder.mycard_id}</Text>
             </Text>
             <Text style={styles.label}>
-              Cantidad (TARJETAS): <Text style={styles.value}>{workOrder.workOrder.quantity}</Text>
+              Cantidad (TARJETAS):{' '}
+              <Text style={styles.value}>{workOrder.workOrder.quantity}</Text>
             </Text>
             <Text style={styles.label}>
-              Cantidad (HOJAS): <Text style={styles.value}>{cantidadHojas}</Text>
+              Cantidad (KITS): <Text style={styles.value}>{cantidadHojas}</Text>
             </Text>
             <Text style={styles.label}>
-              Comentarios: <Text style={styles.value}>{workOrder.workOrder.comments}</Text>
+              Comentarios:{' '}
+              <Text style={styles.value}>{workOrder.workOrder.comments}</Text>
             </Text>
           </View>
           {renderComponentByArea()}
@@ -114,12 +121,12 @@ const LiberarProductoAuxScreen: React.FC = () => {
 export default LiberarProductoAuxScreen;
 
 const styles = StyleSheet.create({
-  container: { 
+  container: {
     flex: 1,
     paddingTop: 16,
     paddingBottom: 2,
-    paddingHorizontal: 8, 
-    backgroundColor: '#fdfaf6', 
+    paddingHorizontal: 25,
+    backgroundColor: '#fdfaf6',
   },
   title: {
     fontSize: 20,

@@ -8,6 +8,7 @@ import {
   submitToCQMImpression,
 } from '@/api/liberarProducto';
 import { useAuthContext } from '@/context/AuthContext';
+import { calcularCantidadPorLiberar } from './util/calcularCantidadPorLiberar';
 
 interface Props {
   workOrder: any;
@@ -42,6 +43,7 @@ export default function ImpresionComponent({ workOrder }: Props) {
       'En Calidad',
       'Pendiente parcial',
       'Enviado a auditoria parcial',
+      'Enviado a auditoria',
       'En inconformidad CQM',
     ];
 
@@ -64,16 +66,8 @@ export default function ImpresionComponent({ workOrder }: Props) {
   };
   const shouldDisableCQM = () => {
     const estadosBloqueados = ['Enviado a CQM', 'En Calidad', 'Listo'];
-    const isDisabled =
-      estadosBloqueados.includes(currentFlow.status) ||
-      estadosBloqueados.includes(lastCompletedOrPartial.status) ||
-      estadosBloqueados.includes(nextFlow?.status) || // nextFlow puede ser opcional
-      Number(cantidadporliberar) === 0;
-    const algunoBloqueado = workOrder?.workOrder?.flow?.some((flow: any) =>
-      estadosBloqueados.includes(flow.status)
-    );
-
-    return isDisabled || algunoBloqueado;
+    const isDisabled = estadosBloqueados.includes(currentFlow.status);
+    return isDisabled || Number(cantidadporliberar) === 0;
   };
   //Para guardar las respuestas
   const [responses, setResponses] = useState<
@@ -237,6 +231,11 @@ export default function ImpresionComponent({ workOrder }: Props) {
       (q: any) => q.role_id === null
     );
     const flowId = currentFlow.id;
+    const numValue = Number(sampleQuantity);
+    if (isNaN(numValue) || !Number.isInteger(numValue) || numValue < 0) {
+      alert('Por favor, ingresa una cantidad de muestra válida.');
+      return;
+    }
     if (checkedQuestionsFrente.length === 0) {
       alert('Por favor, selecciona al menos una respuesta antes de enviar.');
       return;
@@ -273,7 +272,8 @@ export default function ImpresionComponent({ workOrder }: Props) {
   // Para Liberar el producto cuando ya ha pasado por CQM
   const [showConfirm, setShowConfirm] = useState(false);
   const handleLiberarClick = () => {
-    if (Number(sampleQuantity) <= 0) {
+    const numValue = Number(sampleQuantity);
+    if (isNaN(numValue) || !Number.isInteger(numValue) || numValue <= 0) {
       alert('Por favor, ingresa una cantidad de muestra válida.');
       return;
     }
@@ -313,69 +313,11 @@ export default function ImpresionComponent({ workOrder }: Props) {
     }
   };
 
-  let cantidadporliberar = 0;
-  const totalLiberado =
-    currentFlow.partialReleases?.reduce(
-      (sum: number, release: PartialRelease) => sum + release.quantity,
-      0
-    ) ?? 0;
-  console.log('Total liberado:', totalLiberado);
-  const validatedPartials =
-    lastCompletedOrPartial.partialReleases
-      ?.filter((r: PartialRelease) => r.validated)
-      .reduce((sum: number, r: PartialRelease) => sum + (r.quantity || 0), 0) ??
-    0;
-
-  const empalmeQty =
-    lastCompletedOrPartial.areaResponse.prepress?.plates ??
-    lastCompletedOrPartial.areaResponse.impression?.release_quantity ??
-    lastCompletedOrPartial.areaResponse.serigrafia?.release_quantity ??
-    lastCompletedOrPartial.areaResponse.empalme?.release_quantity ??
-    lastCompletedOrPartial.areaResponse.laminacion?.release_quantity ??
-    lastCompletedOrPartial.areaResponse.corte?.good_quantity ??
-    lastCompletedOrPartial.areaResponse.colorEdge?.good_quantity ??
-    lastCompletedOrPartial.areaResponse.hotStamping?.good_quantity ??
-    lastCompletedOrPartial.areaResponse.millingChip?.good_quantity ??
-    lastCompletedOrPartial.areaResponse.personalizacion?.good_quantity ??
-    currentFlow.workOrder.quantity ??
-    0;
-
-  const validados = validatedPartials - empalmeQty;
-
-  console.log('Cantidad validada total:', validados);
-  // ✅ 1. Preprensa tiene prioridad
-  if (lastCompletedOrPartial.area?.name === 'preprensa') {
-    cantidadporliberar = currentFlow.workOrder.quantity - totalLiberado;
-  }
-  // ✅ 2. Si hay validados en otras áreas
-  else if (validados > 0) {
-    let resta = validados - totalLiberado;
-    if (resta < 0) {
-      cantidadporliberar = 0;
-    } else {
-      cantidadporliberar = resta;
-    }
-  }
-  // ✅ 3. Si hay liberaciones sin validar
-  else if (totalLiberado > 0) {
-    cantidadporliberar = currentFlow.workOrder.quantity - totalLiberado;
-  }
-  // ✅ 4. Si no hay nada, usar la cantidad entregada
-  else {
-    cantidadporliberar =
-      lastCompletedOrPartial.areaResponse.prepress?.plates ??
-      lastCompletedOrPartial.areaResponse.impression?.release_quantity ??
-      lastCompletedOrPartial.areaResponse.serigrafia?.release_quantity ??
-      lastCompletedOrPartial.areaResponse.empalme?.release_quantity ??
-      lastCompletedOrPartial.areaResponse.laminacion?.release_quantity ??
-      lastCompletedOrPartial.areaResponse.corte?.good_quantity ??
-      lastCompletedOrPartial.areaResponse.colorEdge?.good_quantity ??
-      lastCompletedOrPartial.areaResponse.hotStamping?.good_quantity ??
-      lastCompletedOrPartial.areaResponse.millingChip?.good_quantity ??
-      lastCompletedOrPartial.areaResponse.personalizacion?.good_quantity ??
-      currentFlow.workOrder.quantity ??
-      0;
-  }
+  const cantidadporliberar = calcularCantidadPorLiberar(
+    currentFlow,
+    lastCompletedOrPartial
+  );
+  console.log('Cantidad final por liberar:', cantidadporliberar);
 
   const cantidadHojasRaw = Number(workOrder?.workOrder.quantity) / 24;
   const cantidadHojas = cantidadHojasRaw > 0 ? Math.ceil(cantidadHojasRaw) : 0;
@@ -399,7 +341,7 @@ export default function ImpresionComponent({ workOrder }: Props) {
             <Value>{workOrder.workOrder.quantity || 'No definida'}</Value>
           </InfoItem>
           <InfoItem style={{ backgroundColor: '#eaeaf5', borderRadius: '8px' }}>
-            <Label>Cantidad (HOJAS):</Label>
+            <Label>Cantidad (KITS):</Label>
             <Value>{cantidadHojas}</Value>
           </InfoItem>
         </DataWrapper>
@@ -481,7 +423,7 @@ export default function ImpresionComponent({ workOrder }: Props) {
           <SectionTitle>Datos de Producción</SectionTitle>
           <NewDataWrapper>
             <InputGroup>
-              <Label>Cantidad a Liberar (HOJAS):</Label>
+              <Label>Cantidad a Liberar (KITS):</Label>
               <Input
                 type="number"
                 min="0"
@@ -505,7 +447,7 @@ export default function ImpresionComponent({ workOrder }: Props) {
               onClick={openModal}
               disabled={shouldDisableCQM()}
             >
-              Enviar a CQM
+              Enviar a Calidad/CQM
             </CqmButton>
           </NewDataWrapper>
           <InputGroup>
@@ -548,7 +490,7 @@ export default function ImpresionComponent({ workOrder }: Props) {
         </ModalOverlay>
       )}
 
-      {/* Modal para enviar a CQM */}
+      {/* Modal para Enviar a Calidad/CQM */}
       {showModal && (
         <ModalOverlay>
           <ModalContent>

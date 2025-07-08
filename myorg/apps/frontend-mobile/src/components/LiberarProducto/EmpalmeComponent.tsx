@@ -18,6 +18,7 @@ import {
   releaseProductFromEmpalme,
 } from '../../api/liberarProducto';
 import { useAuth } from '../../contexts/AuthContext';
+import { calcularCantidadPorLiberar } from './util/calcularCantidadPorLiberar';
 
 interface PartialRelease {
   validated: boolean;
@@ -27,7 +28,7 @@ const EmpalmeComponent = ({ workOrder }: { workOrder: any }) => {
   console.log('Order', workOrder);
   const navigation =
     useNavigation<NativeStackNavigationProp<RootStackParamList>>();
-  const [sampleQuantity, setSampleQuantity] = useState<number>(0);
+  const [sampleQuantity, setSampleQuantity] = useState<string>('0');
   const [comments, setComments] = useState('');
   const [showCqmModal, setShowCqmModal] = useState(false);
   const [showConfirm, setShowConfirm] = useState(false);
@@ -82,13 +83,20 @@ const EmpalmeComponent = ({ workOrder }: { workOrder: any }) => {
   const allParcialsValidated = currentFlow.partialReleases?.every(
     (r: PartialRelease) => r.validated
   );
-
-  const tarjetasporliberar = sampleQuantity * 24;
+  const sampleQuantityNumber = Number(sampleQuantity);
+  const tarjetasporliberar = !isNaN(sampleQuantityNumber)
+    ? sampleQuantityNumber * 24
+    : 0;
 
   const enviarACQM = async () => {
+    const numValue = Number(sampleQuantity);
+    if (isNaN(numValue) || !Number.isInteger(numValue) || numValue < 0) {
+      Alert.alert('Cantidad de muestra inválida');
+      return;
+    }
     const isFrenteVueltaValid =
       checkedQuestion.length > 0 || checkedQuestion.length > 0;
-    if (!questions.length || !isFrenteVueltaValid ) {
+    if (!questions.length || !isFrenteVueltaValid) {
       Alert.alert('Completa todas las preguntas y cantidad de muestra.');
       return;
     }
@@ -114,16 +122,16 @@ const EmpalmeComponent = ({ workOrder }: { workOrder: any }) => {
       navigation.navigate('liberarProducto');
       setShowCqmModal(false);
     } catch (err) {
-      Alert.alert('Error al enviar a CQM.');
+      Alert.alert('Error al Enviar a Calidad/CQM.');
     }
   };
 
   const liberarProducto = async () => {
-    if (Number(sampleQuantity) <= 0) {
+    const numValue = Number(sampleQuantity);
+    if (isNaN(numValue) || !Number.isInteger(numValue) || numValue <= 0) {
       Alert.alert('Cantidad de muestra inválida');
       return;
     }
-
     const payload = {
       workOrderId: workOrder.workOrder.id,
       workOrderFlowId: currentFlow.id,
@@ -133,7 +141,6 @@ const EmpalmeComponent = ({ workOrder }: { workOrder: any }) => {
       comments,
       formAnswerId: currentFlow.answers?.[0]?.id,
     };
-
     try {
       await releaseProductFromEmpalme(payload);
       setShowConfirm(false);
@@ -145,12 +152,20 @@ const EmpalmeComponent = ({ workOrder }: { workOrder: any }) => {
   };
 
   const cantidadEntregadaLabel = lastCompletedOrPartial.areaResponse
-    ? 'Cantidad entregada:'
+    ? 'Cantidad entregada (TARJETAS):'
     : lastCompletedOrPartial.partialReleases?.some(
         (r: PartialRelease) => r.validated
       )
-    ? 'Cantidad entregada validada:'
-    : 'Cantidad faltante por liberar:';
+    ? 'Cantidad entregada validada (TARJETAS):'
+    : 'Cantidad faltante por liberar (TARJETAS):';
+
+  const cantidadEntregadaLabelKits = lastCompletedOrPartial.areaResponse
+    ? 'Cantidad entregada (KITS):'
+    : lastCompletedOrPartial.partialReleases?.some(
+        (r: PartialRelease) => r.validated
+      )
+    ? 'Cantidad entregada validada (KITS):'
+    : 'Cantidad faltante por liberar (KITS):';
 
   const cantidadEntregadaValue = lastCompletedOrPartial.areaResponse
     ? // Mostrar cantidad según sub-área disponible
@@ -180,51 +195,11 @@ const EmpalmeComponent = ({ workOrder }: { workOrder: any }) => {
         0
       ) ?? 0);
 
-  let cantidadporliberar = 0;
-  const totalLiberado =
-    currentFlow.partialReleases?.reduce(
-      (sum: number, release: PartialRelease) => sum + release.quantity,
-      0
-    ) ?? 0;
-  console.log('Total liberado:', totalLiberado);
-  const validados =
-    lastCompletedOrPartial.partialReleases
-      ?.filter((r: PartialRelease) => r.validated)
-      .reduce((sum: number, r: PartialRelease) => sum + r.quantity, 0) ?? 0;
-  console.log('Cantidad validada:', validados);
-  // ✅ 1. Preprensa tiene prioridad
-  if (lastCompletedOrPartial.area?.name === 'preprensa') {
-    cantidadporliberar = currentFlow.workOrder.quantity - totalLiberado;
-  }
-  // ✅ 2. Si hay validados en otras áreas
-  else if (validados > 0) {
-    let resta = validados - totalLiberado;
-    if (resta < 0) {
-      cantidadporliberar = 0;
-    } else {
-      cantidadporliberar = resta;
-    }
-  }
-  // ✅ 3. Si hay liberaciones sin validar
-  else if (totalLiberado > 0) {
-    cantidadporliberar = currentFlow.workOrder.quantity - totalLiberado;
-  }
-  // ✅ 4. Si no hay nada, usar la cantidad entregada
-  else {
-    cantidadporliberar =
-      lastCompletedOrPartial.areaResponse.prepress?.plates ??
-      lastCompletedOrPartial.areaResponse.impression?.release_quantity ??
-      lastCompletedOrPartial.areaResponse.serigrafia?.release_quantity ??
-      lastCompletedOrPartial.areaResponse.empalme?.release_quantity ??
-      lastCompletedOrPartial.areaResponse.laminacion?.release_quantity ??
-      lastCompletedOrPartial.areaResponse.corte?.good_quantity ??
-      lastCompletedOrPartial.areaResponse.colorEdge?.good_quantity ??
-      lastCompletedOrPartial.areaResponse.hotStamping?.good_quantity ??
-      lastCompletedOrPartial.areaResponse.millingChip?.good_quantity ??
-      lastCompletedOrPartial.areaResponse.personalizacion?.good_quantity ??
-      currentFlow.workOrder.quantity ??
-      0;
-  }
+  const cantidadporliberar = calcularCantidadPorLiberar(
+    currentFlow,
+    lastCompletedOrPartial
+  );
+  console.log('Cantidad final por liberar:', cantidadporliberar);
   const shouldDisableLiberar = () => {
     const currentInvalidStatuses = [
       'Enviado a CQM',
@@ -258,16 +233,8 @@ const EmpalmeComponent = ({ workOrder }: { workOrder: any }) => {
   };
   const shouldDisableCQM = () => {
     const estadosBloqueados = ['Enviado a CQM', 'En Calidad', 'Listo'];
-    const isDisabled =
-      estadosBloqueados.includes(currentFlow.status) ||
-      estadosBloqueados.includes(lastCompletedOrPartial.status) ||
-      estadosBloqueados.includes(nextFlow?.status) || // nextFlow puede ser opcional
-      Number(cantidadporliberar) === 0;
-
-    const algunoBloqueado = workOrder.workOrder.flow.some((flow:any) =>
-      estadosBloqueados.includes(flow.status)
-    );
-    return isDisabled || algunoBloqueado;
+    const isDisabled = estadosBloqueados.includes(currentFlow.status);
+    return isDisabled || Number(cantidadporliberar) === 0;
   };
   const disableLiberarButton = shouldDisableLiberar();
   const disableLiberarCQM = shouldDisableCQM();
@@ -292,7 +259,7 @@ const EmpalmeComponent = ({ workOrder }: { workOrder: any }) => {
 
       <View style={styles.cardDetail}>
         <Text style={styles.labelDetail}>
-          Cantidad (HOJAS):
+          Cantidad (KITS):
           <Text style={styles.valueDetail}> {cantidadHojas}</Text>
         </Text>
         <Text style={styles.labelDetail}>
@@ -313,16 +280,32 @@ const EmpalmeComponent = ({ workOrder }: { workOrder: any }) => {
           {cantidadEntregadaLabel}
           <Text style={styles.valueDetail}> {cantidadEntregadaValue}</Text>
         </Text>
+        <Text style={styles.labelDetail}>
+          {cantidadEntregadaLabelKits}
+          <Text style={styles.valueDetail}>
+            {' '}
+            {Math.ceil(cantidadEntregadaValue / 24)}
+          </Text>
+        </Text>
 
         {workOrder?.partialReleases?.length > 0 && (
-          <Text style={styles.labelDetail}>
-            Cantidad por Liberar:
-            <Text style={styles.valueDetail}> {cantidadporliberar}</Text>
-          </Text>
+          <>
+            <Text style={styles.labelDetail}>
+              Cantidad por Liberar (TARJETAS):
+              <Text style={styles.valueDetail}>{cantidadporliberar}</Text>
+            </Text>
+            <Text style={styles.labelDetail}>
+              Cantidad por Liberar (KITS):
+              <Text style={styles.valueDetail}>
+                {' '}
+                {Math.ceil(cantidadporliberar / 24)}
+              </Text>
+            </Text>
+          </>
         )}
       </View>
 
-      <Text style={styles.label}>Cantidad a liberar:</Text>
+      <Text style={styles.label}>Cantidad a liberar (KITS):</Text>
       <TextInput
         style={styles.input}
         theme={{ roundness: 30 }}
@@ -331,12 +314,12 @@ const EmpalmeComponent = ({ workOrder }: { workOrder: any }) => {
         keyboardType="numeric"
         placeholder="Ej: 100"
         value={sampleQuantity.toString()}
-        onChangeText={(text) => setSampleQuantity(Number(text))}
+        onChangeText={(text) => setSampleQuantity(text)}
       />
 
       <Text style={styles.label}>Cantidad a liberar (TARJETAS):</Text>
       <TextInput
-        style={styles.input}
+        style={styles.inputDisabled}
         theme={{ roundness: 30 }}
         mode="outlined"
         activeOutlineColor="#000"
@@ -368,7 +351,7 @@ const EmpalmeComponent = ({ workOrder }: { workOrder: any }) => {
         onPress={() => !disableLiberarCQM && setShowCqmModal(true)}
         disabled={disableLiberarCQM}
       >
-        <Text style={styles.buttonText}>Enviar a CQM</Text>
+        <Text style={styles.buttonText}>Enviar a Calidad/CQM</Text>
       </TouchableOpacity>
 
       <TouchableOpacity
@@ -432,7 +415,7 @@ const EmpalmeComponent = ({ workOrder }: { workOrder: any }) => {
               keyboardType="numeric"
               placeholder="Ej: 2"
               value={sampleQuantity.toString()}
-              onChangeText={(text) => setSampleQuantity(Number(text))}
+              onChangeText={(text) => setSampleQuantity(text)}
             />
 
             {/* Sección expandible de calidad */}
@@ -581,6 +564,14 @@ const styles = StyleSheet.create({
     padding: 10,
     marginBottom: 12,
     backgroundColor: '#fff',
+    height: 30,
+    fontSize: 16,
+  },
+  inputDisabled: {
+    borderRadius: 18,
+    padding: 10,
+    marginBottom: 12,
+    backgroundColor: '#e3e3e3',
     height: 30,
     fontSize: 16,
   },

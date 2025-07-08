@@ -11,7 +11,7 @@ datasource db {
 model User {
   id                    Int                 @id @default(autoincrement())
   username              String              @unique
-  email                 String              
+  email                 String
   password              String
   phone                 String?
   profile_image         String?
@@ -29,12 +29,42 @@ model User {
   formAuditory          FormAuditory[]      @relation("UserAssignedToFormAuditory")
   inconformitiesCreated Inconformities[]    @relation("UserInconformities")
   biometricKeys         UserBiometricKey[]  
-  partialReleases   PartialRelease[]   @relation("UserPartialReleases")
+  partialReleases       PartialRelease[]    @relation("UserPartialReleases")
+
+  // Campos inversos añadidos
+  deviceTokens          DeviceToken[]
+  notifications         Notification[]
 
   created_at            DateTime            @default(now()) @map("created_at")
   updated_at            DateTime            @updatedAt @map("updated_at")
 
   @@map("users")
+}
+
+model DeviceToken {
+  id           String   @id @default(cuid())
+  userId       Int                      
+  token        String  
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  user         User     @relation(fields: [userId], references: [id])
+
+  @@index([userId])
+}
+
+model Notification {
+  id          String   @id @default(cuid())
+  userId      Int                     
+  title       String
+  body        String
+  data        Json?
+  isRead      Boolean  @default(false)
+  createdAt   DateTime @default(now())
+
+  user        User     @relation(fields: [userId], references: [id])
+
+  @@index([userId, isRead])
 }
 
 model UserBiometricKey {

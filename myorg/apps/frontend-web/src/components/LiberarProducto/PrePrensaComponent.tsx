@@ -1,10 +1,10 @@
 'use client';
 
-import axios from "axios";
-import { useRouter } from "next/navigation";
-import { useState } from "react";
-import styled from "styled-components";
-import { submitPrepressForm } from "@/api/liberarProducto";
+import axios from 'axios';
+import { useRouter } from 'next/navigation';
+import { useState } from 'react';
+import styled from 'styled-components';
+import { submitPrepressForm } from '@/api/liberarProducto';
 
 interface Props {
   workOrder: any;
@@ -12,27 +12,43 @@ interface Props {
 type PartialRelease = {
   area: string;
   quantity: number;
-}
+};
 
 export default function PrePrensaComponent({ workOrder }: Props) {
   const [plates, setPlates] = useState('');
   const [positives, SetPositives] = useState('');
   const [testTypes, SetTestTypes] = useState('');
   const [comments, SetComments] = useState('');
-  const [showConfirm, setShowConfirm] = useState(false); 
+  const [showConfirm, setShowConfirm] = useState(false);
 
   const router = useRouter();
 
   const currentFlow = [...workOrder.workOrder.flow]
-  .reverse()
-  .find((item) =>
-    ["Listo", "En proceso", "Enviado a CQM", "En Calidad"].includes(item.status)
-  );
+    .reverse()
+    .find((item) =>
+      ['Listo', 'En proceso', 'Enviado a CQM', 'En Calidad'].includes(
+        item.status
+      )
+    );
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    const platesNumber = Number(plates);
+    const positivesNumber = Number(positives);
+
     if (!plates || !positives || !testTypes) {
-      alert('Por favor. completa los campos obligatorios');
+      alert('Por favor, completa los campos obligatorios');
+      return;
+    }
+
+    // Validar que sean números enteros positivos
+    if (
+      platesNumber < 0 ||
+      !Number.isInteger(platesNumber) ||
+      positivesNumber < 0 ||
+      !Number.isInteger(positivesNumber)
+    ) {
+      alert('Los valores deben ser números enteros positivos');
       return;
     }
     const payload = {
@@ -56,7 +72,7 @@ export default function PrePrensaComponent({ workOrder }: Props) {
     } finally {
       setShowConfirm(false);
     }
-  }
+  };
 
   return (
     <Container>
@@ -78,7 +94,7 @@ export default function PrePrensaComponent({ workOrder }: Props) {
       </DataWrapper>
 
       <DataWrapper>
-        <InfoItem style={{ marginTop: '20px'}}>
+        <InfoItem style={{ marginTop: '20px' }}>
           <Label>Comentarios:</Label>
           <Value>{workOrder.workOrder.comments}</Value>
         </InfoItem>
@@ -89,41 +105,84 @@ export default function PrePrensaComponent({ workOrder }: Props) {
         <NewDataWrapper>
           <InputGroup>
             <Label>Placas:</Label>
-            <Input type="number" min="0" placeholder="Ej: 2" value={plates} onChange={(e) => setPlates(e.target.value)} />
+            <Input
+              type="number"
+              min="0"
+              placeholder="Ej: 2"
+              value={plates}
+              onChange={(e) => setPlates(e.target.value)}
+            />
           </InputGroup>
           <InputGroup>
             <Label>Positivos:</Label>
-            <Input type="number" min="0" placeholder="Ej: 3" value={positives} onChange={(e) => SetPositives(e.target.value)} />
+            <Input
+              type="number"
+              min="0"
+              placeholder="Ej: 3"
+              value={positives}
+              onChange={(e) => SetPositives(e.target.value)}
+            />
           </InputGroup>
         </NewDataWrapper>
 
         <SectionTitle>Tipo de Prueba</SectionTitle>
         <RadioGroup>
           <RadioLabel>
-            <Radio type="radio" name="prueba" value="color" onChange={(e) => SetTestTypes(e.target.value)} />
+            <Radio
+              type="radio"
+              name="prueba"
+              value="color"
+              onChange={(e) => SetTestTypes(e.target.value)}
+            />
             Prueba de color
           </RadioLabel>
           <RadioLabel>
-            <Radio type="radio" name="prueba" value="fisica" onChange={(e) => SetTestTypes(e.target.value)} />
+            <Radio
+              type="radio"
+              name="prueba"
+              value="fisica"
+              onChange={(e) => SetTestTypes(e.target.value)}
+            />
             Muestra física
           </RadioLabel>
           <RadioLabel>
-            <Radio type="radio" name="prueba" value="digital" onChange={(e) => SetTestTypes(e.target.value)} />
+            <Radio
+              type="radio"
+              name="prueba"
+              value="digital"
+              onChange={(e) => SetTestTypes(e.target.value)}
+            />
             Prueba digital
           </RadioLabel>
         </RadioGroup>
 
         <SectionTitle>Comentarios</SectionTitle>
-        <Textarea placeholder="Agrega un comentario adicional..."  onChange={(e) => SetComments(e.target.value)}/>
+        <Textarea
+          placeholder="Agrega un comentario adicional..."
+          onChange={(e) => SetComments(e.target.value)}
+        />
 
-        <LiberarButton type="button" onClick={() => setShowConfirm(true)}>Liberar producto</LiberarButton>
+        <LiberarButton type="button" onClick={() => setShowConfirm(true)}>
+          Liberar producto
+        </LiberarButton>
       </form>
       {showConfirm && (
         <ModalOverlay>
           <ModalBox>
-            <h4 style={{ color: 'black'}}>¿Estás segura/o que deseas liberar este producto?</h4>
-            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '1rem', marginTop: '1rem' }}>
-              <CancelButton onClick={() => setShowConfirm(false)}>Cancelar</CancelButton>
+            <h4 style={{ color: 'black' }}>
+              ¿Estás segura/o que deseas liberar este producto?
+            </h4>
+            <div
+              style={{
+                display: 'flex',
+                justifyContent: 'flex-end',
+                gap: '1rem',
+                marginTop: '1rem',
+              }}
+            >
+              <CancelButton onClick={() => setShowConfirm(false)}>
+                Cancelar
+              </CancelButton>
               <ConfirmButton onClick={handleSubmit}>Confirmar</ConfirmButton>
             </div>
           </ModalBox>
@@ -140,7 +199,7 @@ const Container = styled.div`
   padding: 2rem;
   margin-top: 1.5rem;
   border-radius: 1rem;
-  box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
   max-width: 800px;
   margin-left: auto;
   margin-right: auto;
@@ -265,7 +324,7 @@ const ModalOverlay = styled.div`
   left: 0;
   width: 100%;
   height: 100%;
-  background: rgba(0,0,0,0.3);
+  background: rgba(0, 0, 0, 0.3);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -275,7 +334,7 @@ const ModalBox = styled.div`
   background: white;
   padding: 2rem;
   border-radius: 1rem;
-  box-shadow: 0 8px 24px rgba(0,0,0,0.2);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.2);
   max-width: 400px;
   width: 90%;
 `;
@@ -300,7 +359,7 @@ const ConfirmButton = styled.button`
 `;
 
 const CancelButton = styled.button`
-  background-color: #BBBBBB;
+  background-color: #bbbbbb;
   color: white;
   padding: 0.5rem 1.5rem;
   border-radius: 0.5rem;

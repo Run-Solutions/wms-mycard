@@ -397,7 +397,7 @@ const PersonalizacionComponent = ({ workOrder }: { workOrder: any }) => {
           </View>
 
           {/* Preguntas normales */}
-          {questions.slice(10, 15).map((q: any) => {
+          {questions.slice(10, 16).map((q: any) => {
             const responses = workOrder.answers[
               index
             ]?.FormAnswerResponse?.find(
@@ -430,32 +430,6 @@ const PersonalizacionComponent = ({ workOrder }: { workOrder: any }) => {
               </View>
             );
           })}
-          <Text style={styles.label}>Color De Personalización:</Text>
-          <TextInput
-            style={styles.input}
-            value={
-              workOrder?.answers[index].color_personalizacion ??
-              'No se reconoce la muestra enviada'
-            }
-            editable={false}
-            mode="outlined"
-            activeOutlineColor="#000"
-            theme={{ roundness: 30 }}
-          />
-          <Text style={styles.label}>
-            Tipo de Código de Barras Que Se Personaliza:
-          </Text>
-          <TextInput
-            style={styles.input}
-            value={
-              workOrder?.answers[index].codigo_barras ??
-              'No se reconoce la muestra enviada'
-            }
-            editable={false}
-            mode="outlined"
-            activeOutlineColor="#000"
-            theme={{ roundness: 30 }}
-          />
           {/* Muestras */}
           <Text style={styles.label}>Muestras entregadas:</Text>
           <TextInput
@@ -482,7 +456,7 @@ const PersonalizacionComponent = ({ workOrder }: { workOrder: any }) => {
           </View>
 
           {/* Preguntas normales */}
-          {questions.slice(16, 23).map((q: any) => {
+          {questions.slice(16, 24).map((q: any) => {
             const responses = workOrder.answers[
               index
             ]?.FormAnswerResponse?.find(
@@ -542,7 +516,7 @@ const PersonalizacionComponent = ({ workOrder }: { workOrder: any }) => {
           </View>
 
           {/* Preguntas normales */}
-          {questions.slice(24, 25).map((q: any) => {
+          {questions.slice(24, 26).map((q: any) => {
             const responses = workOrder.answers[
               index
             ]?.FormAnswerResponse?.find(
@@ -575,32 +549,6 @@ const PersonalizacionComponent = ({ workOrder }: { workOrder: any }) => {
               </View>
             );
           })}
-          <Text style={styles.label}>Color De Personalización:</Text>
-          <TextInput
-            style={styles.input}
-            value={
-              workOrder?.answers[index].color_personalizacion ??
-              'No se reconoce la muestra enviada'
-            }
-            editable={false}
-            mode="outlined"
-            activeOutlineColor="#000"
-            theme={{ roundness: 30 }}
-          />
-          <Text style={styles.label}>
-            Tipo de Código de Barras Que Se Personaliza:
-          </Text>
-          <TextInput
-            style={styles.input}
-            value={
-              workOrder?.answers[index].codigo_barras ??
-              'No se reconoce la muestra enviada'
-            }
-            editable={false}
-            mode="outlined"
-            activeOutlineColor="#000"
-            theme={{ roundness: 30 }}
-          />
           {/* Muestras */}
           <Text style={styles.label}>Muestras entregadas:</Text>
           <TextInput

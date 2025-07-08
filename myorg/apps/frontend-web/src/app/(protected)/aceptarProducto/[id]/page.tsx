@@ -37,11 +37,11 @@ export default function AceptarProductoAuxPage({ params }: Props) {
     } else if (['Pendiente'].includes(workOrder.status) && workOrder.workOrder.flow.partialReleases.length > 0) {
       lastCompletedOrPartial = [...workOrder.workOrder.flow]
       .reverse()
-      .find((item) => ['Listo', 'Enviado a CQM', 'En calidad', 'Parcial'].includes(item.status));
+      .find((item) => ['Listo', 'Enviado a CQM', 'En Calidad', 'Parcial'].includes(item.status));
     } else if (['Pendiente parcial'].includes(workOrder.status)) {
       lastCompletedOrPartial = [...workOrder.workOrder.flow]
       .reverse()
-      .find((item) => ['Listo', 'Enviado a CQM', 'En calidad', 'Parcial'].includes(item.status));
+      .find((item) => ['Listo', 'Enviado a CQM', 'En Calidad', 'Parcial', 'En proceso'].includes(item.status));
     }
 
     console.log('Area previa', lastCompletedOrPartial);

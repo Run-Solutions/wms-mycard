@@ -12,9 +12,15 @@ import {
 } from 'react-native';
 import { useRoute, RouteProp, useNavigation } from '@react-navigation/native';
 import { InternalStackParamList } from '../../../../navigation/types';
-import { fetchWorkOrderById, closeWorkOrder } from '../../../../api/seguimientoDeOts';
+import {
+  fetchWorkOrderById,
+  closeWorkOrder,
+} from '../../../../api/seguimientoDeOts';
 
-type WorkOrderDetailRouteProp = RouteProp<InternalStackParamList, 'WorkOrderDetailScreen'>;
+type WorkOrderDetailRouteProp = RouteProp<
+  InternalStackParamList,
+  'WorkOrderDetailScreen'
+>;
 
 type AreaTotals = {
   buenas: number;
@@ -58,101 +64,123 @@ const WorkOrderDetailScreen: React.FC = () => {
     loadData();
   }, [id]);
 
- // Función para obtener los datos específicos de cada área
- const getAreaData = (
-  areaId: number,
-  areaResponse: any,
-  partialReleases: any[] = [],
-  flowUser: any = null,
-  index: number = -1
-) => {
-  const sumFromPartials = () => {
-    return partialReleases.reduce(
-      (acc: any, curr: any) => {
-        acc.buenas += curr.quantity || 0;
-        acc.malas += curr.bad_quantity || 0;
-        acc.excedente += curr.excess_quantity || 0;
-        return acc;
-      },
-      { buenas: 0, malas: 0, excedente: 0 }
-    );
-  };
-
-  const getCommonData = (areaKey: string) => {
-    const hasResponse = !!areaResponse?.[areaKey];
-    const usuario = areaResponse?.user?.username || flowUser?.username ||'';
-    const auditor = areaResponse?.[areaKey]?.formAuditory?.user?.username || '';
-
-    if (!hasResponse && partialReleases.length > 0) {
-      const resumen = sumFromPartials();
-      console.log('[PARCIAL DETECTADO]', areaKey, resumen);
-      return { ...resumen, cqm: 0, muestras: 0, usuario, auditor: '' };
-    }
-
-    return {
-      buenas:
-        areaResponse?.[areaKey]?.good_quantity ||
-        areaResponse?.[areaKey]?.release_quantity ||
-        areaResponse?.[areaKey]?.plates ||
-        0,
-      malas: areaResponse?.[areaKey]?.bad_quantity || 0,
-      excedente: areaResponse?.[areaKey]?.excess_quantity || 0,
-      cqm: areaResponse?.[areaKey]?.form_answer?.sample_quantity ?? 0,
-      muestras: areaResponse?.[areaKey]?.formAuditory?.sample_auditory ?? 0,
-      usuario,
-      auditor,
+  // Función para obtener los datos específicos de cada área
+  const getAreaData = (
+    areaId: number,
+    areaResponse: any,
+    partialReleases: any[] = [],
+    flowUser: any = null,
+    index: number = -1
+  ) => {
+    const sumFromPartials = () => {
+      return partialReleases.reduce(
+        (acc: any, curr: any) => {
+          acc.buenas += curr.quantity || 0;
+          acc.malas += curr.bad_quantity || 0;
+          acc.excedente += curr.excess_quantity || 0;
+          return acc;
+        },
+        { buenas: 0, malas: 0, excedente: 0 }
+      );
     };
+
+    const getCommonData = (areaKey: string) => {
+      const hasResponse = !!areaResponse?.[areaKey];
+      const usuario = areaResponse?.user?.username || flowUser?.username || '';
+      const auditor =
+        areaResponse?.[areaKey]?.formAuditory?.user?.username || '';
+
+      if (!hasResponse && partialReleases.length > 0) {
+        const resumen = sumFromPartials();
+        console.log('[PARCIAL DETECTADO]', areaKey, resumen);
+        return { ...resumen, cqm: 0, muestras: 0, usuario, auditor: '' };
+      }
+
+      return {
+        buenas:
+          areaResponse?.[areaKey]?.good_quantity ||
+          areaResponse?.[areaKey]?.release_quantity ||
+          areaResponse?.[areaKey]?.plates ||
+          0,
+        malas: areaResponse?.[areaKey]?.bad_quantity || 0,
+        excedente: areaResponse?.[areaKey]?.excess_quantity || 0,
+        cqm: areaResponse?.[areaKey]?.form_answer?.sample_quantity ?? 0,
+        muestras: areaResponse?.[areaKey]?.formAuditory?.sample_auditory ?? 0,
+        usuario,
+        auditor,
+      };
+    };
+
+    switch (areaId) {
+      case 1:
+        return getCommonData('prepress');
+      case 2:
+        return getCommonData('impression');
+      case 3:
+        return getCommonData('serigrafia');
+      case 4:
+        return getCommonData('empalme');
+      case 5:
+        return getCommonData('laminacion');
+      case 6:
+        return getCommonData('corte');
+      case 7:
+        return getCommonData('colorEdge');
+      case 8:
+        return getCommonData('hotStamping');
+      case 9:
+        return getCommonData('millingChip');
+      case 10:
+        return getCommonData('personalizacion');
+      default:
+        return {
+          buenas: 0,
+          malas: 0,
+          excedente: 0,
+          cqm: 0,
+          muestras: 0,
+          usuario: '',
+          auditor: '',
+        };
+    }
   };
 
-  switch (areaId) {
-    case 1:
-      return getCommonData('prepress');
-    case 2:
-      return getCommonData('impression');
-    case 3:
-      return getCommonData('serigrafia');
-    case 4:
-      return getCommonData('empalme');
-    case 5:
-      return getCommonData('laminacion');
-    case 6:
-      return getCommonData('corte');
-    case 7:
-      return getCommonData('colorEdge');
-    case 8:
-      return getCommonData('hotStamping');
-    case 9:
-      return getCommonData('millingChip');
-    case 10:
-      return getCommonData('personalizacion');
-    default:
-      return {
-        buenas: 0,
-        malas: 0,
-        excedente: 0,
-        cqm: 0,
-        muestras: 0,
-        usuario: '',
-        auditor: '',
-      };
-  }
-};
-
-const areas: AreaData[] =
-workOrder?.flow?.map((item: any, index: number) => ({
-  id: item.area_id,
-  name: item.area?.name || 'Sin nombre',
-  status: item.status || 'Desconocido',
-  response: item.areaResponse || {},
-  answers: item.answers?.[0] || {},
-  ...getAreaData(item.area_id, item.areaResponse, item.partialReleases, item.user, index),
-})) || [];
-
-
+  const areas: AreaData[] =
+    workOrder?.flow?.map((item: any, index: number) => ({
+      id: item.area_id,
+      name: item.area?.name || 'Sin nombre',
+      status: item.status || 'Desconocido',
+      response: item.areaResponse || {},
+      answers: item.answers?.[0] || {},
+      ...getAreaData(
+        item.area_id,
+        item.areaResponse,
+        item.partialReleases,
+        item.user,
+        index
+      ),
+    })) || [];
 
   const cantidadHojasRaw = Number(workOrder?.quantity) / 24;
   const cantidadHojas = cantidadHojasRaw > 0 ? Math.ceil(cantidadHojasRaw) : 0;
+  const ultimaArea = areas[areas.length - 1];
+  const totalMalas = areas.reduce((acc, area) => acc + (area.malas || 0), 0);
+  const totalCqm = areas
+    .filter((area) => area.id >= 6)
+    .reduce((acc, area) => acc + (area.cqm || 0), 0);
+  const totalMuestras = areas.reduce(
+    (acc, area) => acc + (area.muestras || 0),
+    0
+  );
+  const totalUltimaBuenas = ultimaArea?.buenas || 0;
+  const totalUltimaExcedente = ultimaArea?.excedente || 0;
 
+  const totalGeneral =
+    totalUltimaBuenas +
+    totalUltimaExcedente +
+    totalMalas +
+    totalCqm +
+    totalMuestras;
 
   const handleCloseOrder = async () => {
     try {
@@ -170,17 +198,22 @@ workOrder?.flow?.map((item: any, index: number) => ({
       <Text style={styles.title}>Información de la Orden #{id}</Text>
 
       <View style={styles.card}>
-        <Text style={styles.label}>OT:</Text>
+        <Text style={styles.label}>Número de Orden:</Text>
         <Text style={styles.value}>{workOrder?.ot_id}</Text>
 
-        <Text style={styles.label}>Presupuesto:</Text>
+        <Text style={styles.label}>Id del Presupuesto:</Text>
         <Text style={styles.value}>{workOrder?.mycard_id}</Text>
 
         <Text style={styles.label}>Cantidad (TARJETAS):</Text>
         <Text style={styles.value}>{workOrder?.quantity}</Text>
 
-        <Text style={styles.label}>Cantidad (HOJAS):</Text>
+        <Text style={styles.label}>Cantidad (KITS):</Text>
         <Text style={styles.value}>{cantidadHojas}</Text>
+
+        <Text style={styles.label}>Fecha de Creación:</Text>
+        <Text style={styles.value}>
+          {new Date(workOrder?.createdAt).toLocaleDateString()}
+        </Text>
 
         <Text style={styles.label}>Comentarios:</Text>
         <Text style={styles.value}>{workOrder?.comments}</Text>
@@ -189,37 +222,173 @@ workOrder?.flow?.map((item: any, index: number) => ({
       <Text style={styles.subtitle}>Datos de Producción por Área</Text>
       <ScrollView horizontal>
         <View style={styles.table}>
-        <View style={styles.headerRow}>
-            <Text style={styles.cellUser}>Área</Text>
-            <Text style={styles.cellUser}>Estado</Text>
-            <Text style={styles.cellUser}>Buenas</Text>
-            <Text style={styles.cellUser}>Malas</Text>
-            <Text style={styles.cellUser}>Excedente</Text>
-            <Text style={styles.cellUser}>CQM</Text>
-            <Text style={styles.cellUser}>Muestras</Text>
-            <Text style={styles.cellUser}>Totales</Text>
-            <Text style={styles.cellUser}>Usuario</Text>
-            <Text style={styles.cellUser}>Auditor</Text>
+          {/* Encabezado */}
+          <View style={styles.headerRow}>
+            <Text style={[styles.cellHeader, { width: 180 }]}></Text>
+            {areas.map((area, index) => (
+              <Text
+                key={`${area.id}-${index}`}
+                style={[styles.cellHeader, { minWidth: 90 }]}
+              >
+                {area.name}
+              </Text>
+            ))}
           </View>
-          {areas.map((area: any, index: number) => (
-            <View key={index} style={styles.row}>
-              <Text style={styles.cellUser}>{area.name}</Text>
-              <Text style={styles.cellUser}>{area.status}</Text>
-              <Text style={styles.cellUser}>{area.buenas}</Text>
-              <Text style={styles.cellUser}>{area.malas}</Text>
-              <Text style={styles.cellUser}>{area.excedente}</Text>
-              <Text style={styles.cellUser}>{area.cqm}</Text>
-              <Text style={styles.cellUser}>{area.muestras}</Text>
-              <Text style={styles.cellUser}>{Number(area.buenas) + Number(area.malas) + Number(area.excedente) + Number(area.cqm) + Number(area.muestras)}</Text>
-              <Text style={styles.cellUser}>{area?.usuario}</Text>
-              <Text style={styles.cellUser}>{area?.auditor}</Text>
-            </View>
-          ))}
+
+          {/* Usuario */}
+          <View style={styles.row}>
+            <Text style={styles.cellLabel}>Usuario</Text>
+            {areas.map((area, index) => (
+              <Text key={`${area.id}-usuario-${index}`} style={styles.cellUser}>
+                {area.usuario}
+              </Text>
+            ))}
+          </View>
+
+          {/* Auditor */}
+          <View style={styles.row}>
+            <Text style={styles.cellLabel}>Auditor</Text>
+            {areas.map((area, index) => (
+              <Text key={`${area.id}-auditor-${index}`} style={styles.cellUser}>
+                {area.auditor}
+              </Text>
+            ))}
+          </View>
+
+          {/* Estado */}
+          <View style={styles.row}>
+            <Text style={styles.cellLabel}>Estado</Text>
+            {areas.map((area, index) => (
+              <Text key={`${area.id}-status-${index}`} style={styles.cellUser}>
+                {area.status}
+              </Text>
+            ))}
+          </View>
+
+          {/* Buenas */}
+          <View style={styles.row}>
+            <Text style={styles.cellLabel}>Buenas</Text>
+            {areas.map((area, index) => (
+              <Text key={`${area.id}-buenas-${index}`} style={styles.cellUser}>
+                {area.buenas}
+              </Text>
+            ))}
+          </View>
+
+          {/* Malas */}
+          <View style={styles.row}>
+            <Text style={styles.cellLabel}>Malas</Text>
+            {areas.map((area, index) => (
+              <Text key={`${area.id}-malas-${index}`} style={styles.cellUser}>
+                {area.malas}
+              </Text>
+            ))}
+          </View>
+
+          {/* Excedente */}
+          <View style={styles.row}>
+            <Text style={styles.cellLabel}>Excedente</Text>
+            {areas.map((area, index) => (
+              <Text
+                key={`${area.id}-excedente-${index}`}
+                style={styles.cellUser}
+              >
+                {area.excedente}
+              </Text>
+            ))}
+          </View>
+
+          {/* CQM */}
+          <View style={styles.row}>
+            <Text style={styles.cellLabel}>CQM</Text>
+            {areas.map((area, index) => (
+              <Text key={`${area.id}-cqm-${index}`} style={styles.cellUser}>
+                {area.cqm}
+              </Text>
+            ))}
+          </View>
+
+          {/* Muestras */}
+          <View style={styles.row}>
+            <Text style={styles.cellLabel}>Muestras</Text>
+            {areas.map((area, index) => (
+              <Text
+                key={`${area.id}-muestras-${index}`}
+                style={styles.cellUser}
+              >
+                {area.muestras}
+              </Text>
+            ))}
+          </View>
+
+          {/* Suma Total */}
+          <View style={styles.row}>
+            <Text style={styles.cellLabel}>SUMA TOTAL</Text>
+            {areas.map((area, index) => (
+              <Text key={`${area.id}-suma-${index}`} style={styles.cellUser}>
+                {Number(area.buenas) +
+                  Number(area.malas) +
+                  Number(area.excedente) +
+                  Number(area.cqm) +
+                  Number(area.muestras)}
+              </Text>
+            ))}
+          </View>
+
+          {/* Buenas + Excedente */}
+          <View style={[styles.row, { backgroundColor: '#d7e6d1' }]}>
+            <Text style={styles.cellLabel}>BUENAS + EXCEDENTE</Text>
+            {areas.map((area, index) => (
+              <Text
+                key={`${area.id}-buenas-excedente-${index}`}
+                style={styles.cellUser}
+              >
+                {area.id >= 6 ? area.buenas + area.excedente : ''}
+              </Text>
+            ))}
+          </View>
         </View>
       </ScrollView>
 
+      {workOrder?.status !== 'En proceso' && (
+        <>
+          <Text style={styles.subtitle}>Cuadres</Text>
+          <View style={styles.tableCuadres}>
+            <View style={styles.row}>
+              <Text style={styles.cellLabel}>Buenas Última Operación</Text>
+              <Text style={styles.cellValue}>{ultimaArea?.buenas ?? ''}</Text>
+            </View>
+            <View style={styles.row}>
+              <Text style={styles.cellLabel}>Excedente Última Operación</Text>
+              <Text style={styles.cellValue}>
+                {ultimaArea?.excedente ?? ''}
+              </Text>
+            </View>
+            <View style={styles.row}>
+              <Text style={styles.cellLabel}>Total Malas</Text>
+              <Text style={styles.cellValue}>{totalMalas}</Text>
+            </View>
+            <View style={styles.row}>
+              <Text style={styles.cellLabel}>Total CQM</Text>
+              <Text style={styles.cellValue}>{totalCqm}</Text>
+            </View>
+            <View style={styles.row}>
+              <Text style={styles.cellLabel}>Total Muestras</Text>
+              <Text style={styles.cellValue}>{totalMuestras}</Text>
+            </View>
+            <View style={styles.row}>
+              <Text style={styles.cellLabel}>TOTAL</Text>
+              <Text style={styles.cellValue}>{totalGeneral}</Text>
+            </View>
+          </View>
+        </>
+      )}
+
       {workOrder?.status !== 'Cerrado' && (
-        <TouchableOpacity style={styles.button} onPress={() => setShowConfirm(true)}>
+        <TouchableOpacity
+          style={styles.button}
+          onPress={() => setShowConfirm(true)}
+        >
           <Text style={styles.buttonText}>Cerrar Orden de Trabajo</Text>
         </TouchableOpacity>
       )}
@@ -227,12 +396,20 @@ workOrder?.flow?.map((item: any, index: number) => ({
       <Modal visible={showConfirm} transparent animationType="fade">
         <View style={styles.modalOverlay}>
           <View style={styles.modalBox}>
-            <Text style={styles.modalText}>¿Deseas cerrar esta Orden de Trabajo?</Text>
+            <Text style={styles.modalText}>
+              ¿Deseas cerrar esta Orden de Trabajo?
+            </Text>
             <View style={styles.modalActions}>
-              <TouchableOpacity onPress={() => setShowConfirm(false)} style={styles.cancelButton}>
+              <TouchableOpacity
+                onPress={() => setShowConfirm(false)}
+                style={styles.cancelButton}
+              >
                 <Text style={styles.modalButtonText}>Cancelar</Text>
               </TouchableOpacity>
-              <TouchableOpacity onPress={handleCloseOrder} style={styles.confirmButton}>
+              <TouchableOpacity
+                onPress={handleCloseOrder}
+                style={styles.confirmButton}
+              >
                 <Text style={styles.modalButtonText}>Confirmar</Text>
               </TouchableOpacity>
             </View>
@@ -249,6 +426,29 @@ const styles = StyleSheet.create({
   container: {
     padding: 16,
     backgroundColor: '#fdfaf6',
+  },
+  cellHeader: {
+    flex: 1,
+    fontWeight: 'bold',
+    textAlign: 'left',
+    paddingVertical: 8,
+    backgroundColor: '#f0f0f0',
+  },
+  cellLabel: {
+    flex: 1,
+    fontWeight: '600',
+    textAlign: 'left',
+    width: 180,
+  },
+  cellUser: {
+    flex: 1,
+    minWidth: 90,
+    textAlign: 'left',
+  },
+  cellValue: {
+    flex: 1,
+    minWidth: 30,
+    textAlign: 'right',
   },
   title: {
     fontSize: 20,
@@ -279,26 +479,27 @@ const styles = StyleSheet.create({
     padding: 10,
     backgroundColor: '#fff',
   },
+  tableCuadres: {
+    padding: 10,
+    backgroundColor: '#fff',
+    maxWidth: '76%',
+  },
   headerRow: {
     flexDirection: 'row',
     backgroundColor: '#fff',
-    paddingVertical: 8,
   },
   row: {
     flexDirection: 'row',
     borderBottomWidth: 1,
     borderBottomColor: '#ccc',
-    paddingVertical: 6,
+    paddingVertical: 7,
   },
   cell: {
     width: 85,
     paddingHorizontal: 10,
     textAlign: 'center',
   },
-  cellUser:{
-    minWidth: 120,
-    paddingHorizontal: 10
-  },
+
   button: {
     backgroundColor: '#0038A8',
     padding: 12,
