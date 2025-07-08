@@ -259,7 +259,7 @@ export default function PersonalizacionComponent({ formQuestion }: Props) {
                   </tr>
                 </thead>
                 <tbody>
-                  {formQuestions.slice(21, 28).filter((question: any) => question.role_id === null && question.areas.some((area: any) => area.id === 10))
+                  {formQuestions.slice(20, 28).filter((question: any) => question.role_id === null && question.areas.some((area: any) => area.id === 10))
                     .map((question: any) => {
                       // Como no mostraste la estructura de las respuestas aquí, lo dejo vacío
                       const frontAnswer = null;

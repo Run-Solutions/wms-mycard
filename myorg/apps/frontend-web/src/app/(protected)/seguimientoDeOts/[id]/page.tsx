@@ -152,6 +152,22 @@ export default function SeguimientoDeOtsAuxPage({ params }: Props) {
 
   const cantidadHojasRaw = Number(workOrder?.quantity) / 24;
   const cantidadHojas = cantidadHojasRaw > 0 ? Math.ceil(cantidadHojasRaw) : 0;
+  const ultimaArea = areas[areas.length - 1];
+  const totalMalas = areas.reduce((acc, area) => acc + (area.malas || 0), 0);
+  const totalCqm = areas.filter((area) => area.id >= 6).reduce((acc, area) => acc + (area.cqm || 0), 0);
+  const totalMuestras = areas.reduce(
+    (acc, area) => acc + (area.muestras || 0),
+    0
+  );
+  const totalUltimaBuenas = ultimaArea?.buenas || 0;
+  const totalUltimaExcedente = ultimaArea?.excedente || 0;
+
+  const totalGeneral =
+    totalUltimaBuenas +
+    totalUltimaExcedente +
+    totalMalas +
+    totalCqm +
+    totalMuestras;
 
   return (
     <>
@@ -172,7 +188,7 @@ export default function SeguimientoDeOtsAuxPage({ params }: Props) {
             <Value>{workOrder?.quantity}</Value>
           </InfoItem>
           <InfoItem>
-            <Label>Cantidad (HOJAS): </Label>
+            <Label>Cantidad (KITS): </Label>
             <Value>{cantidadHojas}</Value>
           </InfoItem>
           <InfoItem>
@@ -274,6 +290,55 @@ export default function SeguimientoDeOtsAuxPage({ params }: Props) {
               </tbody>
             </Table>
           </TableWrapper>
+          {workOrder?.status !== 'En proceso' && (
+            <>
+              <SectionTitle>Cuadres</SectionTitle>
+              <TableWrapper>
+                <TableCuadres>
+                  <thead>
+                    <tr>
+                      <th />
+                      <th />
+                    </tr>
+                  </thead>
+                  <tbody>
+                    <tr>
+                      <td>Buenas Última Operación</td>
+                      {ultimaArea && (
+                        <td key={`${ultimaArea.id}-last`}>
+                          {ultimaArea.buenas}
+                        </td>
+                      )}
+                    </tr>
+                    <tr>
+                      <td>Excedente Última Operación</td>
+                      {ultimaArea && (
+                        <td key={`${ultimaArea.id}-last`}>
+                          {ultimaArea.excedente}
+                        </td>
+                      )}
+                    </tr>
+                    <tr>
+                      <td>Total Malas</td>
+                      <td>{totalMalas}</td>
+                    </tr>
+                    <tr>
+                      <td>Total CQM</td>
+                      <td>{totalCqm}</td>
+                    </tr>
+                    <tr>
+                      <td>Total Muestras</td>
+                      <td>{totalMuestras}</td>
+                    </tr>
+                    <tr>
+                      <td>TOTAL</td>
+                      <td>{totalGeneral}</td>
+                    </tr>
+                  </tbody>
+                </TableCuadres>
+              </TableWrapper>
+            </>
+          )}
           {workOrder?.status !== 'Cerrado' && (
             <CloseButton onClick={() => setShowConfirm(true)}>
               Cerrar Orden de Trabajo
@@ -372,6 +437,33 @@ const Table = styled.table`
   td {
     padding: 0.75rem;
     text-align: center;
+    color: rgb(4, 4, 4);
+    border-bottom: 1px solid #e5e7eb;
+  }
+
+  th {
+    background: #f3f4f6;
+    color: #374151;
+    font-weight: 600;
+  }
+
+  tr:nth-child(even) {
+    background: #fafafa;
+  }
+`;
+
+const TableCuadres = styled.table`
+  width: 40%;
+  border-collapse: collapse;
+  background: white;
+  border-radius: 0.75rem;
+  overflow: hidden;
+  box-shadow: 0 4px 10px rgba(0, 0, 0, 0.05);
+
+  th,
+  td {
+    padding: 0.75rem;
+    text-align: left;
     color: rgb(4, 4, 4);
     border-bottom: 1px solid #e5e7eb;
   }

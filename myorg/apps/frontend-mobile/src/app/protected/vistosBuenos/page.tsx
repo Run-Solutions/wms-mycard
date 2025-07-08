@@ -1,30 +1,64 @@
-import React, { useEffect, useState } from 'react';
-import { View, Text, FlatList, TouchableOpacity, StyleSheet, ActivityIndicator, Alert, Modal, Pressable } from 'react-native';
-import { getPendingOrders } from '../../../api/aceptarProducto'; 
-import { NavigationProp, useNavigation } from '@react-navigation/native';
+import React, { useCallback, useEffect, useState } from 'react';
+import {
+  View,
+  Text,
+  FlatList,
+  TouchableOpacity,
+  StyleSheet,
+  ActivityIndicator,
+  Alert,
+  Modal,
+  Pressable,
+} from 'react-native';
+import { NavigationProp, useNavigation, useFocusEffect } from '@react-navigation/native';
 import { RootStackParamList } from '../../../navigation/types';
 import { fetchPendingOrders, acceptWorkOrder } from '../../../api/vistosBuenos';
+import { useAuth } from '../../../contexts/AuthContext';
 
 interface WorkOrder {
   id: number;
+  work_order_id: number;
   area_id: number;
+  status: string;
+  assigned_at: string;
+  created_at: string;
+  updated_at: string;
   answers: {
     id: number;
     work_order_flow_id: number;
     accepted: boolean;
   }[];
+  user: {
+    id: number;
+    username: string;
+  };
+  area: {
+    name: string;
+  };
   workOrder: {
+    id: number;
     ot_id: string;
-    priority: boolean;
-    createdAt: string;
     mycard_id: string;
+    priority: string;
     quantity: number;
+    comments: string;
+    created_by: number;
+    validated: boolean;
+    createdAt: string;
+    updatedAt: string;
     flow: {
       id: string;
+      status: string;
+      assigned_user: number;
       area: {
         id: number;
         name: string;
       };
+      answers?: {
+        id: number;
+        reviewed_by_id: number;
+        reviewed: boolean;
+      }[];
     }[];
     user: {
       username: string;
@@ -37,30 +71,77 @@ interface WorkOrder {
   };
 }
 
+function puedeAceptarOTCQM(
+  selectedOrder: WorkOrder,
+  currentUserId: number
+): boolean {
+  const flujos = selectedOrder.workOrder.flow;
+
+  for (const flujo of flujos) {
+    if (flujo.status === 'En Calidad' && flujo.answers?.length) {
+      const lastAnswer = flujo.answers[flujo.answers.length - 1];
+
+      const estaAsignadoAUsuario = lastAnswer.reviewed_by_id === currentUserId;
+      const noHaRevisado = lastAnswer.reviewed === false;
+
+      if (estaAsignadoAUsuario && noHaRevisado) {
+        console.log(
+          '⛔ Usuario ya tiene otro flujo en calidad pendiente:',
+          flujo
+        );
+        return false;
+      }
+    }
+  }
+
+  return true; // ✅ No hay bloqueos, puede aceptar
+}
+
 const VistosBuenosScreen = () => {
   const [orders, setOrders] = useState<WorkOrder[]>([]);
   const [loading, setLoading] = useState(true);
   const [modalVisible, setModalVisible] = useState(false);
   const [selectedOrder, setSelectedOrder] = useState<WorkOrder | null>(null);
+  const { user } = useAuth();
 
   const navigation = useNavigation<NavigationProp<RootStackParamList>>();
 
-  useEffect(() => {
-    const loadData = async () => {
-      try {
-        const orders = await fetchPendingOrders();
-        setOrders(orders);
-      } catch (err: any) {
-        Alert.alert('Error', err.message);
-      } finally {
-        setLoading(false);
-      }
-    };
-    loadData();
+  const loadData = useCallback(async () => {
+    setLoading(true);
+    try {
+      const data = await fetchPendingOrders();
+      setOrders(data);
+    } catch (err: any) {
+      Alert.alert('Error', err.message);
+    } finally {
+      setLoading(false);
+    }
   }, []);
+
+  useEffect(() => {
+    loadData();
+  }, [loadData]);
   
+  useFocusEffect(
+    React.useCallback(() => {
+      loadData();
+    }, [loadData])
+  );
+
   const aceptarOT = async () => {
-    console.log(selectedOrder)
+    console.log(selectedOrder);
+    if (
+      !selectedOrder ||
+      !selectedOrder.answers ||
+      selectedOrder.answers.length === 0 ||
+      puedeAceptar === false
+    ) {
+      console.log('No hay respuestas disponibles en la orden.');
+      Alert.alert(
+        'Debes liberar completamente tu participación anterior antes de aceptar esta etapa.'
+      );
+      return;
+    }
     try {
       await acceptWorkOrder(selectedOrder);
       closeModal();
@@ -80,6 +161,11 @@ const VistosBuenosScreen = () => {
     setModalVisible(false);
   };
 
+  const puedeAceptar =
+    selectedOrder && user ? puedeAceptarOTCQM(selectedOrder, user.sub) : false;
+
+  console.log('✅ ¿Puede aceptar?:', puedeAceptar);
+
   const renderItem = ({ item }: { item: WorkOrder }) => (
     <TouchableOpacity style={styles.card} onPress={() => openModal(item)}>
       {item.workOrder.priority && <View style={styles.priorityBadge} />}
@@ -91,9 +177,12 @@ const VistosBuenosScreen = () => {
             Cantidad: {item.workOrder.quantity}
           </Text>
         </View>
-        <Text style={styles.text}>Creado por: {item.workOrder.user.username}</Text>
         <Text style={styles.text}>
-          Fecha: {new Date(item.workOrder.createdAt).toLocaleDateString('es-ES')}
+          Creado por: {item.workOrder.user.username}
+        </Text>
+        <Text style={styles.text}>
+          Fecha:{' '}
+          {new Date(item.workOrder.createdAt).toLocaleDateString('es-ES')}
         </Text>
       </View>
     </TouchableOpacity>
@@ -121,14 +210,36 @@ const VistosBuenosScreen = () => {
           <View style={styles.modalContent}>
             {selectedOrder && (
               <>
-                <Text style={styles.modalTitle}>Orden: {selectedOrder.workOrder.ot_id}</Text>
-                <Text style={styles.modalText}>Presupuesto: {selectedOrder.workOrder.mycard_id}</Text>
-                <Text style={styles.modalText}>Cantidad: {selectedOrder.workOrder.quantity}</Text>
-                <Text style={styles.modalText}>Prioridad: {selectedOrder.workOrder.priority ? 'Sí' : 'No'}</Text>
-                <Text style={styles.modalText}>Creado por: {selectedOrder.workOrder.user.username}</Text>
+                <Text style={styles.modalTitle}>
+                  Orden: {selectedOrder.workOrder.ot_id}
+                </Text>
+                <Text style={styles.modalText}>
+                  Id del Presupuesto: {selectedOrder.workOrder.mycard_id}
+                </Text>
+                <Text style={styles.modalText}>
+                  Cantidad: {selectedOrder.workOrder.quantity}
+                </Text>
+                <Text style={styles.modalText}>
+                  Creado por: {selectedOrder.workOrder.user.username}
+                </Text>
+                <Text style={styles.modalText}>
+                  Prioridad: {selectedOrder.workOrder.priority ? 'Sí' : 'No'}
+                </Text>
+                <Text style={styles.modalText}>
+                  Comentario: {selectedOrder.workOrder.comments}
+                </Text>
+                <Text style={styles.modalText}>
+                  Enviado por: {selectedOrder.user?.username}
+                </Text>
+                <Text style={styles.modalText}>
+                  Área de evaluación: {selectedOrder.area?.name}
+                </Text>
 
                 <View style={styles.rowButtons}>
-                  <Pressable style={styles.modalButtonReject} onPress={closeModal}>
+                  <Pressable
+                    style={styles.modalButtonReject}
+                    onPress={closeModal}
+                  >
                     <Text style={styles.modalButtonText}>Cerrar</Text>
                   </Pressable>
                   <Pressable style={styles.modalButton} onPress={aceptarOT}>

@@ -7,6 +7,9 @@ import { AuthContext } from "../../contexts/AuthContext";
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { biometricLogin, getBiometricChallenge, login } from '../../api/auth'; 
 import { decodeJwtClean } from "../../utils/jwt";
+import { registerForPushNotificationsAsync } from "../../utils/ExpoPushService";
+import { savePushToken } from "../../api/notifications";
+
 
 import ReactNativeBiometrics from "react-native-biometrics";
 import nacl from 'tweetnacl';
@@ -100,16 +103,28 @@ const LoginScreen: React.FC = () => {
         setError("Por favor, ingrese usuario y contraseña");
         return;
       }
+  
       const response = await login(username.trim(), password.trim());
       const data = await response.data;
-
+  
       if (data.token) {
         await AsyncStorage.setItem('token', data.token);
         const user = decodeJwtClean<User>(data.token);
-
+  
         if (user) {
           setUser(user);
           setIsAuthenticated(true);
+  
+          // ✅ Registrar notificaciones
+          console.log("🔹 Solicitando permisos de notificaciones...");
+          const expoToken = await registerForPushNotificationsAsync();
+          if (expoToken) {
+            console.log("✅ Expo Push Token obtenido:", expoToken);
+            await savePushToken(user.sub, expoToken);
+            console.log("✅ Token enviado al backend correctamente.");
+          } else {
+            console.log("⚠️ No se obtuvo un token de notificaciones.");
+          }
         } else {
           setError("No se pudo decodificar el usuario del token");
         }
@@ -152,7 +167,7 @@ const LoginScreen: React.FC = () => {
           theme={{ roundness: 30 }}
         />
         {error && <Text style={styles.error}>{error}</Text>}
-        <Button mode="contained" onPress={handleBiometricLogin} style={styles.button}>
+        <Button mode="contained" onPress={handleLogin} style={styles.button}>
           Iniciar Sesión
         </Button>
         <Button

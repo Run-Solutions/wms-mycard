@@ -16,7 +16,12 @@ async function bootstrap() {
   app.useWebSocketAdapter(new IoAdapter(app) as any);
 
   app.enableCors({
-    origin: [ 'http://localhost:3001', 'http://64.23.225.99:3002', 'https://64.23.225.99:3002', 'https://mycard.runsolutions-services.com'],
+    origin: [
+      'http://localhost:3001',
+      'http://64.23.225.99:3002',
+      'https://64.23.225.99:3002',
+      'https://mycard.runsolutions-services.com/api/',
+    ],
     methods: 'GET,HEAD,PUT,PATCH,POST,DELETE',
     credentials: true,
   });

@@ -154,7 +154,7 @@ export default function EmpalmeComponentAccept({ workOrder }: Props) {
           <Value>{workOrder.workOrder.quantity || 'No definida'}</Value>
         </InfoItem>
         <InfoItem style={{ backgroundColor: '#eaeaf5', borderRadius: '8px' }}>
-          <Label>Cantidad (HOJAS):</Label>
+          <Label>Cantidad (KITS):</Label>
           <Value>{cantidadHojas}</Value>
         </InfoItem>
       </DataWrapper>
@@ -179,7 +179,14 @@ export default function EmpalmeComponentAccept({ workOrder }: Props) {
         <SectionTitle>Datos de Producción</SectionTitle>
         <NewDataWrapper>
           <InputGroup>
-            <Label>Cantidad entregada:</Label>
+            <Label>Cantidad entregada (KITS):</Label>
+            <Input
+              type="number"
+              name="release_quantity"
+              value={Math.ceil(defaultValues.release_quantity / 24)}
+              disabled
+            />
+            <Label>Cantidad entregada (TARJETAS):</Label>
             <Input
               type="number"
               name="release_quantity"

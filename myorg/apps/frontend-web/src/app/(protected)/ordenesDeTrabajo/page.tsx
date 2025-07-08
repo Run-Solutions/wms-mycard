@@ -14,12 +14,26 @@ const WorkOrdersPage: React.FC = () => {
   const theme = useTheme();
 
   // Formulacion de los estados
-  const [formData, setFormData] = useState({ ot_id: '', mycard_id: '', quantity: '', comments: '', areasOperatorIds: [] as string[], priority: false, files: [] as File[], });
+  const [formData, setFormData] = useState({
+    ot_id: '',
+    mycard_id: '',
+    quantity: '',
+    comments: '',
+    areasOperatorIds: [] as string[],
+    priority: false,
+    files: [] as File[],
+  });
   const [message, setMessage] = useState('');
-  const [areasOperator, setAreasOperator] = useState<{ label: string; value: string }[]>([]);
+  const [areasOperator, setAreasOperator] = useState<
+    { label: string; value: string }[]
+  >([]);
   const [dropdownCount, setDropdownCount] = useState(4);
-  const [files, setFiles] = useState<{ ot: File | null; sku: File | null; op: File | null }>({ ot: null, sku: null, op: null, });
-  
+  const [files, setFiles] = useState<{
+    ot: File | null;
+    sku: File | null;
+    op: File | null;
+  }>({ ot: null, sku: null, op: null });
+
   // Para obtener las areas de operacion
   useEffect(() => {
     getAreasOperator()
@@ -28,14 +42,22 @@ const WorkOrdersPage: React.FC = () => {
   }, []);
 
   // Para manejar los cambios de los campos del formulario
-  const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>, areaIndex?: number) => {
+  const handleChange = (
+    e: React.ChangeEvent<
+      HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement
+    >,
+    areaIndex?: number
+  ) => {
     const target = e.target;
     const name = target.name;
-    const value = target.type === 'checkbox' ? (target as HTMLInputElement).checked : target.value;
+    const value =
+      target.type === 'checkbox'
+        ? (target as HTMLInputElement).checked
+        : target.value;
     if (areaIndex !== undefined) {
       setFormData((prev) => {
         const updatedFlows = [...prev.areasOperatorIds];
-        updatedFlows[areaIndex] = value as string || "";  // Asignamos el valor al índice correspondiente
+        updatedFlows[areaIndex] = (value as string) || ''; // Asignamos el valor al índice correspondiente
         //const filteredFlows = updatedFlows.filter(area => area !== "");
         return { ...prev, areasOperatorIds: updatedFlows };
       });
@@ -63,7 +85,10 @@ const WorkOrdersPage: React.FC = () => {
   };
 
   // Para la carga de archivos
-  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>, type: 'ot' | 'sku' | 'op') => {
+  const handleFileChange = (
+    e: React.ChangeEvent<HTMLInputElement>,
+    type: 'ot' | 'sku' | 'op'
+  ) => {
     const file = e.target.files?.[0]; // Obtener solo el primer file
     if (!file) return; // Si no hay archivos, salimos de la función
     setFiles((prevFiles) => ({
@@ -96,23 +121,23 @@ const WorkOrdersPage: React.FC = () => {
       alert('Todos los campos son obligatorios excepto la prioridad.');
       return;
     }
-    
+
     if (formData.areasOperatorIds.length < 3) {
       alert('Debes seleccionar al menos 3 áreas.');
       return;
     }
-    
+
     if (formData.areasOperatorIds[0] !== '1') {
       alert('La primera área debe ser la de Preprensa (ID: 1).');
       return;
     }
-  
+
     if (!files.ot || !files.sku || !files.op) {
       alert('Debes subir OT, SKU y OP.');
       return;
     }
     const cleanedAreasOperatorIds = formData.areasOperatorIds.filter(
-      (id) => id !== "" && id !== undefined && id !== null
+      (id) => id !== '' && id !== undefined && id !== null
     );
     const payload = {
       ...formData,
@@ -122,7 +147,7 @@ const WorkOrdersPage: React.FC = () => {
       const result = await createWorkOrder(payload, {
         ot: files.ot!,
         sku: files.sku!,
-        op: files.op!
+        op: files.op!,
       });
       setMessage(result.message || 'Orden de trabajo creada correctamente');
       // Reseteamos
@@ -143,7 +168,8 @@ const WorkOrdersPage: React.FC = () => {
       alert('La OT es duplicada');
     }
   };
-  const cantidadHojas: number = Math.ceil(parseInt(formData.quantity) / 24) || 0;
+  const cantidadHojas: number =
+    Math.ceil(parseInt(formData.quantity) / 24) || 0;
 
   return (
     <PageContainer>
@@ -155,19 +181,42 @@ const WorkOrdersPage: React.FC = () => {
         <DataWrapper>
           <Auxiliar>
             <Label>Número de Orden:</Label>
-            <Input type="text" name="ot_id" value={formData.ot_id} onChange={handleChange} required />
+            <Input
+              type="text"
+              name="ot_id"
+              value={formData.ot_id}
+              onChange={handleChange}
+              required
+            />
           </Auxiliar>
           <Auxiliar>
             <Label>ID del Presupuesto:</Label>
-            <Input type="text" name="mycard_id" value={formData.mycard_id} onChange={handleChange} required />
+            <Input
+              type="text"
+              name="mycard_id"
+              value={formData.mycard_id}
+              onChange={handleChange}
+              required
+            />
           </Auxiliar>
           <Auxiliar>
             <Label>Cantidad (TARJETAS):</Label>
-            <Input type="number" name="quantity" value={formData.quantity} onChange={handleChange} required />
+            <Input
+              type="number"
+              name="quantity"
+              value={formData.quantity}
+              onChange={handleChange}
+              required
+            />
           </Auxiliar>
           <Auxiliar>
-            <Label>Cantidad (HOJAS):</Label>
-            <Input type="number" name="quantity" value={cantidadHojas} readOnly/>
+            <Label>Cantidad (KITS):</Label>
+            <Input
+              type="number"
+              name="quantity"
+              value={cantidadHojas}
+              readOnly
+            />
           </Auxiliar>
         </DataWrapper>
 
@@ -175,44 +224,112 @@ const WorkOrdersPage: React.FC = () => {
           <Auxiliar>
             <Label>Flujo Asignado:</Label>
             <Selects style={{ marginRight: '40px' }}>
-              {Array.from({ length: Math.ceil(dropdownCount / 4) }).map((_, rowIndex) => (
-                <SelectRow key={rowIndex} style={{ display: "flex", alignItems: "center", height: '50px' }}>
-                  {Array.from({ length: 4 }).map((_, colIndex) => {
-                    const index = rowIndex * 4 + colIndex;
-                    return index < dropdownCount ? (
-                      <SelectWrapper key={index} style={{ display: "flex", alignItems: "center" }}>
-                        {colIndex > 0 && <Arrow>➡</Arrow>}
-                        <Select name={`area-${index}`} onChange={(e) => handleChange(e, index)} value={formData.areasOperatorIds[index] || ''} style={{ height: '100%' }}>
-                          <option value=''>Selecciona un área</option>
-                          {getAvailableAreas(index).map((area) => (
-                              <option key={area.value} value={area.value}>{area.label}</option>
-                            ))
-                          }
-                        </Select>
-                      </SelectWrapper>
-                    ) : null;
-                  })}
-                  {dropdownCount > rowIndex * 4 && dropdownCount <= (rowIndex + 1) * 4 && (
-                    <div style={{ display: "flex", flexDirection: "column", justifyContent: "center", height: '0px', padding: '0', minWidth: '40px' }}>
-                      {dropdownCount < 50 && dropdownCount > rowIndex * 4 && dropdownCount <= (rowIndex + 1) * 4 && (
-                      <IconButton type="button" onClick={addDropdown} style={{ height: "20px", borderRadius: "40em", padding: '0', color: '#05060f99'}}>+</IconButton>
+              {Array.from({ length: Math.ceil(dropdownCount / 4) }).map(
+                (_, rowIndex) => (
+                  <SelectRow
+                    key={rowIndex}
+                    style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      height: '50px',
+                    }}
+                  >
+                    {Array.from({ length: 4 }).map((_, colIndex) => {
+                      const index = rowIndex * 4 + colIndex;
+                      return index < dropdownCount ? (
+                        <SelectWrapper
+                          key={index}
+                          style={{ display: 'flex', alignItems: 'center' }}
+                        >
+                          {colIndex > 0 && <Arrow>➡</Arrow>}
+                          <Select
+                            name={`area-${index}`}
+                            onChange={(e) => handleChange(e, index)}
+                            value={formData.areasOperatorIds[index] || ''}
+                            style={{ height: '100%' }}
+                          >
+                            <option value="">Selecciona un área</option>
+                            {getAvailableAreas(index).map((area) => (
+                              <option key={area.value} value={area.value}>
+                                {area.label}
+                              </option>
+                            ))}
+                          </Select>
+                        </SelectWrapper>
+                      ) : null;
+                    })}
+                    {dropdownCount > rowIndex * 4 &&
+                      dropdownCount <= (rowIndex + 1) * 4 && (
+                        <div
+                          style={{
+                            display: 'flex',
+                            flexDirection: 'column',
+                            justifyContent: 'center',
+                            height: '0px',
+                            padding: '0',
+                            minWidth: '40px',
+                          }}
+                        >
+                          {dropdownCount < 50 &&
+                            dropdownCount > rowIndex * 4 &&
+                            dropdownCount <= (rowIndex + 1) * 4 && (
+                              <IconButton
+                                type="button"
+                                onClick={addDropdown}
+                                style={{
+                                  height: '20px',
+                                  borderRadius: '40em',
+                                  padding: '0',
+                                  color: '#05060f99',
+                                }}
+                              >
+                                +
+                              </IconButton>
+                            )}
+                          <IconButton
+                            aria-label="delete"
+                            type="button"
+                            onClick={removeLastDropdown}
+                            style={{
+                              height: '20px',
+                              color: '#05060f99',
+                              borderRadius: '40em',
+                              marginTop: '5px',
+                              padding: '0',
+                            }}
+                          >
+                            <DeleteIcon />
+                          </IconButton>
+                        </div>
                       )}
-                      <IconButton aria-label="delete" type="button" onClick={removeLastDropdown} style={{ height: "20px", color: '#05060f99', borderRadius: "40em", marginTop: "5px", padding: '0' }}>
-                        <DeleteIcon />
-                      </IconButton>
-                    </div>
-                  )}
-                </SelectRow>
-              ))}
+                  </SelectRow>
+                )
+              )}
             </Selects>
 
             <Label>Comentarios:</Label>
-            <TextArea name="comments" value={formData.comments} onChange={handleChange} required placeholder="Escribe tus comentarios aquí..." />
+            <TextArea
+              name="comments"
+              value={formData.comments}
+              onChange={handleChange}
+              required
+              placeholder="Escribe tus comentarios aquí..."
+            />
           </Auxiliar>
 
           <Auxiliar>
             <Label>Subir OT (PDF):</Label>
-            <label htmlFor="upload-ot" style={{ borderRadius: '10rem', border: '2px solid #aeadab', width: '100%', height: '44px', display: 'flex', flexDirection: 'row' }}>
+            <label
+              htmlFor="upload-ot"
+              style={{
+                borderRadius: '10rem',
+                border: '2px solid #aeadab',
+                width: '100%',
+                height: '44px',
+                display: 'flex',
+                flexDirection: 'row',
+              }}
+            >
               <HiddenInput
                 accept="application/pdf"
                 id="upload-ot"
@@ -222,58 +339,109 @@ const WorkOrdersPage: React.FC = () => {
               <IconButton color="primary" component="span">
                 <UploadFileIcon />
               </IconButton>
-            {files.ot && (
-              <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                <Typography variant="body2" style={{ color: 'black'}}>{files.ot.name}</Typography>
-                <IconButton onClick={() => removeFile('ot')} color="error">
-                  <DeleteIcon />
-                </IconButton>
-              </div>
-            )}
+              {files.ot && (
+                <div
+                  style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '0.5rem',
+                  }}
+                >
+                  <Typography variant="body2" style={{ color: 'black' }}>
+                    {files.ot.name}
+                  </Typography>
+                  <IconButton onClick={() => removeFile('ot')} color="error">
+                    <DeleteIcon />
+                  </IconButton>
+                </div>
+              )}
             </label>
             <Label>Subir SKU (PDF):</Label>
-            <label htmlFor="upload-sku" style={{ borderRadius: '10rem', border: '2px solid #aeadab', width: '100%', height: '44px', display: 'flex', flexDirection: 'row' }}>
+            <label
+              htmlFor="upload-sku"
+              style={{
+                borderRadius: '10rem',
+                border: '2px solid #aeadab',
+                width: '100%',
+                height: '44px',
+                display: 'flex',
+                flexDirection: 'row',
+              }}
+            >
               <HiddenInput
-                accept='application/pdf'
-                id='upload-sku'
-                type='file'
+                accept="application/pdf"
+                id="upload-sku"
+                type="file"
                 onChange={(e) => handleFileChange(e, 'sku')}
               />
               <IconButton color="primary" component="span">
                 <UploadFileIcon />
               </IconButton>
-            {files.sku && ( 
-              <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                <Typography variant="body2" style={{ color: 'black'}}>{files.sku.name}</Typography>
-                <IconButton onClick={() => removeFile('sku')} color='error'>
-                  <DeleteIcon />
-                </IconButton>
-              </div>
-            )}
+              {files.sku && (
+                <div
+                  style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '0.5rem',
+                  }}
+                >
+                  <Typography variant="body2" style={{ color: 'black' }}>
+                    {files.sku.name}
+                  </Typography>
+                  <IconButton onClick={() => removeFile('sku')} color="error">
+                    <DeleteIcon />
+                  </IconButton>
+                </div>
+              )}
             </label>
             <Label>Subir OP (PDF):</Label>
-            <label htmlFor="upload-op" style={{ borderRadius: '10rem', border: '2px solid #aeadab', width: '100%', height: '44px', display: 'flex', flexDirection: 'row' }}>
+            <label
+              htmlFor="upload-op"
+              style={{
+                borderRadius: '10rem',
+                border: '2px solid #aeadab',
+                width: '100%',
+                height: '44px',
+                display: 'flex',
+                flexDirection: 'row',
+              }}
+            >
               <HiddenInput
-                accept='application/pdf'
-                id='upload-op'
-                type='file'
+                accept="application/pdf"
+                id="upload-op"
+                type="file"
                 onChange={(e) => handleFileChange(e, 'op')}
               />
               <IconButton color="primary" component="span">
                 <UploadFileIcon />
               </IconButton>
-            {files.op && ( 
-              <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                <Typography variant="body2" style={{ color: 'black'}}>{files.op.name}</Typography>
-                <IconButton onClick={() => removeFile('op')} color='error'>
-                  <DeleteIcon />
-                </IconButton>
-              </div>
-            )}
+              {files.op && (
+                <div
+                  style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '0.5rem',
+                  }}
+                >
+                  <Typography variant="body2" style={{ color: 'black' }}>
+                    {files.op.name}
+                  </Typography>
+                  <IconButton onClick={() => removeFile('op')} color="error">
+                    <DeleteIcon />
+                  </IconButton>
+                </div>
+              )}
             </label>
             <CheckboxWrapper>
               <Label>Prioridad:</Label>
-              <input type="checkbox" name="priority" checked={formData.priority} onChange={(e) => { handleChange(e)}} />
+              <input
+                type="checkbox"
+                name="priority"
+                checked={formData.priority}
+                onChange={(e) => {
+                  handleChange(e);
+                }}
+              />
             </CheckboxWrapper>
           </Auxiliar>
         </OperationWrapper>
@@ -369,7 +537,7 @@ const SelectWrapper = styled.div`
   margin-bottom: 5px;
 `;
 
-const SelectRow  = styled.div`
+const SelectRow = styled.div`
   display: flex;
   gap: 10px;
   align-items: center;
@@ -403,9 +571,9 @@ const Input = styled.input`
   height: 44px;
   outline: none;
   color: black;
-  transition: border-color 0.3s cubic-bezier(0.25, 0.01, 0.25, 1), 
-              color 0.3s cubic-bezier(0.25, 0.01, 0.25, 1), 
-              background 0.2s cubic-bezier(0.25, 0.01, 0.25, 1);
+  transition: border-color 0.3s cubic-bezier(0.25, 0.01, 0.25, 1),
+    color 0.3s cubic-bezier(0.25, 0.01, 0.25, 1),
+    background 0.2s cubic-bezier(0.25, 0.01, 0.25, 1);
 
   &::placeholder {
     color: #aaa;
@@ -418,7 +586,6 @@ const Input = styled.input`
     border-color: #05060f;
   }
 `;
-
 
 const Select = styled.select`
   padding: 10px;
@@ -465,4 +632,3 @@ const Message = styled.p`
 const HiddenInput = styled('input')({
   display: 'none',
 });
-

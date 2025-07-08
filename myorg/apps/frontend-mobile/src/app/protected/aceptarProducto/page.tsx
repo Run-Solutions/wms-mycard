@@ -1,11 +1,27 @@
 import React, { useState } from 'react';
-import { View, Text, FlatList, TouchableOpacity, StyleSheet, ActivityIndicator, Alert, Modal, Pressable } from 'react-native';
-import { getPendingOrders, acceptWorkOrderFlow } from '../../../api/aceptarProducto'; 
+import {
+  View,
+  Text,
+  FlatList,
+  TouchableOpacity,
+  StyleSheet,
+  ActivityIndicator,
+  Alert,
+  Modal,
+  Pressable,
+} from 'react-native';
+import {
+  getPendingOrders,
+  acceptWorkOrderFlow,
+} from '../../../api/aceptarProducto';
 import { NavigationProp } from '@react-navigation/native';
 import { RootStackParamList } from '../../../navigation/types';
 import { useFocusEffect } from '@react-navigation/native';
 import { useCallback } from 'react';
-import { CompositeNavigationProp, useNavigation } from '@react-navigation/native';
+import {
+  CompositeNavigationProp,
+  useNavigation,
+} from '@react-navigation/native';
 import { DrawerNavigationProp } from '@react-navigation/drawer';
 import { useAuth } from '../../../contexts/AuthContext';
 
@@ -18,6 +34,7 @@ interface WorkOrder {
     id: number;
     ot_id: string;
     priority: boolean;
+    comments: string;
     createdAt: string;
     mycard_id: string;
     quantity: number;
@@ -56,21 +73,21 @@ function puedeAceptarNuevaEtapa(
   currentUserId: number
 ): boolean {
   const flujosAnterioresMismaAreaYUsuario = allFlows.filter(
-    f =>
+    (f) =>
       f.area_id === currentFlow.area_id &&
       f.id < currentFlow.id &&
       f.assigned_user === currentUserId
-  )
+  );
   if (flujosAnterioresMismaAreaYUsuario.length === 0) {
     // ✅ Nunca participó antes: puede aceptar
     return true;
   }
   for (const flujo of flujosAnterioresMismaAreaYUsuario) {
     const pendiente =
-      ["Parcial", "Listo"].includes(flujo.status) ||
+      ['Parcial', 'Listo'].includes(flujo.status) ||
       (flujo.partialReleases || []).some((r) => !r.validated);
     if (pendiente) {
-      console.log("⛔ Usuario ya participó y aún tiene pendientes:", flujo);
+      console.log('⛔ Usuario ya participó y aún tiene pendientes:', flujo);
       return false;
     }
   }
@@ -78,7 +95,10 @@ function puedeAceptarNuevaEtapa(
   return true;
 }
 
-type NavigationType = CompositeNavigationProp<DrawerNavigationProp<RootStackParamList>, NavigationProp<RootStackParamList>>;
+type NavigationType = CompositeNavigationProp<
+  DrawerNavigationProp<RootStackParamList>,
+  NavigationProp<RootStackParamList>
+>;
 
 const AceptarProductoScreen = () => {
   const [orders, setOrders] = useState<WorkOrder[]>([]);
@@ -89,15 +109,15 @@ const AceptarProductoScreen = () => {
 
   const navigation = useNavigation<NavigationType>();
   const aceptarOT = async () => {
-    console.log("Aceptar OT");
+    console.log('Aceptar OT');
     if (!selectedOrder) return;
-    const flowItem = [...selectedOrder?.workOrder.flow || []]
-    .reverse()
-    .find(
-      (f) =>
-        f.area.id === selectedOrder.area_id &&
-        f.status === selectedOrder.status
-    );
+    const flowItem = [...(selectedOrder?.workOrder.flow || [])]
+      .reverse()
+      .find(
+        (f) =>
+          f.area.id === selectedOrder.area_id &&
+          f.status === selectedOrder.status
+      );
     if (!flowItem) {
       Alert.alert('Error', 'No se encontró el flujo activo para esta área');
       return;
@@ -119,15 +139,18 @@ const AceptarProductoScreen = () => {
         ...flowItem,
         area_id: selectedOrder.area_id,
         assigned_user: currentUserId ?? null,
-        work_order_id: selectedOrder.work_order_id
+        work_order_id: selectedOrder.work_order_id,
       },
       mappedFlows,
       currentUserId
     );
-    console.log("puedeAceptar:", puedeAceptar);
+    console.log('puedeAceptar:', puedeAceptar);
     console.log('User', currentUserId);
     if (!puedeAceptar) {
-      Alert.alert('Error', "Debes liberar completamente tu participación anterior antes de aceptar esta etapa.");
+      Alert.alert(
+        'Error',
+        'Debes liberar completamente tu participación anterior antes de aceptar esta etapa.'
+      );
       return;
     }
     if (selectedOrder.area_id >= 2 && selectedOrder.area_id <= 6) {
@@ -140,14 +163,14 @@ const AceptarProductoScreen = () => {
     }
     try {
       await acceptWorkOrderFlow(flowId.toString());
-      Alert.alert("OT aceptada", "La orden fue aceptada exitosamente.");
+      Alert.alert('OT aceptada', 'La orden fue aceptada exitosamente.');
       closeModal();
       fetchOrders(); // recargar lista
     } catch (error: any) {
       console.error(error);
       Alert.alert(
-        "Error",
-        error?.response?.data?.message || "Error al conectar con el servidor."
+        'Error',
+        error?.response?.data?.message || 'Error al conectar con el servidor.'
       );
     }
   };
@@ -160,7 +183,10 @@ const AceptarProductoScreen = () => {
         const sorted = data.sort((a, b) => {
           if (a.workOrder.priority && !b.workOrder.priority) return -1;
           if (!a.workOrder.priority && b.workOrder.priority) return 1;
-          return new Date(a.workOrder.createdAt).getTime() - new Date(b.workOrder.createdAt).getTime();
+          return (
+            new Date(a.workOrder.createdAt).getTime() -
+            new Date(b.workOrder.createdAt).getTime()
+          );
         });
         setOrders(sorted);
       } else {
@@ -168,7 +194,7 @@ const AceptarProductoScreen = () => {
       }
     } catch (err) {
       console.error(err);
-      Alert.alert("Error", "No se pudieron cargar las órdenes pendientes");
+      Alert.alert('Error', 'No se pudieron cargar las órdenes pendientes');
     } finally {
       setLoading(false);
     }
@@ -191,7 +217,9 @@ const AceptarProductoScreen = () => {
   };
 
   const renderItem = ({ item }: { item: WorkOrder }) => {
-    const fecha = new Date(item.workOrder.createdAt).toLocaleDateString('es-ES');
+    const fecha = new Date(item.workOrder.createdAt).toLocaleDateString(
+      'es-ES'
+    );
     return (
       <TouchableOpacity style={styles.card} onPress={() => openModal(item)}>
         {item.workOrder.priority && <View style={styles.priorityBadge} />}
@@ -203,7 +231,9 @@ const AceptarProductoScreen = () => {
               Cantidad: {item.workOrder.quantity}
             </Text>
           </View>
-          <Text style={styles.text}>Creado por: {item.workOrder.user.username}</Text>
+          <Text style={styles.text}>
+            Creado por: {item.workOrder.user.username}
+          </Text>
           <Text style={styles.text}>Fecha de creación: {fecha}</Text>
         </View>
       </TouchableOpacity>
@@ -236,19 +266,34 @@ const AceptarProductoScreen = () => {
           <View style={styles.modalContent}>
             {selectedOrder && (
               <>
-                <Text style={styles.modalTitle}>Orden: {selectedOrder.workOrder.ot_id}</Text>
-                <Text style={styles.modalText}>ID MyCard: {selectedOrder.workOrder.mycard_id}</Text>
-                <Text style={styles.modalText}>Cantidad: {selectedOrder.workOrder.quantity}</Text>
-                <Text style={styles.modalText}>Prioridad: {selectedOrder.workOrder.priority ? 'Alta' : 'Normal'}</Text>
-                <Text style={styles.modalText}>Creado por: {selectedOrder.workOrder.user.username}</Text>
-                <Text style={styles.modalText}>Fecha: {new Date(selectedOrder.workOrder.createdAt).toLocaleDateString('es-ES')}</Text>
+                <Text style={styles.modalTitle}>
+                  Orden: {selectedOrder.workOrder.ot_id}
+                </Text>
+                <Text style={styles.modalText}>
+                  Id del Presupuesto: {selectedOrder.workOrder.mycard_id}
+                </Text>
+                <Text style={styles.modalText}>
+                  Cantidad: {selectedOrder.workOrder.quantity}
+                </Text>
+                <Text style={styles.modalText}>
+                  Creado por: {selectedOrder.workOrder.user.username}
+                </Text>
+                <Text style={styles.modalText}>
+                  Prioridad: {selectedOrder.workOrder.priority ? 'Si' : 'No'}
+                </Text>
+                <Text style={styles.modalText}>
+                  Comentarios: {selectedOrder.workOrder.comments}
+                </Text>
                 <View style={styles.rowButtons}>
-                <Pressable style={styles.modalButtonReject} onPress={closeModal}>
-                  <Text style={styles.modalButtonText}>Cerrar</Text>
-                </Pressable>
-                <Pressable style={styles.modalButton} onPress={aceptarOT}>
-                  <Text style={styles.modalButtonText}>Aceptar OT</Text>
-                </Pressable>
+                  <Pressable
+                    style={styles.modalButtonReject}
+                    onPress={closeModal}
+                  >
+                    <Text style={styles.modalButtonText}>Cerrar</Text>
+                  </Pressable>
+                  <Pressable style={styles.modalButton} onPress={aceptarOT}>
+                    <Text style={styles.modalButtonText}>Aceptar OT</Text>
+                  </Pressable>
                 </View>
               </>
             )}

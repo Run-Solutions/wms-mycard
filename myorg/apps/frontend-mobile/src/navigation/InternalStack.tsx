@@ -14,6 +14,7 @@ import LiberarProductoAuxScreen from '../app/protected/liberarProducto/[id]/page
 import CerrarOrdenDeTrabajoAuxScreen from '../app/protected/cerrarOrdenDeTrabajo/[id]/page';
 import RecepcionCQMAuxScreen from '../app/protected/recepcionCqm/[id]/page';
 import InconformidadesAuxScreen from '../app/protected/inconformidades/[id]/page';
+import NotificationsScreen from '../screens/NotificationsScreen';
 
 // Importa stripAccents
 import { stripAccents } from '../utils/stringUtils';
@@ -27,9 +28,9 @@ interface InternalStackProps {
 export const InternalStack: React.FC<InternalStackProps> = ({ modules }) => {
   // Buscamos las configuraciones cuyos names coincidan (sin tildes ni mayúsculas)
   const dynamicScreens = modules
-    .map(mod =>
+    .map((mod) =>
       MODULE_CONFIG.find(
-        cfg => stripAccents(mod.name) === stripAccents(cfg.name)
+        (cfg) => stripAccents(mod.name) === stripAccents(cfg.name)
       )
     )
     .filter((cfg): cfg is ModuleConfig => cfg !== undefined);
@@ -90,9 +91,16 @@ export const InternalStack: React.FC<InternalStackProps> = ({ modules }) => {
           title: `OT #${(route.params as { id: number }).id}`,
         })}
       />
+      <Stack.Screen
+        name="NotificationsScreen"
+        component={NotificationsScreen}
+        options={{
+          title: 'Notificacioddes',
+        }}
+      />
 
       {/** Rutas dinámicas **/}
-      {dynamicScreens.map(cfg => (
+      {dynamicScreens.map((cfg) => (
         <Stack.Screen
           key={cfg.route}
           name={cfg.route}

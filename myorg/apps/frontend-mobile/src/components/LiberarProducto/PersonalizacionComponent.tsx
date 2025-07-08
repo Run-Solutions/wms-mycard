@@ -19,6 +19,7 @@ import {
   releaseProductFromPersonalizacion,
 } from '../../api/liberarProducto';
 import { useAuth } from '../../contexts/AuthContext';
+import { calcularCantidadPorLiberar } from './util/calcularCantidadPorLiberar';
 
 interface PartialRelease {
   validated: boolean;
@@ -56,30 +57,48 @@ const PersonalizacionComponent = ({ workOrder }: { workOrder: any }) => {
   const currentFlow = workOrder.workOrder.flow.find(
     (f: any) =>
       f.area_id === workOrder.area.id &&
-    ['Pendiente', 'En proceso', 'Parcial', 'Pendiente parcial', 'Listo', 'Enviado a CQM', 'En Calidad', 'Enviado a auditoria parcial'].includes(f.status) &&
+      [
+        'Pendiente',
+        'En proceso',
+        'Parcial',
+        'Pendiente parcial',
+        'Listo',
+        'Enviado a CQM',
+        'En Calidad',
+        'Enviado a auditoria parcial',
+      ].includes(f.status) &&
       f.user?.id === currentUserId
   );
   if (!currentFlow) {
-    alert("No tienes una orden activa para esta área.");
+    alert('No tienes una orden activa para esta área.');
     return;
   }
-  const currentIndex = flowList.findIndex((item) => item.id === currentFlow?.id);
+  const currentIndex = flowList.findIndex(
+    (item) => item.id === currentFlow?.id
+  );
   console.log('el currentIndex', currentIndex);
   // Anterior (si hay)
-  const lastCompletedOrPartial = currentIndex > 0 ? flowList[currentIndex - 1] : null;
+  const lastCompletedOrPartial =
+    currentIndex > 0 ? flowList[currentIndex - 1] : null;
   // Siguiente (si hay)
-  const nextFlow = currentIndex !== -1 && currentIndex < flowList.length - 1
-    ? flowList[currentIndex + 1]
-    : null;
-  console.log("El flujo actual (currentFlow)", currentFlow);
-  console.log("El siguiente flujo (nextFlow)", nextFlow);
-  console.log("Ultimo parcial o completado", lastCompletedOrPartial);
+  const nextFlow =
+    currentIndex !== -1 && currentIndex < flowList.length - 1
+      ? flowList[currentIndex + 1]
+      : null;
+  console.log('El flujo actual (currentFlow)', currentFlow);
+  console.log('El siguiente flujo (nextFlow)', nextFlow);
+  console.log('Ultimo parcial o completado', lastCompletedOrPartial);
 
   const allParcialsValidated = currentFlow.partialReleases?.every(
     (r: PartialRelease) => r.validated
   );
 
   const enviarACQM = async () => {
+    const numValue = Number(sampleQuantity);
+    if (isNaN(numValue) || !Number.isInteger(numValue) || numValue < 0) {
+      Alert.alert('Cantidad de muestra inválida');
+      return;
+    }
     if (!questions.length) {
       Alert.alert('Completa todas las preguntas y cantidad de muestra.');
       return;
@@ -124,11 +143,16 @@ const PersonalizacionComponent = ({ workOrder }: { workOrder: any }) => {
       navigation.navigate('liberarProducto');
       setShowCqmModal(false);
     } catch (err) {
-      Alert.alert('Error al enviar a CQM.');
+      Alert.alert('Error al Enviar a Calidad/CQM.');
     }
   };
 
   const liberarProducto = async () => {
+    const numValue = Number(goodQuantity);
+    if (isNaN(numValue) || !Number.isInteger(numValue) || numValue <= 0) {
+      Alert.alert('Cantidad de muestra inválida');
+      return;
+    }
     const payload = {
       workOrderId: workOrder.workOrder.id,
       workOrderFlowId: currentFlow.id,
@@ -191,51 +215,11 @@ const PersonalizacionComponent = ({ workOrder }: { workOrder: any }) => {
           0
         ) ?? 0);
 
-  let cantidadporliberar = 0;
-  const totalLiberado =
-    currentFlow.partialReleases?.reduce(
-      (sum: number, release: PartialRelease) => sum + release.quantity,
-      0
-    ) ?? 0;
-  console.log('Total liberado:', totalLiberado);
-  const validados =
-    lastCompletedOrPartial.partialReleases
-      ?.filter((r: PartialRelease) => r.validated)
-      .reduce((sum: number, r: PartialRelease) => sum + r.quantity, 0) ?? 0;
-  console.log('Cantidad validada:', validados);
-  // ✅ 1. Preprensa tiene prioridad
-  if (lastCompletedOrPartial.area?.name === 'preprensa') {
-    cantidadporliberar = currentFlow.workOrder.quantity - totalLiberado;
-  }
-  // ✅ 2. Si hay validados en otras áreas
-  else if (validados > 0) {
-    let resta = validados - totalLiberado;
-    if (resta < 0) {
-      cantidadporliberar = 0;
-    } else {
-      cantidadporliberar = resta;
-    }
-  }
-  // ✅ 3. Si hay liberaciones sin validar
-  else if (totalLiberado > 0) {
-    cantidadporliberar = currentFlow.workOrder.quantity - totalLiberado;
-  }
-  // ✅ 4. Si no hay nada, usar la cantidad entregada
-  else {
-    cantidadporliberar =
-      lastCompletedOrPartial.areaResponse.prepress?.plates ??
-      lastCompletedOrPartial.areaResponse.impression?.release_quantity ??
-      lastCompletedOrPartial.areaResponse.serigrafia?.release_quantity ??
-      lastCompletedOrPartial.areaResponse.empalme?.release_quantity ??
-      lastCompletedOrPartial.areaResponse.laminacion?.release_quantity ??
-      lastCompletedOrPartial.areaResponse.corte?.good_quantity ??
-      lastCompletedOrPartial.areaResponse.colorEdge?.good_quantity ??
-      lastCompletedOrPartial.areaResponse.hotStamping?.good_quantity ??
-      lastCompletedOrPartial.areaResponse.millingChip?.good_quantity ??
-      lastCompletedOrPartial.areaResponse.personalizacion?.good_quantity ??
-      currentFlow.workOrder.quantity ??
-      0;
-  }
+  const cantidadporliberar = calcularCantidadPorLiberar(
+    currentFlow,
+    lastCompletedOrPartial
+  );
+  console.log('Cantidad final por liberar:', cantidadporliberar);
 
   const shouldDisableLiberar = () => {
     const currentInvalidStatuses = [
@@ -275,29 +259,38 @@ const PersonalizacionComponent = ({ workOrder }: { workOrder: any }) => {
     );
   };
   const shouldDisableCQM = () => {
-    const estadosBloqueados = [
-      'Enviado a CQM',
-      'En Calidad',
-      'Listo',
-      'Enviado a auditoria parcial',
-    ];
-    const estadosBloqueadosCQMAfterCorte = [
+    const estadosBloqueadosBase = [
       'Enviado a CQM',
       'En Calidad',
       'Listo',
       'Enviado a auditoria parcial',
       'Enviado a Auditoria',
     ];
-    const isDisabled =
-      estadosBloqueados.includes(currentFlow.status) ||
-      estadosBloqueadosCQMAfterCorte.includes(lastCompletedOrPartial.status) ||
-      estadosBloqueados.includes(nextFlow?.status) || // nextFlow puede ser opcional
-      Number(cantidadporliberar) === 0;
-    const algunoBloqueado = workOrder.workOrder.flow.some((flow:any) =>
-      estadosBloqueados.includes(flow.status)
+    const estadosBloqueadosExtra = [
+      'Listo',
+      'Enviado a auditoria parcial',
+      'Enviado a Auditoria',
+    ];
+    const statusesToCheck = [
+      currentFlow.status,
+      nextFlow?.status,
+      lastCompletedOrPartial.status,
+    ];
+    const matchBloqueadosBase = statusesToCheck.some((status) =>
+      estadosBloqueadosBase.includes(status)
     );
-  
-    return isDisabled || algunoBloqueado;
+    const matchBloqueadosExtra = statusesToCheck.some((status) =>
+      estadosBloqueadosExtra.includes(status)
+    );
+    const algunoBloqueado = workOrder.workOrder.flow.some((flow: any) =>
+      estadosBloqueadosBase.includes(flow.status)
+    );
+    return (
+      matchBloqueadosBase ||
+      matchBloqueadosExtra ||
+      algunoBloqueado ||
+      Number(cantidadporliberar) === 0
+    );
   };
   const disableLiberarButton = shouldDisableLiberar();
   const disableLiberarCQM = shouldDisableCQM();
@@ -405,7 +398,7 @@ const PersonalizacionComponent = ({ workOrder }: { workOrder: any }) => {
         onPress={() => !disableLiberarCQM && setShowCqmModal(true)}
         disabled={disableLiberarCQM}
       >
-        <Text style={styles.buttonText}>Enviar a CQM</Text>
+        <Text style={styles.buttonText}>Enviar a Calidad/CQM</Text>
       </TouchableOpacity>
 
       <TouchableOpacity
@@ -430,24 +423,33 @@ const PersonalizacionComponent = ({ workOrder }: { workOrder: any }) => {
 
           {/* Tabs */}
           <View style={styles.tabs}>
-            <ScrollView horizontal showsHorizontalScrollIndicator={false} >
-              {['etiquetadora', 'persos', 'laser', 'packsmart', 'otto', 'embolsadora'].map((opt) => (
+            <ScrollView horizontal showsHorizontalScrollIndicator={false}>
+              {[
+                'etiquetadora',
+                'persos',
+                'laser',
+                'packsmart',
+                'otto',
+                'embolsadora',
+              ].map((opt) => (
                 <TouchableOpacity
                   key={opt}
                   style={[
                     styles.tab,
-                    {marginRight: 10},
-                    selectedOption === opt && styles.tabSelected
+                    { marginRight: 10 },
+                    selectedOption === opt && styles.tabSelected,
                   ]}
                   onPress={() => setSelectedOption(opt)}
                 >
                   <Text
                     style={[
                       styles.tabText,
-                      selectedOption === opt && styles.tabTextSelected
+                      selectedOption === opt && styles.tabTextSelected,
                     ]}
                   >
-                    {opt === 'persos' ? "Persos's" : opt.charAt(0).toUpperCase() + opt.slice(1)}
+                    {opt === 'persos'
+                      ? "Persos's"
+                      : opt.charAt(0).toUpperCase() + opt.slice(1)}
                   </Text>
                 </TouchableOpacity>
               ))}
@@ -591,25 +593,37 @@ const PersonalizacionComponent = ({ workOrder }: { workOrder: any }) => {
                 </View>
 
                 {/* Preguntas normales */}
-                {workOrder.area.formQuestions
-                  .slice(20, 28).map((q: any) => (
-                    <View key={q.id} style={styles.tableRow}>
-                      {/* Pregunta */}
-                      <View style={[styles.tableCell, { flex: 2 }]}>
-                        <Text style={styles.questionText}>{q.title}</Text>
-                      </View>
-
-                      {/* Respuesta */}
-                      <View style={[styles.tableCell, { flex: 1, alignItems: 'center' }]}>
-                        <TouchableOpacity
-                          onPress={() => toggleCheckbox(q.id, checkedQuestion, setCheckedQuestion)}
-                          style={styles.radioCircle}
-                        >
-                          {checkedQuestion.includes(q.id) && <View style={styles.radioDot} />}
-                        </TouchableOpacity>
-                      </View>
+                {workOrder.area.formQuestions.slice(20, 28).map((q: any) => (
+                  <View key={q.id} style={styles.tableRow}>
+                    {/* Pregunta */}
+                    <View style={[styles.tableCell, { flex: 2 }]}>
+                      <Text style={styles.questionText}>{q.title}</Text>
                     </View>
-                  ))}
+
+                    {/* Respuesta */}
+                    <View
+                      style={[
+                        styles.tableCell,
+                        { flex: 1, alignItems: 'center' },
+                      ]}
+                    >
+                      <TouchableOpacity
+                        onPress={() =>
+                          toggleCheckbox(
+                            q.id,
+                            checkedQuestion,
+                            setCheckedQuestion
+                          )
+                        }
+                        style={styles.radioCircle}
+                      >
+                        {checkedQuestion.includes(q.id) && (
+                          <View style={styles.radioDot} />
+                        )}
+                      </TouchableOpacity>
+                    </View>
+                  </View>
+                ))}
               </ScrollView>
             </>
           )}
@@ -623,29 +637,40 @@ const PersonalizacionComponent = ({ workOrder }: { workOrder: any }) => {
                 </View>
 
                 {/* Preguntas normales */}
-                {workOrder.area.formQuestions
-                  .slice(14, 20).map((q: any) => (
-                    <View key={q.id} style={styles.tableRow}>
-                      {/* Pregunta */}
-                      <View style={[styles.tableCell, { flex: 2 }]}>
-                        <Text style={styles.questionText}>{q.title}</Text>
-                      </View>
-
-                      {/* Respuesta */}
-                      <View style={[styles.tableCell, { flex: 1, alignItems: 'center' }]}>
-                        <TouchableOpacity
-                          onPress={() => toggleCheckbox(q.id, checkedQuestion, setCheckedQuestion)}
-                          style={styles.radioCircle}
-                        >
-                          {checkedQuestion.includes(q.id) && <View style={styles.radioDot} />}
-                        </TouchableOpacity>
-                      </View>
+                {workOrder.area.formQuestions.slice(14, 20).map((q: any) => (
+                  <View key={q.id} style={styles.tableRow}>
+                    {/* Pregunta */}
+                    <View style={[styles.tableCell, { flex: 2 }]}>
+                      <Text style={styles.questionText}>{q.title}</Text>
                     </View>
-                  ))}
+
+                    {/* Respuesta */}
+                    <View
+                      style={[
+                        styles.tableCell,
+                        { flex: 1, alignItems: 'center' },
+                      ]}
+                    >
+                      <TouchableOpacity
+                        onPress={() =>
+                          toggleCheckbox(
+                            q.id,
+                            checkedQuestion,
+                            setCheckedQuestion
+                          )
+                        }
+                        style={styles.radioCircle}
+                      >
+                        {checkedQuestion.includes(q.id) && (
+                          <View style={styles.radioDot} />
+                        )}
+                      </TouchableOpacity>
+                    </View>
+                  </View>
+                ))}
               </ScrollView>
             </>
-          )
-          }
+          )}
 
           {selectedOption === 'embolsadora' && (
             <>
@@ -657,30 +682,40 @@ const PersonalizacionComponent = ({ workOrder }: { workOrder: any }) => {
                 </View>
 
                 {/* Preguntas normales */}
-                {workOrder.area.formQuestions
-                  .slice(28, 30).map((q: any) => (
-                    <View key={q.id} style={styles.tableRow}>
-                      {/* Pregunta */}
-                      <View style={[styles.tableCell, { flex: 2 }]}>
-                        <Text style={styles.questionText}>{q.title}</Text>
-                      </View>
-
-                      {/* Respuesta */}
-                      <View style={[styles.tableCell, { flex: 1, alignItems: 'center' }]}>
-                        <TouchableOpacity
-                          onPress={() => toggleCheckbox(q.id, checkedQuestion, setCheckedQuestion)}
-                          style={styles.radioCircle}
-                        >
-                          {checkedQuestion.includes(q.id) && <View style={styles.radioDot} />}
-                        </TouchableOpacity>
-                      </View>
+                {workOrder.area.formQuestions.slice(28, 30).map((q: any) => (
+                  <View key={q.id} style={styles.tableRow}>
+                    {/* Pregunta */}
+                    <View style={[styles.tableCell, { flex: 2 }]}>
+                      <Text style={styles.questionText}>{q.title}</Text>
                     </View>
-                  ))}
+
+                    {/* Respuesta */}
+                    <View
+                      style={[
+                        styles.tableCell,
+                        { flex: 1, alignItems: 'center' },
+                      ]}
+                    >
+                      <TouchableOpacity
+                        onPress={() =>
+                          toggleCheckbox(
+                            q.id,
+                            checkedQuestion,
+                            setCheckedQuestion
+                          )
+                        }
+                        style={styles.radioCircle}
+                      >
+                        {checkedQuestion.includes(q.id) && (
+                          <View style={styles.radioDot} />
+                        )}
+                      </TouchableOpacity>
+                    </View>
+                  </View>
+                ))}
               </ScrollView>
             </>
-          )
-          }
-
+          )}
 
           {/* Campo de muestras */}
           <Text style={styles.label}>Muestras:</Text>
@@ -770,14 +805,15 @@ const PersonalizacionComponent = ({ workOrder }: { workOrder: any }) => {
               />
             </ScrollView>
           )}
-          {['etiquetadora', 'packsmart', 'otto', 'embolsadora'].includes(selectedOption) && showQuality &&(
-            <>
-              {/* Botones */}
-              <Text>
-                No hay preguntas
-              </Text>
-            </>
-          )}
+          {['etiquetadora', 'packsmart', 'otto', 'embolsadora'].includes(
+            selectedOption
+          ) &&
+            showQuality && (
+              <>
+                {/* Botones */}
+                <Text>No hay preguntas</Text>
+              </>
+            )}
 
           {/* Botones */}
           <View style={styles.footerButtons}>

@@ -17,7 +17,10 @@ export const fetchPendingOrders = async () => {
       return data.sort((a, b) => {
         if (a.workOrder.priority && !b.workOrder.priority) return -1;
         if (!a.workOrder.priority && b.workOrder.priority) return 1;
-        return new Date(a.workOrder.createdAt).getTime() - new Date(b.workOrder.createdAt).getTime();
+        return (
+          new Date(a.workOrder.createdAt).getTime() -
+          new Date(b.workOrder.createdAt).getTime()
+        );
       });
     } else {
       return [];
@@ -36,7 +39,8 @@ export const acceptWorkOrder = async (selectedOrder: any) => {
 
   if (selectedOrder.answers?.length) {
     for (let i = selectedOrder.answers.length - 1; i >= 0; i--) {
-      if (selectedOrder.answers[i].accepted === false) {
+      const accepted = selectedOrder.answers[i].accepted;
+      if (accepted === false || accepted === null || accepted === undefined) {
         index = i;
         break;
       }
@@ -52,12 +56,16 @@ export const acceptWorkOrder = async (selectedOrder: any) => {
   try {
     const token = await AsyncStorage.getItem('token');
 
-    await API.patch(`/work-order-cqm/${flowId}/accept`, {}, {
-      headers: {
-        Authorization: `Bearer ${token}`,
-        'Content-Type': 'application/json',
-      },
-    });
+    await API.patch(
+      `/work-order-cqm/${flowId}/accept`,
+      {},
+      {
+        headers: {
+          Authorization: `Bearer ${token}`,
+          'Content-Type': 'application/json',
+        },
+      }
+    );
 
     // Todo OK
     return;

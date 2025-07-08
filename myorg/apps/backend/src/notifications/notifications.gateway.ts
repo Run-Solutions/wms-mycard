@@ -1,8 +1,12 @@
+// myorg/apps/backend/src/notifications/notifications.gateway.ts
 import {
   WebSocketGateway,
   WebSocketServer,
   OnGatewayConnection,
   OnGatewayDisconnect,
+  SubscribeMessage,
+  MessageBody,
+  ConnectedSocket,
 } from '@nestjs/websockets';
 import { Server, Socket } from 'socket.io';
 import { NotificationsService } from './notifications.service';
@@ -18,14 +22,24 @@ export class NotificationsGateway
 
   handleConnection(client: Socket): void {
     console.log(`Cliente conectado: ${client.id}`);
-    // Al conectarse, se envían las notificaciones pendientes (si las hay)
-    const pending = this.notificationsService.getPendingNotifications();
-    pending.forEach((notification) => {
-      client.emit('notification', notification);
-    });
+    // Esperamos que el cliente envíe su userId en un mensaje
   }
 
   handleDisconnect(client: Socket): void {
     console.log(`Cliente desconectado: ${client.id}`);
+  }
+
+  /**
+   * Cuando el cliente solicita sus notificaciones
+   */
+  @SubscribeMessage('getNotifications')
+  async handleGetNotifications(
+    @MessageBody() userId: number,
+    @ConnectedSocket() client: Socket,
+  ): Promise<void> {
+    const notifications = await this.notificationsService.getUserNotifications(userId);
+    notifications.forEach((notification) => {
+      client.emit('notification', notification);
+    });
   }
 }

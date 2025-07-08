@@ -20,7 +20,8 @@ import { RootStackParamList } from '../../navigation/types';
 import { submitPrepressForm } from '../../api/liberarProducto';
 
 const PrePrensaComponent: React.FC<{ workOrder: any }> = ({ workOrder }) => {
-  const navigation = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
+  const navigation =
+    useNavigation<NativeStackNavigationProp<RootStackParamList>>();
   const [plates, setPlates] = useState('');
   const [positives, setPositives] = useState('');
   const [testType, setTestType] = useState('');
@@ -31,69 +32,53 @@ const PrePrensaComponent: React.FC<{ workOrder: any }> = ({ workOrder }) => {
   const currentFlow = [...workOrder.workOrder.flow]
     .reverse()
     .find((item) =>
-      ['Listo', 'En proceso', 'Enviado a CQM', 'En Calidad'].includes(item.status)
+      ['Listo', 'En proceso', 'Enviado a CQM', 'En Calidad'].includes(
+        item.status
+      )
     );
 
-    const handleSubmit = async () => {
-      if (!plates || !positives || !testType) {
-        Alert.alert('Completa todos los campos obligatorios.');
-        return;
-      }
-    
-      const payload = {
-        workOrderId: workOrder.work_order_id,
-        workOrderFlowId: currentFlow.id,
-        areaId: workOrder.area_id,
-        assignedUser: workOrder.assigned_user || null,
-        plates: parseInt(plates),
-        positives: parseInt(positives),
-        testType,
-        comments,
-      };
-    
-      try {
-        await submitPrepressForm(payload);
-        Alert.alert('Producto liberado con éxito');
-        navigation.navigate('liberarProducto');
-      } catch (error) {
-        Alert.alert('Error al liberar el producto.');
-      } finally {
-        setShowConfirm(false);
-      }
+  const handleSubmit = async () => {
+    if (!plates || !positives || !testType) {
+      Alert.alert('Completa todos los campos obligatorios.');
+      return;
+    }
+
+    const payload = {
+      workOrderId: workOrder.work_order_id,
+      workOrderFlowId: currentFlow.id,
+      areaId: workOrder.area_id,
+      assignedUser: workOrder.assigned_user || null,
+      plates: parseInt(plates),
+      positives: parseInt(positives),
+      testType,
+      comments,
     };
 
-    const cantidadHojasRaw = Number(workOrder?.workOrder.quantity) / 24;
+    try {
+      await submitPrepressForm(payload);
+      Alert.alert('Producto liberado con éxito');
+      navigation.navigate('liberarProducto');
+    } catch (error) {
+      Alert.alert('Error al liberar el producto.');
+    } finally {
+      setShowConfirm(false);
+    }
+  };
+
+  const cantidadHojasRaw = Number(workOrder?.workOrder.quantity) / 24;
   const cantidadHojas = cantidadHojasRaw > 0 ? Math.ceil(cantidadHojasRaw) : 0;
 
   return (
     <KeyboardAvoidingView
-    style={{ flex: 1 }}
-    behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-    keyboardVerticalOffset={Platform.OS === 'ios' ? 80 : 0}
+      style={{ flex: 1 }}
+      behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+      keyboardVerticalOffset={Platform.OS === 'ios' ? 80 : 0}
     >
       <TouchableWithoutFeedback onPress={Keyboard.dismiss}>
         <View style={styles.container}>
           <Text style={styles.title}>Área: Preprensa</Text>
 
           <ScrollView style={styles.scrollArea}>
-
-            <View style={styles.card}>
-              <Text style={styles.label}>Número de Orden:</Text>
-              <Text style={styles.value}>{workOrder.workOrder.ot_id}</Text>
-
-              <Text style={styles.label}>ID del Presupuesto:</Text>
-              <Text style={styles.value}>{workOrder.workOrder.mycard_id}</Text>
-
-              <Text style={styles.label}>Cantidad (TARJETAS):</Text>
-              <Text style={styles.value}>{workOrder.workOrder.quantity}</Text>
-
-              <Text style={styles.label}>Cantidad (HOJAS):</Text>
-              <Text style={styles.value}>{cantidadHojas}</Text>
-
-              <Text style={styles.label}>Comentarios:</Text>
-              <Text style={styles.value}>{workOrder.workOrder.comments}</Text>
-            </View>
-
             <Text style={styles.subtitle}>Datos de Producción</Text>
 
             <TextInput
@@ -121,7 +106,10 @@ const PrePrensaComponent: React.FC<{ workOrder: any }> = ({ workOrder }) => {
             {['color', 'fisica', 'digital'].map((option) => (
               <TouchableOpacity
                 key={option}
-                style={[styles.radioButton, testType === option && styles.radioSelected]}
+                style={[
+                  styles.radioButton,
+                  testType === option && styles.radioSelected,
+                ]}
                 onPress={() => setTestType(option)}
               >
                 <Text style={styles.radioText}>{`Prueba ${option}`}</Text>
@@ -140,14 +128,19 @@ const PrePrensaComponent: React.FC<{ workOrder: any }> = ({ workOrder }) => {
               onChangeText={setComments}
             />
 
-            <TouchableOpacity style={styles.button} onPress={() => setShowConfirm(true)}>
+            <TouchableOpacity
+              style={styles.button}
+              onPress={() => setShowConfirm(true)}
+            >
               <Text style={styles.buttonText}>Liberar producto</Text>
             </TouchableOpacity>
 
             <Modal visible={showConfirm} transparent animationType="fade">
               <View style={styles.modalOverlay}>
                 <View style={styles.modalBox}>
-                  <Text style={styles.modalText}>¿Deseas liberar este producto?</Text>
+                  <Text style={styles.modalText}>
+                    ¿Deseas liberar este producto?
+                  </Text>
                   <View style={styles.modalActions}>
                     <TouchableOpacity
                       style={styles.cancelButton}
@@ -175,24 +168,24 @@ const PrePrensaComponent: React.FC<{ workOrder: any }> = ({ workOrder }) => {
 export default PrePrensaComponent;
 
 const styles = StyleSheet.create({
-  container: { 
+  container: {
     flex: 1,
     paddingTop: 16,
     paddingBottom: 32,
-    paddingHorizontal: 8, 
-    backgroundColor: '#fdfaf6', 
+    paddingHorizontal: 8,
+    backgroundColor: '#fdfaf6',
   },
-  title: { 
-    fontSize: 20, 
-    fontWeight: 'bold', 
+  title: {
+    fontSize: 20,
+    fontWeight: 'bold',
     marginBottom: 16,
     textAlign: 'center',
     color: 'black',
     padding: Platform.OS === 'ios' ? 10 : 0,
   },
-  subtitle: { 
-    fontSize: 16, 
-    fontWeight: 'bold', 
+  subtitle: {
+    fontSize: 16,
+    fontWeight: 'bold',
     marginTop: 20,
     marginBottom: 12,
   },

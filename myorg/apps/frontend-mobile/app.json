@@ -1,7 +1,7 @@
 {
   "expo": {
     "name": "MyCard",
-    "slug": "Run Solutions",
+    "slug": "RunSolutions",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
@@ -17,6 +17,8 @@
       "bundleIdentifier": "com.anonymous.RunSolutions"
     },
     "android": {
+      "versionCode": 2,
+      "googleServicesFile": "./android/app/google-services.json",
       "adaptiveIcon": {
         "foregroundImage": "./assets/icon.png",
         "backgroundColor": "#ffffff"
@@ -25,6 +27,11 @@
     },
     "web": {
       "favicon": "./assets/icon.png"
+    },
+    "extra": {
+      "eas": {
+        "projectId": "af5eaa51-78b0-4710-91e5-1d0ed2ebda4d"
+      }
     }
   }
 }
