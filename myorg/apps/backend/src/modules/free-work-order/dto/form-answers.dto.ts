@@ -37,6 +37,10 @@ export class CreateFormAnswerImpressionDto {
     @IsString()
     @IsNotEmpty()
     finish_validation: string;
+
+    @IsString()
+    @IsNotEmpty()
+    valor_anclaje: string;
     
     @IsString()
     @IsNotEmpty()

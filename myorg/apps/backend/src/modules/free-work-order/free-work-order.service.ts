@@ -415,6 +415,7 @@ export class FreeWorkOrderService {
       question_id,
       work_order_id,
       finish_validation,
+      valor_anclaje,
       response,
       user_id,
       area_id,
@@ -425,52 +426,23 @@ export class FreeWorkOrderService {
 
     try {
       return await this.prisma.$transaction(async (tx) => {
-        // Buscar si ya existe un FormAnswer con ese work_order_flow_id
-        const existingFormAnswer = await tx.formAnswer.findFirst({
-          where: {
+        // Crear siempre un nuevo FormAnswer
+        const newFormAnswer = await tx.formAnswer.create({
+          data: {
+            user_id,
+            area_id,
+            sample_quantity,
+            finish_validation,
+            valor_anclaje,
+            work_order_id,
+            reviewed: reviewed ?? false,
             work_order_flow_id,
           },
         });
 
-        let formAnswerId: number;
+        const formAnswerId = newFormAnswer.id;
 
-        if (existingFormAnswer) {
-          // Si existe, actualizar los datos
-          const updatedFormAnswer = await tx.formAnswer.update({
-            where: { id: existingFormAnswer.id },
-            data: {
-              user_id,
-              area_id,
-              sample_quantity,
-              finish_validation,
-              work_order_id,
-              reviewed: reviewed ?? false,
-            },
-          });
-
-          formAnswerId = updatedFormAnswer.id;
-
-          // Eliminar las respuestas anteriores
-          await tx.formAnswerResponse.deleteMany({
-            where: { form_answer_id: formAnswerId },
-          });
-        } else {
-          // Si no existe, crear el FormAnswer
-          const newFormAnswer = await tx.formAnswer.create({
-            data: {
-              user_id,
-              area_id,
-              sample_quantity,
-              finish_validation,
-              work_order_id,
-              reviewed: reviewed ?? false,
-              work_order_flow_id,
-            },
-          });
-
-          formAnswerId = newFormAnswer.id;
-        }
-        // Mapear las respuestas de cada pregunta
+        // Crear las respuestas nuevas
         const respuestas = question_id.map((questionId, index) => ({
           question_id: questionId,
           response_operator: response[index],

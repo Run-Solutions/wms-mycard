@@ -1,3 +1,4 @@
+// myorg/apps/frontend-web/src/api/seguimientoDeOts.ts
 import API from "./http";
 
 export const fetchWorkOrdersInProgress = async () => {
@@ -55,4 +56,18 @@ export const getFileByName = async (filename: string) => {
   } catch (error) {
     throw error
   }
+};
+
+export const updateWorkOrderAreas = async (ot_id: string, payload: any) => {
+  const token = await localStorage.getItem('token');
+  if (!token) throw new Error('Token no encontrado');
+
+  const response = await API.patch(`/work-orders/${ot_id}/areas`, payload, {
+    headers: {
+      Authorization: `Bearer ${token}`,
+      'Content-Type': 'application/json',
+    },
+  });
+
+  return response.data;
 };

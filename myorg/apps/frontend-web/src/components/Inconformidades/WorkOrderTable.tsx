@@ -92,10 +92,10 @@ const WorkOrderTable: React.FC<Props> = ({ orders, title, statusFilter }) => {
   const validOrders = Array.isArray(orders) ? orders : [];
   const filteredOrders = validOrders.filter((order) => {
     const statusMatch =
-      order.status.toLowerCase().includes(statusFilter.toLowerCase()) ||
-      order.flow.some((f) =>
-        f.status.toLowerCase().includes(statusFilter.toLowerCase())
-      );
+    order.status.toLowerCase() === statusFilter.toLowerCase() ||
+    order.flow.some((f) =>
+      f.status.toLowerCase() === statusFilter.toLowerCase()
+    );
     const searchMatch = order.ot_id
       .toLowerCase()
       .includes(searchValue.toLowerCase());

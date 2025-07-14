@@ -118,6 +118,10 @@ export default function LaminacionComponent({ formQuestion }: Props) {
             </RadioLabel>
           </RadioGroup>
           <InputGroup style={{ width: '50%', marginTop:'10px'}}>
+            <Label>Valor de Anclaje Obtenido:</Label>
+            <Input type="number" readOnly />
+          </InputGroup>
+          <InputGroup style={{ width: '50%', marginTop:'10px'}}>
             <Label>Muestras entregadas:</Label>
             <Input type="number" readOnly />
           </InputGroup>
