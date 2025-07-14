@@ -217,6 +217,17 @@ export default function EmpalmeComponent({ workOrder }: Props) {
             </tbody>
           </Table>
           <InputGroup style={{ width: '50%' }}>
+            <Label>Valor de Anclaje Obtenido:</Label>
+            <Input
+              type="number"
+              value={
+                workOrder?.answers[index].valor_anclaje ??
+                'No se reconoce la muestra enviada'
+              }
+              readOnly
+            />
+          </InputGroup>
+          <InputGroup style={{ width: '50%' }}>
             <Label>Validar Acabado Vs Orden De Trabajo:</Label>
             <Input
               type="text"

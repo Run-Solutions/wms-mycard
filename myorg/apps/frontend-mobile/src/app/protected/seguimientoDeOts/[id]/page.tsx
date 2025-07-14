@@ -15,7 +15,9 @@ import { InternalStackParamList } from '../../../../navigation/types';
 import {
   fetchWorkOrderById,
   closeWorkOrder,
+  updateWorkOrderAreas,
 } from '../../../../api/seguimientoDeOts';
+import { TextInput } from 'react-native-paper';
 
 type WorkOrderDetailRouteProp = RouteProp<
   InternalStackParamList,
@@ -55,14 +57,109 @@ const WorkOrderDetailScreen: React.FC = () => {
   const navigation = useNavigation();
   const [workOrder, setWorkOrder] = useState<any>(null);
   const [showConfirm, setShowConfirm] = useState(false);
+  const [areas, setAreas] = useState<AreaData[]>([]);
 
   useEffect(() => {
     const loadData = async () => {
       const data = await fetchWorkOrderById(id);
       setWorkOrder(data);
+      const areaData =
+        data?.flow?.map((item: any, index: number) => ({
+          id: item.area_id,
+          name: item.area?.name || 'Sin nombre',
+          status: item.status || 'Desconocido',
+          response: item.areaResponse || {},
+          answers: item.answers?.[0] || {},
+          ...getAreaData(
+            item.area_id,
+            item.areaResponse,
+            item.partialReleases,
+            item.user,
+            index
+          ),
+        })) || [];
+      setAreas(areaData);
     };
     loadData();
   }, [id]);
+
+  const renderCell = (area: AreaData, field: keyof AreaData) => {
+    // 1. Si la orden está cerrada, todo es lectura
+    if (workOrder?.status === 'Cerrado') {
+      return <Text style={styles.cellUser}>{area[field]}</Text>;
+    }
+
+    // 2. Si el área no está Completado, todo es lectura
+    if (area.status !== 'Completado') {
+      return <Text style={styles.cellUser}>{area[field]}</Text>;
+    }
+
+    // 3. Preprensa: solo 'buenas' editable
+    if (area.id === 1) {
+      if (field === 'buenas') {
+        return (
+          <TextInput
+            mode="outlined"
+            activeOutlineColor="#000"
+            value={String(area[field])}
+            keyboardType="numeric"
+            onChangeText={(text) => handleValueChange(area.id, field, text)}
+            style={[styles.input, {height:40}]}
+          />
+        );
+      } else {
+        return <Text style={styles.cellUser}>{area[field]}</Text>;
+      }
+    }
+
+    // 4. CQM solo editable desde Impresión (id >=2)
+    if (field === 'cqm') {
+      if (area.id >= 2) {
+        return (
+          <TextInput
+            mode="outlined"
+            activeOutlineColor="#000"
+            keyboardType="numeric"
+            value={String(area[field])}
+            onChangeText={(text) => handleValueChange(area.id, field, text)}
+            style={[styles.input, {height:40}]}
+          />
+        );
+      } else {
+        return <Text style={styles.cellUser}>{area[field]}</Text>;
+      }
+    }
+
+    // 5. Muestras solo editable desde Corte (id >=6)
+    if (field === 'muestras') {
+      if (area.id >= 6) {
+        return (
+          <TextInput
+            mode="outlined"
+            activeOutlineColor="#000"
+            keyboardType="numeric"
+            value={String(area[field])}
+            onChangeText={(text) => handleValueChange(area.id, field, text)}
+            style={[styles.input, {height:40}]}
+          />
+        );
+      } else {
+        return <Text style={styles.cellUser}>{area[field]}</Text>;
+      }
+    }
+
+    // 6. Resto de campos (buenas, malas, excedente) editables si área Completado
+    return (
+      <TextInput
+        mode="outlined"
+        activeOutlineColor="#000"
+        keyboardType="numeric"
+        value={String(area[field])}
+        onChangeText={(text) => handleValueChange(area.id, field, text)}
+        style={[styles.input, {height:40}]}
+      />
+    );
+  };
 
   // Función para obtener los datos específicos de cada área
   const getAreaData = (
@@ -145,22 +242,6 @@ const WorkOrderDetailScreen: React.FC = () => {
     }
   };
 
-  const areas: AreaData[] =
-    workOrder?.flow?.map((item: any, index: number) => ({
-      id: item.area_id,
-      name: item.area?.name || 'Sin nombre',
-      status: item.status || 'Desconocido',
-      response: item.areaResponse || {},
-      answers: item.answers?.[0] || {},
-      ...getAreaData(
-        item.area_id,
-        item.areaResponse,
-        item.partialReleases,
-        item.user,
-        index
-      ),
-    })) || [];
-
   const cantidadHojasRaw = Number(workOrder?.quantity) / 24;
   const cantidadHojas = cantidadHojasRaw > 0 ? Math.ceil(cantidadHojasRaw) : 0;
   const ultimaArea = areas[areas.length - 1];
@@ -190,6 +271,103 @@ const WorkOrderDetailScreen: React.FC = () => {
     } catch (error) {
       console.error(error);
       Alert.alert('Error', 'No se pudo cerrar la orden.');
+    }
+  };
+
+  const handleValueChange = (
+    areaId: number,
+    field: keyof AreaData,
+    value: string | number
+  ) => {
+    setAreas((prev) =>
+      prev.map((area) =>
+        area.id === areaId ? { ...area, [field]: Number(value) } : area
+      )
+    );
+  };
+
+  const handleSaveChanges = async () => {
+    const payload = {
+      areas: areas
+        .filter((area) => area.status === 'Completado')
+        .map((area) => {
+          // Este mapa relaciona nombre del área con el nombre del bloque en el objeto
+          const blockMap: Record<string, string> = {
+            preprensa: 'prepress',
+            impresion: 'impression',
+            serigrafia: 'serigrafia',
+            empalme: 'empalme',
+            laminacion: 'laminacion',
+            corte: 'corte',
+            coloredge: 'colorEdge',
+            millingchip: 'millingChip',
+            hotstamping: 'hotStamping',
+            personalizacion: 'personalizacion',
+          };
+
+          // Normaliza nombre a minúscula sin espacios
+          const normalizedName = area.name.toLowerCase().replace(/\s/g, '');
+
+          const block = blockMap[normalizedName] || 'otros';
+          const blockId = (area.response as any)?.[block]?.id;
+          const formId = (area.response as any)?.[block]?.form_auditory_id;
+          const cqmId = (area.response as any)?.[block]?.form_answer_id;
+
+          // Prepara los campos que compartes para la mayoría de áreas
+          let data: Record<string, number> = {
+            good_quantity: area.buenas,
+            bad_quantity: area.malas,
+            excess_quantity: area.excedente,
+          };
+          let sample_data: Record<string, number> = {
+            sample_quantity: area.cqm,
+            sample_auditory: area.muestras,
+          };
+
+          // Para áreas con campos específicos
+          if (block === 'prepress') {
+            data = {
+              plates: area.buenas,
+            };
+          }
+          if (
+            ['impression', 'serigrafia', 'laminacion', 'empalme'].includes(
+              block
+            )
+          ) {
+            data = {
+              release_quantity: area.buenas,
+              bad_quantity: area.malas,
+              excess_quantity: area.excedente,
+            };
+            sample_data = {
+              sample_quantity: area.cqm,
+            };
+          }
+
+          return {
+            areaId: area.id,
+            block,
+            blockId,
+            formId,
+            cqmId,
+            data,
+            sample_data,
+          };
+        }),
+    };
+
+    console.log('Payload a enviar:', payload);
+
+    // Aquí haces el fetch
+
+    try {
+      await updateWorkOrderAreas(workOrder.ot_id, payload);
+      Alert.alert('Éxito', 'Cambios guardados correctamente');
+      navigation.goBack();
+    } catch (err) {
+      console.error(err);
+      Alert.alert('Error', 'Error al guardar los cambios');
     }
   };
 
@@ -269,9 +447,9 @@ const WorkOrderDetailScreen: React.FC = () => {
           <View style={styles.row}>
             <Text style={styles.cellLabel}>Buenas</Text>
             {areas.map((area, index) => (
-              <Text key={`${area.id}-buenas-${index}`} style={styles.cellUser}>
-                {area.buenas}
-              </Text>
+              <View key={`${area.id}-buenas-${index}`} style={styles.cellUser}>
+                {renderCell(area, 'buenas')}
+              </View>
             ))}
           </View>
 
@@ -279,9 +457,9 @@ const WorkOrderDetailScreen: React.FC = () => {
           <View style={styles.row}>
             <Text style={styles.cellLabel}>Malas</Text>
             {areas.map((area, index) => (
-              <Text key={`${area.id}-malas-${index}`} style={styles.cellUser}>
-                {area.malas}
-              </Text>
+              <View key={`${area.id}-malas-${index}`} style={styles.cellUser}>
+                {renderCell(area, 'malas')}
+              </View>
             ))}
           </View>
 
@@ -289,12 +467,12 @@ const WorkOrderDetailScreen: React.FC = () => {
           <View style={styles.row}>
             <Text style={styles.cellLabel}>Excedente</Text>
             {areas.map((area, index) => (
-              <Text
+              <View
                 key={`${area.id}-excedente-${index}`}
                 style={styles.cellUser}
               >
-                {area.excedente}
-              </Text>
+                {renderCell(area, 'excedente')}
+              </View>
             ))}
           </View>
 
@@ -302,9 +480,9 @@ const WorkOrderDetailScreen: React.FC = () => {
           <View style={styles.row}>
             <Text style={styles.cellLabel}>CQM</Text>
             {areas.map((area, index) => (
-              <Text key={`${area.id}-cqm-${index}`} style={styles.cellUser}>
-                {area.cqm}
-              </Text>
+              <View key={`${area.id}-cqm-${index}`} style={styles.cellUser}>
+                {renderCell(area, 'cqm')}
+              </View>
             ))}
           </View>
 
@@ -312,12 +490,12 @@ const WorkOrderDetailScreen: React.FC = () => {
           <View style={styles.row}>
             <Text style={styles.cellLabel}>Muestras</Text>
             {areas.map((area, index) => (
-              <Text
+              <View
                 key={`${area.id}-muestras-${index}`}
                 style={styles.cellUser}
               >
-                {area.muestras}
-              </Text>
+                {renderCell(area, 'muestras')}
+              </View>
             ))}
           </View>
 
@@ -385,12 +563,20 @@ const WorkOrderDetailScreen: React.FC = () => {
       )}
 
       {workOrder?.status !== 'Cerrado' && (
+        <>
+        <TouchableOpacity
+          style={styles.buttonSave}
+          onPress={handleSaveChanges}
+        >
+          <Text style={styles.buttonText}>Guardar Cambios</Text>
+        </TouchableOpacity>
         <TouchableOpacity
           style={styles.button}
           onPress={() => setShowConfirm(true)}
         >
           <Text style={styles.buttonText}>Cerrar Orden de Trabajo</Text>
         </TouchableOpacity>
+        </>
       )}
 
       <Modal visible={showConfirm} transparent animationType="fade">
@@ -499,9 +685,19 @@ const styles = StyleSheet.create({
     paddingHorizontal: 10,
     textAlign: 'center',
   },
-
+  input: {
+    width: 80,
+    marginVertical: 4,
+  },
   button: {
     backgroundColor: '#0038A8',
+    padding: 12,
+    borderRadius: 18,
+    alignItems: 'center',
+    marginBottom: 20,
+  },
+  buttonSave: {
+    backgroundColor: '#A9A9A9',
     padding: 12,
     borderRadius: 18,
     alignItems: 'center',

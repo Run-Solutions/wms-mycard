@@ -1,4 +1,5 @@
-import { IsInt, IsNotEmpty, IsString, IsArray, IsOptional } from "class-validator";
+import { IsInt, IsNumber, IsNotEmpty, IsString, IsArray, IsOptional, ValidateNested } from "class-validator";
+import { Type } from 'class-transformer';
 
 export class CreateWorkOrderDto {
     @IsString()
@@ -31,3 +32,38 @@ export class CreateWorkOrderDto {
     @IsInt({ each: true })
     areasOperatorIds: number[];
 }
+
+export class SampleDataDto {
+  @IsOptional()
+  @IsNumber()
+  sample_quantity?: number;
+  
+  @IsOptional()
+  @IsNumber()
+  sample_auditory?: number;
+}
+
+export class UpdateAreaDataDto {
+  block: string;
+
+  blockId: number;
+
+  @IsOptional()
+  formId?: number;
+
+  @IsOptional()
+  cqmId?: number;
+
+  data: Record<string, any>;
+
+  @ValidateNested()
+  @Type(() => SampleDataDto)
+  sample_data: SampleDataDto;
+}
+
+  export class UpdateWorkOrderAreasDto {
+    @IsArray()
+    @ValidateNested({ each: true })
+    @Type(() => UpdateAreaDataDto)
+    areas: UpdateAreaDataDto[];
+  }

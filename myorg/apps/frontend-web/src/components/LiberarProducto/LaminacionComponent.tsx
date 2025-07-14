@@ -22,6 +22,7 @@ export default function LaminacionComponent({ workOrder }: Props) {
   const router = useRouter();
   const [otherValue, setOtherValue] = useState('');
   const [selectedOption, setSelectedOption] = useState('');
+  const [valorAnclaje, setValorAnclaje] = useState('');
   // Para habilitar entre las opciones en caso de que sea otro
   const handleOptionChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     setSelectedOption(e.target.value);
@@ -203,6 +204,11 @@ export default function LaminacionComponent({ workOrder }: Props) {
       alert('Por favor, ingresa una cantidad de muestra válida.');
       return;
     }
+    const valorAnclajeNum = Number(valorAnclaje);
+    if (isNaN(valorAnclajeNum) || valorAnclajeNum < 0) {
+      alert('Por favor, ingresa un valor de anclaje numérico valido.');
+      return;
+    }
     if (responses.length === 0) {
       alert('Por favor, selecciona al menos una respuesta antes de enviar.');
       return;
@@ -218,6 +224,7 @@ export default function LaminacionComponent({ workOrder }: Props) {
       sample_quantity: Number(sampleQuantity),
       finish_validation:
         selectedOption === 'otro' ? otherValue : selectedOption,
+      valor_anclaje: valorAnclaje,
     };
     try {
       await submitToCQMLaminacion(payload);
@@ -539,6 +546,16 @@ export default function LaminacionComponent({ workOrder }: Props) {
                   style={{ marginTop: '10px' }}
                 />
               )}
+            </InputGroup>
+            <InputGroup style={{ paddingTop: '30px' }}>
+              <Label>Valor de Anclaje Obtenido:</Label>
+              <Input
+                type="number"
+                min={0}
+                placeholder="Ej: 2"
+                value={valorAnclaje}
+                onChange={(e) => setValorAnclaje(e.target.value)}
+              />
             </InputGroup>
             <InputGroup style={{ paddingTop: '30px' }}>
               <Label>Muestras:</Label>

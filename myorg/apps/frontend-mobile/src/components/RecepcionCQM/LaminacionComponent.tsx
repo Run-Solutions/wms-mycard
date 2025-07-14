@@ -182,7 +182,7 @@ const LaminacionComponent = ({ workOrder }: { workOrder: any }) => {
         );
       })}
 
-      {/* Muestras */}
+      {/* Respuestas libres */}
       <Text style={styles.label}>Validar Acabado Vs Orden De Trabajo:</Text>
       <TextInput
         style={styles.input}
@@ -191,6 +191,18 @@ const LaminacionComponent = ({ workOrder }: { workOrder: any }) => {
         activeOutlineColor="#000"
         value={
           workOrder?.answers[index].finish_validation ??
+          'No se reconoce la muestra enviada'
+        }
+        editable={false}
+      />
+      <Text style={styles.label}>Valor de Anclaje Obtenido:</Text>
+      <TextInput
+        style={styles.input}
+        theme={{ roundness: 30 }}
+        mode="outlined"
+        activeOutlineColor="#000"
+        value={
+          workOrder?.answers[index].valor_anclaje ??
           'No se reconoce la muestra enviada'
         }
         editable={false}

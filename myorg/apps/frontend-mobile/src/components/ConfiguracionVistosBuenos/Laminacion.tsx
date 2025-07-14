@@ -90,6 +90,15 @@ export default function Laminacion({ formQuestion }: Props) {
         <Text>◯ Otro</Text>
       </View>
 
+      <Text style={styles.label}>Valor de Anclaje Obtenido:</Text>
+      <TextInput
+        style={styles.input}
+        theme={{ roundness: 30 }}
+        mode="outlined"
+        activeOutlineColor="#000"
+        editable={false}
+      />
+      
       <Text style={styles.label}>Muestras entregadas:</Text>
       <TextInput
         style={styles.input}

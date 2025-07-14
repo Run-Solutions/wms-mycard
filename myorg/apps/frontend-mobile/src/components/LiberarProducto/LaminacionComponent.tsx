@@ -37,6 +37,7 @@ const LaminacionComponent = ({ workOrder }: { workOrder: any }) => {
   const [showQuality, setShowQuality] = useState<boolean>(false);
   const [value, setValue] = useState('');
   const [otherValue, setOtherValue] = useState('');
+  const [valorAnclaje, setValorAnclaje] = useState('');
 
   const questions =
     workOrder.area.formQuestions?.filter((q: any) => q.role_id === null) || [];
@@ -98,6 +99,11 @@ const LaminacionComponent = ({ workOrder }: { workOrder: any }) => {
       Alert.alert('Cantidad de muestra inválida');
       return;
     }
+    const valorAnclajeNum = Number(valorAnclaje);
+    if (isNaN(valorAnclajeNum) || valorAnclajeNum < 0) {
+      alert('Por favor, ingresa un valor de anclaje numérico valido.');
+      return;
+    }
     const isFrenteVueltaValid =
       checkedQuestion.length > 0 || checkedQuestion.length > 0;
     if (!questions.length || !isFrenteVueltaValid) {
@@ -119,6 +125,7 @@ const LaminacionComponent = ({ workOrder }: { workOrder: any }) => {
       user_id: currentFlow.assigned_user,
       sample_quantity: Number(sampleQuantity),
       finish_validation: value === 'otro' ? otherValue : value,
+      valor_anclaje: valorAnclaje,
     };
 
     try {
@@ -446,6 +453,18 @@ const LaminacionComponent = ({ workOrder }: { workOrder: any }) => {
               />
             )}
 
+            {/* Preguntas */}
+            <Text style={styles.label}>Valor de Anclaje Obtenido:</Text>
+            <TextInput
+              style={styles.input}
+              theme={{ roundness: 30 }}
+              mode="outlined"
+              activeOutlineColor="#000"
+              keyboardType="numeric"
+              placeholder="Ej: 2"
+              value={valorAnclaje.toString()}
+              onChangeText={(text) => setValorAnclaje(text)}
+            />
             {/* Muestras */}
             <Text style={styles.label}>Muestras:</Text>
             <TextInput

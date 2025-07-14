@@ -251,6 +251,8 @@ model PrepressResponse {
   id                     Int                      @id @default(autoincrement())
   plates                 Int                      // Placas
   positives              Int                      // Positivos
+  bad_quantity           Int?      
+  excess_quantity        Int?   
   testType               String                   // Tipo de prueba: "color" | "fisica" | "digital"
   comments               String?                  // Comentarios opcionales
 
@@ -268,6 +270,8 @@ model PrepressResponse {
 model ImpressionResponse {
   id                     Int                      @id @default(autoincrement())
   release_quantity       Int                      // Cantidad a liberar
+  bad_quantity           Int?      
+  excess_quantity        Int?   
   comments               String?                  // Comentarios opcionales
 
   created_at             DateTime                 @default(now()) @map("created_at")
@@ -284,6 +288,8 @@ model ImpressionResponse {
 model SerigrafiaResponse {
   id                     Int                      @id @default(autoincrement())
   release_quantity       Int                      // Cantidad a liberar
+  bad_quantity           Int?      
+  excess_quantity        Int?   
   comments               String?                  // Comentarios opcionales
 
   created_at             DateTime                 @default(now()) @map("created_at")
@@ -300,6 +306,8 @@ model SerigrafiaResponse {
 model EmpalmeResponse {
   id                     Int                      @id @default(autoincrement())
   release_quantity       Int                      // Cantidad a liberar
+  bad_quantity           Int?      
+  excess_quantity        Int?   
   comments               String?                  // Comentarios opcionales
 
   created_at             DateTime                 @default(now()) @map("created_at")
@@ -316,6 +324,8 @@ model EmpalmeResponse {
 model LaminacionResponse {
   id                     Int                      @id @default(autoincrement())
   release_quantity       Int                      // Cantidad a liberar
+  bad_quantity           Int?      
+  excess_quantity        Int?   
   comments               String?                  // Comentarios opcionales
 
   created_at             DateTime                 @default(now()) @map("created_at")
@@ -481,6 +491,7 @@ model FormAnswer {
 
   sample_quantity            Int?
   finish_validation          String?
+  valor_anclaje              String?
   testtype_cqm               String?
   magnetic_band              String?
   track_type                 String?

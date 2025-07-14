@@ -1,7 +1,7 @@
 /* myorg\apps\backend\src\modules\work-order\work-order.service.ts */
-import { Injectable } from '@nestjs/common';
+import { Injectable, BadRequestException } from '@nestjs/common';
 import { PrismaService } from 'prisma/prisma.service';
-import { CreateWorkOrderDto } from './dto/create-work-order.dto';
+import { CreateWorkOrderDto, UpdateAreaDataDto } from './dto/create-work-order.dto';
 
 @Injectable()
 export class WorkOrderService {
@@ -338,5 +338,133 @@ export class WorkOrderService {
       });
       return { message: 'Respuesta guardada con exito' };
     });
+  }
+  
+  async updateWorkOrderAreas(workOrderId: string, areas: UpdateAreaDataDto[], /*_userId: number*/) {
+    for (const area of areas) {
+      const { block, blockId, data, sample_data, formId, cqmId } = area;
+      if (!block || !blockId) {
+        throw new BadRequestException(`Faltan datos en el área: ${JSON.stringify(area)}`);
+      }
+      switch (block){
+        case 'prepress':
+          await this.prisma.prepressResponse.update({
+            where: { id: blockId },
+            data: { ...data}
+          })
+          break;
+        case 'impression':
+          await this.prisma.impressionResponse.update({
+            where: { id: blockId },
+            data: { ...data}
+          })
+          await this.prisma.formAnswer.update({
+            where: { id: cqmId },
+            data: { ...sample_data}
+          })
+          break;
+        case 'serigrafia':
+          await this.prisma.serigrafiaResponse.update({
+            where: { id: blockId },
+            data: { ...data}
+          })
+          await this.prisma.formAnswer.update({
+            where: { id: cqmId },
+            data: { ...sample_data}
+          })
+          break;
+        case 'empalme':
+          await this.prisma.empalmeResponse.update({
+            where: { id: blockId },
+            data: { ...data}
+          })
+          await this.prisma.formAnswer.update({
+            where: { id: cqmId },
+            data: { ...sample_data}
+          })
+          break;
+        case 'laminacion':
+          await this.prisma.laminacionResponse.update({
+            where: { id: blockId },
+            data: { ...data}
+          })
+          await this.prisma.formAnswer.update({
+            where: { id: cqmId },
+            data: { ...sample_data}
+          })
+          break;
+        case 'corte':
+          await this.prisma.corteResponse.update({
+            where: { id: blockId },
+            data: { ...data}
+          })
+          await this.prisma.formAnswer.update({
+            where: { id: cqmId },
+            data: { sample_quantity: sample_data.sample_quantity }
+          })
+          await this.prisma.formAuditory.update({
+            where: { id: formId },
+            data: { sample_auditory: sample_data.sample_auditory }
+          })
+          break;
+        case 'colorEdge':
+          await this.prisma.colorEdgeResponse.update({
+            where: { id: blockId },
+            data: { ...data}
+          })
+          await this.prisma.formAnswer.update({
+            where: { id: cqmId },
+            data: { sample_quantity: sample_data.sample_quantity }
+          })
+          await this.prisma.formAuditory.update({
+            where: { id: formId },
+            data: { sample_auditory: sample_data.sample_auditory }
+          })
+          break;
+        case 'millingChip':
+          await this.prisma.millingChipResponse.update({
+            where: { id: blockId },
+            data: { ...data}
+          })
+          await this.prisma.formAnswer.update({
+            where: { id: cqmId },
+            data: { sample_quantity: sample_data.sample_quantity }
+          })
+          await this.prisma.formAuditory.update({
+            where: { id: formId },
+            data: { sample_auditory: sample_data.sample_auditory }
+          })
+          break;
+        case 'hotStamping':
+          await this.prisma.hotStampingResponse.update({
+            where: { id: blockId },
+            data: { ...data}
+          })
+          await this.prisma.formAnswer.update({
+            where: { id: cqmId },
+            data: { sample_quantity: sample_data.sample_quantity }
+          })
+          await this.prisma.formAuditory.update({
+            where: { id: formId },
+            data: { sample_auditory: sample_data.sample_auditory }
+          })
+          break;
+        case 'personalizacion':
+          await this.prisma.personalizacionResponse.update({
+            where: { id: blockId },
+            data: { ...data}
+          })
+          await this.prisma.formAnswer.update({
+            where: { id: cqmId },
+            data: { sample_quantity: sample_data.sample_quantity }
+          })
+          await this.prisma.formAuditory.update({
+            where: { id: formId },
+            data: { sample_auditory: sample_data.sample_auditory }
+          })
+          break;
+      }
+    }
+    return { success: true, message: 'Cambios aplicados correctamente' };
   }
 }

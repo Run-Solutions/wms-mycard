@@ -4,7 +4,11 @@
 import { use, useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import styled from 'styled-components';
-import { fetchWorkOrderById, closeWorkOrder } from '@/api/seguimientoDeOts';
+import {
+  fetchWorkOrderById,
+  closeWorkOrder,
+  updateWorkOrderAreas,
+} from '@/api/seguimientoDeOts';
 
 interface Props {
   params: Promise<{ id: string }>;
@@ -15,6 +19,16 @@ type AreaData = {
   name: string;
   status: string;
   response: {
+    prepress: { id: number };
+    impression: { id: number };
+    serigrafia: { id: number };
+    empalme: { id: number };
+    laminacion: { id: number };
+    corte: { id: number };
+    colorEdge: { id: number };
+    millingChip: { id: number };
+    hotStamping: { id: number };
+    personalizacion: { id: number };
     user: {
       username: string;
     };
@@ -34,11 +48,28 @@ export default function SeguimientoDeOtsAuxPage({ params }: Props) {
   const router = useRouter();
   const [workOrder, setWorkOrder] = useState<any>(null);
   const [showConfirm, setShowConfirm] = useState(false);
+  const [areas, setAreas] = useState<AreaData[]>([]);
 
   useEffect(() => {
     const loadData = async () => {
       const data = await fetchWorkOrderById(id);
       setWorkOrder(data);
+      const areaData =
+        data?.flow?.map((item: any, index: number) => ({
+          id: item.area_id,
+          name: item.area?.name || 'Sin nombre',
+          status: item.status || 'Desconocido',
+          response: item.areaResponse || {},
+          answers: item.answers?.[0] || {},
+          ...getAreaData(
+            item.area_id,
+            item.areaResponse,
+            item.partialReleases,
+            item.user,
+            index
+          ),
+        })) || [];
+      setAreas(areaData);
     };
     loadData();
   }, [id]);
@@ -50,6 +81,96 @@ export default function SeguimientoDeOtsAuxPage({ params }: Props) {
     } catch (error) {
       console.log('Error al enviar datos:', error);
     }
+  };
+
+  const renderCell = (area: AreaData, field: keyof AreaData) => {
+    // 1. Si la orden está cerrada, todo es lectura
+    if (workOrder?.status === 'Cerrado') {
+      return <span>{area[field]}</span>;
+    }
+
+    // 2. Si el área no está en Completado, todo es lectura
+    if (area.status !== 'Completado') {
+      return <span>{area[field]}</span>;
+    }
+
+    // 3. Preprensa: solo 'buenas' editable
+    if (area.id === 1) {
+      if (field === 'buenas') {
+        return (
+          <input
+            type="number"
+            value={area[field]}
+            min={0}
+            onChange={(e) => handleValueChange(area.id, field, e.target.value)}
+            style={{
+              width: '80px',
+              padding: '4px',
+              textAlign: 'center',
+            }}
+          />
+        );
+      } else {
+        return <span>{area[field]}</span>;
+      }
+    }
+
+    // 4. CQM solo editable de Impresión en adelante (id >=2)
+    if (field === 'cqm') {
+      if (area.id >= 2) {
+        return (
+          <input
+            type="number"
+            value={area[field]}
+            min={0}
+            onChange={(e) => handleValueChange(area.id, field, e.target.value)}
+            style={{
+              width: '80px',
+              padding: '4px',
+              textAlign: 'center',
+            }}
+          />
+        );
+      } else {
+        return <span>{area[field]}</span>;
+      }
+    }
+
+    // 5. Muestras solo editable de Corte en adelante (id >=6)
+    if (field === 'muestras') {
+      if (area.id >= 6) {
+        return (
+          <input
+            type="number"
+            value={area[field]}
+            min={0}
+            onChange={(e) => handleValueChange(area.id, field, e.target.value)}
+            style={{
+              width: '80px',
+              padding: '4px',
+              textAlign: 'center',
+            }}
+          />
+        );
+      } else {
+        return <span>{area[field]}</span>;
+      }
+    }
+
+    // 6. El resto de campos (buenas, malas, excedente) editables si el área está en Completado
+    return (
+      <input
+        type="number"
+        value={area[field]}
+        min={0}
+        onChange={(e) => handleValueChange(area.id, field, e.target.value)}
+        style={{
+          width: '80px',
+          padding: '4px',
+          textAlign: 'center',
+        }}
+      />
+    );
   };
 
   // Función para obtener los datos específicos de cada área
@@ -134,27 +255,13 @@ export default function SeguimientoDeOtsAuxPage({ params }: Props) {
     }
   };
 
-  const areas: AreaData[] =
-    workOrder?.flow?.map((item: any, index: number) => ({
-      id: item.area_id,
-      name: item.area?.name || 'Sin nombre',
-      status: item.status || 'Desconocido',
-      response: item.areaResponse || {},
-      answers: item.answers?.[0] || {},
-      ...getAreaData(
-        item.area_id,
-        item.areaResponse,
-        item.partialReleases,
-        item.user,
-        index
-      ),
-    })) || [];
-
   const cantidadHojasRaw = Number(workOrder?.quantity) / 24;
   const cantidadHojas = cantidadHojasRaw > 0 ? Math.ceil(cantidadHojasRaw) : 0;
   const ultimaArea = areas[areas.length - 1];
   const totalMalas = areas.reduce((acc, area) => acc + (area.malas || 0), 0);
-  const totalCqm = areas.filter((area) => area.id >= 6).reduce((acc, area) => acc + (area.cqm || 0), 0);
+  const totalCqm = areas
+    .filter((area) => area.id >= 6)
+    .reduce((acc, area) => acc + (area.cqm || 0), 0);
   const totalMuestras = areas.reduce(
     (acc, area) => acc + (area.muestras || 0),
     0
@@ -168,6 +275,102 @@ export default function SeguimientoDeOtsAuxPage({ params }: Props) {
     totalMalas +
     totalCqm +
     totalMuestras;
+
+  const handleValueChange = (
+    areaId: number,
+    field: keyof AreaData,
+    value: string | number
+  ) => {
+    setAreas((prev) =>
+      prev.map((area) =>
+        area.id === areaId ? { ...area, [field]: Number(value) } : area
+      )
+    );
+  };
+
+  const handleSaveChanges = async () => {
+    const payload = {
+      areas: areas
+        .filter((area) => area.status === 'Completado')
+        .map((area) => {
+          // Este mapa relaciona nombre del área con el nombre del bloque en el objeto
+          const blockMap: Record<string, string> = {
+            preprensa: 'prepress',
+            impresion: 'impression',
+            serigrafia: 'serigrafia',
+            empalme: 'empalme',
+            laminacion: 'laminacion',
+            corte: 'corte',
+            coloredge: 'colorEdge',
+            millingchip: 'millingChip',
+            hotstamping: 'hotStamping',
+            personalizacion: 'personalizacion',
+          };
+
+          // Normaliza nombre a minúscula sin espacios
+          const normalizedName = area.name.toLowerCase().replace(/\s/g, '');
+
+          const block = blockMap[normalizedName] || 'otros';
+          const blockId = (area.response as any)?.[block]?.id;
+          const formId = (area.response as any)?.[block]?.form_auditory_id;
+          const cqmId = (area.response as any)?.[block]?.form_answer_id;
+
+          // Prepara los campos que compartes para la mayoría de áreas
+          let data: Record<string, number> = {
+            good_quantity: area.buenas,
+            bad_quantity: area.malas,
+            excess_quantity: area.excedente,
+          };
+          let sample_data: Record<string, number> = {
+            sample_quantity: area.cqm,
+            sample_auditory: area.muestras,
+          };
+
+          // Para áreas con campos específicos
+          if (block === 'prepress') {
+            data = {
+              plates: area.buenas,
+            };
+          }
+          if (
+            ['impression', 'serigrafia', 'laminacion', 'empalme'].includes(
+              block
+            )
+          ) {
+            data = {
+              release_quantity: area.buenas,
+              bad_quantity: area.malas,
+              excess_quantity: area.excedente,
+            };
+            sample_data = {
+              sample_quantity: area.cqm,
+            };
+          }
+
+          return {
+            areaId: area.id,
+            block,
+            blockId,
+            formId,
+            cqmId,
+            data,
+            sample_data,
+          };
+        }),
+    };
+
+    console.log('Payload a enviar:', payload);
+
+    // Aquí haces el fetch
+
+    try {
+      await updateWorkOrderAreas(workOrder.ot_id, payload);
+      alert('Cambios guardados correctamente');
+    } catch (err) {
+      console.error(err);
+      alert('Error al guardar los cambios');
+    }
+  };
 
   return (
     <>
@@ -240,31 +443,41 @@ export default function SeguimientoDeOtsAuxPage({ params }: Props) {
                 <tr>
                   <td>Buenas</td>
                   {areas.map((area, index) => (
-                    <td key={`${area.id}-${index}`}>{area.buenas}</td>
+                    <td key={`${area.id}-${index}`}>
+                      {renderCell(area, 'buenas')}
+                    </td>
                   ))}
                 </tr>
                 <tr>
                   <td>Malas</td>
                   {areas.map((area, index) => (
-                    <td key={`${area.id}-${index}`}>{area.malas}</td>
+                    <td key={`${area.id}-${index}`}>
+                      {renderCell(area, 'malas')}
+                    </td>
                   ))}
                 </tr>
                 <tr>
                   <td>Excedente</td>
                   {areas.map((area, index) => (
-                    <td key={`${area.id}-${index}`}>{area.excedente}</td>
+                    <td key={`${area.id}-${index}`}>
+                      {renderCell(area, 'excedente')}
+                    </td>
                   ))}
                 </tr>
                 <tr>
                   <td>CQM</td>
                   {areas.map((area, index) => (
-                    <td key={`${area.id}-${index}`}>{area.cqm}</td>
+                    <td key={`${area.id}-${index}`}>
+                      {renderCell(area, 'cqm')}
+                    </td>
                   ))}
                 </tr>
                 <tr>
                   <td>Muestras</td>
                   {areas.map((area, index) => (
-                    <td key={`${area.id}-${index}`}>{area.muestras}</td>
+                    <td key={`${area.id}-${index}`}>
+                      {renderCell(area, 'muestras')}
+                    </td>
                   ))}
                 </tr>
                 <tr>
@@ -339,10 +552,14 @@ export default function SeguimientoDeOtsAuxPage({ params }: Props) {
               </TableWrapper>
             </>
           )}
+
           {workOrder?.status !== 'Cerrado' && (
-            <CloseButton onClick={() => setShowConfirm(true)}>
-              Cerrar Orden de Trabajo
-            </CloseButton>
+            <>
+              <SaveButton onClick={handleSaveChanges}>Guardar Cambios</SaveButton>
+              <CloseButton onClick={() => setShowConfirm(true)}>
+                Cerrar Orden de Trabajo
+              </CloseButton>
+            </>
           )}
         </Section>
       </Container>
@@ -476,6 +693,23 @@ const TableCuadres = styled.table`
 
   tr:nth-child(even) {
     background: #fafafa;
+  }
+`;
+
+const SaveButton = styled.button`
+  background-color: #A9A9A9;
+  color: white;
+  padding: 0.9rem 1.5rem;
+  margin-right: 1rem;
+  border: none;
+  border-radius: 0.75rem;
+  font-size: 1rem;
+  cursor: pointer;
+  box-shadow: 0 3px 6px rgba(0, 0, 0, 0.08);
+  transition: background 0.3s;
+
+  &:hover {
+    background: #1d4ed8;
   }
 `;
 

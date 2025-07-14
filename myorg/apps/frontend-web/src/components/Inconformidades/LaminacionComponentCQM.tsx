@@ -97,6 +97,10 @@ export default function LaminacionComponentCQM({ workOrder }: Props) {
             <Input type="text" value={workOrder?.answers[index].finish_validation ?? 'No se reconoce la muestra enviada' } readOnly />
           </InputGroup>
           <InputGroup style={{ marginTop: '-7rem'}}>
+              <Label>Valor de Anclaje Obtenido:</Label>
+              <Input type="number" value={workOrder?.answers[index].valor_anclaje ?? 'No se reconoce la muestra enviada' } readOnly />
+          </InputGroup>
+          <InputGroup style={{ marginTop: '-7rem'}}>
               <Label>Muestras entregadas:</Label>
               <Input type="number" value={workOrder?.answers[index].sample_quantity ?? 'No se reconoce la muestra enviada' } readOnly />
           </InputGroup>
