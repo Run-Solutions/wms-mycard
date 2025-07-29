@@ -11,12 +11,13 @@ import AceptarProductoScreen from '../app/protected/aceptarProducto/page';
 import LiberarProductoScreen from '../app/protected/liberarProducto/page';
 import InconformidadesScreen from '../app/protected/inconformidades/page';
 // Para calidad
-import VistosBuenosScreen from '../app/protected/vistosBuenos/page';
-import RecepcionCQMScreen from '../app/protected/recepcionCqm/page';
+import RecepcionDeVistosBuenosScreen from '../app/protected/recepcionDeVistosBuenos/page';
+import LiberacionDeVistosBuenosScreen from '../app/protected/liberacionDeVistosBuenos/page';
 import ConfiguracionVistosBuenosScreen from '../app/protected/configuracionVistosBuenos/page';
 // Para auditor
 import AceptarAuditoriaScreen from '../app/protected/aceptarAuditoria/page';
 import CerrarOrdenDeTrabajoScreen from '../app/protected/cerrarOrdenDeTrabajo/page';
+import RechazosScreen from '../app/protected/rechazos/page';
 
 export type ModuleFromApi = {
   id: number;
@@ -74,14 +75,14 @@ export const MODULE_CONFIG: ModuleConfig[] = [
     component: InconformidadesScreen,
   },
   {
-    name: 'Vistos Buenos',
-    route: 'vistosBuenos',
-    component: VistosBuenosScreen,
+    name: 'Recepcion de Vistos Buenos',
+    route: 'recepcionDeVistosBuenos',
+    component: RecepcionDeVistosBuenosScreen,
   },
   {
-    name: 'Recepcion CQM',
-    route: 'recepcionCQM',
-    component: RecepcionCQMScreen,
+    name: 'Liberacion de Vistos Buenos',
+    route: 'liberacionDeVistosBuenos',
+    component: LiberacionDeVistosBuenosScreen,
   },
   {
     name: 'Configuracion Vistos Buenos',
@@ -98,4 +99,9 @@ export const MODULE_CONFIG: ModuleConfig[] = [
     route: 'cerrarOrdenDeTrabajo',
     component: CerrarOrdenDeTrabajoScreen,
   },
+  {
+    name: 'Rechazos',
+    route: 'rechazos',
+    component: RechazosScreen,
+  }
 ];

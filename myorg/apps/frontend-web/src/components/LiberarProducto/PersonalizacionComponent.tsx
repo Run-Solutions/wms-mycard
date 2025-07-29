@@ -1,12 +1,13 @@
 'use client';
 
 import { useRouter } from 'next/navigation';
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
 import styled from 'styled-components';
 import {
   submitToCQMPersonalizacion,
   releaseProductFromPersonalizacion,
 } from '@/api/liberarProducto';
+import { updateWorkOrderAreas } from '@/api/seguimientoDeOts';
 import { useAuthContext } from '@/context/AuthContext';
 import { calcularCantidadPorLiberar } from './util/calcularCantidadPorLiberar';
 
@@ -26,6 +27,12 @@ export default function PersonalizacionComponent({ workOrder }: Props) {
   const openModal = () => {
     setShowModal(true);
   };
+  const [showBadQuantity, setShowBadQuantity] = useState(false);
+  const [areaBadQuantities, setAreaBadQuantities] = useState<{
+    [areaName: string]: string;
+  }>({});
+  const [materialBadQuantity, setMaterialBadQuantity] = useState<string>('0');
+  const [lastAreaBadQuantity, setLastBadQuantity] = useState<string>('0');
   const closeModal = () => {
     setShowModal(false);
   };
@@ -34,6 +41,9 @@ export default function PersonalizacionComponent({ workOrder }: Props) {
       'Enviado a CQM',
       'En Calidad',
       'Parcial',
+      'Enviado a auditoria parcial',
+      'Pendiente',
+      'Pendiente parcial',
       'En proceso',
     ];
     const nextInvalidStatuses = [
@@ -41,6 +51,9 @@ export default function PersonalizacionComponent({ workOrder }: Props) {
       'Listo',
       'En Calidad',
       'Enviado a auditoria parcial',
+      'Pendiente',
+      'Parcial',
+      'Pendiente parcial',
       'En inconformidad CQM',
     ];
     const nextCorteStatuses = ['Enviado a auditoria parcial'];
@@ -71,7 +84,10 @@ export default function PersonalizacionComponent({ workOrder }: Props) {
       'Enviado a CQM',
       'En Calidad',
       'Listo',
+      'Pendiente',
+      'Pendiente parcial',
       'Enviado a auditoria parcial',
+      'En inconformidad CQM',
       'Enviado a Auditoria',
     ];
     const statusesToCheck = [
@@ -288,7 +304,8 @@ export default function PersonalizacionComponent({ workOrder }: Props) {
       assignedUser: currentFlow.assigned_user,
       releaseQuantity: Number(sampleQuantity),
       goodQuantity: Number(goodQuantity),
-      badQuantity: Number(badQuantity),
+      badQuantity: Number(lastAreaBadQuantity),
+      materialBadQuantity: Number(materialBadQuantity),
       excessQuantity: Number(excessQuantity),
       comments: document.querySelector('textarea')?.value || '',
       formAnswerId: currentFlow.answers[0].id,
@@ -309,6 +326,180 @@ export default function PersonalizacionComponent({ workOrder }: Props) {
     lastCompletedOrPartial
   );
   console.log('Cantidad final por liberar:', cantidadporliberar);
+
+  const previousFlows = flowList
+    .slice(0, currentIndex + 1)
+    .filter((flow) => flow.area_id !== 1);
+
+  console.log('Áreas anteriores sin Preprensa:', previousFlows);
+
+  const handleOpenBadQuantityModal = () => {
+    const initialValues: { [areaName: string]: string } = {};
+
+    previousFlows.forEach((flow) => {
+      const areaName = flow.area.name;
+
+      let badQuantity: number | null | undefined = null;
+      let materialBadQuantity: number | null | undefined = null;
+
+      // Primero, busca en areaResponse
+      if (flow.areaResponse?.impression) {
+        badQuantity = flow.areaResponse.impression.bad_quantity;
+      } else if (flow.areaResponse?.serigrafia) {
+        badQuantity = flow.areaResponse.serigrafia.bad_quantity;
+      } else if (flow.areaResponse?.laminacion) {
+        badQuantity = flow.areaResponse.laminacion.bad_quantity;
+      } else if (flow.areaResponse?.corte) {
+        badQuantity = flow.areaResponse.corte.bad_quantity;
+        materialBadQuantity = flow.areaResponse.corte.material_quantity;
+      } else if (flow.areaResponse?.colorEdge) {
+        badQuantity = flow.areaResponse.colorEdge.bad_quantity;
+        materialBadQuantity = flow.areaResponse.colorEdge.material_quantity;
+      } else if (flow.areaResponse?.colorEdge) {
+        badQuantity = flow.areaResponse.hotStamping.bad_quantity;
+        materialBadQuantity = flow.areaResponse.hotStamping.material_quantity;
+      } else if (flow.areaResponse?.millingChip) {
+        badQuantity = flow.areaResponse.millingChip.bad_quantity;
+        materialBadQuantity = flow.areaResponse.millingChip.material_quantity;
+      } else if (flow.areaResponse?.personalizacion) {
+        badQuantity = flow.areaResponse.personalizacion.bad_quantity;
+        materialBadQuantity =
+          flow.areaResponse.personalizacion.material_quantity;
+      }
+
+      // Si sigue sin valor, busca en partialReleases
+      if (
+        (badQuantity === null || badQuantity === undefined) &&
+        flow.partialReleases?.length > 0
+      ) {
+        badQuantity = flow.partialReleases.reduce(
+          (sum: number, release: any) => {
+            return sum + (release.bad_quantity ?? 0);
+          },
+          0
+        );
+        materialBadQuantity = flow.partialReleases.reduce(
+          (sum: number, release: any) => {
+            return sum + (release.material_quantity ?? 0);
+          },
+          0
+        );
+      }
+      initialValues[`${areaName}_bad`] =
+        badQuantity !== null && badQuantity !== undefined
+          ? String(badQuantity)
+          : '';
+
+      initialValues[`${areaName}_material`] =
+        materialBadQuantity !== null && materialBadQuantity !== undefined
+          ? String(materialBadQuantity)
+          : '';
+    });
+
+    setAreaBadQuantities(initialValues);
+    setShowBadQuantity(true);
+    console.log('Valores iniciales para malas por área:', initialValues);
+  };
+
+  const handleSaveChanges = async () => {
+    const payload = {
+      areas: previousFlows.flatMap((flow) => {
+        const areaName = flow.area.name.toLowerCase();
+
+        const blockMap: Record<string, string> = {
+          impresion: 'impression',
+          serigrafia: 'serigrafia',
+          laminacion: 'laminacion',
+          empalme: 'empalme',
+        };
+
+        const block = blockMap[areaName] || 'otros';
+        if (block === 'otros') {
+          return []; // Descarta si no es bloque conocido
+        }
+
+        const blockData = flow.areaResponse?.[block];
+        const blockId = blockData?.id || null;
+        const formId = blockData?.form_auditory_id || null;
+        const cqmId = blockData?.form_answer_id || null;
+
+        const badKey = `${areaName}_bad`;
+        const materialKey = `${areaName}_material`;
+
+        const bad_quantity = Number(areaBadQuantities[badKey] || 0);
+        const material_quantity =
+          flow.area.id > 6
+            ? Number(areaBadQuantities[materialKey] || 0)
+            : undefined;
+
+        return {
+          areaId: flow.area_id,
+          block,
+          blockId,
+          formId,
+          cqmId,
+          data: {
+            bad_quantity,
+            ...(material_quantity !== undefined && { material_quantity }),
+          },
+        };
+      }),
+    };
+
+    console.log('Payload a enviar:', payload);
+
+    try {
+      await updateWorkOrderAreas(workOrder.workOrder.ot_id, payload);
+      alert('Cambios guardados correctamente');
+    } catch (err) {
+      console.error(err);
+      alert('Error al guardar los cambios');
+    }
+  };
+
+  const sumaBadQuantity = useMemo(() => {
+    return previousFlows.reduce((sum, flow) => {
+      const areaKey = flow.area.name.toLowerCase();
+
+      // Leer del input del usuario
+      const userBad = areaBadQuantities[`${areaKey}_bad`];
+      const userMaterial = areaBadQuantities[`${areaKey}_material`];
+
+      // Valores numéricos o null
+      const bad =
+        userBad !== undefined && userBad !== '' ? Number(userBad) : null;
+
+      const material =
+        userMaterial !== undefined && userMaterial !== ''
+          ? Number(userMaterial)
+          : null;
+
+      // Si hay valores del usuario, usarlos
+      if (bad !== null || material !== null) {
+        const safeBad = bad ?? 0;
+        const safeMaterial = flow.area.id >= 6 ? material ?? 0 : 0;
+        return sum + safeBad + safeMaterial;
+      }
+
+      // Si no hay input del usuario, usar partialReleases como fallback
+      if (flow.partialReleases?.length > 0) {
+        const fallbackBad = flow.partialReleases.reduce(
+          (acc: any, release: any) => {
+            const badQty = release.bad_quantity ?? 0;
+            const materialQty =
+              flow.area.id >= 6 ? release.material_quantity ?? 0 : 0;
+            return acc + badQty + materialQty;
+          },
+          0
+        );
+
+        return sum + fallbackBad;
+      }
+
+      // Si no hay nada, suma 0
+      return sum;
+    }, 0);
+  }, [areaBadQuantities, previousFlows]);
 
   return (
     <>
@@ -417,9 +608,9 @@ export default function PersonalizacionComponent({ workOrder }: Props) {
                 type="number"
                 min="0"
                 placeholder="Ej: 2"
-                value={badQuantity}
-                onChange={(e) => setBadQuantity(e.target.value)}
-                disabled={isDisabled}
+                value={sumaBadQuantity}
+                onClick={handleOpenBadQuantityModal}
+                readOnly
               />
               <Label>Excedente:</Label>
               <Input
@@ -455,6 +646,115 @@ export default function PersonalizacionComponent({ workOrder }: Props) {
           Liberar Producto
         </LiberarButton>
       </Container>
+
+      {/* Modal para marcar malas por areas previas al liberar */}
+      {showBadQuantity && (
+        <ModalOverlay>
+          <ModalBox>
+            <h4>Registrar malas por área</h4>
+            {previousFlows.map((flow) => {
+              const areaKey = flow.area.name.toLowerCase(); // para coincidir con las claves
+              return (
+                <div
+                  key={flow.id}
+                  style={{
+                    display: 'flex',
+                    flexDirection: 'column',
+                    alignItems: 'flex-start',
+                    gap: '0.5rem',
+                    marginTop: '1rem',
+                  }}
+                >
+                  <Label style={{ fontWeight: 'bold' }}>
+                    {flow.area.name.toUpperCase()}
+                  </Label>
+
+                  <div style={{ display: 'flex', gap: '1rem' }}>
+                    <div>
+                      <Label>Malas</Label>
+                      <InputBad
+                        type="number"
+                        min="0"
+                        value={areaBadQuantities[`${areaKey}_bad`] || '0'}
+                        onChange={(e) =>
+                          setAreaBadQuantities({
+                            ...areaBadQuantities,
+                            [`${areaKey}_bad`]: e.target.value,
+                          })
+                        }
+                      />
+                    </div>
+                    {flow.area_id >= 6 && (
+                      <div>
+                        <Label>Malo de fábrica</Label>
+                        <InputBad
+                          type="number"
+                          min="0"
+                          value={
+                            areaBadQuantities[`${areaKey}_material`] || '0'
+                          }
+                          onChange={(e) =>
+                            setAreaBadQuantities({
+                              ...areaBadQuantities,
+                              [`${areaKey}_material`]: e.target.value,
+                            })
+                          }
+                        />
+                      </div>
+                    )}
+                  </div>
+                </div>
+              );
+            })}
+            <div
+              style={{
+                display: 'flex',
+                justifyContent: 'flex-end',
+                gap: '1rem',
+                marginTop: '1rem',
+              }}
+            >
+              <CancelButton onClick={() => setShowBadQuantity(false)}>
+                Cancelar
+              </CancelButton>
+              <ConfirmButton
+                disabled={shouldDisableLiberar()}
+                onClick={async () => {
+                  await handleSaveChanges();
+                  const lastFlow = previousFlows[previousFlows.length - 1];
+                  const areaKey = lastFlow.area.name.toLowerCase();
+                  const lastAreaBad =
+                    areaBadQuantities[`${areaKey}_bad`] || '0';
+                  const lastAreaMaterial =
+                    areaBadQuantities[`${areaKey}_material`] || '0';
+                  // Además, suma el total al input principal de malas
+
+                  const totalBad = Object.keys(areaBadQuantities)
+                    .filter((key) => key.endsWith('_bad'))
+                    .reduce(
+                      (sum, key) => sum + Number(areaBadQuantities[key] || 0),
+                      0
+                    );
+
+                  const totalMaterial = Object.keys(areaBadQuantities)
+                    .filter((key) => key.endsWith('_material'))
+                    .reduce(
+                      (sum, key) => sum + Number(areaBadQuantities[key] || 0),
+                      0
+                    );
+
+                  setLastBadQuantity(lastAreaBad);
+                  setMaterialBadQuantity(lastAreaMaterial);
+                  setBadQuantity(String(totalBad));
+                  setShowBadQuantity(false);
+                }}
+              >
+                Confirmar
+              </ConfirmButton>
+            </div>
+          </ModalBox>
+        </ModalOverlay>
+      )}
 
       {/* Modal para enviar a liberacion */}
       {showConfirm && (
@@ -1084,6 +1384,22 @@ const InputGroup = styled.div`
 `;
 
 const Input = styled.input`
+  width: 100%;
+  color: black;
+  padding: 0.75rem 1rem;
+  border: 2px solid #d1d5db;
+  border-radius: 0.5rem;
+  margin-top: 0.25rem;
+  outline: none;
+  font-size: 1rem;
+  transition: border 0.3s;
+
+  &:focus {
+    border-color: #0038a8;
+  }
+`;
+
+const InputBad = styled.input`
   width: 100%;
   color: black;
   padding: 0.75rem 1rem;

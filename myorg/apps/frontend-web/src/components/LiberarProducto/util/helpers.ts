@@ -1,0 +1,104 @@
+import { WorkOrder } from './types';
+interface FilterParams {
+  searchValue: string;
+  activeArea: string;
+  statusFilter: string | string[];
+  startDate: string;
+  endDate: string;
+}
+
+export const filterOrders = (
+  orders: WorkOrder[],
+  { searchValue, activeArea, statusFilter, startDate, endDate }: FilterParams
+): WorkOrder[] => {
+  const filters = Array.isArray(statusFilter) ? statusFilter : [statusFilter];
+  const filtersLower = filters.map((f) => f.toLowerCase());
+
+  console.log('orders is:', orders, 'type:', typeof orders);
+
+  return orders.filter((order) => {
+    const statusMatch = filtersLower.some(
+      (f) =>
+        order.status.toLowerCase().includes(f) ||
+        order.workOrder.flow.some((flow: any) =>
+          flow.status.toLowerCase().includes(f)
+        )
+    );
+
+    const searchMatch = order.workOrder.ot_id
+      .toLowerCase()
+      .includes(searchValue.toLowerCase());
+
+    const areaMatch =
+      !activeArea ||
+      order.workOrder.flow.some((f: any) =>
+        f.area?.name?.toLowerCase().includes(activeArea.toLowerCase())
+      );
+
+    const createdDate = new Date(order.workOrder.createdAt);
+    const fromDate = startDate ? new Date(startDate) : null;
+    const toDate = endDate ? new Date(endDate) : null;
+
+    const dateMatch =
+      (!fromDate || createdDate >= fromDate) &&
+      (!toDate || createdDate <= toDate);
+
+    return statusMatch && searchMatch && areaMatch && dateMatch;
+  });
+};
+
+export const sortOrders = (
+  orders: WorkOrder[],
+  orderBy: 'ot_id' | 'createdAt',
+  direction: 'asc' | 'desc'
+) => {
+  return [...orders].sort((a, b) => {
+    let cmp = 0;
+
+    if (orderBy === 'createdAt') {
+      cmp =
+        new Date(a.workOrder.createdAt).getTime() -
+        new Date(b.workOrder.createdAt).getTime();
+    } else {
+      cmp = a.workOrder.ot_id.localeCompare(b.workOrder.ot_id);
+    }
+
+    return direction === 'asc' ? cmp : -cmp;
+  });
+};
+
+export const getFileLabel = (filePath: string) => {
+  const lower = filePath.toLowerCase();
+  if (lower.includes('ot')) return 'Ver OT';
+  if (lower.includes('sku')) return 'Ver SKU';
+  if (lower.includes('op')) return 'Ver OP';
+  return 'Ver Archivo';
+};
+
+export const getStatusLabel = (color: string) => {
+  switch (color) {
+    case '#22c55e':
+      return 'Completado';
+    case '#facc15':
+      return 'Enviado a CQM / En Calidad';
+    case '#f5945c':
+      return 'Parcial / Pendiente Parcial';
+    case '#4a90e2':
+      return 'En Proceso / Listo';
+    case '#d1d5db':
+      return 'Sin Estado';
+    default:
+      return '';
+  }
+};
+
+export const getFlowStateStyles = (status: string) => {
+  const s = status?.toLowerCase() || '';
+  return {
+    isActive: s.includes('proceso') || s.includes('listo'),
+    isParcial: s.includes('parcial'),
+    isCompleted: s.includes('completado'),
+    isCalidad: s.includes('enviado a cqm') || s.includes('en calidad'),
+    isInconforme: s.includes('inconformidad'),
+  };
+};

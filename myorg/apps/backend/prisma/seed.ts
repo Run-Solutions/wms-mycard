@@ -35,14 +35,15 @@ async function main() {
       { id: 3, name: "Finalizacion", description: "Cierre de OTs que hayan completado el flujo asignado.", imageName: "putaway.jpg", logoName: "putaway.webp" },
       { id: 4, name: "Permisos", description: "Manejar vista de modulo de acuerdo a los roles de tus usuarios.", imageName: "packing.jpg", logoName: "settings.svg" },
       { id: 5, name: "Usuarios", description: "Gestiona y administra los usuarios del sistema.", imageName: "users.jpg", logoName: "users.webp" },
-      { id: 6, name: "Vistos Buenos", description: "Maneja las OTs enviadas por produccion para calificar.", imageName: "ubication.jpg", logoName: "items.webp" },
-      { id: 7, name: "Recepcion CQM", description: "Recibe las OTs enviadas por produccion.", imageName: "putaway.jpg", logoName: "putaway.webp" },
+      { id: 6, name: "Recepcion de Vistos Buenos", description: "Maneja las OTs enviadas por produccion para calificar.", imageName: "ubication.jpg", logoName: "items.webp" },
+      { id: 7, name: "Liberacion de Vistos Buenos", description: "Recibe las OTs enviadas por produccion.", imageName: "putaway.jpg", logoName: "putaway.webp" },
       { id: 8, name: "Configuracion Vistos Buenos", description: "Edita los puntos de evaluación de tu área.", imageName: "slotting.jpg", logoName: "settings.svg" },
       { id: 9, name: "Aceptar Producto", description: "Maneja las OTs enviadas por áreas previas.", imageName: "putaway.jpg", logoName: "items.webp" },
       { id: 10, name: "Aceptar Auditoria", description: "Maneja las OTs enviadas por áreas previas.", imageName: "putaway.jpg", logoName: "items.webp" },
       { id: 11, name: "Cerrar Orden de Trabajo", description: "Finaliza las OTs que han completado todos sus procesos junto con su cantidad.", imageName: "putaway.jpg", logoName: "putaway.webp" },
       { id: 12, name: "Liberar Producto", description: "Maneja las OTs que tienes en tu área para liberar.", imageName: "putaway.jpg", logoName: "putaway.webp" },
       { id: 13, name: "Inconformidades", description: "Maneja las OTs que han sido rechazadas por parte de la operacion siguiente.", imageName: "nebulas.gif", logoName: "extra.webp" },
+      { id: 14, name: "Rechazos", description: "Maneja las OTs que han sido rechazadas por parte de la operacion siguiente.", imageName: "nebulas.gif", logoName: "extra.webp" },
     ],
     skipDuplicates: true,
   });
@@ -59,24 +60,34 @@ async function main() {
   });
 
   // 🔹 Seed para ModulePermission (asignando permisos a roles)
-  await prisma.modulePermission.createMany({
-    data: [
-      { id: 1, role_id: 1, module_id: 1, enabled: true }, 
-      { id: 2, role_id: 1, module_id: 2, enabled: true }, 
-      { id: 3, role_id: 1, module_id: 3, enabled: true },
-      { id: 4, role_id: 1, module_id: 4, enabled: true },
-      { id: 5, role_id: 1, module_id: 5, enabled: true }, 
-      { id: 6, role_id: 3, module_id: 6, enabled: true }, 
-      { id: 7, role_id: 3, module_id: 7, enabled: true },
-      { id: 8, role_id: 3, module_id: 8, enabled: true },
-      { id: 9, role_id: 4, module_id: 10, enabled: true }, 
-      { id: 10, role_id: 4, module_id: 11, enabled: true }, 
-      { id: 11, role_id: 2, module_id: 9, enabled: true }, 
-      { id: 12, role_id: 2, module_id: 12, enabled: true },
-      { id: 13, role_id: 2, module_id: 13, enabled: true },
-    ],
-    skipDuplicates: true,
-  });
+  const permissions = [
+    { id: 1, role_id: 1, module_id: 1, enabled: true }, 
+    { id: 2, role_id: 1, module_id: 2, enabled: true }, 
+    { id: 3, role_id: 1, module_id: 3, enabled: true },
+    { id: 4, role_id: 1, module_id: 4, enabled: true },
+    { id: 5, role_id: 1, module_id: 5, enabled: true }, 
+    { id: 6, role_id: 3, module_id: 6, enabled: true }, 
+    { id: 7, role_id: 3, module_id: 7, enabled: true },
+    { id: 8, role_id: 3, module_id: 8, enabled: true },
+    { id: 9, role_id: 4, module_id: 10, enabled: true }, 
+    { id: 10, role_id: 4, module_id: 11, enabled: true }, 
+    { id: 11, role_id: 4, module_id: 14, enabled: true }, 
+    { id: 12, role_id: 2, module_id: 9, enabled: true }, 
+    { id: 13, role_id: 2, module_id: 12, enabled: true },
+    { id: 14, role_id: 2, module_id: 13, enabled: true },
+  ];
+  
+  for (const perm of permissions) {
+    await prisma.modulePermission.upsert({
+      where: { id: perm.id },
+      update: {
+        role_id: perm.role_id,
+        module_id: perm.module_id,
+        enabled: perm.enabled,
+      },
+      create: perm,
+    });
+  }
   
   // 🔹 Seed para FormQuestions asociadas a "impresion"
   // 🔹 Seed para FormQuestions

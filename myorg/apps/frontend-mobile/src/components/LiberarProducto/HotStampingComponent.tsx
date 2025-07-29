@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import {
   View,
   Text,
@@ -17,6 +17,7 @@ import {
   submitToCQMHotStamping,
   releaseProductFromHotStamping,
 } from '../../api/liberarProducto';
+import { updateWorkOrderAreas } from '../../api/seguimientoDeOts';
 import { useAuth } from '../../contexts/AuthContext';
 import { calcularCantidadPorLiberar } from './util/calcularCantidadPorLiberar';
 
@@ -40,6 +41,12 @@ const HotStampingComponent = ({ workOrder }: { workOrder: any }) => {
   const [colorFoil, setColorFoil] = React.useState('');
   const [revisarPosicion, setRevisarPosicion] = React.useState('');
   const [imagenHolograma, setImagenHolograma] = React.useState('');
+  const [showBadQuantity, setShowBadQuantity] = useState(false);
+  const [areaBadQuantities, setAreaBadQuantities] = useState<{
+    [areaName: string]: string;
+  }>({});
+  const [materialBadQuantity, setMaterialBadQuantity] = useState<string>('0');
+  const [lastAreaBadQuantity, setLastBadQuantity] = useState<string>('0');
 
   const questions =
     workOrder.area.formQuestions?.filter((q: any) => q.role_id === null) || [];
@@ -123,7 +130,7 @@ const HotStampingComponent = ({ workOrder }: { workOrder: any }) => {
     try {
       await submitToCQMHotStamping(payload);
       Alert.alert('Formulario enviado a CQM');
-      navigation.navigate('liberarProducto');
+      navigation.goBack();
       setShowCqmModal(false);
     } catch (err) {
       Alert.alert('Error al Enviar a Calidad/CQM.');
@@ -142,7 +149,8 @@ const HotStampingComponent = ({ workOrder }: { workOrder: any }) => {
       areaId: workOrder.area.id,
       assignedUser: currentFlow.assigned_user,
       goodQuantity: Number(goodQuantity),
-      badQuantity: Number(badQuantity),
+      badQuantity: Number(lastAreaBadQuantity),
+      materialBadQuantity: Number(materialBadQuantity),
       excessQuantity: Number(excessQuantity),
       comments,
       formAnswerId: currentFlow.answers?.[0]?.id,
@@ -152,7 +160,7 @@ const HotStampingComponent = ({ workOrder }: { workOrder: any }) => {
       await releaseProductFromHotStamping(payload);
       setShowConfirm(false);
       Alert.alert('Producto liberado correctamente');
-      navigation.navigate('liberarProducto');
+      navigation.goBack();
     } catch (err) {
       Alert.alert('Error del servidor al liberar.');
     }
@@ -203,11 +211,194 @@ const HotStampingComponent = ({ workOrder }: { workOrder: any }) => {
     lastCompletedOrPartial
   );
   console.log('Cantidad final por liberar:', cantidadporliberar);
+
+  const previousFlows = flowList
+    .slice(0, currentIndex + 1)
+    .filter((flow) => flow.area_id !== 1);
+
+  console.log('Áreas anteriores sin Preprensa:', previousFlows);
+
+  const handleOpenBadQuantityModal = () => {
+    const initialValues: { [areaName: string]: string } = { ...areaBadQuantities };
+
+    previousFlows.forEach((flow) => {
+      const areaName = flow.area.name;
+
+      let badQuantity: number | null | undefined = null;
+      let materialBadQuantity: number | null | undefined = null;
+
+      // Primero, busca en areaResponse
+      if (flow.areaResponse?.impression) {
+        badQuantity = flow.areaResponse.impression.bad_quantity;
+      } else if (flow.areaResponse?.serigrafia) {
+        badQuantity = flow.areaResponse.serigrafia.bad_quantity;
+      } else if (flow.areaResponse?.laminacion) {
+        badQuantity = flow.areaResponse.laminacion.bad_quantity;
+      } else if (flow.areaResponse?.corte) {
+        badQuantity = flow.areaResponse.corte.bad_quantity;
+        materialBadQuantity = flow.areaResponse.corte.material_quantity;
+      } else if (flow.areaResponse?.colorEdge) {
+        badQuantity = flow.areaResponse.colorEdge.bad_quantity;
+        materialBadQuantity = flow.areaResponse.colorEdge.material_quantity;
+      } else if (flow.areaResponse?.hotStamping) {
+        badQuantity = flow.areaResponse.hotStamping.bad_quantity;
+        materialBadQuantity = flow.areaResponse.hotStamping.material_quantity;
+      } else if (flow.areaResponse?.millingChip) {
+        badQuantity = flow.areaResponse.millingChip.bad_quantity;
+        materialBadQuantity = flow.areaResponse.millingChip.material_quantity;
+      }
+
+      // Si sigue sin valor, busca en partialReleases
+      if (
+        (badQuantity === null || badQuantity === undefined) &&
+        flow.partialReleases?.length > 0
+      ) {
+        badQuantity = flow.partialReleases.reduce(
+          (sum: number, release: any) => {
+            return sum + (release.bad_quantity ?? 0);
+          },
+          0
+        );
+        materialBadQuantity = flow.partialReleases.reduce(
+          (sum: number, release: any) => {
+            return sum + (release.material_quantity ?? 0);
+          },
+          0
+        );
+      }
+      // ⚠️ SOLO setear si no están ya definidos
+      if (initialValues[`${areaName}_bad`] === undefined) {
+        initialValues[`${areaName}_bad`] =
+          badQuantity !== null && badQuantity !== undefined
+            ? String(badQuantity)
+            : '';
+      }
+  
+      if (
+        flow.area.id >= 6 &&
+        initialValues[`${areaName}_material`] === undefined
+      ) {
+        initialValues[`${areaName}_material`] =
+          materialBadQuantity !== null && materialBadQuantity !== undefined
+            ? String(materialBadQuantity)
+            : '';
+      }
+    });
+
+    setAreaBadQuantities(initialValues);
+    setShowBadQuantity(true);
+    console.log('Valores iniciales para malas por área:', initialValues);
+  };
+
+  const handleSaveChanges = async () => {
+    const payload = {
+      areas: previousFlows.flatMap((flow) => {
+        const areaName = flow.area.name.toLowerCase();
+
+        const blockMap: Record<string, string> = {
+          impresion: 'impression',
+          serigrafia: 'serigrafia',
+          empalme: 'empalme',
+          laminacion: 'laminacion',
+          corte: 'corte',
+          'color edge': 'colorEdge',
+        };
+
+        const block = blockMap[areaName] || 'otros';
+        if (block === 'otros') {
+          return []; // Descarta si no es bloque conocido
+        }
+
+        const blockData = flow.areaResponse?.[block];
+        const blockId = blockData?.id || null;
+        const formId = blockData?.form_auditory_id || null;
+        const cqmId = blockData?.form_answer_id || null;
+
+        const badKey = `${areaName}_bad`;
+        const materialKey = `${areaName}_material`;
+
+        const bad_quantity = Number(areaBadQuantities[badKey] || 0);
+        const material_quantity =
+          flow.area.id > 6
+            ? Number(areaBadQuantities[materialKey] || 0)
+            : undefined;
+
+        return {
+          areaId: flow.area_id,
+          block,
+          blockId,
+          formId,
+          cqmId,
+          data: {
+            bad_quantity,
+            ...(material_quantity !== undefined && { material_quantity }),
+          },
+        };
+      }),
+    };
+
+    console.log('Payload a enviar:', payload);
+
+    try {
+      await updateWorkOrderAreas(workOrder.workOrder.ot_id, payload);
+      alert('Cambios guardados correctamente');
+    } catch (err) {
+      console.error(err);
+      alert('Error al guardar los cambios');
+    }
+  };
+
+  const sumaBadQuantity = useMemo(() => {
+    return previousFlows.reduce((sum, flow) => {
+      const areaKey = flow.area.name.toLowerCase();
+
+      // Leer del input del usuario
+      const userBad = areaBadQuantities[`${areaKey}_bad`];
+      const userMaterial = areaBadQuantities[`${areaKey}_material`];
+
+      // Valores numéricos o null
+      const bad =
+        userBad !== undefined && userBad !== '' ? Number(userBad) : null;
+
+      const material =
+        userMaterial !== undefined && userMaterial !== ''
+          ? Number(userMaterial)
+          : null;
+
+      // Si hay valores del usuario, usarlos
+      if (bad !== null || material !== null) {
+        const safeBad = bad ?? 0;
+        const safeMaterial = flow.area.id >= 6 ? material ?? 0 : 0;
+        return sum + safeBad + safeMaterial;
+      }
+
+      // Si no hay input del usuario, usar partialReleases como fallback
+      if (flow.partialReleases?.length > 0) {
+        const fallbackBad = flow.partialReleases.reduce(
+          (acc: any, release: any) => {
+            const badQty = release.bad_quantity ?? 0;
+            const materialQty =
+              flow.area.id >= 6 ? release.material_quantity ?? 0 : 0;
+            return acc + badQty + materialQty;
+          },
+          0
+        );
+
+        return sum + fallbackBad;
+      }
+
+      // Si no hay nada, suma 0
+      return sum;
+    }, 0);
+  }, [areaBadQuantities, previousFlows]);
   const shouldDisableLiberar = () => {
     const currentInvalidStatuses = [
       'Enviado a CQM',
       'En Calidad',
       'Parcial',
+      'Enviado a auditoria parcial',
+      'Pendiente',
+      'Pendiente parcial',
       'En proceso',
     ];
     const nextInvalidStatuses = [
@@ -215,6 +406,9 @@ const HotStampingComponent = ({ workOrder }: { workOrder: any }) => {
       'Listo',
       'En Calidad',
       'Enviado a auditoria parcial',
+      'Pendiente',
+      'Parcial',
+      'Pendiente parcial',
       'En inconformidad CQM',
     ];
     const nextCorteStatuses = ['Enviado a auditoria parcial'];
@@ -245,7 +439,10 @@ const HotStampingComponent = ({ workOrder }: { workOrder: any }) => {
       'Enviado a CQM',
       'En Calidad',
       'Listo',
+      'Pendiente',
+      'Pendiente parcial',
       'Enviado a auditoria parcial',
+      'En inconformidad CQM',
       'Enviado a Auditoria',
     ];
     const estadosBloqueadosExtra = [
@@ -332,16 +529,24 @@ const HotStampingComponent = ({ workOrder }: { workOrder: any }) => {
         onChangeText={setGoodQuantity}
       />
       <Text style={styles.label}>Malas:</Text>
-      <TextInput
-        style={styles.input}
-        theme={{ roundness: 30 }}
-        mode="outlined"
-        activeOutlineColor="#000"
-        keyboardType="numeric"
-        placeholder="Ej: 100"
-        value={badQuantity}
-        onChangeText={setBadQuantity}
-      />
+      <TouchableOpacity
+        onPress={handleOpenBadQuantityModal}
+        activeOpacity={0.7}
+      >
+        <TextInput
+          style={styles.input}
+          theme={{ roundness: 30 }}
+          mode="outlined"
+          activeOutlineColor="#000"
+          keyboardType="numeric"
+          placeholder={
+            sumaBadQuantity > 0 ? sumaBadQuantity.toString() : '0'
+          }
+          value={sumaBadQuantity}
+          editable={false} // deshabilita edición
+          pointerEvents="none" // evita que se abra el teclado
+        />
+      </TouchableOpacity>
       <Text style={styles.label}>Excedente:</Text>
       <TextInput
         style={styles.input}
@@ -390,6 +595,117 @@ const HotStampingComponent = ({ workOrder }: { workOrder: any }) => {
       </TouchableOpacity>
 
       <View style={{ marginBottom: 60 }}></View>
+
+      {/* Modal para marcar malas por areas previas al liberar */}
+      <Modal visible={showBadQuantity} transparent animationType="fade">
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalBoxScrollable}>
+            <Text style={styles.modalTitle}>Registrar malas por área</Text>
+
+            <ScrollView style={{ maxHeight: 400 }}>
+              {previousFlows.map((flow) => {
+                const areaKey = flow.area.name.toLowerCase();
+                return (
+                  <View key={flow.id} style={{ marginTop: 16 }}>
+                    <Text style={styles.areaLabel}>
+                      {flow.area.name.toUpperCase()}
+                    </Text>
+
+                    <View style={styles.areaInputsContainer}>
+                      <View style={[styles.inputGroup, { maxWidth: '40%' }]}>
+                        <Text style={styles.inputLabel}>Malas</Text>
+                        <TextInput
+                          style={styles.input}
+                          theme={{ roundness: 30 }}
+                          mode="outlined"
+                          activeOutlineColor="#000"
+                          keyboardType="numeric"
+                          value={areaBadQuantities[`${areaKey}_bad`] || '0'}
+                          onChangeText={(text) =>
+                            setAreaBadQuantities((prev) => ({
+                              ...prev,
+                              [`${areaKey}_bad`]: text,
+                            }))
+                          }
+                        />
+                      </View>
+
+                      {flow.area_id >= 6 && (
+                        <View style={[styles.inputGroup, { maxWidth: '40%' }]}>
+                          <Text style={styles.inputLabel}>Malo de fábrica</Text>
+                          <TextInput
+                            style={styles.input}
+                            theme={{ roundness: 30 }}
+                            mode="outlined"
+                            activeOutlineColor="#000"
+                            keyboardType="numeric"
+                            value={
+                              areaBadQuantities[`${areaKey}_material`] || '0'
+                            }
+                            onChangeText={(text) =>
+                              setAreaBadQuantities((prev) => ({
+                                ...prev,
+                                [`${areaKey}_material`]: text,
+                              }))
+                            }
+                          />
+                        </View>
+                      )}
+                    </View>
+                  </View>
+                );
+              })}
+            </ScrollView>
+
+            <View style={styles.modalActions}>
+              <TouchableOpacity
+                style={styles.cancelButton}
+                onPress={() => setShowBadQuantity(false)}
+              >
+                <Text style={styles.modalButtonText}>Cancelar</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[
+                  styles.confirmButton,
+                  shouldDisableLiberar() && { opacity: 0.5 },
+                ]}
+                disabled={shouldDisableLiberar()}
+                onPress={async () => {
+                  await handleSaveChanges();
+
+                  const lastFlow = previousFlows[previousFlows.length - 1];
+                  const areaKey = lastFlow.area.name.toLowerCase();
+                  const lastAreaBad =
+                    areaBadQuantities[`${areaKey}_bad`] || '0';
+                  const lastAreaMaterial =
+                    areaBadQuantities[`${areaKey}_material`] || '0';
+
+                  const totalBad = Object.keys(areaBadQuantities)
+                    .filter((key) => key.endsWith('_bad'))
+                    .reduce(
+                      (sum, key) => sum + Number(areaBadQuantities[key] || 0),
+                      0
+                    );
+
+                  const totalMaterial = Object.keys(areaBadQuantities)
+                    .filter((key) => key.endsWith('_material'))
+                    .reduce(
+                      (sum, key) => sum + Number(areaBadQuantities[key] || 0),
+                      0
+                    );
+
+                  setLastBadQuantity(lastAreaBad);
+                  setMaterialBadQuantity(lastAreaMaterial);
+                  setBadQuantity(String(totalBad));
+                  setShowBadQuantity(false);
+                }}
+              >
+                <Text style={styles.modalButtonText}>Confirmar</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
 
       {/* Modal CQM */}
       <Modal visible={showCqmModal} animationType="slide">
@@ -819,7 +1135,7 @@ const styles = StyleSheet.create({
     opacity: 1,
   },
   inputGroup: {
-    paddingTop: 20,
+    width: '100%',
   },
   radioGroup: {
     flexDirection: 'row',
@@ -834,5 +1150,26 @@ const styles = StyleSheet.create({
   radioLabel: {
     fontSize: 16,
     marginLeft: 4,
+  },
+  modalBoxScrollable: {
+    backgroundColor: '#fff',
+    borderRadius: 10,
+    padding: 20,
+    width: '90%',
+    maxHeight: '90%',
+  },
+  areaLabel: {
+    fontWeight: 'bold',
+    fontSize: 14,
+    marginBottom: 6,
+  },
+  areaInputsContainer: {
+    flexDirection: 'row',
+    gap: 16,
+    flexWrap: 'wrap',
+  },
+  inputLabel: {
+    fontSize: 13,
+    marginBottom: 4,
   },
 });

@@ -34,6 +34,7 @@ model User {
   // Campos inversos añadidos
   deviceTokens          DeviceToken[]
   notifications         Notification[]
+  logs                  LogAreaDataUpdate[]
 
   created_at            DateTime            @default(now()) @map("created_at")
   updated_at            DateTime            @updatedAt @map("updated_at")
@@ -51,6 +52,7 @@ model DeviceToken {
   user         User     @relation(fields: [userId], references: [id])
 
   @@index([userId])
+  @@map("device_token")
 }
 
 model Notification {
@@ -65,6 +67,7 @@ model Notification {
   user        User     @relation(fields: [userId], references: [id])
 
   @@index([userId, isRead])
+  @@map("notification")
 }
 
 model UserBiometricKey {
@@ -76,6 +79,7 @@ model UserBiometricKey {
   user      User    @relation(fields: [userId], references: [id])
 
   @@unique([userId, alias])
+  @@map("user_biometric_key")
 }
 
 model Role {
@@ -206,15 +210,20 @@ model PartialRelease {
   test_type              String?
   bad_quantity           Int?               
   excess_quantity        Int?
+  material_quantity      Int?
 
   observation            String?
   validated              Boolean             @default(false)
   form_auditory_id       Int?
+
+  formAuditory           FormAuditory?       @relation(fields: [form_auditory_id], references: [id])
+  user                   User?               @relation("UserPartialReleases", fields: [user_id], references: [id])
+  inconformities         Inconformities[]    // Relacion inversa
+  WorkOrderFlow          WorkOrderFlow       @relation(fields: [work_order_flow_id], references: [id], onDelete: Cascade)
+
   created_at             DateTime            @default(now()) @map("created_at")
 
-  user                   User?               @relation("UserPartialReleases", fields: [user_id], references: [id])
-  inconformities         Inconformities[]         // Relacion inversa
-  WorkOrderFlow          WorkOrderFlow       @relation(fields: [work_order_flow_id], references: [id], onDelete: Cascade)
+  @@map("partial_release")
 }
 
 model AreasResponse {
@@ -343,7 +352,8 @@ model CorteResponse {
   id                     Int                      @id @default(autoincrement())
   good_quantity          Int      
   bad_quantity           Int      
-  excess_quantity        Int      
+  excess_quantity        Int   
+  material_quantity      Int?   
   
   comments               String?                  // Comentarios opcionales
 
@@ -354,7 +364,7 @@ model CorteResponse {
   form_answer            FormAnswer               @relation("AnswerOnCorte", fields: [form_answer_id], references: [id])
   areas_response_id      Int                      @unique
   areas_response         AreasResponse            @relation("CorteOnResponse", fields: [areas_response_id], references: [id], onDelete: Cascade)
-  form_auditory_id       Int                      @unique //Respuesta del auditor
+  form_auditory_id       Int?                      @unique //Respuesta del auditor
   formAuditory           FormAuditory?            @relation("CorteToFormAuditory", fields: [form_auditory_id], references: [id], onDelete: Cascade)
 
   @@map("corte_response")
@@ -364,7 +374,8 @@ model ColorEdgeResponse {
   id                     Int                      @id @default(autoincrement())
   good_quantity          Int      
   bad_quantity           Int      
-  excess_quantity        Int      
+  excess_quantity        Int     
+  material_quantity      Int?    
   
   comments               String?                  // Comentarios opcionales
 
@@ -375,7 +386,7 @@ model ColorEdgeResponse {
   form_answer            FormAnswer               @relation("AnswerOnColorEdge", fields: [form_answer_id], references: [id])
   areas_response_id      Int                      @unique
   areas_response         AreasResponse            @relation("ColorEdgeOnResponse", fields: [areas_response_id], references: [id], onDelete: Cascade)
-  form_auditory_id       Int                      @unique
+  form_auditory_id       Int?                     @unique
   formAuditory           FormAuditory?            @relation("ColorEdgeToFormAuditory", fields: [form_auditory_id], references: [id], onDelete: Cascade)
 
   @@map("color_edge_response")
@@ -385,7 +396,8 @@ model HotStampingResponse {
   id                     Int                      @id @default(autoincrement())
   good_quantity          Int      
   bad_quantity           Int      
-  excess_quantity        Int      
+  excess_quantity        Int     
+  material_quantity      Int?    
   
   comments               String?                  // Comentarios opcionales
 
@@ -396,7 +408,7 @@ model HotStampingResponse {
   form_answer            FormAnswer               @relation("AnswerOnHotStamping", fields: [form_answer_id], references: [id])
   areas_response_id      Int                      @unique
   areas_response         AreasResponse            @relation("HotStampingOnResponse", fields: [areas_response_id], references: [id], onDelete: Cascade)
-  form_auditory_id       Int                      @unique
+  form_auditory_id       Int?                     @unique
   formAuditory           FormAuditory?            @relation("HotStampingToFormAuditory", fields: [form_auditory_id], references: [id], onDelete: Cascade)
 
   @@map("hot_stamping_response")
@@ -407,6 +419,7 @@ model MillingChipResponse {
   good_quantity          Int      
   bad_quantity           Int      
   excess_quantity        Int      
+  material_quantity      Int?   
   
   comments               String?                    // Comentarios opcionales
 
@@ -417,7 +430,7 @@ model MillingChipResponse {
   form_answer            FormAnswer                 @relation("AnswerOnMillingChip", fields: [form_answer_id], references: [id])
   areas_response_id      Int                        @unique
   areas_response         AreasResponse              @relation("MillingChipOnResponse", fields: [areas_response_id], references: [id], onDelete: Cascade)
-  form_auditory_id       Int                        @unique
+  form_auditory_id       Int?                        @unique
   formAuditory           FormAuditory?              @relation("MillingChipToFormAuditory", fields: [form_auditory_id], references: [id], onDelete: Cascade)
 
   @@map("milling_chip_response")
@@ -428,6 +441,7 @@ model PersonalizacionResponse {
   good_quantity          Int      
   bad_quantity           Int      
   excess_quantity        Int      
+  material_quantity      Int?   
   
   comments               String?                      // Comentarios opcionales
 
@@ -438,7 +452,7 @@ model PersonalizacionResponse {
   form_answer            FormAnswer                   @relation("AnswerOnPersonalizacion", fields: [form_answer_id], references: [id])
   areas_response_id      Int                          @unique
   areas_response         AreasResponse                @relation("PersonalizacionOnResponse", fields: [areas_response_id], references: [id], onDelete: Cascade)
-  form_auditory_id       Int                          @unique
+  form_auditory_id       Int?                          @unique
   formAuditory           FormAuditory?                @relation("PersonalizacionToFormAuditory", fields: [form_auditory_id], references: [id], onDelete: Cascade)
 
   @@map("personalizacion_response")
@@ -458,6 +472,8 @@ model FormAuditory {
 
   work_order_flow_id                Int?                      // NUEVO campo para relación
   workOrderFlow                     WorkOrderFlow?            @relation(fields: [work_order_flow_id], references: [id])
+  inconformities                    Inconformities[]         // Relacion inversa
+  partialReleases                   PartialRelease[]
 
   user                              User?                     @relation("UserAssignedToFormAuditory", fields: [reviewed_by_id], references: [id])
   created_at                        DateTime                  @default(now()) @map("created_at")
@@ -560,13 +576,16 @@ model FormAnswerResponse {
 
 model Inconformities {
   id                      Int               @id @default(autoincrement())
+  comments                String            // Relación con FormQuestion
+  reviewed                Boolean?          
+  created_by              Int?              // Respuesta individual
   areas_response_id       Int?              // Relación con la tabla principal FormAnswer
   form_answer_id          Int?
   partial_release_id      Int?      
-  comments                String            // Relación con FormQuestion
-  created_by              Int?              // Respuesta individual
+  form_auditory_id        Int?
 
   partialReleases         PartialRelease?    @relation(fields: [partial_release_id], references: [id], onDelete: Cascade)
+  formAuditory            FormAuditory?      @relation(fields: [form_auditory_id], references: [id], onDelete: Cascade)
   areaResponse            AreasResponse?     @relation(fields: [areas_response_id], references: [id], onDelete: Cascade)
   formAnswer              FormAnswer?        @relation(fields: [form_answer_id], references: [id], onDelete: Cascade)
   user                    User?             @relation("UserInconformities", fields: [created_by], references: [id])
@@ -574,4 +593,21 @@ model Inconformities {
   created_at             DateTime           @default(now())
 
   @@map("inconformities")
+}
+
+model LogAreaDataUpdate {
+  id              Int       @id @default(autoincrement())
+  work_order_id   Int
+  area_id         Int
+  area_name       String
+  block           String
+  field           String
+  old_value       String?
+  new_value       String?
+  user_id         Int
+  created_at      DateTime  @default(now())
+
+  user            User      @relation(fields: [user_id], references: [id])
+
+  @@map("area_update_logs")
 }

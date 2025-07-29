@@ -50,13 +50,16 @@ const HotStampingComponent: React.FC<{ workOrder: any }> = ({ workOrder }) => {
     ? lastPartialRelease.observation
     : workOrder.areaResponse?.hotStamping.comments;
 
-  const inconformityUser = lastPartialRelease
-    ? lastPartialRelease.inconformities[0]?.user.username
-    : workOrder.areaResponse?.inconformities.at(-1)?.user.username;
+    const inconformityList = lastPartialRelease
+    ? lastPartialRelease.inconformities
+    : workOrder.areaResponse?.inconformities || [];
 
-  const inconformityComments = lastPartialRelease
-    ? lastPartialRelease.inconformities[0]?.comments
-    : workOrder.areaResponse?.inconformities.at(-1)?.comments;
+  const lastUnreviewedInconformity = [...inconformityList]
+    .reverse()
+    .find((i) => i.reviewed === false);
+
+  const inconformityUser = lastUnreviewedInconformity?.user.username;
+  const inconformityComments = lastUnreviewedInconformity?.comments;
 
   const handleSubmit = async () => {
     const partialRelease = workOrder.partialReleases.find(
@@ -72,7 +75,7 @@ const HotStampingComponent: React.FC<{ workOrder: any }> = ({ workOrder }) => {
       await acceptHotStampingInconformity(areaResponseFlowId);
       setShowModal(false);
       Alert.alert('Inconformidad aceptada');
-      navigation.navigate('liberarProducto');
+      navigation.goBack();
     } catch (error: any) {
       Alert.alert('Error al aceptar', error.message || 'Ocurrió un error');
     } finally {

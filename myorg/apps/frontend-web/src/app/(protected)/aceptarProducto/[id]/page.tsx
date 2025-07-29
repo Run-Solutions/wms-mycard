@@ -10,6 +10,11 @@ import ImpresionComponentAccept from "@/components/AceptarProducto/ImpresionComp
 import SerigrafiaComponentAccept from "@/components/AceptarProducto/SerigrafiaComponent";
 import EmpalmeComponentAccept from "@/components/AceptarProducto/EmpalmeComponent";
 import LaminacionComponentAccept from "@/components/AceptarProducto/LaminacionComponent";
+import CorteComponentAccept from "@/components/AceptarProducto/CorteComponent";
+import ColorEdgeComponentAccept from "@/components/AceptarProducto/ColorEdgeComponent";
+import HotStampingComponentAccept from "@/components/AceptarProducto/HotStampingComponent";
+import MillingChipComponentAccept from "@/components/AceptarProducto/MillingChipComponent";
+import PersonalizacionComponentAccept from "@/components/AceptarProducto/PersonalizacionComponent";
 
 interface Props {
     params: Promise<{ id: string }>;
@@ -33,7 +38,7 @@ export default function AceptarProductoAuxPage({ params }: Props) {
     if (workOrder.status === 'Pendiente'){
       lastCompletedOrPartial = [...workOrder.workOrder.flow]
       .reverse()
-      .find((item) => item.status === "Completado");
+      .find((item) => item.status === 'Completado');
     } else if (['Pendiente'].includes(workOrder.status) && workOrder.workOrder.flow.partialReleases.length > 0) {
       lastCompletedOrPartial = [...workOrder.workOrder.flow]
       .reverse()
@@ -59,6 +64,16 @@ export default function AceptarProductoAuxPage({ params }: Props) {
             return <EmpalmeComponentAccept workOrder={workOrder}/>
         case 5:
             return <LaminacionComponentAccept workOrder={workOrder}/>
+        case 6:
+            return <CorteComponentAccept workOrder={workOrder}/>
+        case 7:
+            return <ColorEdgeComponentAccept workOrder={workOrder}/>
+        case 8:
+            return <HotStampingComponentAccept workOrder={workOrder}/>
+        case 9:
+            return <MillingChipComponentAccept workOrder={workOrder}/>
+        case 10:
+            return <PersonalizacionComponentAccept workOrder={workOrder}/>
         default: 
           return <div>Area no reconocida.</div>
       }

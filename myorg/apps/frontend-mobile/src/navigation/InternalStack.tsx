@@ -12,8 +12,9 @@ import AceptarProductoAuxScreen from '../app/protected/aceptarProducto/[id]/page
 import AceptarAuditoriaAuxScreen from '../app/protected/aceptarAuditoria/[id]/page';
 import LiberarProductoAuxScreen from '../app/protected/liberarProducto/[id]/page';
 import CerrarOrdenDeTrabajoAuxScreen from '../app/protected/cerrarOrdenDeTrabajo/[id]/page';
-import RecepcionCQMAuxScreen from '../app/protected/recepcionCqm/[id]/page';
+import LiberacionDeVistosBuenosAuxScreen from '../app/protected/liberacionDeVistosBuenos/[id]/page';
 import InconformidadesAuxScreen from '../app/protected/inconformidades/[id]/page';
+import RechazosAuxScreen from '../app/protected/rechazos/[id]/page';
 import NotificationsScreen from '../screens/NotificationsScreen';
 
 // Importa stripAccents
@@ -78,8 +79,8 @@ export const InternalStack: React.FC<InternalStackProps> = ({ modules }) => {
         })}
       />
       <Stack.Screen
-        name="RecepcionCQMAuxScreen"
-        component={RecepcionCQMAuxScreen}
+        name="LiberacionDeVistosBuenosAuxScreen"
+        component={LiberacionDeVistosBuenosAuxScreen}
         options={({ route }) => ({
           title: `OT #${(route.params as { id: number }).id}`,
         })}
@@ -87,6 +88,13 @@ export const InternalStack: React.FC<InternalStackProps> = ({ modules }) => {
       <Stack.Screen
         name="InconformidadesAuxScreen"
         component={InconformidadesAuxScreen}
+        options={({ route }) => ({
+          title: `OT #${(route.params as { id: number }).id}`,
+        })}
+      />
+      <Stack.Screen
+        name="RechazosAuxScreen"
+        component={RechazosAuxScreen}
         options={({ route }) => ({
           title: `OT #${(route.params as { id: number }).id}`,
         })}

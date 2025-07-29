@@ -1,15 +1,15 @@
-'use client'
-import styled from "styled-components";
-import { useRouter } from "next/navigation";
-import { useState } from "react";
-import { acceptPrepressInconformity } from "@/api/inconformidades";
+'use client';
+import styled from 'styled-components';
+import { useRouter } from 'next/navigation';
+import { useState } from 'react';
+import { acceptPrepressInconformity } from '@/api/inconformidades';
 
 interface Props {
   workOrder: any;
 }
 
 export default function PreprensaComponent({ workOrder }: Props) {
-  console.log('la misma workorder',workOrder);
+  console.log('la misma workorder', workOrder);
   const router = useRouter();
   const [showModal, setShowModal] = useState(false);
   const openModal = () => {
@@ -31,78 +31,135 @@ export default function PreprensaComponent({ workOrder }: Props) {
       console.error(error);
       alert('Error al conectar con el servidor');
     }
-  }
+  };
 
-  const lastIndex = workOrder.areaResponse.inconformities.length > 1 
-  ? workOrder.areaResponse.inconformities.length - 1 
-  : 0;
+  const lastIndex =
+    workOrder.areaResponse.inconformities.length > 1
+      ? workOrder.areaResponse.inconformities.length - 1
+      : 0;
 
   return (
     <>
-    <FlexContainer>
-    <Container>
-      <NewData>
-        <SectionTitle>Entregaste:</SectionTitle>
-        <NewDataWrapper>
-          <InputGroup>
-            <Label>Placas:</Label>
-            <Input type="number" value={workOrder.areaResponse.prepress.plates} disabled/>
-          </InputGroup>
-          <InputGroup>
-            <Label>Positivos:</Label>
-            <Input type="number" value={workOrder.areaResponse.prepress.positives} disabled/>
-          </InputGroup>
-        </NewDataWrapper>
-        <SectionTitle>Tipo de Prueba</SectionTitle>
-        <NewDataWrapper>
-            <RadioGroup style={{ display: 'flex'}}>
-              <RadioLabel>
-                <Radio type="radio" name="prueba" value="color" checked={workOrder.areaResponse.prepress.testType === "color"} readOnly/>
-                Prueba de color
-              </RadioLabel>
-              <RadioLabel>
-                <Radio type="radio" name="prueba" value="fisica" checked={workOrder.areaResponse.prepress.testType === "fisica"} readOnly/>
-                Muestra física
-              </RadioLabel>
-              <RadioLabel>
-                <Radio type="radio" name="prueba" value="digital" checked={workOrder.areaResponse.prepress.testType === "digital"} readOnly/>
-                Prueba digital
-              </RadioLabel>
-            </RadioGroup>
-        </NewDataWrapper>
-          <InputGroup>
-            <Label>Comentarios</Label>
-            <Textarea value={workOrder.areaResponse.prepress.comments} disabled/>
-          </InputGroup>
-      </NewData>
-    </Container>
-    <Container>
-      <NewData>
-        <SectionTitle>Inconformidad:</SectionTitle>
-        <InputGroup>
-          <Label>Respuesta de Usuario</Label>
-          <Input type="text" value={workOrder.areaResponse.inconformities[lastIndex].user.username} disabled/>
-        </InputGroup>
-        <InputGroup>
-          <Label>Comentarios</Label>
-          <Textarea value={workOrder.areaResponse.inconformities[lastIndex].comments} disabled/>
-        </InputGroup>
-      </NewData>
-    </Container>
-    </FlexContainer>
-    <CloseButton onClick={openModal}>Aceptar Inconformidad</CloseButton>
-    {showModal && (
-      <ModalOverlay>
-        <ModalBox>
-          <h4>¿Estás segura/o que deseas aceptar la inconformidad? Deberás liberar nuevamente</h4>
-          <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '1rem', marginTop: '1rem' }}>
-            <CancelButton onClick={closeModal}>Cancelar</CancelButton>
-            <ConfirmButton onClick={handleSubmit}>Confirmar</ConfirmButton>
-          </div>
-        </ModalBox>
-      </ModalOverlay>
-    )}
-  </>
+      <FlexContainer>
+        <Container>
+          <NewData>
+            <SectionTitle>Entregaste:</SectionTitle>
+            <NewDataWrapper>
+              <InputGroup>
+                <Label>Placas:</Label>
+                <Input
+                  type="number"
+                  value={workOrder.areaResponse.prepress.plates}
+                  disabled
+                />
+              </InputGroup>
+              <InputGroup>
+                <Label>Positivos:</Label>
+                <Input
+                  type="number"
+                  value={workOrder.areaResponse.prepress.positives}
+                  disabled
+                />
+              </InputGroup>
+            </NewDataWrapper>
+            <SectionTitle>Tipo de Prueba</SectionTitle>
+            <NewDataWrapper>
+              <RadioGroup style={{ display: 'flex' }}>
+                <RadioLabel>
+                  <Radio
+                    type="radio"
+                    name="prueba"
+                    value="color"
+                    checked={
+                      workOrder.areaResponse.prepress.testType === 'color'
+                    }
+                    readOnly
+                  />
+                  Prueba de color
+                </RadioLabel>
+                <RadioLabel>
+                  <Radio
+                    type="radio"
+                    name="prueba"
+                    value="fisica"
+                    checked={
+                      workOrder.areaResponse.prepress.testType === 'fisica'
+                    }
+                    readOnly
+                  />
+                  Muestra física
+                </RadioLabel>
+                <RadioLabel>
+                  <Radio
+                    type="radio"
+                    name="prueba"
+                    value="digital"
+                    checked={
+                      workOrder.areaResponse.prepress.testType === 'digital'
+                    }
+                    readOnly
+                  />
+                  Prueba digital
+                </RadioLabel>
+              </RadioGroup>
+            </NewDataWrapper>
+            <InputGroup>
+              <Label>Comentarios</Label>
+              <Textarea
+                value={workOrder.areaResponse.prepress.comments}
+                disabled
+              />
+            </InputGroup>
+          </NewData>
+        </Container>
+        <Container>
+          <NewData>
+            <SectionTitle>Inconformidad:</SectionTitle>
+            <InputGroup>
+              <Label>Respuesta de Usuario</Label>
+              <Input
+                type="text"
+                value={
+                  workOrder.areaResponse.inconformities[lastIndex].user.username
+                }
+                disabled
+              />
+            </InputGroup>
+            <InputGroup>
+              <Label>Comentarios</Label>
+              <Textarea
+                value={
+                  workOrder.areaResponse.inconformities[lastIndex].comments
+                }
+                disabled
+              />
+            </InputGroup>
+          </NewData>
+        </Container>
+      </FlexContainer>
+      <CloseButton onClick={openModal}>Aceptar Inconformidad</CloseButton>
+      {showModal && (
+        <ModalOverlay>
+          <ModalBox>
+            <h4>
+              ¿Estás segura/o que deseas aceptar la inconformidad? Deberás
+              liberar nuevamente
+            </h4>
+            <div
+              style={{
+                display: 'flex',
+                justifyContent: 'flex-end',
+                gap: '1rem',
+                marginTop: '1rem',
+              }}
+            >
+              <CancelButton onClick={closeModal}>Cancelar</CancelButton>
+              <ConfirmButton onClick={handleSubmit}>Confirmar</ConfirmButton>
+            </div>
+          </ModalBox>
+        </ModalOverlay>
+      )}
+    </>
   );
 }
 
@@ -118,13 +175,12 @@ const Container = styled.div`
   background: white;
   padding: 2rem;
   border-radius: 1rem;
-  box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
   flex: 1;
   min-width: 300px;
   max-width: 600px;
 `;
-const NewData = styled.div`
-`;
+const NewData = styled.div``;
 
 const SectionTitle = styled.h3`
   font-size: 1.25rem;
@@ -182,7 +238,7 @@ const Textarea = styled.textarea`
 `;
 
 const CloseButton = styled.button`
-  background: #0038A8;
+  background: #0038a8;
   color: white;
   margin-top: 20px;
   padding: 0.9rem 1.5rem;
@@ -190,11 +246,11 @@ const CloseButton = styled.button`
   border-radius: 0.75rem;
   font-size: 1rem;
   cursor: pointer;
-  box-shadow: 0 3px 6px rgba(0,0,0,0.08);
+  box-shadow: 0 3px 6px rgba(0, 0, 0, 0.08);
   transition: background 0.3s;
 
   &:hover {
-    background: #1D4ED8;
+    background: #1d4ed8;
   }
 `;
 
@@ -205,7 +261,7 @@ const ModalOverlay = styled.div`
   color: black;
   width: 100%;
   height: 100%;
-  background: rgba(0,0,0,0.4);
+  background: rgba(0, 0, 0, 0.4);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -216,13 +272,13 @@ const ModalBox = styled.div`
   background: white;
   padding: 2rem;
   border-radius: 1rem;
-  box-shadow: 0 8px 24px rgba(0,0,0,0.2);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.2);
   max-width: 400px;
   width: 90%;
 `;
 
 const ConfirmButton = styled.button`
-  background-color: #0038A8;
+  background-color: #0038a8;
   color: white;
   padding: 0.5rem 1.5rem;
   border-radius: 0.5rem;
@@ -241,7 +297,7 @@ const ConfirmButton = styled.button`
 `;
 
 const CancelButton = styled.button`
-  background-color: #BBBBBB;
+  background-color: #bbbbbb;
   color: white;
   padding: 0.5rem 1.5rem;
   border-radius: 0.5rem;

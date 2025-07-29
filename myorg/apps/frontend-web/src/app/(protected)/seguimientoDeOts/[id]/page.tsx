@@ -14,7 +14,7 @@ interface Props {
   params: Promise<{ id: string }>;
 }
 
-type AreaData = {
+export type AreaData = {
   id: number;
   name: string;
   status: string;

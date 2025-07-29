@@ -1,6 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import { PrismaService } from 'prisma/prisma.service';
 import { AcceptAuditoryDto } from './dto/accept-workorder-response';
+import { FormAuditory } from '@prisma/client';
 
 @Injectable()
 export class AcceptAuditoryWorkOrderService {
@@ -81,6 +82,7 @@ export class AcceptAuditoryWorkOrderService {
           id: partial.id,
           reviewed_by_id: userId,
           sample_auditory: dto.sample_auditory,
+          work_order_flow_id: partial.work_order_flow_id,
         },
       });
       await this.prisma.partialRelease.update({
@@ -139,6 +141,7 @@ export class AcceptAuditoryWorkOrderService {
           id: pendingPartial.id,
           reviewed_by_id: userId,
           sample_auditory: dto.sample_auditory,
+          work_order_flow_id: pendingPartial.work_order_flow_id,
         },
       });
       const nextFlow = await this.prisma.workOrderFlow.findFirst({
@@ -157,18 +160,35 @@ export class AcceptAuditoryWorkOrderService {
       return formAuditory;
     }
     // Si no hay parcial pendiente, se completa normalmente
-    const formAuditory = await this.prisma.formAuditory.upsert({
-      where: { id: corte.form_auditory_id },
-      update: {
-        reviewed_by_id: userId,
-        sample_auditory: dto.sample_auditory,
-      },
-      create: {
-        id: corte.id,
-        reviewed_by_id: userId,
-        sample_auditory: dto.sample_auditory,
-      },
-    });
+    let formAuditory: FormAuditory;
+
+    if (corte.form_auditory_id != null) {
+      formAuditory = await this.prisma.formAuditory.upsert({
+        where: { id: corte.form_auditory_id },
+        update: {
+          reviewed_by_id: userId,
+          sample_auditory: dto.sample_auditory,
+        },
+        create: {
+          id: corte.id,
+          reviewed_by_id: userId,
+          sample_auditory: dto.sample_auditory,
+          work_order_flow_id: workOrderFlow.id,
+        },
+      });
+    } else {
+      formAuditory = await this.prisma.formAuditory.create({
+        data: {
+          reviewed_by_id: userId,
+          sample_auditory: dto.sample_auditory,
+          work_order_flow_id: workOrderFlow.id,
+        },
+      });
+      await this.prisma.corteResponse.update({
+        where: { id: corte.id },
+        data: { form_auditory_id: formAuditory.id },
+      });
+    }
     await this.prisma.workOrderFlow.update({
       where: { id: workOrderFlow.id },
       data: { status: 'Completado' },
@@ -233,6 +253,7 @@ export class AcceptAuditoryWorkOrderService {
           id: partial?.id,
           reviewed_by_id: userId,
           sample_auditory: dto.sample_auditory,
+          work_order_flow_id: partial?.work_order_flow_id,
         },
       });
       await this.prisma.partialRelease.update({
@@ -291,6 +312,7 @@ export class AcceptAuditoryWorkOrderService {
           id: pendingPartial?.id,
           reviewed_by_id: userId,
           sample_auditory: dto.sample_auditory,
+          work_order_flow_id: pendingPartial.work_order_flow_id,
         },
       });
       const nextFlow = await this.prisma.workOrderFlow.findFirst({
@@ -309,18 +331,35 @@ export class AcceptAuditoryWorkOrderService {
       return formAuditory;
     }
     // Si no hay parcial pendiente, se completa normalmente
-    const formAuditory = await this.prisma.formAuditory.upsert({
-      where: { id: colorEdge.form_auditory_id },
-      update: {
-        reviewed_by_id: userId,
-        sample_auditory: dto.sample_auditory,
-      },
-      create: {
-        id: colorEdge.form_auditory_id,
-        reviewed_by_id: userId,
-        sample_auditory: dto.sample_auditory,
-      },
-    });
+    let formAuditory: FormAuditory;
+
+    if (colorEdge.form_auditory_id != null) {
+      formAuditory = await this.prisma.formAuditory.upsert({
+        where: { id: colorEdge.form_auditory_id },
+        update: {
+          reviewed_by_id: userId,
+          sample_auditory: dto.sample_auditory,
+        },
+        create: {
+          id: colorEdge.form_auditory_id,
+          reviewed_by_id: userId,
+          sample_auditory: dto.sample_auditory,
+          work_order_flow_id: workOrderFlow.id,
+        },
+      });
+    } else {
+      formAuditory = await this.prisma.formAuditory.create({
+        data: {
+          reviewed_by_id: userId,
+          sample_auditory: dto.sample_auditory,
+          work_order_flow_id: workOrderFlow.id,
+        },
+      });
+      await this.prisma.colorEdgeResponse.update({
+        where: { id: colorEdge.id },
+        data: { form_auditory_id: formAuditory.id },
+      });
+    }
     await this.prisma.workOrderFlow.update({
       where: { id: workOrderFlow.id },
       data: { status: 'Completado' },
@@ -385,6 +424,7 @@ export class AcceptAuditoryWorkOrderService {
           id: partial.id,
           reviewed_by_id: userId,
           sample_auditory: dto.sample_auditory,
+          work_order_flow_id: partial.work_order_flow_id,
         },
       });
       await this.prisma.partialRelease.update({
@@ -434,7 +474,7 @@ export class AcceptAuditoryWorkOrderService {
       });
       await this.prisma.workOrderFlow.update({
         where: { id: pendingPartial.work_order_flow_id },
-        data: { status: 'Parcial' },
+        data: { status: 'Completado' },
       });
       const formAuditory = await this.prisma.formAuditory.upsert({
         where: { id: pendingPartial.id },
@@ -446,6 +486,7 @@ export class AcceptAuditoryWorkOrderService {
           id: pendingPartial.id,
           reviewed_by_id: userId,
           sample_auditory: dto.sample_auditory,
+          work_order_flow_id: pendingPartial.work_order_flow_id,
         },
       });
       const nextFlow = await this.prisma.workOrderFlow.findFirst({
@@ -463,18 +504,36 @@ export class AcceptAuditoryWorkOrderService {
       }
       return formAuditory;
     }
-    const formAuditory = await this.prisma.formAuditory.upsert({
-      where: { id: hotStamping.form_auditory_id },
-      update: {
-        reviewed_by_id: userId,
-        sample_auditory: dto.sample_auditory,
-      },
-      create: {
-        id: hotStamping.id,
-        reviewed_by_id: userId,
-        sample_auditory: dto.sample_auditory,
-      },
-    });
+    // Si no hay parcial pendiente, se completa normalmente
+    let formAuditory: FormAuditory;
+
+    if (hotStamping.form_auditory_id != null) {
+      formAuditory = await this.prisma.formAuditory.upsert({
+        where: { id: hotStamping.form_auditory_id },
+        update: {
+          reviewed_by_id: userId,
+          sample_auditory: dto.sample_auditory,
+        },
+        create: {
+          id: hotStamping.id,
+          reviewed_by_id: userId,
+          sample_auditory: dto.sample_auditory,
+          work_order_flow_id: workOrderFlow.id,
+        },
+      });
+    } else {
+      formAuditory = await this.prisma.formAuditory.create({
+        data: {
+          reviewed_by_id: userId,
+          sample_auditory: dto.sample_auditory,
+          work_order_flow_id: workOrderFlow.id,
+        },
+      });
+      await this.prisma.hotStampingResponse.update({
+        where: { id: hotStamping.id },
+        data: { form_auditory_id: formAuditory.id },
+      });
+    }
     await this.prisma.workOrderFlow.update({
       where: { id: workOrderFlow.id },
       data: { status: 'Completado' },
@@ -539,6 +598,7 @@ export class AcceptAuditoryWorkOrderService {
           id: partial.id,
           reviewed_by_id: userId,
           sample_auditory: dto.sample_auditory,
+          work_order_flow_id: partial.work_order_flow_id,
         },
       });
       await this.prisma.partialRelease.update({
@@ -599,6 +659,7 @@ export class AcceptAuditoryWorkOrderService {
           id: pendingPartial.id,
           reviewed_by_id: userId,
           sample_auditory: dto.sample_auditory,
+          work_order_flow_id: pendingPartial.work_order_flow_id,
         },
       });
       const nextFlow = await this.prisma.workOrderFlow.findFirst({
@@ -616,18 +677,36 @@ export class AcceptAuditoryWorkOrderService {
       }
       return formAuditory;
     }
-    const formAuditory = await this.prisma.formAuditory.upsert({
-      where: { id: millingChip.form_auditory_id },
-      update: {
-        reviewed_by_id: userId,
-        sample_auditory: dto.sample_auditory,
-      },
-      create: {
-        id: millingChip.id,
-        reviewed_by_id: userId,
-        sample_auditory: dto.sample_auditory,
-      },
-    });
+    // Si no hay parcial pendiente, se completa normalmente
+    let formAuditory: FormAuditory;
+
+    if (millingChip.form_auditory_id != null) {
+      formAuditory = await this.prisma.formAuditory.upsert({
+        where: { id: millingChip.form_auditory_id },
+        update: {
+          reviewed_by_id: userId,
+          sample_auditory: dto.sample_auditory,
+        },
+        create: {
+          id: millingChip.id,
+          reviewed_by_id: userId,
+          sample_auditory: dto.sample_auditory,
+          work_order_flow_id: workOrderFlow.id,
+        },
+      });
+    } else {
+      formAuditory = await this.prisma.formAuditory.create({
+        data: {
+          reviewed_by_id: userId,
+          sample_auditory: dto.sample_auditory,
+          work_order_flow_id: workOrderFlow.id,
+        },
+      });
+      await this.prisma.millingChipResponse.update({
+        where: { id: millingChip.id },
+        data: { form_auditory_id: formAuditory.id },
+      });
+    }
     await this.prisma.workOrderFlow.update({
       where: { id: workOrderFlow.id },
       data: { status: 'Completado' },
@@ -693,6 +772,7 @@ export class AcceptAuditoryWorkOrderService {
           id: partial.id,
           reviewed_by_id: userId,
           sample_auditory: dto.sample_auditory,
+          work_order_flow_id: partial.work_order_flow_id,
         },
       });
       await this.prisma.partialRelease.update({
@@ -751,6 +831,7 @@ export class AcceptAuditoryWorkOrderService {
           id: pendingPartial.id,
           reviewed_by_id: userId,
           sample_auditory: dto.sample_auditory,
+          work_order_flow_id: pendingPartial.work_order_flow_id,
         },
       });
       const nextFlow = await this.prisma.workOrderFlow.findFirst({
@@ -768,18 +849,36 @@ export class AcceptAuditoryWorkOrderService {
       }
       return formAuditory;
     }
-    const formAuditory = await this.prisma.formAuditory.upsert({
-      where: { id: personalizacion.form_auditory_id },
-      update: {
-        reviewed_by_id: userId,
-        sample_auditory: dto.sample_auditory,
-      },
-      create: {
-        id: personalizacion.id,
-        reviewed_by_id: userId,
-        sample_auditory: dto.sample_auditory,
-      },
-    });
+    // Si no hay parcial pendiente, se completa normalmente
+    let formAuditory: FormAuditory;
+
+    if(personalizacion.form_auditory_id != null) {
+      formAuditory = await this.prisma.formAuditory.upsert({
+        where: { id: personalizacion.form_auditory_id },
+        update: {
+          reviewed_by_id: userId,
+          sample_auditory: dto.sample_auditory,
+        },
+        create: {
+          id: personalizacion.id,
+          reviewed_by_id: userId,
+          sample_auditory: dto.sample_auditory,
+          work_order_flow_id: workOrderFlow.id,
+        },
+      });
+    } else {
+      formAuditory = await this.prisma.formAuditory.create({
+        data: {
+          reviewed_by_id: userId,
+          sample_auditory: dto.sample_auditory,
+          work_order_flow_id: workOrderFlow.id,
+        },
+      });
+      await this.prisma.personalizacionResponse.update({
+        where: { id: personalizacion.id },
+        data: { form_auditory_id: formAuditory.id },
+      });
+    }
     await this.prisma.workOrderFlow.update({
       where: { id: workOrderFlow.id },
       data: { status: 'Completado' },

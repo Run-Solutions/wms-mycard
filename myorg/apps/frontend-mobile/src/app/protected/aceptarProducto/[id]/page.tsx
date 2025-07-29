@@ -18,10 +18,17 @@ import ImpresionComponentAccept from '../../../../components/AceptarProducto/Imp
 import SerigrafiaComponentAccept from '../../../../components/AceptarProducto/SerigrafiaComponentAccept';
 import EmpalmeComponentAccept from '../../../../components/AceptarProducto/EmpalmeComponentAccept';
 import LaminacionComponentAccept from '../../../../components/AceptarProducto/LaminacionComponentAccept';
-
+import CorteComponentAccept from '../../../../components/AceptarProducto/CorteComponentAccept';
+import ColorEdgeComponentAccept from '../../../../components/AceptarProducto/ColorEdgeComponentAccept';
+import HotStampingComponentAccept from '../../../../components/AceptarProducto/HotStampingComponentAccept';
+import MillingChipComponentAccept from '../../../../components/AceptarProducto/MillingChipComponentAccept';
+import PersonalizacionComponentAccept from '../../../../components/AceptarProducto/PersonalizacionComponentAccept';
 import { InternalStackParamList } from '../../../../navigation/types';
 
-type RouteParams = RouteProp<InternalStackParamList, 'AceptarProductoAuxScreen'>;
+type RouteParams = RouteProp<
+  InternalStackParamList,
+  'AceptarProductoAuxScreen'
+>;
 
 const AceptarProductoAuxScreen: React.FC = () => {
   const route = useRoute<RouteParams>();
@@ -52,15 +59,32 @@ const AceptarProductoAuxScreen: React.FC = () => {
     let lastStep;
 
     if (workOrder.status === 'Pendiente') {
-      lastStep = [...workOrder.workOrder.flow].reverse().find((step) => step.status === 'Completado');
-    } else if (workOrder.status === 'Pendiente' && workOrder.workOrder.flow.partialReleases?.length > 0) {
-      lastStep = [...workOrder.workOrder.flow].reverse().find((step) =>
-        ['Listo', 'Enviado a CQM', 'En calidad', 'Parcial'].includes(step.status)
-      );
+      lastStep = [...workOrder.workOrder.flow]
+        .reverse()
+        .find((step) => step.status === 'Completado');
+    } else if (
+      workOrder.status === 'Pendiente' &&
+      workOrder.workOrder.flow.partialReleases?.length > 0
+    ) {
+      lastStep = [...workOrder.workOrder.flow]
+        .reverse()
+        .find((step) =>
+          ['Listo', 'Enviado a CQM', 'En calidad', 'Parcial'].includes(
+            step.status
+          )
+        );
     } else if (workOrder.status === 'Pendiente parcial') {
-      lastStep = [...workOrder.workOrder.flow].reverse().find((step) =>
-        ['Listo', 'Enviado a CQM', 'En calidad', 'Parcial', 'En proceso'].includes(step.status)
-      );
+      lastStep = [...workOrder.workOrder.flow]
+        .reverse()
+        .find((step) =>
+          [
+            'Listo',
+            'Enviado a CQM',
+            'En calidad',
+            'Parcial',
+            'En proceso',
+          ].includes(step.status)
+        );
     }
     console.log(lastStep);
 
@@ -75,34 +99,44 @@ const AceptarProductoAuxScreen: React.FC = () => {
         return <EmpalmeComponentAccept workOrder={workOrder} />;
       case 5:
         return <LaminacionComponentAccept workOrder={workOrder} />;
-    default:
+      case 6:
+        return <CorteComponentAccept workOrder={workOrder} />;
+      case 7:
+        return <ColorEdgeComponentAccept workOrder={workOrder} />;
+      case 8:
+        return <HotStampingComponentAccept workOrder={workOrder} />;
+      case 9:
+        return <MillingChipComponentAccept workOrder={workOrder} />;
+      case 10:
+        return <PersonalizacionComponentAccept workOrder={workOrder} />;
+      default:
         return <Text style={styles.title}>Área no reconocida.</Text>;
     }
   };
 
-    return (
-      <ScrollView contentContainerStyle={styles.container}>
-        {loading ? (
-          <ActivityIndicator size="large" color="#2563EB" />
-        ) : (
-          renderComponentByArea()
-        )}
-      </ScrollView>
-    );
-  };
+  return (
+    <ScrollView contentContainerStyle={styles.container}>
+      {loading ? (
+        <ActivityIndicator size="large" color="#2563EB" />
+      ) : (
+        renderComponentByArea()
+      )}
+    </ScrollView>
+  );
+};
 
-  export default AceptarProductoAuxScreen;
+export default AceptarProductoAuxScreen;
 
-  const styles = StyleSheet.create({
-    container: {
-      padding: 16,
-      backgroundColor: '#fdfaf6',
-      flexGrow: 1,
-    },
-    title: {
-      fontSize: 20,
-      fontWeight: 'bold',
-      marginVertical: 16,
-      textAlign: 'center',
-    },
-  });
+const styles = StyleSheet.create({
+  container: {
+    padding: 16,
+    backgroundColor: '#fdfaf6',
+    flexGrow: 1,
+  },
+  title: {
+    fontSize: 20,
+    fontWeight: 'bold',
+    marginVertical: 16,
+    textAlign: 'center',
+  },
+});

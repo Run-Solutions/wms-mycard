@@ -10,9 +10,9 @@ import {
 
 // Define un tipo para los valores del formulario
 type ColorEdgeData = {
-  good_quantity: number;
-  bad_quantity: number;
-  excess_quantity: number;
+  good_quantity: number | string;
+  bad_quantity: number | string;
+  excess_quantity: number | string;
   cqm_quantity: string;
   comments: string;
 };
@@ -39,13 +39,18 @@ export default function ColorEdgeComponentAcceptAuditory({ workOrder }: Props) {
   const [isDisabled, setIsDisabled] = useState(true);
 
   const [sampleAuditory, setSampleQuantity] = useState('');
+  const [showBadQuantity, setShowBadQuantity] = useState(false);
+  const [areaBadQuantities, setAreaBadQuantities] = useState<{
+    [areaName: string]: string;
+  }>({});
+  const [materialBadQuantity, setMaterialBadQuantity] = useState<string>('0');
 
   if (workOrder.area_id >= 2) {
     // Estados tipados para los valores predeterminados y actuales
     const [defaultValues, setDefaultValues] = useState<ColorEdgeData>({
-      good_quantity: 0,
-      bad_quantity: 0,
-      excess_quantity: 0,
+      good_quantity: '',
+      bad_quantity: '',
+      excess_quantity: '',
       cqm_quantity: '',
       comments: '',
     });
@@ -99,7 +104,7 @@ export default function ColorEdgeComponentAcceptAuditory({ workOrder }: Props) {
           bad_quantity: restantebad > 0 ? restantebad : 0,
           excess_quantity: restanteexc > 0 ? restanteexc : 0,
           cqm_quantity: cqm_quantity || '',
-          comments: '', // puedes ajustar si quieres comentarios por defecto
+          comments: colorEdge.comments || '',
         };
         setDefaultValues(vals);
       } else {
@@ -148,6 +153,111 @@ export default function ColorEdgeComponentAcceptAuditory({ workOrder }: Props) {
         alert('Error al conectar con el servidor');
       }
     };
+    const currentFlow = workOrder;
+    const flowList = [...workOrder.workOrder.flow];
+    const currentIndex = flowList.findIndex(
+      (item) => item.id === currentFlow?.id
+    );
+    const previousFlows = flowList
+      .slice(0, currentIndex + 1)
+      .filter((flow) => flow.area_id !== 1);
+
+    console.log('Áreas anteriores sin Preprensa:', previousFlows);
+    const handleOpenBadQuantityModal = () => {
+      const initialValues: { [areaName: string]: string } = {};
+
+      previousFlows.forEach((flow) => {
+        const areaName = flow.area.name;
+
+        let badQuantity: number | null | undefined = null;
+        let materialBadQuantity: number | null | undefined = null;
+
+        // Primero, busca en areaResponse
+        if (flow.areaResponse?.impression) {
+          badQuantity = flow.areaResponse.impression.bad_quantity;
+        } else if (flow.areaResponse?.serigrafia) {
+          badQuantity = flow.areaResponse.serigrafia.bad_quantity;
+        } else if (flow.areaResponse?.laminacion) {
+          badQuantity = flow.areaResponse.laminacion.bad_quantity;
+        } else if (flow.areaResponse?.corte) {
+          badQuantity = flow.areaResponse.corte.bad_quantity;
+          materialBadQuantity = flow.areaResponse.corte.material_quantity;
+        } else if (flow.areaResponse?.colorEdge) {
+          badQuantity = flow.areaResponse.colorEdge.bad_quantity;
+          materialBadQuantity = flow.areaResponse.colorEdge.material_quantity;
+        }
+
+        // Si sigue sin valor, busca en partialReleases
+        if (
+          (badQuantity === null || badQuantity === undefined) &&
+          flow.partialReleases?.length > 0
+        ) {
+          badQuantity = flow.partialReleases.reduce(
+            (sum: number, release: any) => {
+              return sum + (release.bad_quantity ?? 0);
+            },
+            0
+          );
+          materialBadQuantity = flow.partialReleases.reduce(
+            (sum: number, release: any) => {
+              return sum + (release.material_quantity ?? 0);
+            },
+            0
+          );
+        }
+
+        // Guardar valores por separado
+        initialValues[`${areaName}_bad`] =
+          badQuantity !== null && badQuantity !== undefined
+            ? String(badQuantity)
+            : '';
+
+        initialValues[`${areaName}_material`] =
+          materialBadQuantity !== null && materialBadQuantity !== undefined
+            ? String(materialBadQuantity)
+            : '';
+      });
+
+      setAreaBadQuantities(initialValues);
+      setShowBadQuantity(true);
+      console.log('Valores iniciales para malas por área:', initialValues);
+    };
+
+    const sumaBadQuantity = previousFlows.reduce((sum, flow) => {
+      let bad = 0;
+
+      if (flow.areaResponse?.impression) {
+        bad = flow.areaResponse.impression.bad_quantity || 0;
+      } else if (flow.areaResponse?.serigrafia) {
+        bad = flow.areaResponse.serigrafia.bad_quantity || 0;
+      } else if (flow.areaResponse?.laminacion) {
+        bad = flow.areaResponse.laminacion.bad_quantity || 0;
+      } else if (flow.areaResponse?.corte) {
+        const corte = flow.areaResponse.corte;
+        const corteBad = corte.bad_quantity || 0;
+        const corteMaterial = corte.material_quantity || 0; // ← suma también este
+        bad = corteBad + corteMaterial;
+      } else if (flow.areaResponse?.colorEdge) {
+        const colorEdge = flow.areaResponse.colorEdge;
+        const colorEdgeBad = colorEdge.bad_quantity || 0;
+        const colorEdgeMaterial = colorEdge.material_quantity || 0; // ← suma también este
+        bad = colorEdgeBad + colorEdgeMaterial;
+      }
+
+      // Si no hay respuesta y sí hay parciales
+      if (bad === 0 && flow.partialReleases?.length > 0) {
+        bad = flow.partialReleases.reduce(
+          (partialSum: number, release: any) => {
+            const badQty = release.bad_quantity ?? 0;
+            const materialQty = release.material_quantity ?? 0;
+            return partialSum + badQty + materialQty; // ← también suma material aquí
+          },
+          0
+        );
+      }
+
+      return sum + bad;
+    }, 0);
 
     return (
       <Container>
@@ -195,8 +305,9 @@ export default function ColorEdgeComponentAcceptAuditory({ workOrder }: Props) {
               <Input
                 type="number"
                 name="bad_quantity"
-                value={defaultValues.bad_quantity}
-                disabled
+                value={sumaBadQuantity}
+                onClick={handleOpenBadQuantityModal}
+                readOnly
               />
               <Label>Excedente:</Label>
               <Input
@@ -215,6 +326,7 @@ export default function ColorEdgeComponentAcceptAuditory({ workOrder }: Props) {
               <Label>Muestras:</Label>
               <Input
                 type="number"
+                min={0}
                 value={sampleAuditory}
                 onChange={(e) => setSampleQuantity(e.target.value)}
               />
@@ -231,6 +343,82 @@ export default function ColorEdgeComponentAcceptAuditory({ workOrder }: Props) {
         <AceptarButton onClick={() => setShowConfirm(true)}>
           Aceptar recepción del producto
         </AceptarButton>
+        {/* Modal para marcar malas por areas previas al liberar */}
+        {showBadQuantity && (
+          <ModalOverlay>
+            <ModalBox>
+              <h4>Registrar malas por área</h4>
+              {previousFlows.map((flow) => {
+                const areaKey = flow.area.name.toLowerCase(); // para coincidir con las claves
+                return (
+                  <div
+                    key={flow.id}
+                    style={{
+                      display: 'flex',
+                      flexDirection: 'column',
+                      alignItems: 'flex-start',
+                      gap: '0.5rem',
+                      marginTop: '1rem',
+                    }}
+                  >
+                    <Label style={{ fontWeight: 'bold' }}>
+                      {flow.area.name.toUpperCase()}
+                    </Label>
+
+                    <div style={{ display: 'flex', gap: '1rem' }}>
+                      <div>
+                        <Label>Malas</Label>
+                        <InputBad
+                          type="number"
+                          min="0"
+                          readOnly
+                          value={areaBadQuantities[`${areaKey}_bad`] || '0'}
+                          onChange={(e) =>
+                            setAreaBadQuantities({
+                              ...areaBadQuantities,
+                              [`${areaKey}_bad`]: e.target.value,
+                            })
+                          }
+                        />
+                      </div>
+                      {flow.area_id >= 6 && (
+                        <div>
+                          <Label>Malo de fábrica</Label>
+                          <InputBad
+                            type="number"
+                            min="0"
+                            readOnly
+                            value={
+                              areaBadQuantities[`${areaKey}_material`] || '0'
+                            }
+                            onChange={(e) =>
+                              setAreaBadQuantities({
+                                ...areaBadQuantities,
+                                [`${areaKey}_material`]: e.target.value,
+                              })
+                            }
+                          />
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                );
+              })}
+              <div
+                style={{
+                  display: 'flex',
+                  justifyContent: 'flex-end',
+                  gap: '1rem',
+                  marginTop: '1rem',
+                }}
+              >
+                <CancelButton onClick={() => setShowBadQuantity(false)}>
+                  Cerrar
+                </CancelButton>
+              </div>
+            </ModalBox>
+          </ModalOverlay>
+        )}
         {showConfirm && (
           <ModalOverlay>
             <ModalBox>
@@ -374,6 +562,22 @@ const Input = styled.input`
   border: 2px solid #d1d5db;
   border-radius: 0.5rem;
   color: black;
+  margin-top: 0.25rem;
+  outline: none;
+  font-size: 1rem;
+  transition: border 0.3s;
+
+  &:focus {
+    border-color: #0038a8;
+  }
+`;
+
+const InputBad = styled.input`
+  width: 100%;
+  color: black;
+  padding: 0.75rem 1rem;
+  border: 2px solid #d1d5db;
+  border-radius: 0.5rem;
   margin-top: 0.25rem;
   outline: none;
   font-size: 1rem;

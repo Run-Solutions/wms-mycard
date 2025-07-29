@@ -91,7 +91,7 @@ const SerigrafiaComponentAccept: React.FC<{ workOrder: any }> = ({
   
         const vals: SerigrafiaData = {
           release_quantity: restante > 0 ? restante : 0,
-          comments: '', // puedes ajustar si quieres comentarios por defecto
+          comments: serigrafia.comments || '',
         };
         setDefaultValues(vals);
       } else {

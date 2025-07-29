@@ -18,7 +18,7 @@ interface WorkOrder {
   createdAt: string;
   updatedAt: string;
   user: {
-    username: string
+    username: string;
   };
   files: {
     id: number;
@@ -32,7 +32,7 @@ interface WorkOrder {
     assigned_user?: number;
     area?: {
       name?: string;
-    }
+    };
     // otros campos que necesites
   }[];
   formAnswers?: any[]; // Añadir si es necesario
@@ -43,13 +43,16 @@ const InconformidadesPage: React.FC = () => {
   useEffect(() => {
     async function fetchAllWorkOrders() {
       try {
-        const data = await getWorkOrdersWithInconformidad();
-        console.log('Datos de Ordenes: ', data);
-        if (!Array.isArray(data)) {
-          return;
+        const { pendingOrders } = await getWorkOrdersWithInconformidad();
+        console.log('Datos de Ordenes: ', pendingOrders);
+
+        // Extrae los workOrders de cada elemento
+        if (pendingOrders && Array.isArray(pendingOrders)) {
+          const workOrders = pendingOrders.map((item: any) => item.workOrder);
+          setWorkOrders(workOrders);
+        } else {
+          console.warn('pendingOrdersAuditory no está definido o no es un arreglo', pendingOrders);
         }
-        const workOrders = data.map((item: any) => item.workOrder);
-        setWorkOrders(workOrders);
       } catch (err) {
         console.error(err);
         console.error('Error en fetchAllWorkOrders', err);
@@ -63,8 +66,16 @@ const InconformidadesPage: React.FC = () => {
       <TitleWrapper>
         <Title>Inconformidades</Title>
       </TitleWrapper>
-      <WorkOrderTable orders={WorkOrders} title='Ordenes Devueltas por Inconformidad' statusFilter='En inconformidad'/>
-      <WorkOrderTable orders={WorkOrders} title='Ordenes Devueltas por Inconformidad En Calidad' statusFilter='En inconformidad CQM'/>
+      <WorkOrderTable
+        orders={WorkOrders}
+        title="Ordenes Devueltas por Inconformidad"
+        statusFilter="En inconformidad"
+      />
+      <WorkOrderTable
+        orders={WorkOrders}
+        title="Ordenes Devueltas por Inconformidad En Calidad"
+        statusFilter="En inconformidad CQM"
+      />
     </PageContainer>
   );
 };
@@ -87,5 +98,5 @@ const TitleWrapper = styled.div`
 const Title = styled.h1<{ theme: any }>`
   font-size: 2rem;
   font-weight: 500;
-  color: ${({ theme }) => theme.palette.text.primary}
+  color: ${({ theme }) => theme.palette.text.primary};
 `;

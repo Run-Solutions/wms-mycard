@@ -73,7 +73,13 @@ const FreeProductPage: React.FC = () => {
       <WorkOrderTable
         orders={WorkOrders}
         title="Órdenes en Proceso"
-        statusFilter={['En Proceso', 'Enviado a CQM', 'En Calidad', 'Parcial']}
+        statusFilter={[
+          'En Proceso',
+          'Enviado a CQM',
+          'En Calidad',
+          'Parcial',
+          'En inconformidad auditoria',
+        ]}
       />
       {currentAreaId !== 1 && (
         <>
@@ -114,70 +120,4 @@ const Title = styled.h1<{ theme: any }>`
   font-size: 2rem;
   font-weight: 500;
   color: ${({ theme }) => theme.palette.text.primary};
-`;
-
-const Timeline = styled.div`
-  display: flex;
-  flex-direction: row;
-  overflow-x: auto;
-  width: 100%;
-  gap: 18px;
-  box-sizing: border-box;
-  margin-right: 0;
-`;
-
-const TimelineItem = styled.div`
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  position: relative;
-  min-width: 65px;
-
-  &:last-child {
-    margin-right: 0;
-  }
-`;
-
-const Circle = styled.div.withConfig({
-  shouldForwardProp: (prop) => prop !== '$isActive',
-})<StyledProps>`
-  width: 30px;
-  height: 30px;
-  background-color: ${({ $isActive }) => ($isActive ? '#4a90e2' : '#d1d5db')};
-  border-radius: 50%;
-  color: white;
-  font-size: 12px;
-  font-weight: bold;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  z-index: 2;
-  box-shadow: ${({ $isActive }) => ($isActive ? '0 0 5px #4a90e2' : 'none')};
-  transition: background-color 0.3s, box-shadow 0.3s;
-`;
-
-const Line = styled.div.withConfig({
-  shouldForwardProp: (prop) => prop !== '$isLast',
-})<{ $isLast: boolean }>`
-  position: absolute;
-  top: 14px;
-  left: 50%;
-  height: 2px;
-  width: 80px;
-  background-color: #d1d5db;
-  z-index: 0;
-  display: ${({ $isLast }) => ($isLast ? 'none' : 'block')};
-`;
-
-const AreaName = styled.span.withConfig({
-  shouldForwardProp: (prop) => prop !== '$isActive',
-})<StyledProps>`
-  margin-top: 0.5rem;
-  font-size: 0.75rem;
-  font-weight: ${({ $isActive }) => ($isActive ? 'bold' : 'normal')};
-  color: ${({ $isActive }) => ($isActive ? '#4a90e2' : '#6b7280')};
-  text-align: center;
-  max-width: 80px;
-  text-transform: capitalize;
-  transition: color 0.3s, font-weight 0.3s;
 `;

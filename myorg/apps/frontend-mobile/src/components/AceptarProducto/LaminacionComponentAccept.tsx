@@ -91,7 +91,7 @@ const LaminacionComponentAccept: React.FC<{ workOrder: any }> = ({
 
       const vals: LaminacionData = {
         release_quantity: restante > 0 ? restante : 0,
-        comments: '', // puedes ajustar si quieres comentarios por defecto
+        comments: laminacion.comments || '',
       };
       setDefaultValues(vals);
     } else {

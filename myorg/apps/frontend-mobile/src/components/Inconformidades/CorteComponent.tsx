@@ -9,7 +9,7 @@ import {
   Alert,
   Platform,
 } from 'react-native';
-import { TextInput } from "react-native-paper";
+import { TextInput } from 'react-native-paper';
 import { useNavigation } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { RootStackParamList } from '../../navigation/types';
@@ -24,7 +24,8 @@ interface PartialRelease {
 }
 
 const CorteComponent: React.FC<{ workOrder: any }> = ({ workOrder }) => {
-  const navigation = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
+  const navigation =
+    useNavigation<NativeStackNavigationProp<RootStackParamList>>();
   const [showModal, setShowModal] = useState(false);
 
   const openModal = () => setShowModal(true);
@@ -50,13 +51,16 @@ const CorteComponent: React.FC<{ workOrder: any }> = ({ workOrder }) => {
     ? lastPartialRelease.observation
     : workOrder.areaResponse?.corte.comments;
 
-  const inconformityUser = lastPartialRelease
-    ? lastPartialRelease.inconformities[0]?.user.username
-    : workOrder.areaResponse?.inconformities.at(-1)?.user.username;
+  const inconformityList = lastPartialRelease
+    ? lastPartialRelease.inconformities
+    : workOrder.areaResponse?.inconformities || [];
 
-  const inconformityComments = lastPartialRelease
-    ? lastPartialRelease.inconformities[0]?.comments
-    : workOrder.areaResponse?.inconformities.at(-1)?.comments;
+  const lastUnreviewedInconformity = [...inconformityList]
+    .reverse()
+    .find((i) => i.reviewed === false);
+
+  const inconformityUser = lastUnreviewedInconformity?.user.username;
+  const inconformityComments = lastUnreviewedInconformity?.comments;
 
   const handleSubmit = async () => {
     const partialRelease = workOrder.partialReleases.find(
@@ -68,11 +72,10 @@ const CorteComponent: React.FC<{ workOrder: any }> = ({ workOrder }) => {
 
     console.log(areaResponseFlowId);
     try {
-
       await acceptCorteInconformity(areaResponseFlowId);
       setShowModal(false);
       Alert.alert('Inconformidad aceptada');
-      navigation.navigate('liberarProducto');
+      navigation.goBack();
     } catch (error: any) {
       Alert.alert('Error al aceptar', error.message || 'Ocurrió un error');
     } finally {
@@ -82,24 +85,35 @@ const CorteComponent: React.FC<{ workOrder: any }> = ({ workOrder }) => {
 
   return (
     <View>
-      <ScrollView contentContainerStyle={[styles.container, { paddingBottom: 230 }]}>
+      <ScrollView
+        contentContainerStyle={[styles.container, { paddingBottom: 230 }]}
+      >
         <Text style={styles.title}>Área: Corte</Text>
 
         <View style={styles.card}>
           <Text style={styles.subtitle}>Buenas:</Text>
-          <TextInput style={styles.input} editable={false} value={String(releaseQuantity)}
+          <TextInput
+            style={styles.input}
+            editable={false}
+            value={String(releaseQuantity)}
             mode="outlined"
             activeOutlineColor="#000"
             theme={{ roundness: 30 }}
           />
           <Text style={styles.subtitle}>Malas:</Text>
-          <TextInput style={styles.input} editable={false} value={String(releaseBad)}
+          <TextInput
+            style={styles.input}
+            editable={false}
+            value={String(releaseBad)}
             mode="outlined"
             activeOutlineColor="#000"
             theme={{ roundness: 30 }}
           />
           <Text style={styles.subtitle}>Excedente:</Text>
-          <TextInput style={styles.input} editable={false} value={String(releaseExcess)}
+          <TextInput
+            style={styles.input}
+            editable={false}
+            value={String(releaseExcess)}
             mode="outlined"
             activeOutlineColor="#000"
             theme={{ roundness: 30 }}
@@ -146,13 +160,20 @@ const CorteComponent: React.FC<{ workOrder: any }> = ({ workOrder }) => {
           <View style={styles.modalOverlay}>
             <View style={styles.modalBox}>
               <Text style={styles.modalText}>
-                ¿Estás segura/o que deseas aceptar la inconformidad? Deberás liberar nuevamente.
+                ¿Estás segura/o que deseas aceptar la inconformidad? Deberás
+                liberar nuevamente.
               </Text>
               <View style={styles.modalActions}>
-                <TouchableOpacity style={styles.cancelButton} onPress={closeModal}>
+                <TouchableOpacity
+                  style={styles.cancelButton}
+                  onPress={closeModal}
+                >
                   <Text style={styles.modalButtonText}>Cancelar</Text>
                 </TouchableOpacity>
-                <TouchableOpacity style={styles.confirmButton} onPress={handleSubmit}>
+                <TouchableOpacity
+                  style={styles.confirmButton}
+                  onPress={handleSubmit}
+                >
                   <Text style={styles.modalButtonText}>Confirmar</Text>
                 </TouchableOpacity>
               </View>

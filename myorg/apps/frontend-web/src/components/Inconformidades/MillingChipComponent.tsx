@@ -1,8 +1,8 @@
-'use client'
-import styled from "styled-components";
-import { useRouter } from "next/navigation";
-import { useState } from "react";
-import { acceptMillingChipInconformity } from "@/api/inconformidades";
+'use client';
+import styled from 'styled-components';
+import { useRouter } from 'next/navigation';
+import { useState } from 'react';
+import { acceptMillingChipInconformity } from '@/api/inconformidades';
 
 interface Props {
   workOrder: any;
@@ -46,7 +46,7 @@ export default function MillingChipComponent({ workOrder }: Props) {
       console.error(error);
       alert('Error al conectar con el servidor');
     }
-  }
+  };
 
   // Obtener la última parcialidad sin validar
   const lastPartialRelease = workOrder.partialReleases.find(
@@ -68,63 +68,91 @@ export default function MillingChipComponent({ workOrder }: Props) {
     ? lastPartialRelease.observation
     : workOrder.areaResponse?.millingChip.comments;
 
-  const inconformityUser = lastPartialRelease
-    ? lastPartialRelease.inconformities[0]?.user.username
-    : workOrder.areaResponse?.inconformities.at(-1)?.user.username;
+  const inconformityList = lastPartialRelease
+    ? lastPartialRelease.inconformities
+    : workOrder.areaResponse?.inconformities || [];
 
-  const inconformityComments = lastPartialRelease
-    ? lastPartialRelease.inconformities[0]?.comments
-    : workOrder.areaResponse?.inconformities.at(-1)?.comments;
+  const lastUnreviewedInconformity = [...inconformityList]
+    .reverse()
+    .find((i) => i.reviewed === false);
+
+  const inconformityUser = lastUnreviewedInconformity?.user.username;
+  const inconformityComments = lastUnreviewedInconformity?.comments;
 
   return (
     <>
-    <FlexContainer>
-    <Container>
-      <NewData>
-        <SectionTitle>Entregaste:</SectionTitle>
-        <NewDataWrapper>
-        <InputGroup>
-            <Label>Buenas:</Label>
-            <Input type="number" name="good_quantity" value={releaseQuantity} disabled/>
-            <Label>Malas:</Label>
-            <Input type="number" name="bad_quantity" value={releaseBad} disabled/>
-            <Label>Exceso:</Label>
-            <Input type="number" name="excess_quantity" value={releaseExcess} disabled/>
-          </InputGroup>
-        </NewDataWrapper>
-        <InputGroup>
-          <Label>Comentarios</Label>
-          <Textarea value={releaseComments} disabled/>
-        </InputGroup>
-      </NewData>
-    </Container>
-    <Container>
-      <NewData>
-        <SectionTitle>Inconformidad:</SectionTitle>
-        <InputGroup>
-          <Label>Respuesta de Usuario</Label>
-          <Input type="text" value={inconformityUser} disabled/>
-        </InputGroup>
-        <InputGroup>
-          <Label>Comentarios</Label>
-          <Textarea value={inconformityComments} disabled/>
-        </InputGroup>
-      </NewData>
-    </Container>
-    </FlexContainer>
-    <CloseButton onClick={openModal}>Aceptar Inconformidad</CloseButton>
-    {showModal && (
-      <ModalOverlay>
-        <ModalBox>
-          <h4>¿Estás segura/o que deseas aceptar la inconformidad? Deberás liberar nuevamente</h4>
-          <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '1rem', marginTop: '1rem' }}>
-            <CancelButton onClick={closeModal}>Cancelar</CancelButton>
-            <ConfirmButton onClick={handleSubmit}>Confirmar</ConfirmButton>
-          </div>
-        </ModalBox>
-      </ModalOverlay>
-    )}
-  </>
+      <FlexContainer>
+        <Container>
+          <NewData>
+            <SectionTitle>Entregaste:</SectionTitle>
+            <NewDataWrapper>
+              <InputGroup>
+                <Label>Buenas:</Label>
+                <Input
+                  type="number"
+                  name="good_quantity"
+                  value={releaseQuantity}
+                  disabled
+                />
+                <Label>Malas:</Label>
+                <Input
+                  type="number"
+                  name="bad_quantity"
+                  value={releaseBad}
+                  disabled
+                />
+                <Label>Excedente:</Label>
+                <Input
+                  type="number"
+                  name="excess_quantity"
+                  value={releaseExcess}
+                  disabled
+                />
+              </InputGroup>
+            </NewDataWrapper>
+            <InputGroup>
+              <Label>Comentarios</Label>
+              <Textarea value={releaseComments} disabled />
+            </InputGroup>
+          </NewData>
+        </Container>
+        <Container>
+          <NewData>
+            <SectionTitle>Inconformidad:</SectionTitle>
+            <InputGroup>
+              <Label>Respuesta de Usuario</Label>
+              <Input type="text" value={inconformityUser} disabled />
+            </InputGroup>
+            <InputGroup>
+              <Label>Comentarios</Label>
+              <Textarea value={inconformityComments} disabled />
+            </InputGroup>
+          </NewData>
+        </Container>
+      </FlexContainer>
+      <CloseButton onClick={openModal}>Aceptar Inconformidad</CloseButton>
+      {showModal && (
+        <ModalOverlay>
+          <ModalBox>
+            <h4>
+              ¿Estás segura/o que deseas aceptar la inconformidad? Deberás
+              liberar nuevamente
+            </h4>
+            <div
+              style={{
+                display: 'flex',
+                justifyContent: 'flex-end',
+                gap: '1rem',
+                marginTop: '1rem',
+              }}
+            >
+              <CancelButton onClick={closeModal}>Cancelar</CancelButton>
+              <ConfirmButton onClick={handleSubmit}>Confirmar</ConfirmButton>
+            </div>
+          </ModalBox>
+        </ModalOverlay>
+      )}
+    </>
   );
 }
 
@@ -140,13 +168,12 @@ const Container = styled.div`
   background: white;
   padding: 2rem;
   border-radius: 1rem;
-  box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
   flex: 1;
   min-width: 300px;
   max-width: 600px;
 `;
-const NewData = styled.div`
-`;
+const NewData = styled.div``;
 
 const SectionTitle = styled.h3`
   font-size: 1.25rem;
@@ -203,7 +230,7 @@ const Textarea = styled.textarea`
 `;
 
 const CloseButton = styled.button`
-  background: #2563EB;
+  background-color: ${({ disabled }) => (disabled ? '#9CA3AF' : '#0038A8')};
   color: white;
   margin-top: 20px;
   padding: 0.9rem 1.5rem;
@@ -211,11 +238,11 @@ const CloseButton = styled.button`
   border-radius: 0.75rem;
   font-size: 1rem;
   cursor: pointer;
-  box-shadow: 0 3px 6px rgba(0,0,0,0.08);
+  box-shadow: 0 3px 6px rgba(0, 0, 0, 0.08);
   transition: background 0.3s;
 
   &:hover {
-    background: #1D4ED8;
+    background: #1d4ed8;
   }
 `;
 
@@ -226,7 +253,7 @@ const ModalOverlay = styled.div`
   color: black;
   width: 100%;
   height: 100%;
-  background: rgba(0,0,0,0.4);
+  background: rgba(0, 0, 0, 0.4);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -237,13 +264,13 @@ const ModalBox = styled.div`
   background: white;
   padding: 2rem;
   border-radius: 1rem;
-  box-shadow: 0 8px 24px rgba(0,0,0,0.2);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.2);
   max-width: 400px;
   width: 90%;
 `;
 
 const ConfirmButton = styled.button`
-  background-color: #2563eb;
+  background-color: ${({ disabled }) => (disabled ? '#9CA3AF' : '#0038A8')};
   color: white;
   padding: 0.5rem 1.5rem;
   border-radius: 0.5rem;
@@ -262,7 +289,7 @@ const ConfirmButton = styled.button`
 `;
 
 const CancelButton = styled.button`
-  background-color: #BBBBBB;
+  background-color: #bbbbbb;
   color: white;
   padding: 0.5rem 1.5rem;
   border-radius: 0.5rem;

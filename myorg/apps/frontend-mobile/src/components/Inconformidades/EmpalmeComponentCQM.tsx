@@ -25,7 +25,7 @@ const EmpalmeComponentCQM = ({ workOrder }: { workOrder: any }) => {
       await acceptCQMInconformity(areaResponse);
       setShowModal(false);
       Alert.alert('Inconformidad aceptada');
-      navigation.navigate('liberarProducto' as never);
+      navigation.goBack();
     } catch (error: any) {
       console.error(error);
       Alert.alert('Error al aceptar la inconformidad');
