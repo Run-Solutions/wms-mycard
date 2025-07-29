@@ -52,6 +52,7 @@ export class CreateCorteResponseDto {
   
   goodQuantity: number;
   badQuantity: number;
+  materialBadQuantity: number;
   excessQuantity: number;
   comments?: string;
   formAnswerId: number;  // ID de la respuesta de CQM aprobada

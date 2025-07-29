@@ -10,31 +10,30 @@ import {
   Platform,
 } from 'react-native';
 import { TextInput } from 'react-native-paper';
-import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useNavigation } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { RootStackParamList } from '../../navigation/types';
 import { acceptPrepressInconformity } from '../../api/inconformidades';
 
 const PreprensaComponent: React.FC<{ workOrder: any }> = ({ workOrder }) => {
-  const navigation = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
+  const navigation =
+    useNavigation<NativeStackNavigationProp<RootStackParamList>>();
   const [showModal, setShowModal] = useState(false);
 
   const openModal = () => setShowModal(true);
   const closeModal = () => setShowModal(false);
 
-  const lastIndex = workOrder.areaResponse.inconformities.length > 1
-    ? workOrder.areaResponse.inconformities.length - 1
-    : 0;
+  const lastIndex =
+    workOrder.areaResponse.inconformities.length > 1
+      ? workOrder.areaResponse.inconformities.length - 1
+      : 0;
 
   const handleSubmit = async () => {
     try {
       const areaResponseId = workOrder.areaResponse.id;
-
       await acceptPrepressInconformity(areaResponseId);
-
       Alert.alert('Inconformidad aceptada');
-      navigation.navigate('liberarProducto');
+      navigation.goBack();
     } catch (error: any) {
       Alert.alert('Error al aceptar', error.message || 'Ocurrió un error');
     } finally {
@@ -44,30 +43,43 @@ const PreprensaComponent: React.FC<{ workOrder: any }> = ({ workOrder }) => {
 
   return (
     <View>
-      <ScrollView contentContainerStyle={[styles.container, { paddingBottom: 230 }]}>
+      <ScrollView
+        contentContainerStyle={[styles.container, { paddingBottom: 230 }]}
+      >
         <Text style={styles.title}>Área: Preprensa</Text>
         <View style={styles.card}>
           <Text style={styles.subtitle}>Entregaste:</Text>
           <Text style={styles.label}>Placas</Text>
-          <TextInput style={styles.input} editable={false} value={String(workOrder.areaResponse.prepress.plates)}
+          <TextInput
+            style={styles.input}
+            editable={false}
+            value={String(workOrder.areaResponse.prepress.plates)}
             mode="outlined"
             activeOutlineColor="#000"
             theme={{ roundness: 30 }}
           />
 
           <Text style={styles.label}>Positivos</Text>
-          <TextInput style={styles.input} editable={false} value={String(workOrder.areaResponse.prepress.positives)}
+          <TextInput
+            style={styles.input}
+            editable={false}
+            value={String(workOrder.areaResponse.prepress.positives)}
             mode="outlined"
             activeOutlineColor="#000"
             theme={{ roundness: 30 }}
           />
 
-          <Text style={[styles.subtitle, { marginTop: 12 }]}>Tipo de Prueba</Text>
+          <Text style={[styles.subtitle, { marginTop: 12 }]}>
+            Tipo de Prueba
+          </Text>
           <View style={styles.radioGroup}>
             {['color', 'fisica', 'digital'].map((type) => (
               <View key={type} style={styles.radioItem}>
                 <Text style={styles.radioText}>
-                  {type === workOrder.areaResponse.prepress.testType ? '🔘' : '⚪'} Prueba {type}
+                  {type === workOrder.areaResponse.prepress.testType
+                    ? '🔘'
+                    : '⚪'}{' '}
+                  Prueba {type}
                 </Text>
               </View>
             ))}
@@ -92,7 +104,9 @@ const PreprensaComponent: React.FC<{ workOrder: any }> = ({ workOrder }) => {
           <TextInput
             style={styles.input}
             editable={false}
-            value={workOrder.areaResponse.inconformities[lastIndex]?.user?.username}
+            value={
+              workOrder.areaResponse.inconformities[lastIndex]?.user?.username
+            }
             mode="outlined"
             activeOutlineColor="#000"
             theme={{ roundness: 30 }}
@@ -117,13 +131,20 @@ const PreprensaComponent: React.FC<{ workOrder: any }> = ({ workOrder }) => {
           <View style={styles.modalOverlay}>
             <View style={styles.modalBox}>
               <Text style={styles.modalText}>
-                ¿Estás segura/o que deseas aceptar la inconformidad? Deberás liberar nuevamente.
+                ¿Estás segura/o que deseas aceptar la inconformidad? Deberás
+                liberar nuevamente.
               </Text>
               <View style={styles.modalActions}>
-                <TouchableOpacity style={styles.cancelButton} onPress={closeModal}>
+                <TouchableOpacity
+                  style={styles.cancelButton}
+                  onPress={closeModal}
+                >
                   <Text style={styles.modalButtonText}>Cancelar</Text>
                 </TouchableOpacity>
-                <TouchableOpacity style={styles.confirmButton} onPress={handleSubmit}>
+                <TouchableOpacity
+                  style={styles.confirmButton}
+                  onPress={handleSubmit}
+                >
                   <Text style={styles.modalButtonText}>Confirmar</Text>
                 </TouchableOpacity>
               </View>
@@ -204,7 +225,6 @@ const styles = StyleSheet.create({
     borderRadius: 14,
     alignItems: 'center',
     marginTop: 12,
-    marginBottom: 50,
   },
   buttonText: {
     color: '#fff',

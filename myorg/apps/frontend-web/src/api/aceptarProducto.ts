@@ -1,4 +1,4 @@
-// myorg/apps/frontend-mobile/src/api/aceptarProducto.ts
+// myorg/apps/frontend-web/src/api/aceptarProducto.ts
 
 import API from './http';
 
@@ -23,6 +23,12 @@ export const acceptWorkOrderFlow = async (flowId: number) => {
 // PATCH /work-order-flow/:flowId/inconformidad
 export const registrarInconformidad = async (flowId: string | number, inconformidad: string) => {
   const response = await API.patch(`/work-order-flow/${flowId}/inconformidad`, {
+    inconformidad,
+  });
+  return response.data;
+};
+export const registrarInconformidadAuditory = async (AuditoryId: string | number, inconformidad: string) => {
+  const response = await API.patch(`/work-order-flow/${AuditoryId}/inconformidad-auditoria`, {
     inconformidad,
   });
   return response.data;

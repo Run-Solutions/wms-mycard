@@ -1212,7 +1212,7 @@ export class FreeWorkOrderService {
     });
   }
 
-  // Para guardar respuesta de liberacion de Preprensa
+  // Para guardar respuesta de liberacion de Corte
   async createCorteResponse(dto: CreateCorteResponseDto) {
     return this.prisma.$transaction(async (tx) => {
       // 1. Obtener cantidad de la orden
@@ -1237,10 +1237,15 @@ export class FreeWorkOrderService {
         (sum, p) => sum + (p.excess_quantity ?? 0),
         0,
       );
+      const totalMaterialPrevio = partials.reduce(
+        (sum, p) => sum + (p.material_quantity ?? 0),
+        0,
+      );
       // 3. Calcular nuevos totales
       const totalLiberadoActual = totalLiberadoPrevio + dto.goodQuantity;
       const totalBadActual = totalBadPrevio + dto.badQuantity;
       const totalExcessActual = totalExcessPrevio + dto.excessQuantity;
+      const totalMaterialActual = totalMaterialPrevio + dto.materialBadQuantity;
       // 4. Si NO se alcanza la cantidad solicitada => solo crear liberación parcial
       if (totalLiberadoActual < workOrder.quantity) {
         await tx.partialRelease.create({
@@ -1249,6 +1254,7 @@ export class FreeWorkOrderService {
             quantity: dto.goodQuantity,
             bad_quantity: dto.badQuantity,
             excess_quantity: dto.excessQuantity,
+            material_quantity: dto.materialBadQuantity,
             observation: dto.comments,
           },
         });
@@ -1287,7 +1293,10 @@ export class FreeWorkOrderService {
       });
       // Crear FormAuditory
       const formAuditory = await tx.formAuditory.create({
-        data: { reviewed_by_id: null },
+        data: { 
+          reviewed_by_id: null,
+          work_order_flow_id: dto.workOrderFlowId,
+        },
       });
       // Crear CorteResponse
       await tx.corteResponse.create({
@@ -1295,6 +1304,7 @@ export class FreeWorkOrderService {
           good_quantity: totalLiberadoActual,
           bad_quantity: totalBadActual,
           excess_quantity: totalExcessActual,
+          material_quantity: totalMaterialActual,
           comments: dto.comments,
           form_answer_id: dto.formAnswerId,
           areas_response_id: response.id,
@@ -1440,10 +1450,15 @@ export class FreeWorkOrderService {
         (sum, p) => sum + (p.excess_quantity ?? 0),
         0,
       );
+      const totalMaterialPrevio = partials.reduce(
+        (sum, p) => sum + (p.material_quantity ?? 0),
+        0,
+      );
       // 3. Calcular nuevos totales
       const totalLiberadoActual = totalLiberadoPrevio + dto.goodQuantity;
       const totalBadActual = totalBadPrevio + dto.badQuantity;
       const totalExcessActual = totalExcessPrevio + dto.excessQuantity;
+      const totalMaterialActual = totalMaterialPrevio + dto.materialBadQuantity;
       // 4. Si NO se alcanza la cantidad solicitada => solo crear liberación parcial
       if (totalLiberadoActual < workOrder.quantity) {
         await tx.partialRelease.create({
@@ -1452,6 +1467,7 @@ export class FreeWorkOrderService {
             quantity: dto.goodQuantity,
             bad_quantity: dto.badQuantity,
             excess_quantity: dto.excessQuantity,
+            material_quantity: dto.materialBadQuantity,
             observation: dto.comments,
           },
         });
@@ -1490,7 +1506,10 @@ export class FreeWorkOrderService {
       });
       // Crear FormAuditory
       const formAuditory = await tx.formAuditory.create({
-        data: { reviewed_by_id: null },
+        data: { 
+          reviewed_by_id: null,
+          work_order_flow_id: dto.workOrderFlowId,
+         },
       });
       // Crear PersonalizacionResponse
       await tx.colorEdgeResponse.create({
@@ -1498,6 +1517,7 @@ export class FreeWorkOrderService {
           good_quantity: totalLiberadoActual,
           bad_quantity: totalBadActual,
           excess_quantity: totalExcessActual,
+          material_quantity: totalMaterialActual,
           comments: dto.comments,
           form_answer_id: dto.formAnswerId,
           areas_response_id: response.id,
@@ -1540,10 +1560,15 @@ export class FreeWorkOrderService {
         (sum, p) => sum + (p.excess_quantity ?? 0),
         0,
       );
+      const totalMaterialPrevio = partials.reduce(
+        (sum, p) => sum + (p.material_quantity ?? 0),
+        0,
+      );
       // 3. Calcular nuevos totales
       const totalLiberadoActual = totalLiberadoPrevio + dto.goodQuantity;
       const totalBadActual = totalBadPrevio + dto.badQuantity;
       const totalExcessActual = totalExcessPrevio + dto.excessQuantity;
+      const totalMaterialActual = totalMaterialPrevio + dto.materialBadQuantity;
       // 4. Si NO se alcanza la cantidad solicitada => solo crear liberación parcial
       if (totalLiberadoActual < workOrder.quantity) {
         await tx.partialRelease.create({
@@ -1552,6 +1577,7 @@ export class FreeWorkOrderService {
             quantity: dto.goodQuantity,
             bad_quantity: dto.badQuantity,
             excess_quantity: dto.excessQuantity,
+            material_quantity: dto.materialBadQuantity,
             observation: dto.comments,
           },
         });
@@ -1590,7 +1616,10 @@ export class FreeWorkOrderService {
       });
       // Crear FormAuditory
       const formAuditory = await tx.formAuditory.create({
-        data: { reviewed_by_id: null },
+        data: { 
+          reviewed_by_id: null,
+          work_order_flow_id: dto.workOrderFlowId,
+        },
       });
       // Crear PersonalizacionResponse
       await tx.hotStampingResponse.create({
@@ -1598,6 +1627,7 @@ export class FreeWorkOrderService {
           good_quantity: totalLiberadoActual,
           bad_quantity: totalBadActual,
           excess_quantity: totalExcessActual,
+          material_quantity: totalMaterialActual,
           comments: dto.comments,
           form_answer_id: dto.formAnswerId,
           areas_response_id: response.id,
@@ -1640,10 +1670,15 @@ export class FreeWorkOrderService {
         (sum, p) => sum + (p.excess_quantity ?? 0),
         0,
       );
+      const totalMaterialPrevio = partials.reduce(
+        (sum, p) => sum + (p.material_quantity ?? 0),
+        0,
+      );
       // 3. Calcular nuevos totales
       const totalLiberadoActual = totalLiberadoPrevio + dto.goodQuantity;
       const totalBadActual = totalBadPrevio + dto.badQuantity;
       const totalExcessActual = totalExcessPrevio + dto.excessQuantity;
+      const totalMaterialActual = totalMaterialPrevio + dto.materialBadQuantity;
       // 4. Si NO se alcanza la cantidad solicitada => solo crear liberación parcial
       if (totalLiberadoActual < workOrder.quantity) {
         await tx.partialRelease.create({
@@ -1652,6 +1687,7 @@ export class FreeWorkOrderService {
             quantity: dto.goodQuantity,
             bad_quantity: dto.badQuantity,
             excess_quantity: dto.excessQuantity,
+            material_quantity: dto.materialBadQuantity,
             observation: dto.comments,
           },
         });
@@ -1690,7 +1726,10 @@ export class FreeWorkOrderService {
       });
       // Crear FormAuditory
       const formAuditory = await tx.formAuditory.create({
-        data: { reviewed_by_id: null },
+        data: { 
+          reviewed_by_id: null,
+          work_order_flow_id: dto.workOrderFlowId,
+        },
       });
       // Crear PersonalizacionResponse
       await tx.millingChipResponse.create({
@@ -1698,6 +1737,7 @@ export class FreeWorkOrderService {
           good_quantity: totalLiberadoActual,
           bad_quantity: totalBadActual,
           excess_quantity: totalExcessActual,
+          material_quantity: totalMaterialActual,
           comments: dto.comments,
           form_answer_id: dto.formAnswerId,
           areas_response_id: response.id,
@@ -1710,7 +1750,6 @@ export class FreeWorkOrderService {
         data: { status: 'Enviado a Auditoria' },
       });
       await this.notifyAuditors(tx, dto.workOrderFlowId);
-
       return { message: 'Respuesta guardada con éxito' };
     });
   }
@@ -1740,10 +1779,15 @@ export class FreeWorkOrderService {
         (sum, p) => sum + (p.excess_quantity ?? 0),
         0,
       );
+      const totalMaterialPrevio = partials.reduce(
+        (sum, p) => sum + (p.material_quantity ?? 0),
+        0,
+      );
       // 3. Calcular nuevos totales
       const totalLiberadoActual = totalLiberadoPrevio + dto.goodQuantity;
       const totalBadActual = totalBadPrevio + dto.badQuantity;
       const totalExcessActual = totalExcessPrevio + dto.excessQuantity;
+      const totalMaterialActual = totalMaterialPrevio + dto.materialBadQuantity;
       // 4. Si NO se alcanza la cantidad solicitada => solo crear liberación parcial
       if (totalLiberadoActual < workOrder.quantity) {
         await tx.partialRelease.create({
@@ -1752,6 +1796,7 @@ export class FreeWorkOrderService {
             quantity: dto.goodQuantity,
             bad_quantity: dto.badQuantity,
             excess_quantity: dto.excessQuantity,
+            material_quantity: dto.materialBadQuantity,
             observation: dto.comments,
           },
         });
@@ -1790,7 +1835,10 @@ export class FreeWorkOrderService {
       });
       // Crear FormAuditory
       const formAuditory = await tx.formAuditory.create({
-        data: { reviewed_by_id: null },
+        data: { 
+          reviewed_by_id: null,
+          work_order_flow_id: dto.workOrderFlowId,
+        },
       });
       // Crear PersonalizacionResponse
       await tx.personalizacionResponse.create({
@@ -1798,6 +1846,7 @@ export class FreeWorkOrderService {
           good_quantity: totalLiberadoActual,
           bad_quantity: totalBadActual,
           excess_quantity: totalExcessActual,
+          material_quantity: totalMaterialActual,
           comments: dto.comments,
           form_answer_id: dto.formAnswerId,
           areas_response_id: response.id,

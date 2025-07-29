@@ -91,7 +91,7 @@ const EmpalmeComponentAccept: React.FC<{ workOrder: any }> = ({
 
       const vals: EmpalmeData = {
         release_quantity: restante > 0 ? restante : 0,
-        comments: '', // puedes ajustar si quieres comentarios por defecto
+        comments: empalme.comments || '',
       };
       setDefaultValues(vals);
     } else {

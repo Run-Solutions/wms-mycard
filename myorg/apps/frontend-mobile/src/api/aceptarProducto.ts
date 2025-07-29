@@ -27,3 +27,9 @@ export const registrarInconformidad = async (flowId: string | number, inconformi
   });
   return response.data;
 };
+export const registrarInconformidadAuditory = async (AuditoryId: string | number, inconformidad: string) => {
+  const response = await API.patch(`/work-order-flow/${AuditoryId}/inconformidad-auditoria`, {
+    inconformidad,
+  });
+  return response.data;
+};

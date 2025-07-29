@@ -1,5 +1,14 @@
 import React, { useState } from 'react';
-import { View, Text, Alert, Modal, TouchableOpacity, ScrollView, StyleSheet, Platform } from 'react-native';
+import {
+  View,
+  Text,
+  Alert,
+  Modal,
+  TouchableOpacity,
+  ScrollView,
+  StyleSheet,
+  Platform,
+} from 'react-native';
 import { TextInput } from 'react-native-paper';
 import { acceptCQMInconformity } from '../../api/inconformidades';
 import { useNavigation } from '@react-navigation/native';
@@ -7,7 +16,8 @@ import { useNavigation } from '@react-navigation/native';
 const SerigrafiaComponentCQM = ({ workOrder }: { workOrder: any }) => {
   const navigation = useNavigation();
   const [showModal, setShowModal] = useState(false);
-  const questions = workOrder.area.formQuestions?.filter((q: any) => q.role_id === null) || [];
+  const questions =
+    workOrder.area.formQuestions?.filter((q: any) => q.role_id === null) || [];
 
   const index = workOrder?.answers
     ?.map((a: any, i: number) => ({ ...a, index: i }))
@@ -25,7 +35,7 @@ const SerigrafiaComponentCQM = ({ workOrder }: { workOrder: any }) => {
       await acceptCQMInconformity(areaResponse);
       setShowModal(false);
       Alert.alert('Inconformidad aceptada');
-      navigation.navigate('liberarProducto' as never);
+      navigation.goBack();
     } catch (error: any) {
       console.error(error);
       Alert.alert('Error al aceptar la inconformidad');
@@ -34,7 +44,9 @@ const SerigrafiaComponentCQM = ({ workOrder }: { workOrder: any }) => {
 
   return (
     <View>
-      <ScrollView contentContainerStyle={[styles.container, { paddingBottom: 230 }]}>
+      <ScrollView
+        contentContainerStyle={[styles.container, { paddingBottom: 230 }]}
+      >
         <Text style={styles.sectionTitle}>Entregaste</Text>
 
         <View style={styles.card}>
@@ -45,7 +57,9 @@ const SerigrafiaComponentCQM = ({ workOrder }: { workOrder: any }) => {
           </View>
           {/* Preguntas normales */}
           {questions.map((q: any) => {
-            const responses = workOrder.answers[index]?.FormAnswerResponse?.find(
+            const responses = workOrder.answers[
+              index
+            ]?.FormAnswerResponse?.find(
               (resp: any) => resp.question_id === q.id
             );
             console.log(responses);
@@ -58,8 +72,15 @@ const SerigrafiaComponentCQM = ({ workOrder }: { workOrder: any }) => {
                   <Text style={styles.questionText}>{q.title}</Text>
                 </View>
                 {/* Respuesta */}
-                <View style={[styles.tableCell, { flex: 1, alignItems: 'center' }]}>
-                  <View style={[styles.radioCircle, operatorResponse && styles.radioDisabled]}>
+                <View
+                  style={[styles.tableCell, { flex: 1, alignItems: 'center' }]}
+                >
+                  <View
+                    style={[
+                      styles.radioCircle,
+                      operatorResponse && styles.radioDisabled,
+                    ]}
+                  >
                     {operatorResponse && <View style={styles.radioDot} />}
                   </View>
                 </View>
@@ -81,7 +102,9 @@ const SerigrafiaComponentCQM = ({ workOrder }: { workOrder: any }) => {
           />
 
           {typeof workOrder?.answers?.[index]?.sample_quantity !== 'number' && (
-            <Text style={{ color: '#b91c1c', marginTop: 8, textAlign: 'center' }}>
+            <Text
+              style={{ color: '#b91c1c', marginTop: 8, textAlign: 'center' }}
+            >
               No se reconoce la muestra enviada
             </Text>
           )}
@@ -91,7 +114,9 @@ const SerigrafiaComponentCQM = ({ workOrder }: { workOrder: any }) => {
         <View style={styles.card}>
           <Text style={styles.label}>Usuario:</Text>
           <TextInput
-            value={workOrder.answers[index].inconformities[lastIndex].user.username}
+            value={
+              workOrder.answers[index].inconformities[lastIndex].user.username
+            }
             editable={false}
             style={styles.input}
             mode="outlined"
@@ -110,7 +135,10 @@ const SerigrafiaComponentCQM = ({ workOrder }: { workOrder: any }) => {
           />
         </View>
 
-        <TouchableOpacity style={styles.button} onPress={() => setShowModal(true)}>
+        <TouchableOpacity
+          style={styles.button}
+          onPress={() => setShowModal(true)}
+        >
           <Text style={styles.buttonText}>Aceptar Inconformidad</Text>
         </TouchableOpacity>
 
@@ -120,12 +148,21 @@ const SerigrafiaComponentCQM = ({ workOrder }: { workOrder: any }) => {
         <Modal visible={showModal} transparent animationType="fade">
           <View style={styles.modalOverlay}>
             <View style={styles.modalBox}>
-              <Text style={styles.modalText}>¿Estás segura/o que deseas aceptar la inconformidad? Deberás liberar nuevamente.</Text>
+              <Text style={styles.modalText}>
+                ¿Estás segura/o que deseas aceptar la inconformidad? Deberás
+                liberar nuevamente.
+              </Text>
               <View style={styles.modalButtons}>
-                <TouchableOpacity style={styles.cancelButton} onPress={() => setShowModal(false)}>
+                <TouchableOpacity
+                  style={styles.cancelButton}
+                  onPress={() => setShowModal(false)}
+                >
                   <Text style={styles.modalButtonText}>Cancelar</Text>
                 </TouchableOpacity>
-                <TouchableOpacity style={styles.confirmButton} onPress={handleSubmit}>
+                <TouchableOpacity
+                  style={styles.confirmButton}
+                  onPress={handleSubmit}
+                >
                   <Text style={styles.modalButtonText}>Confirmar</Text>
                 </TouchableOpacity>
               </View>
@@ -235,7 +272,7 @@ const styles = StyleSheet.create({
     padding: 14,
     borderRadius: 18,
     alignItems: 'center',
-    marginBottom: 50,
+    marginBottom: 30,
   },
   buttonText: {
     color: '#fff',

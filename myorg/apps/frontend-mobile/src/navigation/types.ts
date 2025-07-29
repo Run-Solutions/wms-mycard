@@ -5,8 +5,9 @@ export type InternalStackParamList = {
   AceptarAuditoriaAuxScreen: { flowId: string };
   CerrarOrdenDeTrabajoAuxScreen: { id: string };
   LiberarProductoAuxScreen: { id: string };
-  RecepcionCQMAuxScreen: { id: string };
+  LiberacionDeVistosBuenosAuxScreen: { id: string };
   InconformidadesAuxScreen: { id: string };
+  RechazosAuxScreen: { id: string };
 };
 
 export type RootStackParamList = {

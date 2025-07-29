@@ -78,6 +78,15 @@ export class InconformitiesController {
       }
       return await this.InconformitiesService.inconformityCorte(areaResponseId);
   };
+
+  @Patch(':areaResponse/corte-auditory')
+  async inconformityCorteAuditory(@Req() req: AuthenticatedRequest, @Param('areaResponse') areaResponseId: number,) {
+    const user = req.user;
+      if(!user){
+        throw new ForbiddenException('Usuario no autenticado.');
+      }
+      return await this.InconformitiesService.inconformityCorteAuditory(areaResponseId);
+  };
   
   @Patch(':areaResponse/color-edge')
   async inconformityColorEdge(@Req() req: AuthenticatedRequest, @Param('areaResponse') areaResponseId: number,) {
@@ -87,6 +96,15 @@ export class InconformitiesController {
         throw new ForbiddenException('Usuario no autenticado.');
       }
       return await this.InconformitiesService.inconformityColorEdge(areaResponseId);
+  };
+
+  @Patch(':areaResponse/color-edge-auditory')
+  async inconformityColorEdgeAuditory(@Req() req: AuthenticatedRequest, @Param('areaResponse') areaResponseId: number,) {
+    const user = req.user;
+      if(!user){
+        throw new ForbiddenException('Usuario no autenticado.');
+      }
+      return await this.InconformitiesService.inconformityColorEdgeAuditory(areaResponseId);
   };
   
   @Patch(':areaResponse/hot-stamping')
@@ -99,6 +117,15 @@ export class InconformitiesController {
       return await this.InconformitiesService.inconformityHotStamping(areaResponseId);
   };
 
+  @Patch(':areaResponse/hot-stamping-auditory')
+  async inconformityHotStampingAuditory(@Req() req: AuthenticatedRequest, @Param('areaResponse') areaResponseId: number,) {
+    const user = req.user;
+      if(!user){
+        throw new ForbiddenException('Usuario no autenticado.');
+      }
+      return await this.InconformitiesService.inconformityHotStampingAuditory(areaResponseId);
+  };
+
   @Patch(':areaResponse/milling-chip')
   async inconformityMillingChip(@Req() req: AuthenticatedRequest, @Param('areaResponse') areaResponseId: number,) {
     console.log('LLOEGA');
@@ -107,6 +134,15 @@ export class InconformitiesController {
         throw new ForbiddenException('Usuario no autenticado.');
       }
       return await this.InconformitiesService.inconformityMillingChip(areaResponseId);
+  };
+
+  @Patch(':areaResponse/milling-chip-auditory')
+  async inconformityMillingChipAuditory(@Req() req: AuthenticatedRequest, @Param('areaResponse') areaResponseId: number,) {
+    const user = req.user;
+      if(!user){
+        throw new ForbiddenException('Usuario no autenticado.');
+      }
+      return await this.InconformitiesService.inconformityMillingChipAuditory(areaResponseId);
   };
   
   @Patch(':areaResponse/personalizacion')
@@ -117,6 +153,15 @@ export class InconformitiesController {
         throw new ForbiddenException('Usuario no autenticado.');
       }
       return await this.InconformitiesService.inconformityPersonalizacion(areaResponseId);
+  };
+
+  @Patch(':areaResponse/personalizacion-auditory')
+  async inconformityPersonalizacionAuditory(@Req() req: AuthenticatedRequest, @Param('areaResponse') areaResponseId: number,) {
+    const user = req.user;
+      if(!user){
+        throw new ForbiddenException('Usuario no autenticado.');
+      }
+      return await this.InconformitiesService.inconformityPersonalizacionAuditory(areaResponseId);
   };
  
   @Patch(':areaResponse/cqm')

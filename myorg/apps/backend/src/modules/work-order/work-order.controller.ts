@@ -107,6 +107,6 @@ export class WorkOrderController {
         if(!user){
             throw new ForbiddenException('Usuario no autenticado.');
         }
-        return await this.workOrderService.updateWorkOrderAreas(id, body.areas);
+        return await this.workOrderService.updateWorkOrderAreas(id, body.areas, user.id);
     }
 }

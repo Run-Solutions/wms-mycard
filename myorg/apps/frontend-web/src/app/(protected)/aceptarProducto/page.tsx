@@ -167,7 +167,7 @@ const AcceptProductPage: React.FC = () => {
       return;
     }
     // Si el área no es 1, redirigir inmediatamente
-    if (selectedOrder?.area_id >= 2 && selectedOrder?.area_id <= 6) {
+    if (selectedOrder?.area_id >= 2) {
       router.push(`/aceptarProducto/${flowId}`); 
       return;
     }

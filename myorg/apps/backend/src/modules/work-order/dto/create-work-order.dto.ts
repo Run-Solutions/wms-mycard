@@ -44,6 +44,7 @@ export class SampleDataDto {
 }
 
 export class UpdateAreaDataDto {
+  areaId: number;
   block: string;
 
   blockId: number;

@@ -153,7 +153,7 @@ const AceptarProductoScreen = () => {
       );
       return;
     }
-    if (selectedOrder.area_id >= 2 && selectedOrder.area_id <= 6) {
+    if (selectedOrder.area_id >= 2) {
       closeModal();
       navigation.navigate('Principal', {
         screen: 'AceptarProductoAuxScreen',

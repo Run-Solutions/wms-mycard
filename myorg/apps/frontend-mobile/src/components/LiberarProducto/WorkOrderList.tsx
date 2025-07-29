@@ -1,55 +1,34 @@
-// myorg/apps/frontend-mobile/src/components/LiberarProducto/WorkOrderList.tsx
+// 📁 myorg/apps/frontend-mobile/src/components/LiberarProducto/WorkOrderList.tsx
 'use client';
 
-import React from 'react';
-import { TouchableOpacity } from 'react-native';
-import { useNavigation } from '@react-navigation/native';
-import { NavigationProp } from '@react-navigation/native';
-import { InternalStackParamList } from '../../navigation/types';
-import * as FileSystem from 'expo-file-system';
-import { Buffer } from 'buffer';
-import FileViewer from 'react-native-file-viewer';
-import styled from 'styled-components/native';
-import { TextInput } from 'react-native-paper';
-
-type Navigation = NavigationProp<
-  InternalStackParamList,
-  'LiberarProductoAuxScreen'
->;
+import React, { useMemo, useState } from 'react';
 import {
   View,
   Text,
   FlatList,
   StyleSheet,
-  Platform,
+  TouchableOpacity,
   ScrollView,
 } from 'react-native';
+import { TextInput } from 'react-native-paper';
+import { useNavigation } from '@react-navigation/native';
+import { NavigationProp } from '@react-navigation/native';
+import * as FileSystem from 'expo-file-system';
+import { Buffer } from 'buffer';
+import FileViewer from 'react-native-file-viewer';
+import styled from 'styled-components/native';
+
+import { InternalStackParamList } from '../../navigation/types';
 import { getFileByName } from '../../api/finalizacion';
+import { WorkOrder, SortableField, OrderDirection } from './util/types';
+import {
+  filterOrders,
+  sortOrders,
+  getFileLabel,
+  getFlowStateStyles,
+} from './util/helpers';
 
-interface File {
-  id: number;
-  type: string;
-  file_path: string;
-}
-
-interface WorkOrder {
-  id: number;
-  ot_id: string;
-  mycard_id: string;
-  quantity: number;
-  status: string;
-  validated: boolean;
-  createdAt: string;
-  user: {
-    username: string;
-  };
-  flow: {
-    area_id: number;
-    status: string;
-    area?: { name?: string };
-  }[];
-  files: File[];
-}
+type Navigation = NavigationProp<InternalStackParamList, 'LiberarProductoAuxScreen'>;
 
 interface Props {
   orders: WorkOrder[];
@@ -58,13 +37,28 @@ interface Props {
   isTouchable?: boolean;
 }
 
-const WorkOrderList: React.FC<Props> = ({ orders, onSelectOrder }) => {
-  const [searchValue, setSearchValue] = React.useState('');
-  const navigation = useNavigation<any>();
-  const validOrders = Array.isArray(orders) ? orders : [];
-  const filteredOrders = validOrders.filter((order) =>
-    order.ot_id.toLowerCase().includes(searchValue.toLowerCase())
-  );
+const WorkOrderList: React.FC<Props> = ({ orders = [] }) => {
+  const navigation = useNavigation<Navigation>();
+  const [searchValue, setSearchValue] = useState('');
+  const [activeArea, setActiveArea] = useState('');
+  const [startDate, setStartDate] = useState('');
+  const [endDate, setEndDate] = useState('');
+  const [orderBy, setOrderBy] = useState<SortableField>('createdAt');
+  const [orderDirection, setOrderDirection] = useState<OrderDirection>('asc');
+
+  const filtered = useMemo(() => {
+    return filterOrders(orders, {
+      searchValue,
+      activeArea,
+      startDate,
+      endDate,
+    });
+  }, [orders, searchValue, activeArea, startDate, endDate]);
+
+  const sorted = useMemo(() => {
+    return sortOrders(filtered, orderBy, orderDirection);
+  }, [filtered, orderBy, orderDirection]);
+
   const downloadFile = async (filename: string) => {
     try {
       const res = await getFileByName(filename);
@@ -88,16 +82,12 @@ const WorkOrderList: React.FC<Props> = ({ orders, onSelectOrder }) => {
       console.error('Error al abrir el archivo:', error);
     }
   };
+
   const renderItem = ({ item }: { item: WorkOrder }) => {
     return (
       <View style={styles.card}>
         <TouchableOpacity
-          onPress={() =>
-            navigation.navigate('Principal', {
-              screen: 'LiberarProductoAuxScreen',
-              params: { id: item.ot_id },
-            })
-          }
+          onPress={() => navigation.navigate('LiberarProductoAuxScreen', { id: item.ot_id })}
         >
           <View style={styles.infoRow}>
             <View style={styles.infoBlock}>
@@ -110,24 +100,15 @@ const WorkOrderList: React.FC<Props> = ({ orders, onSelectOrder }) => {
 
             <View style={styles.filesBlock}>
               {item.files.length > 0 ? (
-                item.files.map((file) => {
-                  const label = file.file_path.toLowerCase().includes('ot')
-                    ? 'Ver OT'
-                    : file.file_path.toLowerCase().includes('sku')
-                    ? 'Ver SKU'
-                    : file.file_path.toLowerCase().includes('op')
-                    ? 'Ver OP'
-                    : 'Ver Archivo';
-                  return (
-                    <TouchableOpacity
-                      key={file.id}
-                      onPress={() => downloadFile(file.file_path)}
-                      style={styles.fileButton}
-                    >
-                      <Text style={styles.fileText}>{label}</Text>
-                    </TouchableOpacity>
-                  );
-                })
+                item.files.map((file) => (
+                  <TouchableOpacity
+                    key={file.id}
+                    onPress={() => downloadFile(file.file_path)}
+                    style={styles.fileButton}
+                  >
+                    <Text style={styles.fileText}>{getFileLabel(file.file_path)}</Text>
+                  </TouchableOpacity>
+                ))
               ) : (
                 <Text style={styles.noFiles}>No hay archivos</Text>
               )}
@@ -142,28 +123,22 @@ const WorkOrderList: React.FC<Props> = ({ orders, onSelectOrder }) => {
           contentContainerStyle={styles.timelineContainer}
         >
           {item.flow.map((step, index) => {
-            const isActive = ['proceso', 'listo'].some((word) =>
-              step.status?.toLowerCase().includes(word)
-            );
-            const isParcial = ['parcial'].some((word) =>
-              step.status?.toLowerCase().includes(word)
-            );
-            const isCompleted = step.status
-              ?.toLowerCase()
-              .includes('completado');
-            const isCalidad = ['enviado a cqm', 'en calidad'].some((status) =>
-              step.status?.toLowerCase().includes(status)
-            );
-            const isLast = index === item.flow.length - 1;
-
+            const {
+              isActive,
+              isParcial,
+              isCompleted,
+              isCalidad,
+              isInconforme,
+            } = getFlowStateStyles(step.status);
             const getColor = () => {
               if (isCompleted) return '#22c55e';
               if (isCalidad) return '#facc15';
+              if (isInconforme) return '#a855f7';
               if (isActive) return '#4a90e2';
               if (isParcial) return '#f5945c';
               return '#d1d5db';
             };
-
+            const isLast = index === item.flow.length - 1;
             return (
               <View key={index} style={styles.stepItem}>
                 <View
@@ -178,15 +153,7 @@ const WorkOrderList: React.FC<Props> = ({ orders, onSelectOrder }) => {
                   style={[
                     styles.areaLabel,
                     {
-                      color: isCompleted
-                        ? '#22c55e'
-                        : isCalidad
-                        ? '#facc15'
-                        : isActive
-                        ? '#4a90e2'
-                        : isParcial
-                        ? '#f5945c'
-                        : '#6b7280',
+                      color: getColor(),
                       fontWeight: isActive ? 'bold' : 'normal',
                     },
                   ]}
@@ -201,7 +168,6 @@ const WorkOrderList: React.FC<Props> = ({ orders, onSelectOrder }) => {
       </View>
     );
   };
-
   return (
     <View style={{ flex: 1, padding: 5, backgroundColor: '#fdfaf6' }}>
       <Container>
@@ -217,7 +183,7 @@ const WorkOrderList: React.FC<Props> = ({ orders, onSelectOrder }) => {
         />
       </Container>
       <FlatList
-        data={filteredOrders}
+        data={sorted}
         keyExtractor={(item) => item.id.toString()}
         renderItem={renderItem}
         contentContainerStyle={styles.list}

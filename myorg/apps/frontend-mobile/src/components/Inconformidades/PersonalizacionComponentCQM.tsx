@@ -39,7 +39,7 @@ const PersonalizacionComponentCQM = ({ workOrder }: { workOrder: any }) => {
       await acceptCQMInconformity(areaResponse);
       setShowModal(false);
       Alert.alert('Inconformidad aceptada');
-      navigation.navigate('liberarProducto' as never);
+      navigation.goBack();
     } catch (error: any) {
       console.error(error);
       Alert.alert('Error al aceptar la inconformidad');
@@ -68,7 +68,6 @@ const PersonalizacionComponentCQM = ({ workOrder }: { workOrder: any }) => {
   return (
     <View>
       <ScrollView contentContainerStyle={[styles.container, { paddingBottom: 230 }]}>
-
         <Text style={styles.sectionTitle}>Entregaste</Text>
         <Text style={styles.label}>Tipo de Personalizacion:</Text>
         <TextInput
@@ -619,7 +618,7 @@ const styles = StyleSheet.create({
     padding: 14,
     borderRadius: 18,
     alignItems: 'center',
-    marginBottom: 50,
+    marginBottom: 30,
   },
   buttonText: {
     color: '#fff',

@@ -1,8 +1,8 @@
-'use client'
-import styled from "styled-components";
-import { useRouter } from "next/navigation";
-import { useState } from "react";
-import { acceptCQMInconformity } from "@/api/inconformidades";
+'use client';
+import styled from 'styled-components';
+import { useRouter } from 'next/navigation';
+import { useState } from 'react';
+import { acceptCQMInconformity } from '@/api/inconformidades';
 
 interface Props {
   workOrder: any;
@@ -23,10 +23,11 @@ export default function SerigrafiaComponentCQM({ workOrder }: Props) {
     setShowModal(false);
   };
 
-  // Para obtener el ultimo FormAnswer 
+  // Para obtener el ultimo FormAnswer
   const index = workOrder?.answers
-  ?.map((a: Answer, i: number) => ({ ...a, index: i }))
-  .reverse().find((a: Answer) => a.reviewed === false)?.index;
+    ?.map((a: Answer, i: number) => ({ ...a, index: i }))
+    .reverse()
+    .find((a: Answer) => a.reviewed === false)?.index;
   console.log('el index', index);
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -40,93 +41,131 @@ export default function SerigrafiaComponentCQM({ workOrder }: Props) {
       console.error(error);
       alert('Error al conectar con el servidor');
     }
-  }
+  };
 
-  const lastIndex = workOrder.answers[index].inconformities.length > 1 
-  ? workOrder.answers[index].inconformities.length - 1 
-  : 0;
+  const lastIndex =
+    workOrder.answers[index].inconformities.length > 1
+      ? workOrder.answers[index].inconformities.length - 1
+      : 0;
 
   return (
     <>
-    <FlexContainer>
-    <Container>
-      <NewData>
-        <SectionTitle>Entregaste:</SectionTitle>
-        <NewDataWrapper>
-        <Table>
-            <thead>
-              <tr>
-                <th>Pregunta</th>
-                <th>Respuesta</th>
-              </tr>
-            </thead>
-            <tbody>
-              {workOrder.area.formQuestions
-              .filter((question: { role_id: number | null }) => question.role_id === null)
-              .map((question: { id: number; title: string }) => {
-                // Buscar la respuesta correspondiente a esta pregunta
-                const answer = workOrder.answers[index]?.FormAnswerResponse?.find(
-                  (resp: any) => resp.question_id === question.id
-                );
-                
-                // Obtener la respuesta del operador (response_operator)
-                const operatorResponse = answer?.response_operator;
-
-                return (
-                  <tr key={question.id}>
-                    <td>{question.title}</td>
-                    <td>
-                      {typeof operatorResponse === 'boolean' ? (
-                        <input 
-                          type="checkbox" 
-                          checked={operatorResponse} 
-                          disabled 
-                        />
-                      ) : (
-                        <span>{operatorResponse !== undefined && operatorResponse !== null 
-                          ? operatorResponse.toString() 
-                          : ''}</span>
-                      )}
-                    </td>
+      <FlexContainer>
+        <Container>
+          <NewData>
+            <SectionTitle>Entregaste:</SectionTitle>
+            <NewDataWrapper>
+              <Table>
+                <thead>
+                  <tr>
+                    <th>Pregunta</th>
+                    <th>Respuesta</th>
                   </tr>
-                );
-              })}
-            </tbody>
-          </Table>
-          <InputGroup style={{ marginTop: '-7rem'}}>
-              <Label>Muestras entregadas:</Label>
-              <Input type="number" value={workOrder?.answers[index].sample_quantity ?? 'No se reconoce la muestra enviada' } readOnly />
-          </InputGroup>
-        </NewDataWrapper>
-      </NewData>
-    </Container>
-    <Container>
-      <NewData>
-        <SectionTitle>Inconformidad:</SectionTitle>
-        <InputGroup>
-          <Label>Respuesta de Usuario</Label>
-          <Input type="text" value={workOrder.answers[index].inconformities[lastIndex].user.username} disabled/>
-        </InputGroup>
-        <InputGroup>
-          <Label>Comentarios</Label>
-          <Textarea value={workOrder.answers[index].inconformities[lastIndex].comments} disabled/>
-        </InputGroup>
-      </NewData>
-    </Container>
-    </FlexContainer>
-    <CloseButton onClick={openModal}>Aceptar Inconformidad</CloseButton>
-    {showModal && (
-      <ModalOverlay>
-        <ModalBox>
-          <h4>¿Estás segura/o que deseas aceptar la inconformidad? Deberás liberar nuevamente</h4>
-          <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '1rem', marginTop: '1rem' }}>
-            <CancelButton onClick={closeModal}>Cancelar</CancelButton>
-            <ConfirmButton onClick={handleSubmit}>Confirmar</ConfirmButton>
-          </div>
-        </ModalBox>
-      </ModalOverlay>
-    )}
-  </>
+                </thead>
+                <tbody>
+                  {workOrder.area.formQuestions
+                    .filter(
+                      (question: { role_id: number | null }) =>
+                        question.role_id === null
+                    )
+                    .map((question: { id: number; title: string }) => {
+                      // Buscar la respuesta correspondiente a esta pregunta
+                      const answer = workOrder.answers[
+                        index
+                      ]?.FormAnswerResponse?.find(
+                        (resp: any) => resp.question_id === question.id
+                      );
+
+                      // Obtener la respuesta del operador (response_operator)
+                      const operatorResponse = answer?.response_operator;
+
+                      return (
+                        <tr key={question.id}>
+                          <td>{question.title}</td>
+                          <td>
+                            {typeof operatorResponse === 'boolean' ? (
+                              <input
+                                type="checkbox"
+                                checked={operatorResponse}
+                                disabled
+                              />
+                            ) : (
+                              <span>
+                                {operatorResponse !== undefined &&
+                                operatorResponse !== null
+                                  ? operatorResponse.toString()
+                                  : ''}
+                              </span>
+                            )}
+                          </td>
+                        </tr>
+                      );
+                    })}
+                </tbody>
+              </Table>
+              <InputGroup style={{ marginTop: '-7rem' }}>
+                <Label>Muestras entregadas:</Label>
+                <Input
+                  type="number"
+                  value={
+                    workOrder?.answers[index].sample_quantity ??
+                    'No se reconoce la muestra enviada'
+                  }
+                  readOnly
+                />
+              </InputGroup>
+            </NewDataWrapper>
+          </NewData>
+        </Container>
+        <Container>
+          <NewData>
+            <SectionTitle>Inconformidad:</SectionTitle>
+            <InputGroup>
+              <Label>Respuesta de Usuario</Label>
+              <Input
+                type="text"
+                value={
+                  workOrder.answers[index].inconformities[lastIndex].user
+                    .username
+                }
+                disabled
+              />
+            </InputGroup>
+            <InputGroup>
+              <Label>Comentarios</Label>
+              <Textarea
+                value={
+                  workOrder.answers[index].inconformities[lastIndex].comments
+                }
+                disabled
+              />
+            </InputGroup>
+          </NewData>
+        </Container>
+      </FlexContainer>
+      <CloseButton onClick={openModal}>Aceptar Inconformidad</CloseButton>
+      {showModal && (
+        <ModalOverlay>
+          <ModalBox>
+            <h4>
+              ¿Estás segura/o que deseas aceptar la inconformidad? Deberás
+              liberar nuevamente
+            </h4>
+            <div
+              style={{
+                display: 'flex',
+                justifyContent: 'flex-end',
+                gap: '1rem',
+                marginTop: '1rem',
+              }}
+            >
+              <CancelButton onClick={closeModal}>Cancelar</CancelButton>
+              <ConfirmButton onClick={handleSubmit}>Confirmar</ConfirmButton>
+            </div>
+          </ModalBox>
+        </ModalOverlay>
+      )}
+    </>
   );
 }
 
@@ -142,13 +181,12 @@ const Container = styled.div`
   background: white;
   padding: 2rem;
   border-radius: 1rem;
-  box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
   flex: 1;
   min-width: 300px;
   max-width: 600px;
 `;
-const NewData = styled.div`
-`;
+const NewData = styled.div``;
 
 const SectionTitle = styled.h3`
   font-size: 1.25rem;
@@ -205,7 +243,7 @@ const Textarea = styled.textarea`
 `;
 
 const CloseButton = styled.button`
-  background: #2563EB;
+  background-color: ${({ disabled }) => (disabled ? '#9CA3AF' : '#0038A8')};
   color: white;
   margin-top: 20px;
   padding: 0.9rem 1.5rem;
@@ -213,11 +251,11 @@ const CloseButton = styled.button`
   border-radius: 0.75rem;
   font-size: 1rem;
   cursor: pointer;
-  box-shadow: 0 3px 6px rgba(0,0,0,0.08);
+  box-shadow: 0 3px 6px rgba(0, 0, 0, 0.08);
   transition: background 0.3s;
 
   &:hover {
-    background: #1D4ED8;
+    background: #1d4ed8;
   }
 `;
 
@@ -228,7 +266,7 @@ const ModalOverlay = styled.div`
   color: black;
   width: 100%;
   height: 100%;
-  background: rgba(0,0,0,0.4);
+  background: rgba(0, 0, 0, 0.4);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -239,13 +277,13 @@ const ModalBox = styled.div`
   background: white;
   padding: 2rem;
   border-radius: 1rem;
-  box-shadow: 0 8px 24px rgba(0,0,0,0.2);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.2);
   max-width: 400px;
   width: 90%;
 `;
 
 const ConfirmButton = styled.button`
-  background-color: #2563eb;
+  background-color: ${({ disabled }) => (disabled ? '#9CA3AF' : '#0038A8')};
   color: white;
   padding: 0.5rem 1.5rem;
   border-radius: 0.5rem;
@@ -264,7 +302,7 @@ const ConfirmButton = styled.button`
 `;
 
 const CancelButton = styled.button`
-  background-color: #BBBBBB;
+  background-color: #bbbbbb;
   color: white;
   padding: 0.5rem 1.5rem;
   border-radius: 0.5rem;
@@ -286,7 +324,8 @@ const Table = styled.table`
   width: 100%;
   border-collapse: collapse;
   color: black;
-  th, td {
+  th,
+  td {
     padding: 0.75rem;
     text-align: left;
     border-bottom: 1px solid #e5e7eb;

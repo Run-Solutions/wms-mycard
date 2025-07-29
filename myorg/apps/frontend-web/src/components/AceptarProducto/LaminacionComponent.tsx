@@ -83,7 +83,7 @@ export default function LaminacionComponentAccept({ workOrder }: Props) {
 
       const vals: LaminacionData = {
         release_quantity: restante > 0 ? restante : 0,
-        comments: '', // puedes ajustar si quieres comentarios por defecto
+        comments: laminacion.comments || '',
       };
       setDefaultValues(vals);
     } else {

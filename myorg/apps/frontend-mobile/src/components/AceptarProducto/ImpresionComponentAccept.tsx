@@ -92,7 +92,7 @@ const ImpresionComponentAccept: React.FC<{ workOrder: any }> = ({
 
       const vals: ImpressionData = {
         release_quantity: restante > 0 ? restante : 0,
-        comments: '', // puedes ajustar si quieres comentarios por defecto
+        comments: impresion.comments || '',
       };
       setDefaultValues(vals);
     } else {
