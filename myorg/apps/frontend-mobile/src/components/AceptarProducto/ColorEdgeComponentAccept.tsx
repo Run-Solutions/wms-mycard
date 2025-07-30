@@ -12,7 +12,7 @@ import {
 } from 'react-native';
 import { TextInput } from 'react-native-paper';
 import { useNavigation } from '@react-navigation/native';
-import { acceptWorkOrderFlow, registrarInconformidadAuditory } from '../../api/aceptarProducto';
+import { acceptWorkOrderFlowAfterCorte, registrarInconformidadAuditory } from '../../api/aceptarProducto';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { RootStackParamList } from '../../navigation/types';
 
@@ -128,7 +128,7 @@ const ColorEdgeComponentAccept: React.FC<{ workOrder: any }> = ({
       setDefaultValues(vals);
     } else {
       // Caso original: se busca el primer parcial sin validar
-      const firstUnvalidatedPartial = partials.find((p: any) => !p.validated);
+      const firstUnvalidatedPartial = partials.find((p: any) => p.validated);
 
       const vals: ColorEdgeData = {
         good_quantity: firstUnvalidatedPartial.quantity || '',
@@ -144,7 +144,7 @@ const ColorEdgeComponentAccept: React.FC<{ workOrder: any }> = ({
 
   const handleAceptar = async () => {
     try {
-      await acceptWorkOrderFlow(workOrder.id);
+      await acceptWorkOrderFlowAfterCorte(workOrder.id);
       Alert.alert('Recepción aceptada');
       navigation.goBack();
     } catch (err) {

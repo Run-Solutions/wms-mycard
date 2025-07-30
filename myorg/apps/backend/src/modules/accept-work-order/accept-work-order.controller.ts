@@ -124,6 +124,22 @@ export class AcceptWorkOrderController {
     return { message: 'Orden aceptada correctamente', flow: updatedFlow };
   }
 
+  // Para que el operador acepte la orden
+  @Patch(':id/accept-after-corte')
+  async acceptWorkOrderFlowAfterCorte(
+    @Param('id') id: number,
+    @Req() req: AuthenticatedRequest,
+  ) {
+    const userId = req.user?.id;
+    if (!userId) throw new UnauthorizedException();
+
+    const updatedFlow = await this.AcceptWorkOrderService.acceptWorkOrderFlow(
+      +id,
+      userId,
+    );
+    return { message: 'Orden aceptada correctamente', flow: updatedFlow };
+  }
+
   // Para que el operador marque la orden entregada con inconformidad
   @Patch(':id/inconformidad')
   async inconformidadWorkOrderFlow(

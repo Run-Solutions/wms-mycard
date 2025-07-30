@@ -1,3 +1,4 @@
+// myorg/apps/frontend-mobile/src/app/protected/cerrarOrdenDeTrabajo/[id]/page.tsx
 'use client';
 
 import React, { useEffect, useState } from 'react';
@@ -12,8 +13,7 @@ import {
 } from 'react-native';
 import { useRoute, RouteProp, useNavigation } from '@react-navigation/native';
 import { InternalStackParamList } from '../../../../navigation/types';
-import { liberarWorkOrderAuditory } from '../../../../api/cerrarOrdenDeTrabajo';
-import { fetchWorkOrderById } from '../../../../api/seguimientoDeOts';
+import { liberarWorkOrderAuditory, fetchWorkOrderById } from '../../../../api/cerrarOrdenDeTrabajo';
 
 type WorkOrderDetailRouteProp = RouteProp<
   InternalStackParamList,
@@ -133,11 +133,12 @@ const CerrarOrdenDeTrabajoAuxScreen: React.FC = () => {
     }
   };
 
-  const areas =
-    workOrder?.flow?.map((item: any, index: any) => {
-      const areaData = getAreaData(item.area_id, item.areaResponse);
-      console.log('areaData', areaData.usuario);
-      return {
+  console.log('Work Order Data:', workOrder);
+
+  const areas: AreaData[] =
+    workOrder?.workOrder.flow
+      ?.filter((item: any, index: any) => item.area_id >= 6)
+      .map((item: any, index: any) => ({
         id: item.area_id,
         name: item.area?.name || 'Sin nombre',
         status: item.status || 'Desconocido',
@@ -150,8 +151,7 @@ const CerrarOrdenDeTrabajoAuxScreen: React.FC = () => {
           item.user,
           index
         ),
-      };
-    }) || [];
+      })) || [];
 
   const cantidadHojasRaw = Number(workOrder?.quantity) / 24;
   const cantidadHojas = cantidadHojasRaw > 0 ? Math.ceil(cantidadHojasRaw) : 0;
@@ -175,16 +175,12 @@ const CerrarOrdenDeTrabajoAuxScreen: React.FC = () => {
     totalMuestras;
 
   const handleCloseOrder = async () => {
+    const payload = {
+      workOrderFlowId: workOrder.id,
+      workOrderId: workOrder.workOrder.id,
+    };
+    console.log('Payload to send:', payload);
     try {
-      const currentFlow = workOrder.flow.find(
-        (f: any) => f.status === 'En auditoria'
-      );
-
-      const payload = {
-        workOrderFlowId: currentFlow.id,
-        workOrderId: workOrder.id,
-      };
-      console.log(payload);
       await liberarWorkOrderAuditory(payload);
       Alert.alert('Orden cerrada', 'La orden de trabajo ha sido cerrada.');
       navigation.goBack();
@@ -193,9 +189,6 @@ const CerrarOrdenDeTrabajoAuxScreen: React.FC = () => {
       Alert.alert('Error', 'No se pudo cerrar la orden.');
     }
   };
-  const currentFlow = workOrder.flow.find(
-    (f: any) => f.status === 'En auditoria'
-  );
 
   return (
     <ScrollView contentContainerStyle={styles.container}>
@@ -256,7 +249,7 @@ const CerrarOrdenDeTrabajoAuxScreen: React.FC = () => {
         </View>
       </ScrollView>
 
-      {currentFlow?.status !== 'En proceso' && (
+      {workOrder?.status !== 'En proceso' && (
         <>
           <Text style={styles.subtitle}>Cuadres</Text>
           <View style={styles.tableCuadres}>

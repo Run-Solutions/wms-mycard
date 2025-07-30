@@ -4,7 +4,7 @@ import { useRouter } from 'next/navigation';
 import { useState, useEffect } from 'react';
 import styled from 'styled-components';
 import {
-  acceptWorkOrderFlow,
+  acceptWorkOrderFlowAfterCorte,
   registrarInconformidadAuditory,
 } from '@/api/aceptarProducto';
 
@@ -144,7 +144,7 @@ export default function MillingChipComponentAccept({ workOrder }: Props) {
     }
     const flowId = workOrder?.id;
     try {
-      await acceptWorkOrderFlow(flowId);
+      await acceptWorkOrderFlowAfterCorte(flowId);
       router.push('/aceptarProducto');
     } catch (error) {
       console.error(error);

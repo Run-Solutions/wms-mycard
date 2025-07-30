@@ -37,7 +37,7 @@ type PartialRelease = {
 };
 
 const CorteComponentAcceptAuditory: React.FC<{ workOrder: any }> = ({
-  workOrder,
+  workOrder
 }) => {
   const navigation =
     useNavigation<NativeStackNavigationProp<RootStackParamList>>();
