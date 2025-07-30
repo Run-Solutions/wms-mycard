@@ -38,7 +38,7 @@ interface Props {
 }
 
 const WorkOrderList: React.FC<Props> = ({ orders = [] }) => {
-  const navigation = useNavigation<Navigation>();
+  const navigation = useNavigation<any>();
   const [searchValue, setSearchValue] = useState('');
   const [activeArea, setActiveArea] = useState('');
   const [startDate, setStartDate] = useState('');
@@ -87,7 +87,12 @@ const WorkOrderList: React.FC<Props> = ({ orders = [] }) => {
     return (
       <View style={styles.card}>
         <TouchableOpacity
-          onPress={() => navigation.navigate('LiberarProductoAuxScreen', { id: item.ot_id })}
+          onPress={() =>
+            navigation.navigate('Principal', {
+              screen: 'LiberarProductoAuxScreen',
+              params: { id: item.ot_id },
+            })
+          }
         >
           <View style={styles.infoRow}>
             <View style={styles.infoBlock}>

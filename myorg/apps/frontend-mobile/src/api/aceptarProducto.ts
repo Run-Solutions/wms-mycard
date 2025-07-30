@@ -19,6 +19,10 @@ export const acceptWorkOrderFlow = async (flowId: string) => {
     const response = await API.patch(`/work-order-flow/${flowId}/accept`);
     return response.data;
   };
+export const acceptWorkOrderFlowAfterCorte = async (flowId: string) => {
+    const response = await API.patch(`/work-order-flow/${flowId}/accept-after-corte`);
+    return response.data;
+  };
 
 // PATCH /work-order-flow/:flowId/inconformidad
 export const registrarInconformidad = async (flowId: string | number, inconformidad: string) => {
