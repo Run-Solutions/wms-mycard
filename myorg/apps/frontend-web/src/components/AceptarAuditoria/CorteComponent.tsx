@@ -175,6 +175,8 @@ export default function CorteComponentAcceptAuditory({ workOrder }: Props) {
           badQuantity = flow.areaResponse.impression.bad_quantity;
         } else if (flow.areaResponse?.serigrafia) {
           badQuantity = flow.areaResponse.serigrafia.bad_quantity;
+        } else if (flow.areaResponse?.empalme) {
+          badQuantity = flow.areaResponse.empalme.bad_quantity;
         } else if (flow.areaResponse?.laminacion) {
           badQuantity = flow.areaResponse.laminacion.bad_quantity;
         } else if (flow.areaResponse?.corte) {
@@ -225,6 +227,8 @@ export default function CorteComponentAcceptAuditory({ workOrder }: Props) {
         bad = flow.areaResponse.impression.bad_quantity || 0;
       } else if (flow.areaResponse?.serigrafia) {
         bad = flow.areaResponse.serigrafia.bad_quantity || 0;
+      } else if (flow.areaResponse?.empalme) {
+        bad = flow.areaResponse.empalme.bad_quantity || 0;
       } else if (flow.areaResponse?.laminacion) {
         bad = flow.areaResponse.laminacion.bad_quantity || 0;
       } else if (flow.areaResponse?.corte) {
