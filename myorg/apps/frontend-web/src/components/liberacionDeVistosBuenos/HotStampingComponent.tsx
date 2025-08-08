@@ -1,9 +1,12 @@
-'use client'
+'use client';
 
-import { useRouter } from "next/navigation";
-import { useState } from "react";
-import styled from "styled-components";
-import { submitExtraHotStamping, sendInconformidadCQM } from "@/api/recepcionCQM";
+import { useRouter } from 'next/navigation';
+import { useState } from 'react';
+import styled from 'styled-components';
+import {
+  submitExtraHotStamping,
+  sendInconformidadCQM,
+} from '@/api/recepcionCQM';
 
 interface Props {
   workOrder: any;
@@ -19,82 +22,92 @@ export default function HotStampingComponent({ workOrder }: Props) {
   const [showInconformidad, setShowInconformidad] = useState(false);
   const [inconformidad, setInconformidad] = useState<string>('');
 
-  // Para obtener el ultimo FormAnswer 
+  // Para obtener el ultimo FormAnswer
   const index = workOrder?.answers
-  ?.map((a: Answer, i: number) => ({ ...a, index: i }))
-  .reverse().find((a: Answer) => a.reviewed === false)?.index;
+    ?.map((a: Answer, i: number) => ({ ...a, index: i }))
+    .reverse()
+    .find((a: Answer) => a.reviewed === false)?.index;
   console.log('el index', index);
+  const revisarPosicionValue =
+    workOrder?.answers[index]?.revisar_posicion ?? '';
+  const imagenHologramaValue =
+    workOrder?.answers[index]?.imagen_holograma ?? '';
 
   // Para mostrar formulario de CQM y enviarlo
   const [showConfirmModal, setShowConfirmModal] = useState(false);
 
-  //Para guardar las respuestas 
-  const [responses, setResponses] = useState<{questionId: number, answer: boolean}[]>(
+  //Para guardar las respuestas
+  const [responses, setResponses] = useState<
+    { questionId: number; answer: boolean }[]
+  >(
     workOrder.area.formQuestions
-      .filter((question: {role_id: number | null}) => question.role_id === 3)
-      .map((question: {id: number}) => ({
+      .filter((question: { role_id: number | null }) => question.role_id === 3)
+      .map((question: { id: number }) => ({
         questionId: question.id,
-        answer: false
+        answer: false,
       }))
   );
   // Para controlar qué preguntas están marcadas
   const [checkedQuestions, setCheckedQuestions] = useState<number[]>([]);
   const handleCheckboxChange = (questionId: number, isChecked: boolean) => {
-    setResponses(prevResponses => 
-      prevResponses.map(response =>
-        response.questionId === questionId 
-          ? {...response, answer: isChecked}
+    setResponses((prevResponses) =>
+      prevResponses.map((response) =>
+        response.questionId === questionId
+          ? { ...response, answer: isChecked }
           : response
       )
     );
-  
+
     // Actualizar visualmente el checkbox
-    setCheckedQuestions(prev =>
-      isChecked ? [...prev, questionId] : prev.filter(id => id !== questionId)
+    setCheckedQuestions((prev) =>
+      isChecked ? [...prev, questionId] : prev.filter((id) => id !== questionId)
     );
   };
 
   const handleSelectAll = (isChecked: boolean) => {
-    const questionIds = workOrder.area.formQuestions.filter((question: { role_id: number | null }) => question.role_id === 3).map((q: { id: number }) => q.id);
-  
+    const questionIds = workOrder.area.formQuestions
+      .filter((question: { role_id: number | null }) => question.role_id === 3)
+      .map((q: { id: number }) => q.id);
+
     if (isChecked) {
       // Marcar todas las preguntas
       setCheckedQuestions(questionIds);
-  
+
       setResponses((prevResponses) => {
         // Filtrar respuestas viejas de esas preguntas
         const updatedResponses = prevResponses.filter(
           (response) => !questionIds.includes(response.questionId)
         );
-  
+
         // Agregar todas como true
         const newResponses = questionIds.map((id: number) => ({
           questionId: id,
           answer: true,
         }));
-  
+
         return [...updatedResponses, ...newResponses];
       });
     } else {
       // Desmarcar todas
       setCheckedQuestions([]);
-  
+
       setResponses((prevResponses) =>
-        prevResponses.filter((response) => !questionIds.includes(response.questionId))
+        prevResponses.filter(
+          (response) => !questionIds.includes(response.questionId)
+        )
       );
     }
   };
 
-  
   const handleSubmit = async () => {
     const formAnswerId = workOrder.answers[index]?.id; // id de FormAnswer
     if (!formAnswerId) {
-      alert("No se encontró el ID del formulario.");
+      alert('No se encontró el ID del formulario.');
       return;
     }
     const checkboxPayload = responses.map(({ questionId, answer }) => ({
       question_id: questionId,
-      answer: answer,     
+      answer: answer,
     }));
     const payload = {
       form_answer_id: formAnswerId,
@@ -102,9 +115,9 @@ export default function HotStampingComponent({ workOrder }: Props) {
     };
     try {
       const res = await submitExtraHotStamping(payload);
-      router.push("/liberacionDeVistosBuenos");
+      router.push('/liberacionDeVistosBuenos');
     } catch (error) {
-      console.log("Error al guardar la respuesta: ", error);
+      console.log('Error al guardar la respuesta: ', error);
     }
   };
 
@@ -120,7 +133,7 @@ export default function HotStampingComponent({ workOrder }: Props) {
       console.error(error);
       alert('Error al conectar con el servidor');
     }
-  }
+  };
 
   return (
     <Container>
@@ -161,46 +174,118 @@ export default function HotStampingComponent({ workOrder }: Props) {
             </thead>
             <tbody>
               {workOrder.area.formQuestions
-              .filter((question: { role_id: number | null }) => question.role_id === null)
-              .map((question: { id: number; title: string }) => {
-                // Buscar la respuesta correspondiente a esta pregunta
-                const answer = workOrder.answers[index]?.FormAnswerResponse?.find(
-                  (resp: any) => resp.question_id === question.id
-                );
-                
-                // Obtener la respuesta del operador (response_operator)
-                const operatorResponse = answer?.response_operator;
+                .filter(
+                  (question: { role_id: number | null }) =>
+                    question.role_id === null
+                )
+                .map((question: { id: number; title: string }) => {
+                  // Buscar la respuesta correspondiente a esta pregunta
+                  const answer = workOrder.answers[
+                    index
+                  ]?.FormAnswerResponse?.find(
+                    (resp: any) => resp.question_id === question.id
+                  );
 
-                return (
-                  <tr key={question.id}>
-                    <td>{question.title}</td>
-                    <td>
-                      {typeof operatorResponse === 'boolean' ? (
-                        <input 
-                          type="checkbox" 
-                          checked={operatorResponse} 
-                          disabled 
-                        />
-                      ) : (
-                        <span>{operatorResponse !== undefined && operatorResponse !== null 
-                          ? operatorResponse.toString() 
-                          : ''}</span>
-                      )}
-                    </td>
-                  </tr>
-                );
-              })}
+                  // Obtener la respuesta del operador (response_operator)
+                  const operatorResponse = answer?.response_operator;
+
+                  return (
+                    <tr key={question.id}>
+                      <td>{question.title}</td>
+                      <td>
+                        {typeof operatorResponse === 'boolean' ? (
+                          <input
+                            type="checkbox"
+                            checked={operatorResponse}
+                            disabled
+                          />
+                        ) : (
+                          <span>
+                            {operatorResponse !== undefined &&
+                            operatorResponse !== null
+                              ? operatorResponse.toString()
+                              : ''}
+                          </span>
+                        )}
+                      </td>
+                    </tr>
+                  );
+                })}
             </tbody>
           </Table>
-          <InputGroup style={{ width: '50%'}}>
-              <Label>Color Foil:</Label>
-              <Input type="text" value={workOrder?.answers[index].color_foil ?? 'No se reconoce la muestra enviada' } readOnly />
-              <Label>Revisar Posición Vs Ot:</Label>
-                <Input type="text" value={workOrder?.answers[index].revisar_posicion ?? 'No se reconoce la muestra enviada' } readOnly />
-              <Label>Imagen de Holograma Vs Ot:</Label>
-                <Input type="text" value={workOrder?.answers[index].imagen_holograma ?? 'No se reconoce la muestra enviada' } readOnly />
-              <Label>Muestras entregadas:</Label>
-              <Input type="number" value={workOrder?.answers[index].sample_quantity ?? 'No se reconoce la muestra enviada' } readOnly />
+          <InputGroup style={{ width: '50%' }}>
+            <Label>Color Foil:</Label>
+            <Input
+              type="text"
+              value={
+                workOrder?.answers[index].color_foil ??
+                'No se reconoce la muestra enviada'
+              }
+              readOnly
+            />
+            <Label>Imagen de Holograma Vs Ot:</Label>
+            <RadioGroup>
+              <RadioLabel>
+                <input
+                  type="checkbox"
+                  value="holograma"
+                  checked={
+                    imagenHologramaValue === 'holograma' ||
+                    imagenHologramaValue === 'hologramafoil'
+                  }
+                  disabled
+                />
+                Holograma
+              </RadioLabel>
+              <RadioLabel>
+                <input
+                  type="checkbox"
+                  value="foil"
+                  checked={
+                    imagenHologramaValue === 'foil' ||
+                    imagenHologramaValue === 'hologramafoil'
+                  }
+                  disabled
+                />
+                Foil
+              </RadioLabel>
+            </RadioGroup>
+            <Label>Revisar Posición Vs Ot:</Label>
+            <RadioGroup>
+              <RadioLabel>
+                <input
+                  type="checkbox"
+                  value="holograma"
+                  checked={
+                    revisarPosicionValue === 'holograma' ||
+                    revisarPosicionValue === 'hologramafoil'
+                  }
+                  disabled
+                />
+                Holograma
+              </RadioLabel>
+              <RadioLabel>
+                <input
+                  type="checkbox"
+                  value="foil"
+                  checked={
+                    revisarPosicionValue === 'foil' ||
+                    revisarPosicionValue === 'hologramafoil'
+                  }
+                  disabled
+                />
+                Foil
+              </RadioLabel>
+            </RadioGroup>
+            <Label>Muestras entregadas:</Label>
+            <Input
+              type="number"
+              value={
+                workOrder?.answers[index].sample_quantity ??
+                'No se reconoce la muestra enviada'
+              }
+              readOnly
+            />
           </InputGroup>
         </NewDataWrapper>
         <SectionTitle>Mis respuestas</SectionTitle>
@@ -213,85 +298,125 @@ export default function HotStampingComponent({ workOrder }: Props) {
                   Respuesta
                   <input
                     type="checkbox"
-                    checked={
-                      workOrder.area.formQuestions
-                        .filter((q: { role_id: number | null }) => q.role_id === 3)
-                        .every((q: { id: number }) => checkedQuestions.includes(q.id))
-                    }
+                    checked={workOrder.area.formQuestions
+                      .filter(
+                        (q: { role_id: number | null }) => q.role_id === 3
+                      )
+                      .every((q: { id: number }) =>
+                        checkedQuestions.includes(q.id)
+                      )}
                     onChange={(e) => handleSelectAll(e.target.checked)}
-                    style={{ marginLeft: "8px" }}
+                    style={{ marginLeft: '8px' }}
                   />
                 </th>
               </tr>
             </thead>
             <tbody>
               {workOrder.area.formQuestions
-              .filter((question: { role_id: number | null }) => question.role_id === 3)
-              .map((question: { id: number; title: string }) => {
-                // Buscar la respuesta correspondiente a esta pregunta
-                const answer = workOrder.answers[index]?.FormAnswerResponse?.find(
-                  (resp: any) => resp.question_id === question.id
-                );
-                return (
-                  <tr key={question.id}>
-                    <td>{question.title}</td>
-                    <td>
-                      <input type="checkbox" checked={checkedQuestions.includes(question.id)} onChange={(e) => handleCheckboxChange(question.id, e.target.checked)}/>
-                    </td>
-                  </tr>
-                );
-              })}
+                .filter(
+                  (question: { role_id: number | null }) =>
+                    question.role_id === 3
+                )
+                .map((question: { id: number; title: string }) => {
+                  // Buscar la respuesta correspondiente a esta pregunta
+                  const answer = workOrder.answers[
+                    index
+                  ]?.FormAnswerResponse?.find(
+                    (resp: any) => resp.question_id === question.id
+                  );
+                  return (
+                    <tr key={question.id}>
+                      <td>{question.title}</td>
+                      <td>
+                        <input
+                          type="checkbox"
+                          checked={checkedQuestions.includes(question.id)}
+                          onChange={(e) =>
+                            handleCheckboxChange(question.id, e.target.checked)
+                          }
+                        />
+                      </td>
+                    </tr>
+                  );
+                })}
             </tbody>
           </Table>
         </NewDataWrapper>
-        
       </NewData>
-      <div style={{ display: 'flex', gap: '1rem'}}>
-      <RechazarButton onClick={() => setShowInconformidad(true)}>Rechazar</RechazarButton>
-      <AceptarButton onClick={() => setShowConfirmModal(true)}>Aprobado</AceptarButton>
+      <div style={{ display: 'flex', gap: '1rem' }}>
+        <RechazarButton onClick={() => setShowInconformidad(true)}>
+          Rechazar
+        </RechazarButton>
+        <AceptarButton onClick={() => setShowConfirmModal(true)}>
+          Aprobado
+        </AceptarButton>
       </div>
       {showConfirmModal && (
         <ModalOverlay>
           <ModalContent>
             <ModalTitle>¿Estás seguro/a de aprobar?</ModalTitle>
             <ModalActions>
-              <Button style= {{ backgroundColor: '#BBBBBB'}} onClick={() => setShowConfirmModal(false)}>Cancelar</Button>
-              <Button onClick={() => {
-                setShowConfirmModal(false);
-                handleSubmit();
-              }}>Sí, aprobar</Button>
+              <Button
+                style={{ backgroundColor: '#BBBBBB' }}
+                onClick={() => setShowConfirmModal(false)}
+              >
+                Cancelar
+              </Button>
+              <Button
+                onClick={() => {
+                  setShowConfirmModal(false);
+                  handleSubmit();
+                }}
+              >
+                Sí, aprobar
+              </Button>
             </ModalActions>
           </ModalContent>
         </ModalOverlay>
       )}
       {showInconformidad && (
-          <ModalOverlay>
-            <ModalBox>
-              <h4>Registrar Inconformidad</h4>
-              <h3>Por favor, describe la inconformidad detectada con las respuestas entregadas.</h3>
-              <Textarea
-                value={inconformidad}
-                onChange={(e) => setInconformidad(e.target.value)}
-                placeholder="Escribe aquí la inconformidad..."
-              />
-              <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '1rem', marginTop: '1rem' }}>
-                <CancelButton onClick={() => setShowInconformidad(false)}>Cancelar</CancelButton>
-                <ConfirmButton onClick={() => {
+        <ModalOverlay>
+          <ModalBox>
+            <h4>Registrar Inconformidad</h4>
+            <h3>
+              Por favor, describe la inconformidad detectada con las respuestas
+              entregadas.
+            </h3>
+            <Textarea
+              value={inconformidad}
+              onChange={(e) => setInconformidad(e.target.value)}
+              placeholder="Escribe aquí la inconformidad..."
+            />
+            <div
+              style={{
+                display: 'flex',
+                justifyContent: 'flex-end',
+                gap: '1rem',
+                marginTop: '1rem',
+              }}
+            >
+              <CancelButton onClick={() => setShowInconformidad(false)}>
+                Cancelar
+              </CancelButton>
+              <ConfirmButton
+                onClick={() => {
                   if (!inconformidad.trim()) {
-                    alert('Debes ingresar una inconformidad antes de continuar.');
+                    alert(
+                      'Debes ingresar una inconformidad antes de continuar.'
+                    );
                     return;
                   }
                   handleSubmitInconformidad();
                   setShowInconformidad(false);
-                }}>Guardar</ConfirmButton>
-              </div>
-            </ModalBox>
-          </ModalOverlay>
-        )}
+                }}
+              >
+                Guardar
+              </ConfirmButton>
+            </div>
+          </ModalBox>
+        </ModalOverlay>
+      )}
     </Container>
-
-
-
   );
 }
 
@@ -302,7 +427,7 @@ const Container = styled.div`
   padding: 2rem;
   margin-top: 1.5rem;
   border-radius: 1rem;
-  box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
   max-width: 800px;
   margin-left: auto;
   margin-right: auto;
@@ -315,9 +440,7 @@ const Title = styled.h2`
   color: #1f2937;
 `;
 
-const NewData = styled.div`
-  
-`;
+const NewData = styled.div``;
 
 const SectionTitle = styled.h3`
   font-size: 1.25rem;
@@ -342,6 +465,7 @@ const Label = styled.label`
   font-weight: 600;
   color: #6b7280;
   width: 50%;
+  margin-bottom: 0.5rem;
 `;
 
 const Value = styled.div`
@@ -372,7 +496,7 @@ const Input = styled.input`
   transition: border 0.3s;
 
   &:focus {
-    border-color: #0038A8;
+    border-color: #0038a8;
   }
 `;
 
@@ -380,6 +504,7 @@ const RadioGroup = styled.div`
   display: flex;
   gap: 2rem;
   margin-top: 0.5rem;
+  margin-bottom: 1rem;
 `;
 
 const RadioLabel = styled.label`
@@ -391,7 +516,7 @@ const RadioLabel = styled.label`
 `;
 
 const Radio = styled.input`
-  accent-color: #0038A8;
+  accent-color: #0038a8;
 `;
 
 const Textarea = styled.textarea`
@@ -405,14 +530,14 @@ const Textarea = styled.textarea`
   resize: vertical;
 
   &:focus {
-    border-color: #0038A8;
+    border-color: #0038a8;
     outline: none;
   }
 `;
 
 const AceptarButton = styled.button<{ disabled?: boolean }>`
   margin-top: 1.5rem;
-  background-color: #0038A8;
+  background-color: #0038a8;
   color: white;
   padding: 0.5rem 1.25rem;
   border-radius: 0.5rem;
@@ -422,16 +547,16 @@ const AceptarButton = styled.button<{ disabled?: boolean }>`
   cursor: pointer;
 
   transition: background-color 0.3s ease, color 0.3s ease;
-  
+
   &:hover {
-    background-color: #1D4ED8;
-    outline: none
+    background-color: #1d4ed8;
+    outline: none;
   }
 `;
 
 const RechazarButton = styled.button<{ disabled?: boolean }>`
   margin-top: 1.5rem;
-  background-color: #BBBBBB;
+  background-color: #bbbbbb;
   color: white;
   padding: 0.5rem 1.25rem;
   border-radius: 0.5rem;
@@ -444,7 +569,7 @@ const RechazarButton = styled.button<{ disabled?: boolean }>`
 
   &:hover {
     background-color: #a0a0a0;
-    outline: none
+    outline: none;
   }
 `;
 
@@ -452,7 +577,8 @@ const Table = styled.table`
   width: 100%;
   border-collapse: collapse;
   color: black;
-  th, td {
+  th,
+  td {
     padding: 0.75rem;
     text-align: left;
     border-bottom: 1px solid #e5e7eb;
@@ -513,13 +639,13 @@ const ModalBox = styled.div`
   background: white;
   padding: 2rem;
   border-radius: 1rem;
-  box-shadow: 0 8px 24px rgba(0,0,0,0.2);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.2);
   max-width: 400px;
   width: 90%;
 `;
 
 const CancelButton = styled.button`
-  background-color: #BBBBBB;
+  background-color: #bbbbbb;
   color: white;
   padding: 0.5rem 1.5rem;
   border-radius: 0.5rem;
@@ -538,7 +664,7 @@ const CancelButton = styled.button`
 `;
 
 const ConfirmButton = styled.button`
-  background-color: #0038A8;
+  background-color: #0038a8;
   color: white;
   padding: 0.5rem 1.5rem;
   border-radius: 0.5rem;

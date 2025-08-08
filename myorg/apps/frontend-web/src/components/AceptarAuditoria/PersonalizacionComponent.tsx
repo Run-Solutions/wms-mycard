@@ -7,6 +7,8 @@ import {
   acceptWorkOrderFlowPersonalizacionAuditory,
   registrarInconformidadAuditory,
 } from '@/api/aceptarAuditoria';
+import BadQuantityModal from './util/BadQuantityModal';
+import { AreaData } from '../LiberarProducto/PersonalizacionComponent';
 
 // Define un tipo para los valores del formulario
 type PersonalizacionData = {
@@ -291,6 +293,24 @@ export default function PersonalizacionComponentAcceptAuditory({
       return sum + bad;
     }, 0);
 
+    const normalizedAreas: AreaData[] = previousFlows.map((item) => ({
+      id: item.area?.id ?? item.id,
+      name: item.area?.name ?? item.name ?? '',
+      malas: item.malas ?? 0,
+      defectuoso: item.defectuoso ?? 0,
+
+      // Valores ficticios para completar el tipo requerido
+      status: item.status ?? '',
+      response: item.areaResponse ?? {},
+      answers: item.answers ?? [],
+      usuario: item.user?.username ?? '',
+      auditor: '',
+      buenas: 0,
+      cqm: 0,
+      excedente: 0,
+      muestras: 0,
+    }));
+
     return (
       <Container>
         <Title>Área: {workOrder?.area.name || 'No definida'}</Title>
@@ -376,79 +396,21 @@ export default function PersonalizacionComponentAcceptAuditory({
         </AceptarButton>
         {/* Modal para marcar malas por areas previas al liberar */}
         {showBadQuantity && (
-          <ModalOverlay>
-            <ModalBox>
-              <h4>Registrar malas por área</h4>
-              {previousFlows.map((flow) => {
-                const areaKey = flow.area.name.toLowerCase(); // para coincidir con las claves
-                return (
-                  <div
-                    key={flow.id}
-                    style={{
-                      display: 'flex',
-                      flexDirection: 'column',
-                      alignItems: 'flex-start',
-                      gap: '0.5rem',
-                      marginTop: '1rem',
-                    }}
-                  >
-                    <Label style={{ fontWeight: 'bold' }}>
-                      {flow.area.name.toUpperCase()}
-                    </Label>
-
-                    <div style={{ display: 'flex', gap: '1rem' }}>
-                      <div>
-                        <Label>Malas</Label>
-                        <InputBad
-                          type="number"
-                          min="0"
-                          readOnly
-                          value={areaBadQuantities[`${areaKey}_bad`] || '0'}
-                          onChange={(e) =>
-                            setAreaBadQuantities({
-                              ...areaBadQuantities,
-                              [`${areaKey}_bad`]: e.target.value,
-                            })
-                          }
-                        />
-                      </div>
-                      {flow.area_id >= 6 && (
-                        <div>
-                          <Label>Malo de fábrica</Label>
-                          <InputBad
-                            type="number"
-                            min="0"
-                            readOnly
-                            value={
-                              areaBadQuantities[`${areaKey}_material`] || '0'
-                            }
-                            onChange={(e) =>
-                              setAreaBadQuantities({
-                                ...areaBadQuantities,
-                                [`${areaKey}_material`]: e.target.value,
-                              })
-                            }
-                          />
-                        </div>
-                      )}
-                    </div>
-                  </div>
-                );
-              })}
-              <div
-                style={{
-                  display: 'flex',
-                  justifyContent: 'flex-end',
-                  gap: '1rem',
-                  marginTop: '1rem',
-                }}
-              >
-                <CancelButton onClick={() => setShowBadQuantity(false)}>
-                  Cerrar
-                </CancelButton>
-              </div>
-            </ModalBox>
-          </ModalOverlay>
+          <BadQuantityModal
+            areas={normalizedAreas}
+            areaBadQuantities={areaBadQuantities}
+            setAreaBadQuantities={setAreaBadQuantities}
+            onConfirm={({
+              updatedAreas,
+              totalBad,
+              totalMaterial,
+              lastAreaBad,
+              lastAreaMaterial,
+            }) => {
+              setShowBadQuantity(false);
+            }}
+            onClose={() => setShowBadQuantity(false)}
+          />
         )}
         {showConfirm && (
           <ModalOverlay>

@@ -1,10 +1,15 @@
-'use client'
+// /Users/manue/Documents/Run/MC-06/wms-mycard/myorg/apps/frontend-web/src/components/ConfiguracionVistosBuenos/LaminacionComponent.tsx
+'use client';
 
-import { useRouter } from "next/navigation";
+import { useRouter } from 'next/navigation';
 import { FaEdit, FaTrash } from 'react-icons/fa';
-import { useState } from "react";
-import styled from "styled-components";
-import { deleteFormQuestion, updateFormQuestion } from "@/api/configVistosBuenos";
+import { useState } from 'react';
+import styled from 'styled-components';
+import {
+  deleteFormQuestion,
+  updateFormQuestion,
+} from '@/api/configVistosBuenos';
+import { FormQuestionTable } from './FormQuestionTable';
 
 interface Props {
   formQuestion: any;
@@ -19,14 +24,16 @@ export default function LaminacionComponent({ formQuestion }: Props) {
   const [editingId, setEditingId] = useState<number | null>(null);
   const [newTitle, setNewTitle] = useState('');
   const [deletingId, setDeletingId] = useState<number | null>(null);
-  const [formQuestions, setFormQuestions] = useState<any[]>(formQuestion); 
+  const [formQuestions, setFormQuestions] = useState<any[]>(formQuestion);
 
   const handleUpdateTitle = async (id: number, updatedTitle: string) => {
     // Verificamos si el título ha cambiado
-    const currentTitle = formQuestions.find((q: Question) => q.id === id)?.title;
+    const currentTitle = formQuestions.find(
+      (q: Question) => q.id === id
+    )?.title;
     // Si el título es el mismo, no hacemos nada
     if (currentTitle === updatedTitle) {
-      alert("El título no ha cambiado. No se envía la solicitud.");
+      alert('El título no ha cambiado. No se envía la solicitud.');
       return;
     }
     try {
@@ -36,14 +43,14 @@ export default function LaminacionComponent({ formQuestion }: Props) {
       );
       setFormQuestions(updatedQuestions);
       setEditingId(null);
-  
-      console.log("Datos enviados:", {
+
+      console.log('Datos enviados:', {
         id,
         title: updatedTitle,
       });
       await updateFormQuestion(id, updatedTitle);
     } catch (error) {
-      console.error("Error actualizando la pregunta:", error);
+      console.error('Error actualizando la pregunta:', error);
     }
   };
 
@@ -52,17 +59,18 @@ export default function LaminacionComponent({ formQuestion }: Props) {
       const res = await deleteFormQuestion(id);
       if (res.ok) {
         // Quitamos del estado local
-        const updatedQuestions = formQuestions.filter((q: Question) => q.id !== id);
+        const updatedQuestions = formQuestions.filter(
+          (q: Question) => q.id !== id
+        );
         setFormQuestions(updatedQuestions);
         setDeletingId(null);
       } else {
-        alert("Error al eliminar la pregunta.");
+        alert('Error al eliminar la pregunta.');
       }
     } catch (error) {
-      console.error("Error eliminando la pregunta:", error);
+      console.error('Error eliminando la pregunta:', error);
     }
   };
-
 
   return (
     <Container>
@@ -71,96 +79,57 @@ export default function LaminacionComponent({ formQuestion }: Props) {
       <NewData>
         <SectionTitle>Respuestas del operador</SectionTitle>
         <NewDataWrapper>
-        <Table>
-          <thead>
-            <tr>
-              <th>Pregunta</th>
-              <th>Respuesta</th>
-              <th>Acciones</th>
-            </tr>
-          </thead>
-          <tbody>
-            {formQuestions.filter((question: any) => question.role_id === null && question.areas.some((area: any) => area.id === 5))
-              .map((question: any) => {
-                // Como no mostraste la estructura de las respuestas aquí, lo dejo vacío
-                const frontAnswer = null; 
-                const vueltaAnswer = null;
-                return (
-                  <tr key={question.id}>
-                    <td>{question.title}</td>
-                    <td><input type="checkbox" checked={false} disabled/></td>
-                    <td>
-                      <button style={{ marginRight: '8px' }} onClick={() => {
-                        setEditingId(question.id);
-                        setNewTitle(question.title);
-                        }}><FaEdit /></button>
-                      <button onClick={() => setDeletingId(question.id)}><FaTrash /></button>
-                    </td>
-                  </tr>
-                );
-              })}
-          </tbody>
-        </Table>
-        <InputGroup>
-        <Label>Validar Acabado Vs Orden De Trabajo</Label>
-          <RadioGroup>
-            <RadioLabel>
-              <Radio type="radio" disabled/>
-              B/B
-            </RadioLabel>
-            <RadioLabel>
-              <Radio type="radio" disabled/>
-              M/M
-            </RadioLabel>
-            <RadioLabel>
-              <Radio type="radio" disabled/>
-              Otro
-            </RadioLabel>
-          </RadioGroup>
-          <InputGroup style={{ width: '50%', marginTop:'10px'}}>
-            <Label>Valor de Anclaje Obtenido:</Label>
-            <Input type="number" readOnly />
+          <FormQuestionTable
+            formQuestions={formQuestions}
+            areaId={5}
+            roleId={null}
+            columns={['Respuesta']}
+            onEdit={(id, title) => {
+              setEditingId(id);
+              setNewTitle(title);
+            }}
+            onDelete={(id) => setDeletingId(id)}
+          />
+          <InputGroup>
+            <Label>Validar Acabado Vs Orden De Trabajo</Label>
+            <RadioGroup>
+              <RadioLabel>
+                <Radio type="radio" disabled />
+                B/B
+              </RadioLabel>
+              <RadioLabel>
+                <Radio type="radio" disabled />
+                M/M
+              </RadioLabel>
+              <RadioLabel>
+                <Radio type="radio" disabled />
+                Otro
+              </RadioLabel>
+            </RadioGroup>
+            <InputGroup style={{ width: '50%', marginTop: '10px' }}>
+              <Label>Valor de Anclaje Obtenido:</Label>
+              <Input type="number" readOnly />
+            </InputGroup>
+            <InputGroup style={{ width: '50%', marginTop: '10px' }}>
+              <Label>Muestras entregadas:</Label>
+              <Input type="number" readOnly />
+            </InputGroup>
           </InputGroup>
-          <InputGroup style={{ width: '50%', marginTop:'10px'}}>
-            <Label>Muestras entregadas:</Label>
-            <Input type="number" readOnly />
-          </InputGroup>
-        </InputGroup>
         </NewDataWrapper>
 
         <InputGroup>
           <SectionTitle>Mis respuestas</SectionTitle>
-          <Table>
-            <thead>
-              <tr>
-                <th>Pregunta</th>
-                <th>Respuesta</th>
-                <th>Acciones</th>
-              </tr>
-            </thead>
-            <tbody>
-            {formQuestions.filter((question: any) => question.role_id === 3 && question.areas.some((area: any) => area.id === 5))
-              .map((question: any) => {
-                // Como no mostraste la estructura de las respuestas aquí, lo dejo vacío
-                const frontAnswer = null; 
-                const vueltaAnswer = null;
-                return (
-                  <tr key={question.id}>
-                    <td>{question.title}</td>
-                    <td><input type="checkbox" checked={false} disabled/></td>
-                    <td>
-                      <button style={{ marginRight: '8px' }} onClick={() => {
-                        setEditingId(question.id);
-                        setNewTitle(question.title);
-                        }}><FaEdit /></button>
-                      <button onClick={() => setDeletingId(question.id)}><FaTrash /></button>
-                    </td>
-                  </tr>
-                );
-              })}
-          </tbody>
-          </Table>
-          
+          <FormQuestionTable
+            formQuestions={formQuestions}
+            areaId={5}
+            roleId={3}
+            columns={['Respuesta']}
+            onEdit={(id, title) => {
+              setEditingId(id);
+              setNewTitle(title);
+            }}
+            onDelete={(id) => setDeletingId(id)}
+          />
         </InputGroup>
       </NewData>
       {editingId !== null && (
@@ -179,9 +148,7 @@ export default function LaminacionComponent({ formQuestion }: Props) {
               >
                 Cancelar
               </Button>
-              <Button
-                onClick={() => handleUpdateTitle(editingId, newTitle)}
-              >
+              <Button onClick={() => handleUpdateTitle(editingId, newTitle)}>
                 Guardar
               </Button>
             </ModalActions>
@@ -190,9 +157,12 @@ export default function LaminacionComponent({ formQuestion }: Props) {
       )}
       {deletingId !== null && (
         <ModalOverlay>
-          <ModalContent style={{ width: '400px'}}>
+          <ModalContent style={{ width: '400px' }}>
             <ModalTitle>Eliminar esta pregunta</ModalTitle>
-            <p>¿Estás segura/o de que deseas eliminar esta pregunta? Esta acción no se puede deshacer.</p>
+            <p>
+              ¿Estás segura/o de que deseas eliminar esta pregunta? Esta acción
+              no se puede deshacer.
+            </p>
             <ModalActions>
               <Button
                 style={{ backgroundColor: '#BBBBBB' }}
@@ -221,7 +191,7 @@ const Container = styled.div`
   padding: 2rem;
   margin-top: 1.5rem;
   border-radius: 1rem;
-  box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
   max-width: 800px;
   margin-left: auto;
   margin-right: auto;
@@ -234,9 +204,7 @@ const Title = styled.h2`
   color: #1f2937;
 `;
 
-const NewData = styled.div`
-  
-`;
+const NewData = styled.div``;
 
 const SectionTitle = styled.h3`
   font-size: 1.25rem;
@@ -317,7 +285,8 @@ const Table = styled.table`
   width: 100%;
   border-collapse: collapse;
   color: black;
-  th, td {
+  th,
+  td {
     padding: 0.75rem;
     text-align: left;
     border-bottom: 1px solid #e5e7eb;

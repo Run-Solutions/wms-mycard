@@ -393,7 +393,7 @@ const WorkOrderTable: React.FC<Props> = ({ orders, title, statusFilter }) => {
                 <TableRow key={order.id} hover>
                   <TableCell
                     onClick={() =>
-                      router.push(`/seguimientoDeOts/${order.ot_id}`)
+                      (window.location.href = `/seguimientoDeOts/${order.ot_id}`)
                     }
                     sx={{
                       cursor: 'pointer',

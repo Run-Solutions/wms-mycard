@@ -226,9 +226,8 @@ export default function Personalizacion({ formQuestion }: Props) {
 
 const styles = StyleSheet.create({
   container: {
-    padding: 20,
-    backgroundColor: '#FFF',
-    flex: 1,
+    backgroundColor: '#fdfaf6',
+    marginTop: 10,
   },
   title: {
     fontSize: 22,

@@ -61,13 +61,13 @@ export default function HotStampingComponent({ formQuestion }: Props) {
 
       <Text style={styles.label}>Revisar Posicion Vs Ot</Text>
       <View style={styles.radioGroup}>
-        <Text>◯ Holograma</Text>
-        <Text>◯ Foil</Text>
+        <Text>☐ Holograma</Text>
+        <Text>☐ Foil</Text>
       </View>
       <Text style={styles.label}>Imagen de Holograma Vs Ot</Text>
       <View style={styles.radioGroup}>
-        <Text>◯ Holograma</Text>
-        <Text>◯ Foil</Text>
+        <Text>☐ Holograma</Text>
+        <Text>☐ Foil</Text>
       </View>
 
       <Text style={styles.label}>Muestras entregadas:</Text>
@@ -125,7 +125,10 @@ export default function HotStampingComponent({ formQuestion }: Props) {
 }
 
 const styles = StyleSheet.create({
-  container: { padding: 16, backgroundColor: '#fff', flex: 1 },
+  container: {
+    backgroundColor: '#fdfaf6',
+    marginTop: 10,
+  },
   title: { fontSize: 20, fontWeight: 'bold', marginBottom: 16 },
   section: { fontSize: 16, fontWeight: '600', marginTop: 20 },
   row: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginVertical: 8 },

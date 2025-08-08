@@ -1,5 +1,15 @@
 import React, { useEffect, useState } from 'react';
-import { View, Text, TouchableOpacity, ScrollView, StyleSheet, Alert, Modal, Dimensions, TouchableWithoutFeedback } from 'react-native';
+import {
+  View,
+  Text,
+  TouchableOpacity,
+  ScrollView,
+  StyleSheet,
+  Alert,
+  Modal,
+  Dimensions,
+  TouchableWithoutFeedback,
+} from 'react-native';
 import { getConfigVistosBuenos } from '../../../api/configVistosBuenos';
 import ConfiguracionVistosBuenosOption from '../../../components/ConfiguracionVistosBuenos/ConfiguracionVistosBuenosOption';
 
@@ -56,31 +66,25 @@ const ConfigVistosBuenosScreen: React.FC = () => {
       <Text style={styles.title}>Configuración de Vistos Buenos</Text>
       <View style={styles.grid}>
         {uniqueAreas.map((area) => (
-          <TouchableOpacity key={area.id} style={styles.card} onPress={() => handlePress(area)}>
+          <TouchableOpacity
+            key={area.id}
+            style={styles.card}
+            onPress={() => handlePress(area)}
+          >
             <Text style={styles.cardTitle}>{area.name}</Text>
           </TouchableOpacity>
         ))}
       </View>
 
-      <Modal
-        visible={modalVisible}
-        animationType="fade"
-        transparent
-        onRequestClose={() => setModalVisible(false)}
-      >
-        <TouchableWithoutFeedback onPress={() => setModalVisible(false)}>
-          <View style={styles.modalOverlay}>
-            <TouchableWithoutFeedback onPress={() => setModalVisible(false)}>
-              <View style={styles.modalContainerExpanded}>
-                {selectedArea != null && (
-                  <ConfiguracionVistosBuenosOption id={selectedArea.id} />
-                )}
-              </View>
-            </TouchableWithoutFeedback>
-          </View>
-        </TouchableWithoutFeedback>
+      <Modal visible={modalVisible} animationType="slide">
+        <View style={{ flex: 1, backgroundColor: '#fdfaf6' }}>
+          <ScrollView style={styles.modalOverlay} contentContainerStyle={{ flexGrow: 1 }}>
+            {selectedArea != null && (
+              <ConfiguracionVistosBuenosOption id={selectedArea.id} onClose={() => setModalVisible(false)}/>
+            )}
+          </ScrollView>
+        </View>
       </Modal>
-
     </ScrollView>
   );
 };
@@ -125,18 +129,12 @@ const styles = StyleSheet.create({
   },
   modalOverlay: {
     flex: 1,
-    justifyContent: 'center',
-    backgroundColor: 'rgba(0,0,0,0.5)',
-    padding: 20,
+    paddingTop: 40,
+    paddingHorizontal: 20,
+    backgroundColor: 'rgba(0,0,0,0.4)',
   },
   modalContainerExpanded: {
-    backgroundColor: '#fff',
-    borderRadius: 10,
-    padding: 25,
-    alignItems: 'stretch',
-    elevation: 5,
-    maxHeight: '85%',
-    width: '100%',
+    padding: 20,
   },
   modalTitle: {
     fontSize: 20,

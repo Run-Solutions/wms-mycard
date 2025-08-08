@@ -2,6 +2,8 @@ import React, { useEffect, useState } from 'react';
 import { View, Text, StyleSheet, ActivityIndicator, Platform, ScrollView } from 'react-native';
 import { getWorkOrdersWithInconformidad } from '../../../api/inconformidades';
 import WorkOrderList from '../../../components/Inconformidades/WorkOrderList';
+import { useFocusEffect } from '@react-navigation/native';
+import { useCallback } from 'react';
 
 interface File {
   id: number;
@@ -32,45 +34,53 @@ const InconformidadesScreen: React.FC = () => {
   const [loading, setLoading] = useState(true);
   const [areaId, setAreaId] = useState<number | null>(null);
 
-  useEffect(() => {
-    const fetchData = async () => {
-      try {
-        const data = await getWorkOrdersWithInconformidad();
-        console.log("RAW DATA:", data);
-        if (!Array.isArray(data)) {
-          console.warn('La API no devolvió un array:', data);
-          setOrders([]); // o el estado que uses
-          return;
-        }
-        const transformed = data.map((item: any) => ({
-          id: item.id,
-          ot_id: item.workOrder.ot_id,
-          mycard_id: item.workOrder.mycard_id,
-          quantity: item.workOrder.quantity,
-          status: item.status, 
-          validated: item.workOrder.validated,
-          createdAt: item.workOrder.createdAt,
-          user: item.workOrder.user,
-          files: item.workOrder.files, 
-          flow: item.workOrder.flow.map((f: any) => ({
-            area_id: f.area.id,
-            status: f.status,
-            area: { name: f.area.name }
-          }))
-        }));
-        setOrders(transformed);
-        if (transformed.length > 0) {
-          setAreaId(transformed[0].flow[0]?.area_id ?? null);
-        }
-      } catch (error) {
-        console.error('Error al obtener las órdenes:', error);
-      } finally {
-        setLoading(false);
-      }
-    };
+  useFocusEffect(
+    useCallback(() => {
+      const fetchData = async () => {
+        try {
+          const { pendingOrders } = await getWorkOrdersWithInconformidad();
+          console.log('Datos de Ordenes: ', pendingOrders);
   
-    fetchData();
-  }, []);
+          if (!Array.isArray(pendingOrders)) {
+            console.warn('La API no devolvió un array:', pendingOrders);
+            setOrders([]);
+            return;
+          }
+  
+          const transformed = pendingOrders.map((item: any) => {
+            const wo = item.workOrder;
+            return {
+              id: item.id,
+              ot_id: wo.ot_id,
+              mycard_id: wo.mycard_id,
+              quantity: wo.quantity,
+              status: item.status,
+              validated: wo.validated,
+              createdAt: wo.createdAt,
+              user: wo.user,
+              files: wo.files,
+              flow: wo.flow.map((f: any) => ({
+                area_id: f.area.id,
+                status: f.status,
+                area: { name: f.area.name },
+              })),
+            };
+          });
+  
+          setOrders(transformed);
+          if (transformed.length > 0) {
+            setAreaId(transformed[0].flow[0]?.area_id ?? null);
+          }
+        } catch (error) {
+          console.error('Error al obtener las órdenes:', error);
+        } finally {
+          setLoading(false);
+        }
+      };
+  
+      fetchData();
+    }, [])
+  );
 
   const filterOrdersByStatus = (statuses: string[]) => {
     return orders.filter((o) =>

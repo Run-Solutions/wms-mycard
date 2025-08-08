@@ -15,7 +15,10 @@ import { TextInput } from 'react-native-paper';
 import { useNavigation } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { RootStackParamList } from '../../navigation/types';
-import { submitExtraHotStamping, sendInconformidadCQM } from '../../api/recepcionCQM';
+import {
+  submitExtraHotStamping,
+  sendInconformidadCQM,
+} from '../../api/recepcionCQM';
 
 // Tipos y constantes globales
 
@@ -26,7 +29,8 @@ type Answer = {
 
 const HotStampingComponent = ({ workOrder }: { workOrder: any }) => {
   // Hooks y estados
-  const navigation = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
+  const navigation =
+    useNavigation<NativeStackNavigationProp<RootStackParamList>>();
 
   const [checkedQuestions, setCheckedQuestions] = useState<number[]>([]);
   const [showConfirmModal, setShowConfirmModal] = useState(false);
@@ -39,13 +43,22 @@ const HotStampingComponent = ({ workOrder }: { workOrder: any }) => {
     ?.map((a: Answer, i: number) => ({ ...a, index: i }))
     .reverse()
     .find((a: Answer) => a.reviewed === false)?.index;
+  const revisarPosicionValue =
+    workOrder?.answers[index]?.revisar_posicion ?? '';
+  const imagenHologramaValue =
+    workOrder?.answers[index]?.imagen_holograma ?? '';
 
-  const questions = workOrder.area.formQuestions?.filter((q: any) => q.role_id === null) || [];
-  const qualityQuestions = workOrder.area.formQuestions?.filter((q: any) => q.role_id === 3) || [];
-  const currentFlow = [...workOrder.workOrder.flow].find((f: any) => f.id === workOrder.id);
+  const questions =
+    workOrder.area.formQuestions?.filter((q: any) => q.role_id === null) || [];
+  const qualityQuestions =
+    workOrder.area.formQuestions?.filter((q: any) => q.role_id === 3) || [];
+  const currentFlow = [...workOrder.workOrder.flow].find(
+    (f: any) => f.id === workOrder.id
+  );
 
   const isDisabled = workOrder.status === 'En proceso';
-  const nextFlowIndex = workOrder.workOrder.flow.findIndex((f: any) => f.id === workOrder.id) + 1;
+  const nextFlowIndex =
+    workOrder.workOrder.flow.findIndex((f: any) => f.id === workOrder.id) + 1;
   const nextFlow = workOrder.workOrder.flow[nextFlowIndex] ?? null;
 
   const allParcialsValidated = workOrder.partialReleases?.every(
@@ -58,20 +71,24 @@ const HotStampingComponent = ({ workOrder }: { workOrder: any }) => {
       Alert.alert('No se encontró el Id del formulario');
       return;
     }
-  
-    const questions = workOrder.area.formQuestions.filter((q: any) => q.role_id === 3);
-  
+
+    const questions = workOrder.area.formQuestions.filter(
+      (q: any) => q.role_id === 3
+    );
+
     const isCheckedQuestionsValid = questions.some((q: any) =>
       checkedQuestions.includes(q.id)
     );
-  
-    const checkboxPayload = checkedQuestions.map((questionId: number) => ({ question_id: questionId }));
-  
+
+    const checkboxPayload = checkedQuestions.map((questionId: number) => ({
+      question_id: questionId,
+    }));
+
     const payload = {
       form_answer_id: formAnswerId,
       checkboxes: checkboxPayload,
     };
-  
+
     try {
       const success = await submitExtraHotStamping(payload);
       setShowConfirmModal(false);
@@ -104,20 +121,20 @@ const HotStampingComponent = ({ workOrder }: { workOrder: any }) => {
       <View style={styles.card}>
         <Text style={styles.label}>OT:</Text>
         <Text style={styles.value}>{workOrder.workOrder.ot_id}</Text>
-      
+
         <Text style={styles.label}>Id del Presupuesto:</Text>
         <Text style={styles.value}>{workOrder.workOrder.mycard_id}</Text>
-      
+
         <Text style={styles.label}>Cantidad:</Text>
         <Text style={styles.value}>{workOrder.workOrder.quantity}</Text>
-      
+
         <Text style={styles.label}>Operador:</Text>
         <Text style={styles.value}>{workOrder.user.username}</Text>
-          
+
         <Text style={styles.label}>Comentarios:</Text>
         <Text style={styles.value}>{workOrder.workOrder.comments}</Text>
       </View>
-      
+
       <Text style={styles.modalTitle}>Respuestas del operador</Text>
       {/* Encabezado estilo tabla */}
       <View style={styles.tableHeader}>
@@ -143,7 +160,12 @@ const HotStampingComponent = ({ workOrder }: { workOrder: any }) => {
 
             {/* Respuesta */}
             <View style={[styles.tableCell, { flex: 1, alignItems: 'center' }]}>
-              <View style={[styles.radioCircle, operatorResponse && styles.radioDisabled]}>
+              <View
+                style={[
+                  styles.radioCircle,
+                  operatorResponse && styles.radioDisabled,
+                ]}
+              >
                 {operatorResponse && <View style={styles.radioDot} />}
               </View>
             </View>
@@ -157,27 +179,49 @@ const HotStampingComponent = ({ workOrder }: { workOrder: any }) => {
         theme={{ roundness: 30 }}
         mode="outlined"
         activeOutlineColor="#000"
-        value={workOrder?.answers[index].color_foil ?? 'No se reconoce la muestra enviada' }
+        value={
+          workOrder?.answers[index].color_foil ??
+          'No se reconoce la muestra enviada'
+        }
         editable={false}
       />
-      <Text style={styles.label}>Revisar Posición Vs Ot:</Text>
-      <TextInput
-        style={styles.input}
-        theme={{ roundness: 30 }}
-        mode="outlined"
-        activeOutlineColor="#000"
-        value={workOrder?.answers[index].revisar_posicion ?? 'No se reconoce la muestra enviada' }
-        editable={false}
-      />
-      <Text style={styles.label}>Imagen de Holograma Vs Ot:</Text>
-      <TextInput
-        style={styles.input}
-        theme={{ roundness: 30 }}
-        mode="outlined"
-        activeOutlineColor="#000"
-        value={workOrder?.answers[index].imagen_holograma ?? 'No se reconoce la muestra enviada' }
-        editable={false}
-      />
+      <View style={styles.inputGroup}>
+        <Text style={styles.label}>Imagen de Holograma Vs Ot:</Text>
+        <View style={styles.radioGroup}>
+          {['holograma', 'foil'].map((value) => (
+            <View key={value} style={styles.radioOption}>
+              <View style={[styles.checkbox, { opacity: 0.5 }]}>
+                {imagenHologramaValue === value ||
+                imagenHologramaValue === 'hologramafoil' ? (
+                  <View style={styles.checkboxChecked} />
+                ) : null}
+              </View>
+              <Text style={[styles.radioLabel, { opacity: 0.5 }]}>
+                {value.charAt(0).toUpperCase() + value.slice(1)}
+              </Text>
+            </View>
+          ))}
+        </View>
+      </View>
+
+      <View style={styles.inputGroup}>
+        <Text style={styles.label}>Revisar Posición Vs Ot:</Text>
+        <View style={styles.radioGroup}>
+          {['holograma', 'foil'].map((value) => (
+            <View key={value} style={styles.radioOption}>
+              <View style={[styles.checkbox, { opacity: 0.5 }]}>
+                {revisarPosicionValue === value ||
+                revisarPosicionValue === 'hologramafoil' ? (
+                  <View style={styles.checkboxChecked} />
+                ) : null}
+              </View>
+              <Text style={[styles.radioLabel, { opacity: 0.5 }]}>
+                {value.charAt(0).toUpperCase() + value.slice(1)}
+              </Text>
+            </View>
+          ))}
+        </View>
+      </View>
       <Text style={styles.label}>Muestras entregadas:</Text>
       <TextInput
         style={styles.input}
@@ -186,16 +230,16 @@ const HotStampingComponent = ({ workOrder }: { workOrder: any }) => {
         activeOutlineColor="#000"
         value={
           typeof workOrder?.answers?.[index]?.sample_quantity === 'number'
-          ? workOrder.answers[index].sample_quantity.toString()
-          : ''
+            ? workOrder.answers[index].sample_quantity.toString()
+            : ''
         }
         editable={false}
       />
 
       {typeof workOrder?.answers?.[index]?.sample_quantity !== 'number' && (
-      <Text style={{ color: '#b91c1c', marginTop: 8, textAlign: 'center' }}>
-        No se reconoce la muestra enviada
-      </Text>
+        <Text style={{ color: '#b91c1c', marginTop: 8, textAlign: 'center' }}>
+          No se reconoce la muestra enviada
+        </Text>
       )}
 
       <Text style={[styles.modalTitle, { marginTop: 40 }]}>Mis respuestas</Text>
@@ -241,20 +285,26 @@ const HotStampingComponent = ({ workOrder }: { workOrder: any }) => {
             </View>
           ))}
           <Text style={styles.subtitle}>Tipo de Prueba</Text>
-            {['color', 'perfil', 'fisica'].map(type => (
-              <View key={type} style={styles.radioDisabled}>
-                <Text>{`Prueba ${type}`}</Text>
-              </View>
-            ))}
+          {['color', 'perfil', 'fisica'].map((type) => (
+            <View key={type} style={styles.radioDisabled}>
+              <Text>{`Prueba ${type}`}</Text>
+            </View>
+          ))}
         </>
       )}
 
       {/* Botones */}
       <View style={styles.modalButtonRow}>
-        <TouchableOpacity style={styles.cancelButton} onPress={() => setShowInconformidad(true)}>
+        <TouchableOpacity
+          style={styles.cancelButton}
+          onPress={() => setShowInconformidad(true)}
+        >
           <Text style={styles.modalButtonText}>Rechazar</Text>
         </TouchableOpacity>
-        <TouchableOpacity style={styles.confirmButton} onPress={() => setShowConfirmModal(true)}>
+        <TouchableOpacity
+          style={styles.confirmButton}
+          onPress={() => setShowConfirmModal(true)}
+        >
           <Text style={styles.modalButtonText}>Aprobado</Text>
         </TouchableOpacity>
       </View>
@@ -297,10 +347,16 @@ const HotStampingComponent = ({ workOrder }: { workOrder: any }) => {
               activeOutlineColor="#000"
             />
             <View style={styles.modalActions}>
-              <TouchableOpacity style={styles.cancelButton} onPress={() => setShowInconformidad(false)}>
+              <TouchableOpacity
+                style={styles.cancelButton}
+                onPress={() => setShowInconformidad(false)}
+              >
                 <Text style={styles.modalButtonText}>Cancelar</Text>
               </TouchableOpacity>
-              <TouchableOpacity style={styles.confirmButton} onPress={handleInconformidad}>
+              <TouchableOpacity
+                style={styles.confirmButton}
+                onPress={handleInconformidad}
+              >
                 <Text style={styles.modalButtonText}>Enviar</Text>
               </TouchableOpacity>
             </View>
@@ -314,24 +370,24 @@ const HotStampingComponent = ({ workOrder }: { workOrder: any }) => {
 export default HotStampingComponent;
 
 const styles = StyleSheet.create({
-  container: { 
+  container: {
     flex: 1,
     paddingTop: 16,
     paddingBottom: 32,
-    paddingHorizontal: 8, 
-    backgroundColor: '#fdfaf6', 
+    paddingHorizontal: 8,
+    backgroundColor: '#fdfaf6',
   },
-  title: { 
-    fontSize: 20, 
-    fontWeight: 'bold', 
+  title: {
+    fontSize: 20,
+    fontWeight: 'bold',
     marginBottom: 16,
     textAlign: 'center',
     color: 'black',
     padding: Platform.OS === 'ios' ? 10 : 0,
   },
-  subtitle: { 
-    fontSize: 16, 
-    fontWeight: 'bold', 
+  subtitle: {
+    fontSize: 16,
+    fontWeight: 'bold',
     marginTop: 20,
     marginBottom: 12,
   },
@@ -417,7 +473,7 @@ const styles = StyleSheet.create({
   modalActions: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    marginTop: 10 
+    marginTop: 10,
   },
   cancelButton: {
     backgroundColor: '#A9A9A9',
@@ -467,12 +523,15 @@ const styles = StyleSheet.create({
     marginTop: 8,
   },
   checkbox: {
-    paddingVertical: 6,
-    paddingHorizontal: 12,
+    width: 20,
+    height: 20,
     borderWidth: 1,
     borderColor: '#ccc',
-    borderRadius: 10,
-    backgroundColor: '#f9fafb',
+    borderRadius: 4,
+    backgroundColor: '#fff',
+    marginRight: 10,
+    justifyContent: 'center',
+    alignItems: 'center',
   },
   checkedBox: {
     backgroundColor: '#dbeafe',
@@ -542,17 +601,29 @@ const styles = StyleSheet.create({
   },
   radioGroup: {
     marginTop: 12,
-    alignItems: 'flex-start',
-  },
-  
-  radioLabel: {
     flexDirection: 'row',
-    alignItems: 'center',
-    marginBottom: 12,
-    gap: 10
-  }, 
+    gap: 8,
+  },
+  radioLabel: {
+    fontSize: 14,
+    color: '#1f2937',
+  },
   radioText: {
     fontSize: 16,
     color: '#1f2937',
-  }
+  },
+  checkboxChecked: {
+    width: 12,
+    height: 12,
+    backgroundColor: '#2563eb',
+    borderRadius: 2,
+  },
+  radioOption: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 4,
+  },
+  inputGroup: {
+    marginTop: 16,
+  },
 });

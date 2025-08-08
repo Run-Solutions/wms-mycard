@@ -5,6 +5,7 @@ import { FaEdit, FaTrash } from 'react-icons/fa';
 import { useState } from "react";
 import styled from "styled-components";
 import { deleteFormQuestion, updateFormQuestion } from "@/api/configVistosBuenos";
+import { FormQuestionTable } from "./FormQuestionTable";
 
 interface Props {
   formQuestion: any;
@@ -71,36 +72,17 @@ export default function ColorEdgeComponent({ formQuestion }: Props) {
       <NewData>
         <SectionTitle>Respuestas del operador</SectionTitle>
         <NewDataWrapper>
-        <Table>
-          <thead>
-            <tr>
-              <th>Pregunta</th>
-              <th>Respuesta</th>
-              <th>Acciones</th>
-            </tr>
-          </thead>
-          <tbody>
-            {formQuestions.filter((question: any) => question.role_id === null && question.areas.some((area: any) => area.id === 7))
-              .map((question: any) => {
-                // Como no mostraste la estructura de las respuestas aquí, lo dejo vacío
-                const frontAnswer = null; 
-                const vueltaAnswer = null;
-                return (
-                  <tr key={question.id}>
-                    <td>{question.title}</td>
-                    <td><input type="checkbox" checked={false} disabled/></td>
-                    <td>
-                      <button style={{ marginRight: '8px' }} onClick={() => {
-                        setEditingId(question.id);
-                        setNewTitle(question.title);
-                        }}><FaEdit /></button>
-                      <button onClick={() => setDeletingId(question.id)}><FaTrash /></button>
-                    </td>
-                  </tr>
-                );
-              })}
-          </tbody>
-        </Table>
+          <FormQuestionTable
+            formQuestions={formQuestions}
+            areaId={7}
+            roleId={null}
+            columns={['Respuesta']}
+            onEdit={(id, title) => {
+              setEditingId(id);
+              setNewTitle(title);
+            }}
+            onDelete={(id) => setDeletingId(id)}
+          />
           <InputGroup style={{ width: '50%'}}>
               <Label>Muestras entregadas:</Label>
               <Input type="number" readOnly />

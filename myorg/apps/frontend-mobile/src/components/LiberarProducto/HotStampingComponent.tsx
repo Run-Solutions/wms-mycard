@@ -20,6 +20,8 @@ import {
 import { updateWorkOrderAreas } from '../../api/seguimientoDeOts';
 import { useAuth } from '../../contexts/AuthContext';
 import { calcularCantidadPorLiberar } from './util/calcularCantidadPorLiberar';
+import BadQuantityModal from './util/BadQuantityModal';
+import { AreaData } from './PersonalizacionComponent';
 
 interface PartialRelease {
   validated: boolean;
@@ -38,9 +40,15 @@ const HotStampingComponent = ({ workOrder }: { workOrder: any }) => {
   const [showConfirm, setShowConfirm] = useState(false);
   const [checkedQuestion, setCheckedQuestion] = useState<number[]>([]);
   const [showQuality, setShowQuality] = useState<boolean>(false);
-  const [colorFoil, setColorFoil] = React.useState('');
-  const [revisarPosicion, setRevisarPosicion] = React.useState('');
-  const [imagenHolograma, setImagenHolograma] = React.useState('');
+  const [revisarPosicionChecks, setRevisarPosicionChecks] = useState<string[]>(
+    []
+  );
+  const [imagenHologramaChecks, setImagenHologramaChecks] = useState<string[]>(
+    []
+  );
+
+  const [revisarPosicion, setRevisarPosicion] = useState<string>(''); // Valor combinado
+  const [imagenHolograma, setImagenHolograma] = useState<string>(''); // Valor combinado
   const [showBadQuantity, setShowBadQuantity] = useState(false);
   const [areaBadQuantities, setAreaBadQuantities] = useState<{
     [areaName: string]: string;
@@ -122,7 +130,6 @@ const HotStampingComponent = ({ workOrder }: { workOrder: any }) => {
       reviewed: false,
       user_id: currentFlow.assigned_user,
       sample_quantity: Number(sampleQuantity),
-      color_foil: colorFoil,
       revisar_posicion: revisarPosicion,
       imagen_holograma: imagenHolograma,
     };
@@ -219,7 +226,9 @@ const HotStampingComponent = ({ workOrder }: { workOrder: any }) => {
   console.log('Áreas anteriores sin Preprensa:', previousFlows);
 
   const handleOpenBadQuantityModal = () => {
-    const initialValues: { [areaName: string]: string } = { ...areaBadQuantities };
+    const initialValues: { [areaName: string]: string } = {
+      ...areaBadQuantities,
+    };
 
     previousFlows.forEach((flow) => {
       const areaName = flow.area.name;
@@ -273,7 +282,7 @@ const HotStampingComponent = ({ workOrder }: { workOrder: any }) => {
             ? String(badQuantity)
             : '';
       }
-  
+
       if (
         flow.area.id >= 6 &&
         initialValues[`${areaName}_material`] === undefined
@@ -289,11 +298,29 @@ const HotStampingComponent = ({ workOrder }: { workOrder: any }) => {
     setShowBadQuantity(true);
     console.log('Valores iniciales para malas por área:', initialValues);
   };
+  const normalizedAreas: AreaData[] = previousFlows.map((item) => ({
+    id: item.area?.id ?? item.id,
+    name: item.area?.name ?? item.name ?? '',
+    malas: item.malas ?? 0,
+    defectuoso: item.defectuoso ?? 0,
 
-  const handleSaveChanges = async () => {
+    // Valores ficticios para completar el tipo requerido
+    status: item.status ?? '',
+    response: item.areaResponse ?? {},
+    answers: item.answers ?? [],
+    usuario: item.user?.username ?? '',
+    auditor: '',
+    buenas: 0,
+    cqm: 0,
+    excedente: 0,
+    muestras: 0,
+  }));
+
+  const handleSaveChanges = async (updatedAreas: AreaData[]) => {
+    const effectiveAreas = updatedAreas ?? previousFlows;
     const payload = {
       areas: previousFlows.flatMap((flow) => {
-        const areaName = flow.area.name.toLowerCase();
+        const areaKey = flow.area.name.toLowerCase().replace(/\s/g, '');
 
         const blockMap: Record<string, string> = {
           impresion: 'impression',
@@ -304,7 +331,7 @@ const HotStampingComponent = ({ workOrder }: { workOrder: any }) => {
           'color edge': 'colorEdge',
         };
 
-        const block = blockMap[areaName] || 'otros';
+        const block = blockMap[flow.area.name.toLowerCase()] || 'otros';
         if (block === 'otros') {
           return []; // Descarta si no es bloque conocido
         }
@@ -314,8 +341,8 @@ const HotStampingComponent = ({ workOrder }: { workOrder: any }) => {
         const formId = blockData?.form_auditory_id || null;
         const cqmId = blockData?.form_answer_id || null;
 
-        const badKey = `${areaName}_bad`;
-        const materialKey = `${areaName}_material`;
+        const badKey = `${areaKey}_bad`;
+        const materialKey = `${areaKey}_material`;
 
         const bad_quantity = Number(areaBadQuantities[badKey] || 0);
         const material_quantity =
@@ -485,6 +512,32 @@ const HotStampingComponent = ({ workOrder }: { workOrder: any }) => {
     );
   };
 
+  const handleRevisarPosicionChange = (value: string) => {
+    setRevisarPosicionChecks((prev) => {
+      const newValues = prev.includes(value)
+        ? prev.filter((v) => v !== value)
+        : [...prev, value];
+
+      const finalValue =
+        newValues.length === 2 ? 'hologramafoil' : newValues[0] || '';
+      setRevisarPosicion(finalValue);
+      return newValues;
+    });
+  };
+
+  const handleImagenHologramaChange = (value: string) => {
+    setImagenHologramaChecks((prev) => {
+      const newValues = prev.includes(value)
+        ? prev.filter((v) => v !== value)
+        : [...prev, value];
+
+      const finalValue =
+        newValues.length === 2 ? 'hologramafoil' : newValues[0] || '';
+      setImagenHolograma(finalValue);
+      return newValues;
+    });
+  };
+
   return (
     <ScrollView style={styles.container}>
       <Text style={styles.title}>Área: Hot Stamping</Text>
@@ -539,9 +592,7 @@ const HotStampingComponent = ({ workOrder }: { workOrder: any }) => {
           mode="outlined"
           activeOutlineColor="#000"
           keyboardType="numeric"
-          placeholder={
-            sumaBadQuantity > 0 ? sumaBadQuantity.toString() : '0'
-          }
+          placeholder={sumaBadQuantity > 0 ? sumaBadQuantity.toString() : '0'}
           value={sumaBadQuantity}
           editable={false} // deshabilita edición
           pointerEvents="none" // evita que se abra el teclado
@@ -597,115 +648,30 @@ const HotStampingComponent = ({ workOrder }: { workOrder: any }) => {
       <View style={{ marginBottom: 60 }}></View>
 
       {/* Modal para marcar malas por areas previas al liberar */}
-      <Modal visible={showBadQuantity} transparent animationType="fade">
-        <View style={styles.modalOverlay}>
-          <View style={styles.modalBoxScrollable}>
-            <Text style={styles.modalTitle}>Registrar malas por área</Text>
+      <BadQuantityModal
+        visible={showBadQuantity}
+        areas={normalizedAreas}
+        areaBadQuantities={areaBadQuantities}
+        setAreaBadQuantities={setAreaBadQuantities}
+        onConfirm={({
+          updatedAreas,
+          totalBad,
+          totalMaterial,
+          lastAreaBad,
+          lastAreaMaterial,
+        }) => {
+          setShowBadQuantity(false);
 
-            <ScrollView style={{ maxHeight: 400 }}>
-              {previousFlows.map((flow) => {
-                const areaKey = flow.area.name.toLowerCase();
-                return (
-                  <View key={flow.id} style={{ marginTop: 16 }}>
-                    <Text style={styles.areaLabel}>
-                      {flow.area.name.toUpperCase()}
-                    </Text>
+          // Guarda lo necesario
+          handleSaveChanges(updatedAreas);
 
-                    <View style={styles.areaInputsContainer}>
-                      <View style={[styles.inputGroup, { maxWidth: '40%' }]}>
-                        <Text style={styles.inputLabel}>Malas</Text>
-                        <TextInput
-                          style={styles.input}
-                          theme={{ roundness: 30 }}
-                          mode="outlined"
-                          activeOutlineColor="#000"
-                          keyboardType="numeric"
-                          value={areaBadQuantities[`${areaKey}_bad`] || '0'}
-                          onChangeText={(text) =>
-                            setAreaBadQuantities((prev) => ({
-                              ...prev,
-                              [`${areaKey}_bad`]: text,
-                            }))
-                          }
-                        />
-                      </View>
-
-                      {flow.area_id >= 6 && (
-                        <View style={[styles.inputGroup, { maxWidth: '40%' }]}>
-                          <Text style={styles.inputLabel}>Malo de fábrica</Text>
-                          <TextInput
-                            style={styles.input}
-                            theme={{ roundness: 30 }}
-                            mode="outlined"
-                            activeOutlineColor="#000"
-                            keyboardType="numeric"
-                            value={
-                              areaBadQuantities[`${areaKey}_material`] || '0'
-                            }
-                            onChangeText={(text) =>
-                              setAreaBadQuantities((prev) => ({
-                                ...prev,
-                                [`${areaKey}_material`]: text,
-                              }))
-                            }
-                          />
-                        </View>
-                      )}
-                    </View>
-                  </View>
-                );
-              })}
-            </ScrollView>
-
-            <View style={styles.modalActions}>
-              <TouchableOpacity
-                style={styles.cancelButton}
-                onPress={() => setShowBadQuantity(false)}
-              >
-                <Text style={styles.modalButtonText}>Cancelar</Text>
-              </TouchableOpacity>
-              <TouchableOpacity
-                style={[
-                  styles.confirmButton,
-                  shouldDisableLiberar() && { opacity: 0.5 },
-                ]}
-                disabled={shouldDisableLiberar()}
-                onPress={async () => {
-                  await handleSaveChanges();
-
-                  const lastFlow = previousFlows[previousFlows.length - 1];
-                  const areaKey = lastFlow.area.name.toLowerCase();
-                  const lastAreaBad =
-                    areaBadQuantities[`${areaKey}_bad`] || '0';
-                  const lastAreaMaterial =
-                    areaBadQuantities[`${areaKey}_material`] || '0';
-
-                  const totalBad = Object.keys(areaBadQuantities)
-                    .filter((key) => key.endsWith('_bad'))
-                    .reduce(
-                      (sum, key) => sum + Number(areaBadQuantities[key] || 0),
-                      0
-                    );
-
-                  const totalMaterial = Object.keys(areaBadQuantities)
-                    .filter((key) => key.endsWith('_material'))
-                    .reduce(
-                      (sum, key) => sum + Number(areaBadQuantities[key] || 0),
-                      0
-                    );
-
-                  setLastBadQuantity(lastAreaBad);
-                  setMaterialBadQuantity(lastAreaMaterial);
-                  setBadQuantity(String(totalBad));
-                  setShowBadQuantity(false);
-                }}
-              >
-                <Text style={styles.modalButtonText}>Confirmar</Text>
-              </TouchableOpacity>
-            </View>
-          </View>
-        </View>
-      </Modal>
+          // Actualiza variables como antes
+          setBadQuantity(String(totalBad));
+          setMaterialBadQuantity(String(totalMaterial));
+          setLastBadQuantity(String(lastAreaBad));
+        }}
+        onClose={() => setShowBadQuantity(false)}
+      />
 
       {/* Modal CQM */}
       <Modal visible={showCqmModal} animationType="slide">
@@ -748,30 +714,17 @@ const HotStampingComponent = ({ workOrder }: { workOrder: any }) => {
             ))}
 
             <View style={styles.inputGroup}>
-              <Text style={styles.label}>Color Foil:</Text>
-              <TextInput
-                style={styles.input}
-                theme={{ roundness: 30 }}
-                mode="outlined"
-                activeOutlineColor="#000"
-                placeholder="Ej: "
-                value={colorFoil}
-                onChangeText={setColorFoil}
-              />
-            </View>
-
-            <View style={styles.inputGroup}>
               <Text style={styles.label}>Revisar Posición Vs Ot:</Text>
               <View style={styles.radioGroup}>
                 {['holograma', 'foil'].map((value) => (
                   <TouchableOpacity
                     key={value}
                     style={styles.radioOption}
-                    onPress={() => setRevisarPosicion(value)}
+                    onPress={() => handleRevisarPosicionChange(value)}
                   >
-                    <View style={styles.radioCircle}>
-                      {revisarPosicion === value && (
-                        <View style={styles.radioDot} />
+                    <View style={styles.checkbox}>
+                      {revisarPosicionChecks.includes(value) && (
+                        <View style={styles.checkboxChecked} />
                       )}
                     </View>
                     <Text style={styles.radioLabel}>
@@ -789,11 +742,11 @@ const HotStampingComponent = ({ workOrder }: { workOrder: any }) => {
                   <TouchableOpacity
                     key={value}
                     style={styles.radioOption}
-                    onPress={() => setImagenHolograma(value)}
+                    onPress={() => handleImagenHologramaChange(value)}
                   >
-                    <View style={styles.radioCircle}>
-                      {imagenHolograma === value && (
-                        <View style={styles.radioDot} />
+                    <View style={styles.checkbox}>
+                      {imagenHologramaChecks.includes(value) && (
+                        <View style={styles.checkboxChecked} />
                       )}
                     </View>
                     <Text style={styles.radioLabel}>
@@ -1058,12 +1011,13 @@ const styles = StyleSheet.create({
     marginTop: 8,
   },
   checkbox: {
-    paddingVertical: 6,
-    paddingHorizontal: 12,
+    width: 20,
+    height: 20,
     borderWidth: 1,
-    borderColor: '#ccc',
-    borderRadius: 10,
-    backgroundColor: '#f9fafb',
+    borderColor: '#000',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginRight: 8,
   },
   checkedBox: {
     backgroundColor: '#dbeafe',
@@ -1140,12 +1094,12 @@ const styles = StyleSheet.create({
   radioGroup: {
     flexDirection: 'row',
     justifyContent: 'flex-start',
-    gap: 12,
-    marginTop: 7,
+    gap: 9,
   },
   radioOption: {
     flexDirection: 'row',
     alignItems: 'center',
+    marginBottom: 8,
   },
   radioLabel: {
     fontSize: 16,
@@ -1171,5 +1125,10 @@ const styles = StyleSheet.create({
   inputLabel: {
     fontSize: 13,
     marginBottom: 4,
+  },
+  checkboxChecked: {
+    width: 12,
+    height: 12,
+    backgroundColor: '#000',
   },
 });

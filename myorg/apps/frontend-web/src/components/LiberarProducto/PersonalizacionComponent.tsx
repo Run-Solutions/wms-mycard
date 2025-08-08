@@ -1,5 +1,5 @@
+// myorg/apps/frontend-web/src/components/LiberarProducto/PersonalizacionComponent.tsx
 'use client';
-
 import { useRouter } from 'next/navigation';
 import { useState, useMemo } from 'react';
 import styled from 'styled-components';
@@ -10,7 +10,38 @@ import {
 import { updateWorkOrderAreas } from '@/api/seguimientoDeOts';
 import { useAuthContext } from '@/context/AuthContext';
 import { calcularCantidadPorLiberar } from './util/calcularCantidadPorLiberar';
+import BadQuantityModal from './util/BadQuantityModal';
+import { MachineSection } from './util/MachineSection';
 
+export type AreaData = {
+  id: number;
+  name: string;
+  status: string;
+  response: {
+    prepress: { id: number };
+    impression: { id: number };
+    serigrafia: { id: number };
+    empalme: { id: number };
+    laminacion: { id: number };
+    corte: { id: number };
+    colorEdge: { id: number };
+    millingChip: { id: number };
+    hotStamping: { id: number };
+    personalizacion: { id: number };
+    user: {
+      username: string;
+    };
+  };
+  answers: any;
+  usuario: string;
+  auditor: string;
+  buenas: number;
+  malas: number;
+  cqm: number;
+  excedente: number;
+  defectuoso: number;
+  muestras: number;
+};
 interface Props {
   workOrder: any;
 }
@@ -347,6 +378,8 @@ export default function PersonalizacionComponent({ workOrder }: Props) {
         badQuantity = flow.areaResponse.impression.bad_quantity;
       } else if (flow.areaResponse?.serigrafia) {
         badQuantity = flow.areaResponse.serigrafia.bad_quantity;
+      } else if (flow.areaResponse?.empalme) {
+        badQuantity = flow.areaResponse.empalme.bad_quantity;
       } else if (flow.areaResponse?.laminacion) {
         badQuantity = flow.areaResponse.laminacion.bad_quantity;
       } else if (flow.areaResponse?.corte) {
@@ -355,7 +388,7 @@ export default function PersonalizacionComponent({ workOrder }: Props) {
       } else if (flow.areaResponse?.colorEdge) {
         badQuantity = flow.areaResponse.colorEdge.bad_quantity;
         materialBadQuantity = flow.areaResponse.colorEdge.material_quantity;
-      } else if (flow.areaResponse?.colorEdge) {
+      } else if (flow.areaResponse?.hotStamping) {
         badQuantity = flow.areaResponse.hotStamping.bad_quantity;
         materialBadQuantity = flow.areaResponse.hotStamping.material_quantity;
       } else if (flow.areaResponse?.millingChip) {
@@ -400,20 +433,42 @@ export default function PersonalizacionComponent({ workOrder }: Props) {
     setShowBadQuantity(true);
     console.log('Valores iniciales para malas por área:', initialValues);
   };
+  const normalizedAreas: AreaData[] = previousFlows.map((item) => ({
+    id: item.area?.id ?? item.id,
+    name: item.area?.name ?? item.name ?? '',
+    malas: item.malas ?? 0,
+    defectuoso: item.defectuoso ?? 0,
 
-  const handleSaveChanges = async () => {
+    // Valores ficticios para completar el tipo requerido
+    status: item.status ?? '',
+    response: item.areaResponse ?? {},
+    answers: item.answers ?? [],
+    usuario: item.user?.username ?? '',
+    auditor: '',
+    buenas: 0,
+    cqm: 0,
+    excedente: 0,
+    muestras: 0,
+  }));
+
+  const handleSaveChanges = async (updatedAreas: AreaData[]) => {
+    const effectiveAreas = updatedAreas ?? previousFlows;
     const payload = {
       areas: previousFlows.flatMap((flow) => {
-        const areaName = flow.area.name.toLowerCase();
+        const areaKey = flow.area.name.toLowerCase().replace(/\s/g, '');
 
         const blockMap: Record<string, string> = {
           impresion: 'impression',
           serigrafia: 'serigrafia',
-          laminacion: 'laminacion',
           empalme: 'empalme',
+          laminacion: 'laminacion',
+          corte: 'corte',
+          'color edge': 'colorEdge',
+          'hot stamping': 'hotStamping',
+          'milling chip': 'millingChip',
         };
 
-        const block = blockMap[areaName] || 'otros';
+        const block = blockMap[flow.area.name.toLowerCase()] || 'otros';
         if (block === 'otros') {
           return []; // Descarta si no es bloque conocido
         }
@@ -423,8 +478,8 @@ export default function PersonalizacionComponent({ workOrder }: Props) {
         const formId = blockData?.form_auditory_id || null;
         const cqmId = blockData?.form_answer_id || null;
 
-        const badKey = `${areaName}_bad`;
-        const materialKey = `${areaName}_material`;
+        const badKey = `${areaKey}_bad`;
+        const materialKey = `${areaKey}_material`;
 
         const bad_quantity = Number(areaBadQuantities[badKey] || 0);
         const material_quantity =
@@ -500,6 +555,7 @@ export default function PersonalizacionComponent({ workOrder }: Props) {
       return sum;
     }, 0);
   }, [areaBadQuantities, previousFlows]);
+  console.log(workOrder.area.formQuestions);
 
   return (
     <>
@@ -649,111 +705,29 @@ export default function PersonalizacionComponent({ workOrder }: Props) {
 
       {/* Modal para marcar malas por areas previas al liberar */}
       {showBadQuantity && (
-        <ModalOverlay>
-          <ModalBox>
-            <h4>Registrar malas por área</h4>
-            {previousFlows.map((flow) => {
-              const areaKey = flow.area.name.toLowerCase(); // para coincidir con las claves
-              return (
-                <div
-                  key={flow.id}
-                  style={{
-                    display: 'flex',
-                    flexDirection: 'column',
-                    alignItems: 'flex-start',
-                    gap: '0.5rem',
-                    marginTop: '1rem',
-                  }}
-                >
-                  <Label style={{ fontWeight: 'bold' }}>
-                    {flow.area.name.toUpperCase()}
-                  </Label>
+        <BadQuantityModal
+          areas={normalizedAreas}
+          areaBadQuantities={areaBadQuantities}
+          setAreaBadQuantities={setAreaBadQuantities}
+          onConfirm={({
+            updatedAreas,
+            totalBad,
+            totalMaterial,
+            lastAreaBad,
+            lastAreaMaterial,
+          }) => {
+            setShowBadQuantity(false);
 
-                  <div style={{ display: 'flex', gap: '1rem' }}>
-                    <div>
-                      <Label>Malas</Label>
-                      <InputBad
-                        type="number"
-                        min="0"
-                        value={areaBadQuantities[`${areaKey}_bad`] || '0'}
-                        onChange={(e) =>
-                          setAreaBadQuantities({
-                            ...areaBadQuantities,
-                            [`${areaKey}_bad`]: e.target.value,
-                          })
-                        }
-                      />
-                    </div>
-                    {flow.area_id >= 6 && (
-                      <div>
-                        <Label>Malo de fábrica</Label>
-                        <InputBad
-                          type="number"
-                          min="0"
-                          value={
-                            areaBadQuantities[`${areaKey}_material`] || '0'
-                          }
-                          onChange={(e) =>
-                            setAreaBadQuantities({
-                              ...areaBadQuantities,
-                              [`${areaKey}_material`]: e.target.value,
-                            })
-                          }
-                        />
-                      </div>
-                    )}
-                  </div>
-                </div>
-              );
-            })}
-            <div
-              style={{
-                display: 'flex',
-                justifyContent: 'flex-end',
-                gap: '1rem',
-                marginTop: '1rem',
-              }}
-            >
-              <CancelButton onClick={() => setShowBadQuantity(false)}>
-                Cancelar
-              </CancelButton>
-              <ConfirmButton
-                disabled={shouldDisableLiberar()}
-                onClick={async () => {
-                  await handleSaveChanges();
-                  const lastFlow = previousFlows[previousFlows.length - 1];
-                  const areaKey = lastFlow.area.name.toLowerCase();
-                  const lastAreaBad =
-                    areaBadQuantities[`${areaKey}_bad`] || '0';
-                  const lastAreaMaterial =
-                    areaBadQuantities[`${areaKey}_material`] || '0';
-                  // Además, suma el total al input principal de malas
+            // Guarda lo necesario
+            handleSaveChanges(updatedAreas);
 
-                  const totalBad = Object.keys(areaBadQuantities)
-                    .filter((key) => key.endsWith('_bad'))
-                    .reduce(
-                      (sum, key) => sum + Number(areaBadQuantities[key] || 0),
-                      0
-                    );
-
-                  const totalMaterial = Object.keys(areaBadQuantities)
-                    .filter((key) => key.endsWith('_material'))
-                    .reduce(
-                      (sum, key) => sum + Number(areaBadQuantities[key] || 0),
-                      0
-                    );
-
-                  setLastBadQuantity(lastAreaBad);
-                  setMaterialBadQuantity(lastAreaMaterial);
-                  setBadQuantity(String(totalBad));
-                  setShowBadQuantity(false);
-                }}
-              >
-                Confirmar
-              </ConfirmButton>
-            </div>
-          </ModalBox>
-        </ModalOverlay>
+            // Actualiza variables como antes
+            setBadQuantity(String(totalBad));
+            setMaterialBadQuantity(String(totalMaterial));
+            setLastBadQuantity(String(lastAreaBad));
+          }}
+          onClose={() => setShowBadQuantity(false)}
+        />
       )}
 
       {/* Modal para enviar a liberacion */}
@@ -844,271 +818,127 @@ export default function PersonalizacionComponent({ workOrder }: Props) {
 
             {selectedOption === 'etiquetadora' && (
               <>
-                <Table>
-                  <thead>
-                    <tr>
-                      <th>Pregunta</th>
-                      <th>Respuesta</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    <tr>
-                      <td>{workOrder.area.formQuestions[0]?.title}</td>
-                      <td>
-                        <input
-                          type="checkbox"
-                          checked={checkedQuestions.includes(
-                            workOrder.area.formQuestions[0]?.id
-                          )}
-                          onChange={(e) =>
-                            handleCheckboxChange(
-                              workOrder.area.formQuestions[0]?.id,
-                              e.target.checked
-                            )
-                          }
-                        />
-                      </td>
-                    </tr>
-                  </tbody>
-                </Table>
-                <InputGroup style={{ paddingTop: '30px', width: '70%' }}>
-                  <Label>
-                    Verificar Tipo De Etiqueta Vs Ot Y Pegar Utilizada:
-                  </Label>
-                  <Input
-                    type="text"
-                    placeholder="Ej: "
-                    value={verificarEtiqueta}
-                    onChange={(e) => setVerificarEtiqueta(e.target.value)}
-                  />
-                </InputGroup>
+                <MachineSection
+                  visible={selectedOption === 'etiquetadora'}
+                  machine="etiquetadora"
+                  questions={workOrder.area.formQuestions}
+                  areaId={10}
+                  roleId={null}
+                  questionSlice={[0, 1]} // ✅ Solo la primera pregunta
+                  checkedQuestions={checkedQuestions}
+                  onCheckToggle={handleCheckboxChange}
+                  title=""
+                  extras={
+                    <InputGroup style={{ paddingTop: '30px', width: '70%' }}>
+                      <Label>
+                        Verificar Tipo De Etiqueta Vs Ot Y Pegar Utilizada:
+                      </Label>
+                      <Input
+                        type="text"
+                        placeholder="Ej: "
+                        value={verificarEtiqueta}
+                        onChange={(e) => setVerificarEtiqueta(e.target.value)}
+                      />
+                    </InputGroup>
+                  }
+                />
               </>
             )}
 
             {selectedOption === 'persos' && (
               <>
-                <Table>
-                  <thead>
-                    <tr>
-                      <th>Pregunta</th>
-                      <th>
-                        Respuesta
-                        <button
-                          onClick={toggleQuestions}
-                          style={{
-                            marginLeft: '3px',
-                            cursor: 'pointer',
-                            border: 'none',
-                            background: 'transparent',
-                          }}
-                        >
-                          {questionsOpen ? '▼' : '▶'}
-                        </button>
-                        {questionsOpen && (
-                          <input
-                            type="checkbox"
-                            checked={workOrder.area.formQuestions
-                              .slice(1, 10)
-                              .every((q: { id: number }) =>
-                                checkedQuestions.includes(q.id)
-                              )}
-                            onChange={(e) =>
-                              handleSelectAll(e.target.checked, 1, 10)
-                            }
-                            style={{ marginLeft: '8px' }}
-                          />
-                        )}
-                      </th>
-                    </tr>
-                  </thead>
+                <MachineSection
+                  visible={selectedOption === 'persos'}
+                  machine="persos"
+                  questions={workOrder.area.formQuestions}
+                  areaId={10}
+                  roleId={null}
+                  questionSlice={[1, 10]} // ✅ Solo la primera pregunta
+                  checkedQuestions={checkedQuestions}
+                  onCheckToggle={handleCheckboxChange}
+                  title=""
+                  extras={
+                    <InputGroup style={{ paddingTop: '30px', width: '70%' }}>
+                      <Label>Color De Personalización:</Label>
+                      <Input
+                        type="text"
+                        placeholder="Ej: "
+                        value={colorPersonalizacion}
+                        onChange={(e) =>
+                          setColorPersonalizacion(e.target.value)
+                        }
+                      />
+                      <Label>
+                        Tipo de Código de Barras Que Se Personaliza:
+                      </Label>
+                      <Input
+                        type="text"
+                        placeholder="Ej: "
+                        value={codigoBarras}
+                        onChange={(e) => setCodigoBarras(e.target.value)}
+                      />
+                    </InputGroup>
+                  }
+                />
+              </>
+            )}
 
-                  <tbody>
-                    {questionsOpen &&
-                      workOrder.area.formQuestions
-                        .slice(1, 10)
-                        .map((question: { id: number; title: string }) => (
-                          <tr key={question.id}>
-                            <td>{question.title}</td>
-                            <td>
-                              <input
-                                type="checkbox"
-                                checked={checkedQuestions.includes(question.id)}
-                                onChange={(e) =>
-                                  handleCheckboxChange(
-                                    question.id,
-                                    e.target.checked
-                                  )
-                                }
-                              />
-                            </td>
-                          </tr>
-                        ))}
-                  </tbody>
-                </Table>
-                <InputGroup style={{ paddingTop: '30px', width: '70%' }}>
-                  <Label>Color De Personalización:</Label>
-                  <Input
-                    type="text"
-                    placeholder="Ej: "
-                    value={colorPersonalizacion}
-                    onChange={(e) => setColorPersonalizacion(e.target.value)}
-                  />
-                </InputGroup>
-                <InputGroup style={{ paddingTop: '30px', width: '70%' }}>
-                  <Label>Tipo de Código de Barras Que Se Personaliza:</Label>
-                  <Input
-                    type="text"
-                    placeholder="Ej: "
-                    value={codigoBarras}
-                    onChange={(e) => setCodigoBarras(e.target.value)}
-                  />
+            {selectedOption === 'laser' && (
+              <>
+                <InputGroup style={{ width: '50%' }}>
+                  <Label>No hay preguntas por parte del operador.</Label>
                 </InputGroup>
               </>
             )}
 
-            {selectedOption === 'laser' && <></>}
-
             {selectedOption === 'packsmart' && (
               <>
-                <Table>
-                  <thead>
-                    <tr>
-                      <th>Pregunta</th>
-                      <th>
-                        Respuesta
-                        <input
-                          type="checkbox"
-                          checked={workOrder.area.formQuestions
-                            .slice(14, 20)
-                            .every((q: { id: number }) =>
-                              checkedQuestions.includes(q.id)
-                            )}
-                          onChange={(e) =>
-                            handleSelectAll(e.target.checked, 14, 20)
-                          }
-                          style={{ marginLeft: '8px' }}
-                        />
-                      </th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {workOrder.area.formQuestions
-                      .slice(14, 20)
-                      .map((question: { id: number; title: string }) => (
-                        <tr key={question.id}>
-                          <td>{question.title}</td>
-                          <td>
-                            <input
-                              type="checkbox"
-                              checked={checkedQuestions.includes(question.id)}
-                              onChange={(e) =>
-                                handleCheckboxChange(
-                                  question.id,
-                                  e.target.checked
-                                )
-                              }
-                            />
-                          </td>
-                        </tr>
-                      ))}
-                  </tbody>
-                </Table>
+                <MachineSection
+                  visible={selectedOption === 'packsmart'}
+                  machine="packsmart"
+                  questions={workOrder.area.formQuestions}
+                  areaId={10}
+                  roleId={null}
+                  questionSlice={[14, 20]} // ✅ Solo la primera pregunta
+                  checkedQuestions={checkedQuestions}
+                  onCheckToggle={handleCheckboxChange}
+                  title=""
+                  extras={<></>}
+                />
               </>
             )}
 
             {selectedOption === 'otto' && (
               <>
-                <Table>
-                  <thead>
-                    <tr>
-                      <th>Pregunta</th>
-                      <th>
-                        Respuesta
-                        <input
-                          type="checkbox"
-                          checked={workOrder.area.formQuestions
-                            .slice(20, 28)
-                            .every((q: { id: number }) =>
-                              checkedQuestions.includes(q.id)
-                            )}
-                          onChange={(e) =>
-                            handleSelectAll(e.target.checked, 20, 28)
-                          }
-                          style={{ marginLeft: '8px' }}
-                        />
-                      </th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {workOrder.area.formQuestions
-                      .slice(20, 28)
-                      .map((question: { id: number; title: string }) => (
-                        <tr key={question.id}>
-                          <td>{question.title}</td>
-                          <td>
-                            <input
-                              type="checkbox"
-                              checked={checkedQuestions.includes(question.id)}
-                              onChange={(e) =>
-                                handleCheckboxChange(
-                                  question.id,
-                                  e.target.checked
-                                )
-                              }
-                            />
-                          </td>
-                        </tr>
-                      ))}
-                  </tbody>
-                </Table>
+                <MachineSection
+                  visible={selectedOption === 'otto'}
+                  machine="otto"
+                  questions={workOrder.area.formQuestions}
+                  areaId={10}
+                  roleId={null}
+                  questionSlice={[20, 28]} // ✅ Solo la primera pregunta
+                  checkedQuestions={checkedQuestions}
+                  onCheckToggle={handleCheckboxChange}
+                  title=""
+                  extras={<></>}
+                />
               </>
             )}
 
             {selectedOption === 'embolsadora' && (
               <>
-                <Table>
-                  <thead>
-                    <tr>
-                      <th>Pregunta</th>
-                      <th>
-                        Respuesta
-                        <input
-                          type="checkbox"
-                          checked={workOrder.area.formQuestions
-                            .slice(28, 30)
-                            .every((q: { id: number }) =>
-                              checkedQuestions.includes(q.id)
-                            )}
-                          onChange={(e) =>
-                            handleSelectAll(e.target.checked, 28, 39)
-                          }
-                          style={{ marginLeft: '8px' }}
-                        />
-                      </th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {workOrder.area.formQuestions
-                      .slice(28, 30)
-                      .map((question: { id: number; title: string }) => (
-                        <tr key={question.id}>
-                          <td>{question.title}</td>
-                          <td>
-                            <input
-                              type="checkbox"
-                              checked={checkedQuestions.includes(question.id)}
-                              onChange={(e) =>
-                                handleCheckboxChange(
-                                  question.id,
-                                  e.target.checked
-                                )
-                              }
-                            />
-                          </td>
-                        </tr>
-                      ))}
-                  </tbody>
-                </Table>
+                <MachineSection
+                  visible={selectedOption === 'embolsadora'}
+                  machine="embolsadora"
+                  questions={workOrder.area.formQuestions}
+                  areaId={10}
+                  roleId={null}
+                  questionSlice={[28, 30]} // ✅ Solo la primera pregunta
+                  checkedQuestions={checkedQuestions}
+                  onCheckToggle={handleCheckboxChange}
+                  title=""
+                  extras={<></>}
+                />
               </>
             )}
 

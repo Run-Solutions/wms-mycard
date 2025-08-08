@@ -1,5 +1,5 @@
+// myorg/apps/frontend-web/src/components/LiberarProducto/CorteComponent.tsx
 'use client';
-
 import { useRouter } from 'next/navigation';
 import { useState, useMemo } from 'react';
 import styled from 'styled-components';
@@ -10,6 +10,8 @@ import {
 import { updateWorkOrderAreas } from '@/api/seguimientoDeOts';
 import { useAuthContext } from '@/context/AuthContext';
 import { calcularCantidadPorLiberar } from './util/calcularCantidadPorLiberar';
+import BadQuantityModal from './util/BadQuantityModal';
+import { AreaData } from './PersonalizacionComponent';
 
 interface Props {
   workOrder: any;
@@ -322,6 +324,8 @@ export default function CorteComponent({ workOrder }: Props) {
         badQuantity = flow.areaResponse.impression.bad_quantity;
       } else if (flow.areaResponse?.serigrafia) {
         badQuantity = flow.areaResponse.serigrafia.bad_quantity;
+      } else if (flow.areaResponse?.empalme) {
+        badQuantity = flow.areaResponse.empalme.bad_quantity;
       } else if (flow.areaResponse?.laminacion) {
         badQuantity = flow.areaResponse.laminacion.bad_quantity;
       } else if (flow.areaResponse?.corte) {
@@ -362,8 +366,26 @@ export default function CorteComponent({ workOrder }: Props) {
     setShowBadQuantity(true);
     console.log('Valores iniciales para malas por área:', initialValues);
   };
+  const normalizedAreas: AreaData[] = previousFlows.map((item) => ({
+    id: item.area?.id ?? item.id,
+    name: item.area?.name ?? item.name ?? '',
+    malas: item.malas ?? 0,
+    defectuoso: item.defectuoso ?? 0,
 
-  const handleSaveChanges = async () => {
+    // Valores ficticios para completar el tipo requerido
+    status: item.status ?? '',
+    response: item.areaResponse ?? {},
+    answers: item.answers ?? [],
+    usuario: item.user?.username ?? '',
+    auditor: '',
+    buenas: 0,
+    cqm: 0,
+    excedente: 0,
+    muestras: 0,
+  }));
+
+  const handleSaveChanges = async (updatedAreas: AreaData[]) => {
+    const effectiveAreas = updatedAreas ?? previousFlows;
     const payload = {
       areas: previousFlows.flatMap((flow) => {
         const areaName = flow.area.name.toLowerCase();
@@ -371,8 +393,8 @@ export default function CorteComponent({ workOrder }: Props) {
         const blockMap: Record<string, string> = {
           impresion: 'impression',
           serigrafia: 'serigrafia',
-          laminacion: 'laminacion',
           empalme: 'empalme',
+          laminacion: 'laminacion',
         };
 
         const block = blockMap[areaName] || 'otros';
@@ -611,111 +633,29 @@ export default function CorteComponent({ workOrder }: Props) {
 
       {/* Modal para marcar malas por areas previas al liberar */}
       {showBadQuantity && (
-        <ModalOverlay>
-          <ModalBox>
-            <h4>Registrar malas por área</h4>
-            {previousFlows.map((flow) => {
-              const areaKey = flow.area.name.toLowerCase(); // para coincidir con las claves
-              return (
-                <div
-                  key={flow.id}
-                  style={{
-                    display: 'flex',
-                    flexDirection: 'column',
-                    alignItems: 'flex-start',
-                    gap: '0.5rem',
-                    marginTop: '1rem',
-                  }}
-                >
-                  <Label style={{ fontWeight: 'bold' }}>
-                    {flow.area.name.toUpperCase()}
-                  </Label>
+        <BadQuantityModal
+          areas={normalizedAreas}
+          areaBadQuantities={areaBadQuantities}
+          setAreaBadQuantities={setAreaBadQuantities}
+          onConfirm={({
+            updatedAreas,
+            totalBad,
+            totalMaterial,
+            lastAreaBad,
+            lastAreaMaterial,
+          }) => {
+            setShowBadQuantity(false);
 
-                  <div style={{ display: 'flex', gap: '1rem' }}>
-                    <div>
-                      <Label>Malas</Label>
-                      <InputBad
-                        type="number"
-                        min="0"
-                        value={areaBadQuantities[`${areaKey}_bad`] || '0'}
-                        onChange={(e) =>
-                          setAreaBadQuantities({
-                            ...areaBadQuantities,
-                            [`${areaKey}_bad`]: e.target.value,
-                          })
-                        }
-                      />
-                    </div>
-                    {flow.area_id >= 6 && (
-                      <div>
-                        <Label>Malo de fábrica</Label>
-                        <InputBad
-                          type="number"
-                          min="0"
-                          value={
-                            areaBadQuantities[`${areaKey}_material`] || '0'
-                          }
-                          onChange={(e) =>
-                            setAreaBadQuantities({
-                              ...areaBadQuantities,
-                              [`${areaKey}_material`]: e.target.value,
-                            })
-                          }
-                        />
-                      </div>
-                    )}
-                  </div>
-                </div>
-              );
-            })}
-            <div
-              style={{
-                display: 'flex',
-                justifyContent: 'flex-end',
-                gap: '1rem',
-                marginTop: '1rem',
-              }}
-            >
-              <CancelButton onClick={() => setShowBadQuantity(false)}>
-                Cancelar
-              </CancelButton>
-              <ConfirmButton
-                disabled={shouldDisableLiberar()}
-                onClick={async () => {
-                  await handleSaveChanges();
-                  const lastFlow = previousFlows[previousFlows.length - 1];
-                  const areaKey = lastFlow.area.name.toLowerCase();
-                  const lastAreaBad =
-                    areaBadQuantities[`${areaKey}_bad`] || '0';
-                  const lastAreaMaterial =
-                    areaBadQuantities[`${areaKey}_material`] || '0';
-                  // Además, suma el total al input principal de malas
+            // Guarda lo necesario
+            handleSaveChanges(updatedAreas);
 
-                  const totalBad = Object.keys(areaBadQuantities)
-                    .filter((key) => key.endsWith('_bad'))
-                    .reduce(
-                      (sum, key) => sum + Number(areaBadQuantities[key] || 0),
-                      0
-                    );
-
-                  const totalMaterial = Object.keys(areaBadQuantities)
-                    .filter((key) => key.endsWith('_material'))
-                    .reduce(
-                      (sum, key) => sum + Number(areaBadQuantities[key] || 0),
-                      0
-                    );
-
-                  setLastBadQuantity(lastAreaBad);
-                  setMaterialBadQuantity(lastAreaMaterial);
-                  setBadQuantity(String(totalBad));
-                  setShowBadQuantity(false);
-                }}
-              >
-                Confirmar
-              </ConfirmButton>
-            </div>
-          </ModalBox>
-        </ModalOverlay>
+            // Actualiza variables como antes
+            setBadQuantity(String(totalBad));
+            setMaterialBadQuantity(String(totalMaterial));
+            setLastBadQuantity(String(lastAreaBad));
+          }}
+          onClose={() => setShowBadQuantity(false)}
+        />
       )}
 
       {/* Modal para enviar a liberacion */}

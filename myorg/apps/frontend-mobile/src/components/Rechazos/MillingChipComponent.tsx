@@ -365,10 +365,10 @@ const MillingChipComponent: React.FC<Props> = ({ workOrder, currentFlow }) => {
               <Text style={styles.modalTitle}>Registrar malas por área</Text>
 
               <ScrollView style={{ maxHeight: 400 }}>
-                {previousFlows.map((flow) => {
+                {previousFlows.map((flow, index) => {
                   const areaKey = flow.area.name.toLowerCase();
                   return (
-                    <View key={flow.id} style={{ marginTop: 16 }}>
+                    <View key={`${flow.id}-${index}`} style={{ marginTop: 16 }}>
                       <Text style={styles.areaLabel}>
                         {flow.area.name.toUpperCase()}
                       </Text>

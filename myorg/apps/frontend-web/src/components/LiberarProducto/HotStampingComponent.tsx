@@ -10,6 +10,8 @@ import {
 import { updateWorkOrderAreas } from '@/api/seguimientoDeOts';
 import { useAuthContext } from '@/context/AuthContext';
 import { calcularCantidadPorLiberar } from './util/calcularCantidadPorLiberar';
+import BadQuantityModal from './util/BadQuantityModal';
+import { AreaData } from './PersonalizacionComponent';
 
 interface Props {
   workOrder: any;
@@ -105,8 +107,14 @@ export default function HotStampingComponent({ workOrder }: Props) {
   >([]);
   const [sampleQuantity, setSampleQuantity] = useState<number | string>('');
   const [colorFoil, setColorFoil] = useState('');
-  const [revisarPosicion, setRevisarPosicion] = useState('');
-  const [imagenHolograma, setImagenHolograma] = useState('');
+  const [revisarPosicion, setRevisarPosicion] = useState<string>('');
+  const [revisarPosicionChecks, setRevisarPosicionChecks] = useState<string[]>(
+    []
+  );
+  const [imagenHolograma, setImagenHolograma] = useState<string>('');
+  const [imagenHologramaChecks, setImagenHologramaChecks] = useState<string[]>(
+    []
+  );
   const [goodQuantity, setGoodQuantity] = useState<number | string>('');
   const [badQuantity, setBadQuantity] = useState<number | string>('');
   const [excessQuantity, setExcessQuantity] = useState<number | string>('');
@@ -187,7 +195,36 @@ export default function HotStampingComponent({ workOrder }: Props) {
     (r: PartialRelease) => r.validated
   );
 
-  // Para mandar la OT a evaluacion por CQM
+  // Esta función se llama cuando el usuario hace clic en un checkbox
+  const handleRevisarPosicionChange = (value: string) => {
+    setRevisarPosicionChecks((prev) => {
+      const newValues = prev.includes(value)
+        ? prev.filter((v) => v !== value)
+        : [...prev, value];
+
+      // Generamos el string final
+      const finalValue =
+        newValues.length === 2 ? 'hologramafoil' : newValues[0] || '';
+
+      setRevisarPosicion(finalValue);
+      return newValues;
+    });
+  };
+  const handleImagenHologramaChange = (value: string) => {
+    setImagenHologramaChecks((prev) => {
+      const newValues = prev.includes(value)
+        ? prev.filter((v) => v !== value)
+        : [...prev, value];
+
+      const finalValue =
+        newValues.length === 2 ? 'hologramafoil' : newValues[0] || '';
+
+      setImagenHolograma(finalValue);
+      return newValues;
+    });
+  };
+  console.log('Revisar posición:', revisarPosicion);
+  console.log('Imagen holograma:', imagenHolograma);
   const handleSubmit = async () => {
     const flowId = currentFlow.id;
     const numValue = Number(sampleQuantity);
@@ -297,6 +334,8 @@ export default function HotStampingComponent({ workOrder }: Props) {
         badQuantity = flow.areaResponse.impression.bad_quantity;
       } else if (flow.areaResponse?.serigrafia) {
         badQuantity = flow.areaResponse.serigrafia.bad_quantity;
+      } else if (flow.areaResponse?.empalme) {
+        badQuantity = flow.areaResponse.empalme.bad_quantity;
       } else if (flow.areaResponse?.laminacion) {
         badQuantity = flow.areaResponse.laminacion.bad_quantity;
       } else if (flow.areaResponse?.corte) {
@@ -305,7 +344,7 @@ export default function HotStampingComponent({ workOrder }: Props) {
       } else if (flow.areaResponse?.colorEdge) {
         badQuantity = flow.areaResponse.colorEdge.bad_quantity;
         materialBadQuantity = flow.areaResponse.colorEdge.material_quantity;
-      } else if (flow.areaResponse?.colorEdge) {
+      } else if (flow.areaResponse?.hotStamping) {
         badQuantity = flow.areaResponse.hotStamping.bad_quantity;
         materialBadQuantity = flow.areaResponse.hotStamping.material_quantity;
       }
@@ -343,20 +382,40 @@ export default function HotStampingComponent({ workOrder }: Props) {
     setShowBadQuantity(true);
     console.log('Valores iniciales para malas por área:', initialValues);
   };
+  const normalizedAreas: AreaData[] = previousFlows.map((item) => ({
+    id: item.area?.id ?? item.id,
+    name: item.area?.name ?? item.name ?? '',
+    malas: item.malas ?? 0,
+    defectuoso: item.defectuoso ?? 0,
 
-  const handleSaveChanges = async () => {
+    // Valores ficticios para completar el tipo requerido
+    status: item.status ?? '',
+    response: item.areaResponse ?? {},
+    answers: item.answers ?? [],
+    usuario: item.user?.username ?? '',
+    auditor: '',
+    buenas: 0,
+    cqm: 0,
+    excedente: 0,
+    muestras: 0,
+  }));
+
+  const handleSaveChanges = async (updatedAreas: AreaData[]) => {
+    const effectiveAreas = updatedAreas ?? previousFlows;
     const payload = {
       areas: previousFlows.flatMap((flow) => {
-        const areaName = flow.area.name.toLowerCase();
+        const areaKey = flow.area.name.toLowerCase().replace(/\s/g, '');
 
         const blockMap: Record<string, string> = {
           impresion: 'impression',
           serigrafia: 'serigrafia',
-          laminacion: 'laminacion',
           empalme: 'empalme',
+          laminacion: 'laminacion',
+          corte: 'corte',
+          'color edge': 'colorEdge',
         };
 
-        const block = blockMap[areaName] || 'otros';
+        const block = blockMap[flow.area.name.toLowerCase()] || 'otros';
         if (block === 'otros') {
           return []; // Descarta si no es bloque conocido
         }
@@ -366,8 +425,8 @@ export default function HotStampingComponent({ workOrder }: Props) {
         const formId = blockData?.form_auditory_id || null;
         const cqmId = blockData?.form_answer_id || null;
 
-        const badKey = `${areaName}_bad`;
-        const materialKey = `${areaName}_material`;
+        const badKey = `${areaKey}_bad`;
+        const materialKey = `${areaKey}_material`;
 
         const bad_quantity = Number(areaBadQuantities[badKey] || 0);
         const material_quantity =
@@ -592,111 +651,29 @@ export default function HotStampingComponent({ workOrder }: Props) {
 
       {/* Modal para marcar malas por areas previas al liberar */}
       {showBadQuantity && (
-        <ModalOverlay>
-          <ModalBox>
-            <h4>Registrar malas por área</h4>
-            {previousFlows.map((flow) => {
-              const areaKey = flow.area.name.toLowerCase(); // para coincidir con las claves
-              return (
-                <div
-                  key={flow.id}
-                  style={{
-                    display: 'flex',
-                    flexDirection: 'column',
-                    alignItems: 'flex-start',
-                    gap: '0.5rem',
-                    marginTop: '1rem',
-                  }}
-                >
-                  <Label style={{ fontWeight: 'bold' }}>
-                    {flow.area.name.toUpperCase()}
-                  </Label>
+        <BadQuantityModal
+          areas={normalizedAreas}
+          areaBadQuantities={areaBadQuantities}
+          setAreaBadQuantities={setAreaBadQuantities}
+          onConfirm={({
+            updatedAreas,
+            totalBad,
+            totalMaterial,
+            lastAreaBad,
+            lastAreaMaterial,
+          }) => {
+            setShowBadQuantity(false);
 
-                  <div style={{ display: 'flex', gap: '1rem' }}>
-                    <div>
-                      <Label>Malas</Label>
-                      <InputBad
-                        type="number"
-                        min="0"
-                        value={areaBadQuantities[`${areaKey}_bad`] || '0'}
-                        onChange={(e) =>
-                          setAreaBadQuantities({
-                            ...areaBadQuantities,
-                            [`${areaKey}_bad`]: e.target.value,
-                          })
-                        }
-                      />
-                    </div>
-                    {flow.area_id >= 6 && (
-                      <div>
-                        <Label>Malo de fábrica</Label>
-                        <InputBad
-                          type="number"
-                          min="0"
-                          value={
-                            areaBadQuantities[`${areaKey}_material`] || '0'
-                          }
-                          onChange={(e) =>
-                            setAreaBadQuantities({
-                              ...areaBadQuantities,
-                              [`${areaKey}_material`]: e.target.value,
-                            })
-                          }
-                        />
-                      </div>
-                    )}
-                  </div>
-                </div>
-              );
-            })}
-            <div
-              style={{
-                display: 'flex',
-                justifyContent: 'flex-end',
-                gap: '1rem',
-                marginTop: '1rem',
-              }}
-            >
-              <CancelButton onClick={() => setShowBadQuantity(false)}>
-                Cancelar
-              </CancelButton>
-              <ConfirmButton
-                disabled={shouldDisableLiberar()}
-                onClick={async () => {
-                  await handleSaveChanges();
-                  const lastFlow = previousFlows[previousFlows.length - 1];
-                  const areaKey = lastFlow.area.name.toLowerCase();
-                  const lastAreaBad =
-                    areaBadQuantities[`${areaKey}_bad`] || '0';
-                  const lastAreaMaterial =
-                    areaBadQuantities[`${areaKey}_material`] || '0';
-                  // Además, suma el total al input principal de malas
+            // Guarda lo necesario
+            handleSaveChanges(updatedAreas);
 
-                  const totalBad = Object.keys(areaBadQuantities)
-                    .filter((key) => key.endsWith('_bad'))
-                    .reduce(
-                      (sum, key) => sum + Number(areaBadQuantities[key] || 0),
-                      0
-                    );
-
-                  const totalMaterial = Object.keys(areaBadQuantities)
-                    .filter((key) => key.endsWith('_material'))
-                    .reduce(
-                      (sum, key) => sum + Number(areaBadQuantities[key] || 0),
-                      0
-                    );
-
-                  setLastBadQuantity(lastAreaBad);
-                  setMaterialBadQuantity(lastAreaMaterial);
-                  setBadQuantity(String(totalBad));
-                  setShowBadQuantity(false);
-                }}
-              >
-                Confirmar
-              </ConfirmButton>
-            </div>
-          </ModalBox>
-        </ModalOverlay>
+            // Actualiza variables como antes
+            setBadQuantity(String(totalBad));
+            setMaterialBadQuantity(String(totalMaterial));
+            setLastBadQuantity(String(lastAreaBad));
+          }}
+          onClose={() => setShowBadQuantity(false)}
+        />
       )}
 
       {/* Modal para enviar a liberacion */}
@@ -771,21 +748,19 @@ export default function HotStampingComponent({ workOrder }: Props) {
               <RadioGroup>
                 <RadioLabel>
                   <Radio
-                    type="radio"
-                    name="revisar_posicion"
+                    type="checkbox"
                     value="holograma"
-                    checked={revisarPosicion === 'holograma'}
-                    onChange={(e) => setRevisarPosicion(e.target.value)}
+                    checked={revisarPosicionChecks.includes('holograma')}
+                    onChange={() => handleRevisarPosicionChange('holograma')}
                   />
                   Holograma
                 </RadioLabel>
                 <RadioLabel>
                   <Radio
-                    type="radio"
-                    name="revisar_posicion"
+                    type="checkbox"
                     value="foil"
-                    checked={revisarPosicion === 'foil'}
-                    onChange={(e) => setRevisarPosicion(e.target.value)}
+                    checked={revisarPosicionChecks.includes('foil')}
+                    onChange={() => handleRevisarPosicionChange('foil')}
                   />
                   Foil
                 </RadioLabel>
@@ -796,21 +771,19 @@ export default function HotStampingComponent({ workOrder }: Props) {
               <RadioGroup>
                 <RadioLabel>
                   <Radio
-                    type="radio"
-                    name="imagen_holograma"
+                    type="checkbox"
                     value="holograma"
-                    checked={imagenHolograma === 'holograma'}
-                    onChange={(e) => setImagenHolograma(e.target.value)}
+                    checked={imagenHologramaChecks.includes('holograma')}
+                    onChange={() => handleImagenHologramaChange('holograma')}
                   />
                   Holograma
                 </RadioLabel>
                 <RadioLabel>
                   <Radio
-                    type="radio"
-                    name="imagen_holograma"
+                    type="checkbox"
                     value="foil"
-                    checked={imagenHolograma === 'foil'}
-                    onChange={(e) => setImagenHolograma(e.target.value)}
+                    checked={imagenHologramaChecks.includes('foil')}
+                    onChange={() => handleImagenHologramaChange('foil')}
                   />
                   Foil
                 </RadioLabel>
