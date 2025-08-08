@@ -272,7 +272,9 @@ const CorteComponent: React.FC<Props> = ({ workOrder, currentFlow }) => {
               activeOutlineColor="#000"
               keyboardType="numeric"
               value={sumaBadQuantity}
-              placeholder={sumaBadQuantity > 0 ? sumaBadQuantity.toString() : '0'}
+              placeholder={
+                sumaBadQuantity > 0 ? sumaBadQuantity.toString() : '0'
+              }
               editable={false} // deshabilita edición
               pointerEvents="none" // evita que se abra el teclado
             />
@@ -332,6 +334,82 @@ const CorteComponent: React.FC<Props> = ({ workOrder, currentFlow }) => {
         </TouchableOpacity>
 
         <View style={{ height: 100 }} />
+
+        <Modal visible={showBadQuantity} transparent animationType="fade">
+          <View style={styles.modalOverlay}>
+            <View style={styles.modalBoxScrollable}>
+              <Text style={styles.modalTitle}>Registrar malas por área</Text>
+
+              <ScrollView style={{ maxHeight: 400 }}>
+                {previousFlows.map((flow, index) => {
+                  const areaKey = flow.area.name.toLowerCase();
+                  return (
+                    <View key={`${flow.id}-${index}`} style={{ marginTop: 16 }}>
+                      <Text style={styles.areaLabel}>
+                        {flow.area.name.toUpperCase()}
+                      </Text>
+
+                      <View style={styles.areaInputsContainer}>
+                        <View style={[styles.inputGroup, { maxWidth: '40%' }]}>
+                          <Text style={styles.inputLabel}>Malas</Text>
+                          <TextInput
+                            style={styles.input}
+                            theme={{ roundness: 30 }}
+                            mode="outlined"
+                            activeOutlineColor="#000"
+                            keyboardType="numeric"
+                            value={areaBadQuantities[`${areaKey}_bad`] || '0'}
+                            onChangeText={(text) =>
+                              setAreaBadQuantities((prev) => ({
+                                ...prev,
+                                [`${areaKey}_bad`]: text,
+                              }))
+                            }
+                          />
+                        </View>
+
+                        {flow.area_id >= 6 && (
+                          <View
+                            style={[styles.inputGroup, { maxWidth: '40%' }]}
+                          >
+                            <Text style={styles.inputLabel}>
+                              Malo de fábrica
+                            </Text>
+                            <TextInput
+                              style={styles.input}
+                              theme={{ roundness: 30 }}
+                              mode="outlined"
+                              activeOutlineColor="#000"
+                              keyboardType="numeric"
+                              value={
+                                areaBadQuantities[`${areaKey}_material`] || '0'
+                              }
+                              onChangeText={(text) =>
+                                setAreaBadQuantities((prev) => ({
+                                  ...prev,
+                                  [`${areaKey}_material`]: text,
+                                }))
+                              }
+                            />
+                          </View>
+                        )}
+                      </View>
+                    </View>
+                  );
+                })}
+              </ScrollView>
+
+              <View style={styles.modalActions}>
+                <TouchableOpacity
+                  style={styles.cancelButton}
+                  onPress={() => setShowBadQuantity(false)}
+                >
+                  <Text style={styles.modalButtonText}>Cancelar</Text>
+                </TouchableOpacity>
+              </View>
+            </View>
+          </View>
+        </Modal>
 
         <Modal visible={showModal} transparent animationType="fade">
           <View style={styles.modalOverlay}>
@@ -464,5 +542,36 @@ const styles = StyleSheet.create({
   modalButtonText: {
     color: '#fff',
     fontWeight: 'bold',
+  },
+  inputLabel: {
+    fontSize: 13,
+    marginBottom: 4,
+  },
+  inputGroup: {
+    width: '100%',
+  },
+  modalTitle: {
+    fontSize: 22,
+    fontWeight: 'bold',
+    marginBottom: 16,
+    textAlign: 'center',
+    color: '#1f2937',
+  },
+  modalBoxScrollable: {
+    backgroundColor: '#fff',
+    borderRadius: 10,
+    padding: 20,
+    width: '90%',
+    maxHeight: '90%',
+  },
+  areaLabel: {
+    fontWeight: 'bold',
+    fontSize: 14,
+    marginBottom: 6,
+  },
+  areaInputsContainer: {
+    flexDirection: 'row',
+    gap: 16,
+    flexWrap: 'wrap',
   },
 });

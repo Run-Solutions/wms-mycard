@@ -1,9 +1,14 @@
-'use client'
+'use client';
 
-import { useRouter } from "next/navigation";
-import { useState } from "react";
-import styled from "styled-components";
-import { submitExtraPersonalizacion, sendInconformidadCQM } from "@/api/recepcionCQM";
+import { useRouter } from 'next/navigation';
+import { useState } from 'react';
+import styled from 'styled-components';
+import {
+  submitExtraPersonalizacion,
+  sendInconformidadCQM,
+} from '@/api/recepcionCQM';
+import { MachineSection } from './util/MachineSection';
+import { MachineSectionEdit } from './util/MachineSectionEdit';
 
 interface Props {
   workOrder: any;
@@ -20,31 +25,34 @@ export default function PersonalizacionComponent({ workOrder }: Props) {
   const [showInconformidad, setShowInconformidad] = useState(false);
   const [inconformidad, setInconformidad] = useState<string>('');
 
-  // Para obtener el ultimo FormAnswer 
+  // Para obtener el ultimo FormAnswer
   const index = workOrder?.answers
-  ?.map((a: Answer, i: number) => ({ ...a, index: i }))
-  .reverse().find((a: Answer) => a.reviewed === false)?.index;
+    ?.map((a: Answer, i: number) => ({ ...a, index: i }))
+    .reverse()
+    .find((a: Answer) => a.reviewed === false)?.index;
   console.log('el index', index);
 
   // Para mostrar formulario de CQM y enviarlo
   const [showConfirmModal, setShowConfirmModal] = useState(false);
 
-  //Para guardar las respuestas 
+  //Para guardar las respuestas
   const tipoPersonalizacion = workOrder?.answers[index].tipo_personalizacion;
-  let selectedQuestions : { id: number, role_id: number | null }[] = [];
+  let selectedQuestions: { id: number; role_id: number | null }[] = [];
 
-  if (tipoPersonalizacion === 'laser'){
+  if (tipoPersonalizacion === 'laser') {
     selectedQuestions = workOrder.area.formQuestions.slice(9, 13);
-  } else if (tipoPersonalizacion === 'persos'){
+  } else if (tipoPersonalizacion === 'persos') {
     selectedQuestions = workOrder.area.formQuestions.slice(13, 17);
   }
 
-  const [responses, setResponses] = useState<{questionId: number, answer: boolean}[]>(
+  const [responses, setResponses] = useState<
+    { questionId: number; answer: boolean }[]
+  >(
     selectedQuestions
       .filter((question) => question.role_id === 3)
-      .map((question: {id: number}) => ({
+      .map((question: { id: number }) => ({
         questionId: question.id,
-        answer: false
+        answer: false,
       }))
   );
   const [cargaAplicacion, setCargaAplicacion] = useState('');
@@ -55,21 +63,23 @@ export default function PersonalizacionComponent({ workOrder }: Props) {
   // Para controlar qué preguntas están marcadas
   const [checkedQuestions, setCheckedQuestions] = useState<number[]>([]);
   const handleCheckboxChange = (questionId: number, isChecked: boolean) => {
-    setResponses(prevResponses => 
-      prevResponses.map(response =>
-        response.questionId === questionId 
-          ? {...response, answer: isChecked}
+    setResponses((prevResponses) =>
+      prevResponses.map((response) =>
+        response.questionId === questionId
+          ? { ...response, answer: isChecked }
           : response
       )
     );
-  
+
     // Actualizar visualmente el checkbox
-    setCheckedQuestions(prev =>
-      isChecked ? [...prev, questionId] : prev.filter(id => id !== questionId)
+    setCheckedQuestions((prev) =>
+      isChecked ? [...prev, questionId] : prev.filter((id) => id !== questionId)
     );
   };
   const handleSelectAllPersos = (isChecked: boolean) => {
-    const questionIds = workOrder.area.formQuestions.slice(13,15).map((q: { id: number }) => q.id);
+    const questionIds = workOrder.area.formQuestions
+      .slice(13, 15)
+      .map((q: { id: number }) => q.id);
     if (isChecked) {
       // Marcar todas las preguntas
       setCheckedQuestions(questionIds);
@@ -89,45 +99,47 @@ export default function PersonalizacionComponent({ workOrder }: Props) {
       // Desmarcar todas
       setCheckedQuestions([]);
       setResponses((prevResponses) =>
-        prevResponses.filter((response) => !questionIds.includes(response.questionId))
+        prevResponses.filter(
+          (response) => !questionIds.includes(response.questionId)
+        )
       );
     }
   };
 
-  
   const handleSubmit = async () => {
     const formAnswerId = workOrder.answers[index]?.id; // id de FormAnswer
     if (!formAnswerId) {
-      alert("No se encontró el ID del formulario.");
+      alert('No se encontró el ID del formulario.');
       return;
     }
     const basePayload = {
       form_answer_id: formAnswerId,
-    }
+    };
     let aditionalFields = {};
-    if(workOrder?.answers[index].tipo_personalizacion === 'laser'){
+    if (workOrder?.answers[index].tipo_personalizacion === 'laser') {
       const checkboxPayload = responses.map(({ questionId, answer }) => ({
         question_id: questionId,
-        answer: answer,     
+        answer: answer,
       }));
-      aditionalFields= {
+      aditionalFields = {
         verificar_script: verificarScript,
         validar_kvc_perso: validarKVC,
         apariencia_quemado: aparienciaQuemado,
         checkboxes: checkboxPayload,
       };
-    }else if(workOrder?.answers[index].tipo_personalizacion === 'persos'){
+    } else if (workOrder?.answers[index].tipo_personalizacion === 'persos') {
       const checkboxPayload = responses.map(({ questionId, answer }) => ({
         question_id: questionId,
-        answer: answer,     
+        answer: answer,
       }));
-      aditionalFields={
+      aditionalFields = {
         carga_aplicacion: cargaAplicacion,
         checkboxes: checkboxPayload,
       };
-    }else if(workOrder?.answers[index].tipo_personalizacion === 'etiquetadora'){
-      aditionalFields={
-      };
+    } else if (
+      workOrder?.answers[index].tipo_personalizacion === 'etiquetadora'
+    ) {
+      aditionalFields = {};
     }
     const payload = {
       ...basePayload,
@@ -135,9 +147,9 @@ export default function PersonalizacionComponent({ workOrder }: Props) {
     };
     try {
       const data = await submitExtraPersonalizacion(payload);
-      router.push("/liberacionDeVistosBuenos");
+      router.push('/liberacionDeVistosBuenos');
     } catch (error) {
-      console.log("Error al guardar la respuesta: ", error);
+      console.log('Error al guardar la respuesta: ', error);
     }
   };
 
@@ -153,7 +165,7 @@ export default function PersonalizacionComponent({ workOrder }: Props) {
       console.error(error);
       alert('Error al conectar con el servidor');
     }
-  }
+  };
 
   return (
     <Container>
@@ -185,247 +197,167 @@ export default function PersonalizacionComponent({ workOrder }: Props) {
       <NewData>
         <SectionTitle>Respuestas del operador</SectionTitle>
         <NewDataWrapper>
-          <InputGroup style={{ paddingTop: '5px', width: '70%'}}>
+          <InputGroup style={{ paddingTop: '5px', width: '70%' }}>
             <Label>Tipo de Personalizacion:</Label>
-            <Input type="text" value={workOrder?.answers[index].tipo_personalizacion ?? 'No se reconoce la muestra enviada' } readOnly />
+            <Input
+              type="text"
+              value={
+                workOrder?.answers[index].tipo_personalizacion ??
+                'No se reconoce la muestra enviada'
+              }
+              readOnly
+            />
           </InputGroup>
 
-        {workOrder?.answers[index].tipo_personalizacion === 'laser' && (
-          <>
-            <InputGroup style={{width: '70%'}}>
-              <Label>Muestras entregadas:</Label>
-              <Input type="number" value={workOrder?.answers[index].sample_quantity ?? 'No se reconoce la muestra enviada' } readOnly />
-            </InputGroup>
-          </>
-        )}
-        
-        {workOrder?.answers[index].tipo_personalizacion === 'persos' && (
-          <>
-            <Table>
-              <thead>
-                <tr>
-                  <th>Pregunta</th>
-                  <th>Respuesta</th>
-                </tr>
-              </thead>
-              <tbody>
-                {workOrder.area.formQuestions.slice(1, 10)
-                .map((question: { id: number; title: string }) => {
-                  // Buscar la respuesta correspondiente a esta pregunta
-                  const answer = workOrder.answers[index]?.FormAnswerResponse?.find(
-                    (resp: any) => resp.question_id === question.id
-                  );
-                  
-                  // Obtener la respuesta del operador (response_operator)
-                  const operatorResponse = answer?.response_operator;
-                  return(
-                    <tr key={question.id}>
-                      <td>{question.title}</td>
-                      <td>
-                      {typeof operatorResponse === 'boolean' ? (
-                          <input 
-                            type="checkbox" 
-                            checked={operatorResponse} 
-                            disabled 
-                          />
-                        ) : (
-                          <span>{operatorResponse !== undefined && operatorResponse !== null 
-                            ? operatorResponse.toString() 
-                            : ''}</span>
-                        )}
-                      </td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </Table>
-            <InputGroup style={{ paddingTop: '10px', width: '70%'}}>
-              <Label>Color De Personalización:</Label>
-              <Input type="text" value={workOrder?.answers[index].color_personalizacion ?? 'No se reconoce la muestra enviada' } readOnly />
-              <Label>Tipo de Código de Barras Que Se Personaliza:</Label>
-              <Input type="text" value={workOrder?.answers[index].codigo_barras ?? 'No se reconoce la muestra enviada' } readOnly />
-              <Label>Muestras entregadas:</Label>
-              <Input type="number" value={workOrder?.answers[index].sample_quantity ?? 'No se reconoce la muestra enviada' } readOnly />
-            </InputGroup>
-          </>
-        )}
-        
-        {workOrder?.answers[index].tipo_personalizacion === 'etiquetadora' && (
-          <>
-            <Table>
-              <thead>
-                <tr>
-                  <th>Pregunta</th>
-                  <th>Respuesta</th>
-                </tr>
-              </thead>
-              <tbody>
-                {workOrder.area.formQuestions.slice(0, 1)
-                .map((question: { id: number; title: string }) => {
-                  // Buscar la respuesta correspondiente a esta pregunta
-                  const answer = workOrder.answers[index]?.FormAnswerResponse?.find(
-                    (resp: any) => resp.question_id === question.id
-                  );
-                  
-                  // Obtener la respuesta del operador (response_operator)
-                  const operatorResponse = answer?.response_operator;
-                  return(
-                  <tr key={question.id}>
-                    <td>{question.title}</td>
-                    <td>
-                    {typeof operatorResponse === 'boolean' ? (
-                        <input 
-                          type="checkbox" 
-                          checked={operatorResponse} 
-                          disabled 
-                        />
-                      ) : (
-                        <span>{operatorResponse !== undefined && operatorResponse !== null 
-                          ? operatorResponse.toString() 
-                          : ''}</span>
-                      )}
-                    </td>
-                  </tr>
-                  );
-                })}
-              </tbody>
-            </Table>
-            <InputGroup style={{ paddingTop: '10px', width: '70%'}}>
-              <Label>Verificar Tipo De Etiqueta Vs Ot Y Pegar Utilizada:</Label>
-              <Input type="text" value={workOrder?.answers[index].verificar_etiqueta ?? 'No se reconoce la muestra enviada' } readOnly />
-              <Label>Muestras entregadas:</Label>
-              <Input type="number" value={workOrder?.answers[index].sample_quantity ?? 'No se reconoce la muestra enviada' } readOnly />
-            </InputGroup>
-          </>
-        )}
-        {workOrder?.answers[index].tipo_personalizacion === 'packsmart' && (
-          <>
-            <Table>
-              <thead>
-                <tr>
-                  <th>Pregunta</th>
-                  <th>Respuesta</th>
-                </tr>
-              </thead>
-              <tbody>
-                {workOrder.area.formQuestions.slice(14, 20)
-                  .map((question: { id: number; title: string }) => {
-                    // Buscar la respuesta correspondiente a esta pregunta
-                    const answer = workOrder.answers[index]?.FormAnswerResponse?.find(
-                      (resp: any) => resp.question_id === question.id
-                    );
+          {workOrder?.answers[index].tipo_personalizacion === 'laser' && (
+            <>
+              <InputGroup style={{ width: '70%' }}>
+                <Label>Muestras entregadas:</Label>
+                <Input
+                  type="number"
+                  value={
+                    workOrder?.answers[index].sample_quantity ??
+                    'No se reconoce la muestra enviada'
+                  }
+                  readOnly
+                />
+              </InputGroup>
+            </>
+          )}
 
-                    // Obtener la respuesta del operador (response_operator)
-                    const operatorResponse = answer?.response_operator;
-                    return (
-                      <tr key={question.id}>
-                        <td>{question.title}</td>
-                        <td>
-                          {typeof operatorResponse === 'boolean' ? (
-                            <input
-                              type="checkbox"
-                              checked={operatorResponse}
-                              disabled
-                            />
-                          ) : (
-                            <span>{operatorResponse !== undefined && operatorResponse !== null
-                              ? operatorResponse.toString()
-                              : ''}</span>
-                          )}
-                        </td>
-                      </tr>
-                    );
-                  })}
-              </tbody>
-            </Table>
-          </>
-        )}
-        {workOrder?.answers[index].tipo_personalizacion === 'otto' && (
-          <>
-            <Table>
-              <thead>
-                <tr>
-                  <th>Pregunta</th>
-                  <th>Respuesta</th>
-                </tr>
-              </thead>
-              <tbody>
-                {workOrder.area.formQuestions.slice(20, 28)
-                  .map((question: { id: number; title: string }) => {
-                    // Buscar la respuesta correspondiente a esta pregunta
-                    const answer = workOrder.answers[index]?.FormAnswerResponse?.find(
-                      (resp: any) => resp.question_id === question.id
-                    );
-                    // Obtener la respuesta del operador (response_operator)
-                    const operatorResponse = answer?.response_operator;
-                    return (
-                      <tr key={question.id}>
-                        <td>{question.title}</td>
-                        <td>
-                          {typeof operatorResponse === 'boolean' ? (
-                            <input
-                              type="checkbox"
-                              checked={operatorResponse}
-                              disabled
-                            />
-                          ) : (
-                            <span>{operatorResponse !== undefined && operatorResponse !== null
-                              ? operatorResponse.toString()
-                              : ''}</span>
-                          )}
-                        </td>
-                      </tr>
-                    );
-                  })}
-              </tbody>
-            </Table>
-          </>
-        )}
-        {workOrder?.answers[index].tipo_personalizacion === 'embolsadora' && (
-          <>
-            <Table>
-              <thead>
-                <tr>
-                  <th>Pregunta</th>
-                  <th>Respuesta</th>
-                </tr>
-              </thead>
-              <tbody>
-                {workOrder.area.formQuestions.slice(28, 30)
-                  .map((question: { id: number; title: string }) => {
-                    // Buscar la respuesta correspondiente a esta pregunta
-                    const answer = workOrder.answers[index]?.FormAnswerResponse?.find(
-                      (resp: any) => resp.question_id === question.id
-                    );
-                    // Obtener la respuesta del operador (response_operator)
-                    const operatorResponse = answer?.response_operator;
-                    return (
-                      <tr key={question.id}>
-                        <td>{question.title}</td>
-                        <td>
-                          {typeof operatorResponse === 'boolean' ? (
-                            <input
-                              type="checkbox"
-                              checked={operatorResponse}
-                              disabled
-                            />
-                          ) : (
-                            <span>{operatorResponse !== undefined && operatorResponse !== null
-                              ? operatorResponse.toString()
-                              : ''}</span>
-                          )}
-                        </td>
-                      </tr>
-                    );
-                  })}
-              </tbody>
-            </Table>
-          </>
-        )}
+          {workOrder?.answers[index].tipo_personalizacion === 'persos' && (
+            <>
+              <MachineSection
+                visible
+                machine="Personalización"
+                title=""
+                questions={workOrder.area.formQuestions}
+                areaId={10}
+                roleId={null}
+                questionSlice={[1, 10]}
+                answers={workOrder.answers[index]?.FormAnswerResponse ?? []}
+                extras={
+                  <InputGroup style={{ width: '70%' }}>
+                    <Label>Color De Personalización:</Label>
+                    <Input
+                      type="text"
+                      value={
+                        workOrder?.answers[index].color_personalizacion ??
+                        'No se reconoce la muestra enviada'
+                      }
+                      readOnly
+                    />
+                    <Label>Tipo de Código de Barras Que Se Personaliza:</Label>
+                    <Input
+                      type="text"
+                      value={
+                        workOrder?.answers[index].codigo_barras ??
+                        'No se reconoce la muestra enviada'
+                      }
+                      readOnly
+                    />
+                    <Label>Muestras entregadas:</Label>
+                    <Input
+                      type="number"
+                      value={
+                        workOrder?.answers[index].sample_quantity ??
+                        'No se reconoce la muestra enviada'
+                      }
+                      readOnly
+                    />
+                  </InputGroup>
+                }
+              />
+            </>
+          )}
+
+          {workOrder?.answers[index].tipo_personalizacion ===
+            'etiquetadora' && (
+            <>
+              <MachineSection
+                visible
+                machine="etiquetadora"
+                title=""
+                questions={workOrder.area.formQuestions}
+                areaId={10}
+                roleId={null}
+                questionSlice={[0, 1]}
+                answers={workOrder.answers[index]?.FormAnswerResponse ?? []}
+                extras={
+                  <InputGroup style={{ width: '70%' }}>
+                    <Label>
+                      Verificar Tipo De Etiqueta Vs Ot Y Pegar Utilizada:
+                    </Label>
+                    <Input
+                      type="text"
+                      value={
+                        workOrder?.answers[index].verificar_etiqueta ??
+                        'No se reconoce la muestra enviada'
+                      }
+                      readOnly
+                    />
+                    <Label>Muestras entregadas:</Label>
+                    <Input
+                      type="number"
+                      value={
+                        workOrder?.answers[index].sample_quantity ??
+                        'No se reconoce la muestra enviada'
+                      }
+                      readOnly
+                    />
+                  </InputGroup>
+                }
+              />
+            </>
+          )}
+          {workOrder?.answers[index].tipo_personalizacion === 'packsmart' && (
+            <>
+              <MachineSection
+                visible
+                machine="packsmart"
+                title=""
+                questions={workOrder.area.formQuestions}
+                areaId={10}
+                roleId={null}
+                questionSlice={[14, 20]}
+                answers={workOrder.answers[index]?.FormAnswerResponse ?? []}
+                extras={<> </>}
+              />
+            </>
+          )}
+          {workOrder?.answers[index].tipo_personalizacion === 'otto' && (
+            <>
+              <MachineSection
+                visible
+                machine="otto"
+                title=""
+                questions={workOrder.area.formQuestions}
+                areaId={10}
+                roleId={null}
+                questionSlice={[20, 28]}
+                answers={workOrder.answers[index]?.FormAnswerResponse ?? []}
+                extras={<> </>}
+              />
+            </>
+          )}
+          {workOrder?.answers[index].tipo_personalizacion === 'embolsadora' && (
+            <>
+              <MachineSection
+                visible
+                machine="embolsadora"
+                title=""
+                questions={workOrder.area.formQuestions}
+                areaId={10}
+                roleId={null}
+                questionSlice={[28, 30]}
+                answers={workOrder.answers[index]?.FormAnswerResponse ?? []}
+                extras={<> </>}
+              />
+            </>
+          )}
         </NewDataWrapper>
         <SectionTitle>Mis respuestas</SectionTitle>
         <NewDataWrapper>
-          
           {workOrder?.answers[index].tipo_personalizacion === 'laser' && (
             <>
               <Table>
@@ -437,146 +369,183 @@ export default function PersonalizacionComponent({ workOrder }: Props) {
                 </thead>
                 <tbody>
                   {workOrder.area.formQuestions
-                  .slice(9, 13)
-                  .filter((question: { role_id: number | null }) => question.role_id === 3)
-                  .map((question: { id: number; title: string }) => {
-                    // Buscar la respuesta correspondiente a esta pregunta
-                    const answer = workOrder.answers[index]?.FormAnswerResponse?.find(
-                      (resp: any) => resp.question_id === question.id
-                    );
-                    return (
-                      <tr key={question.id}>
-                        <td>{question.title}</td>
-                        <td>
-                          <input type="checkbox" checked={checkedQuestions.includes(question.id)} onChange={(e) => handleCheckboxChange(question.id, e.target.checked)}/>
-                        </td>
-                      </tr>
-                    );
-                  })}
+                    .slice(9, 13)
+                    .filter(
+                      (question: { role_id: number | null }) =>
+                        question.role_id === 3
+                    )
+                    .map((question: { id: number; title: string }) => {
+                      // Buscar la respuesta correspondiente a esta pregunta
+                      const answer = workOrder.answers[
+                        index
+                      ]?.FormAnswerResponse?.find(
+                        (resp: any) => resp.question_id === question.id
+                      );
+                      return (
+                        <tr key={question.id}>
+                          <td>{question.title}</td>
+                          <td>
+                            <input
+                              type="checkbox"
+                              checked={checkedQuestions.includes(question.id)}
+                              onChange={(e) =>
+                                handleCheckboxChange(
+                                  question.id,
+                                  e.target.checked
+                                )
+                              }
+                            />
+                          </td>
+                        </tr>
+                      );
+                    })}
                 </tbody>
               </Table>
-              <InputGroup style={{ paddingTop: '10px', width: '70%'}}>
-              <Label>Verificar Script / Layout Vs Ot / Autorizacion:</Label>
-              <Input type="text" placeholder="Ej: " value={verificarScript} onChange={(e) => setVerificarScript(e.target.value)}/>
-              <Label>Validar, Anotar KVC (Llaves), Carga de Aplicación o Prehabilitación:</Label>
-              <Input type="text" placeholder="Ej: " value={validarKVC} onChange={(e) => setValidarKVC(e.target.value)}/>
-              <Label>Describir Apariencia Del Quemado Del Laser (Color):</Label>
-              <Input type="text" placeholder="Ej: " value={aparienciaQuemado} onChange={(e) => setAparienciaQuemado(e.target.value)}/>
-            </InputGroup>
+              <InputGroup style={{ paddingTop: '10px', width: '70%' }}>
+                <Label>Verificar Script / Layout Vs Ot / Autorizacion:</Label>
+                <Input
+                  type="text"
+                  placeholder="Ej: "
+                  value={verificarScript}
+                  onChange={(e) => setVerificarScript(e.target.value)}
+                />
+                <Label>
+                  Validar, Anotar KVC (Llaves), Carga de Aplicación o
+                  Prehabilitación:
+                </Label>
+                <Input
+                  type="text"
+                  placeholder="Ej: "
+                  value={validarKVC}
+                  onChange={(e) => setValidarKVC(e.target.value)}
+                />
+                <Label>
+                  Describir Apariencia Del Quemado Del Laser (Color):
+                </Label>
+                <Input
+                  type="text"
+                  placeholder="Ej: "
+                  value={aparienciaQuemado}
+                  onChange={(e) => setAparienciaQuemado(e.target.value)}
+                />
+              </InputGroup>
             </>
           )}
 
           {workOrder?.answers[index].tipo_personalizacion === 'persos' && (
             <>
-              <Table>
-                <thead>
-                  <tr>
-                    <th>Pregunta</th>
-                    <th style={{ display: 'flex'}}>
-                      Respuesta
-                      <input
-                        type="checkbox"
-                        checked={
-                          workOrder.area.formQuestions.slice(13,15).every((q: { id: number }) =>
-                            checkedQuestions.includes(q.id)
-                          )
-                        }
-                        onChange={(e) => handleSelectAllPersos(e.target.checked)}
-                        style={{ marginLeft: "10px" }}
-                      />
-                    </th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {workOrder.area.formQuestions
-                  .slice(13,15)
-                  .filter((question: { role_id: number | null }) => question.role_id === 3)
-                  .map((question: { id: number; title: string }) => {
-                    // Buscar la respuesta correspondiente a esta pregunta
-                    const answer = workOrder.answers[index]?.FormAnswerResponse?.find(
-                      (resp: any) => resp.question_id === question.id
-                    );
-                    return (
-                      <tr key={question.id}>
-                        <td>{question.title}</td>
-                        <td style={{textAlign: 'center'}}>
-                          <input type="checkbox" checked={checkedQuestions.includes(question.id)} onChange={(e) => handleCheckboxChange(question.id, e.target.checked)}/>
-                        </td>
-                      </tr>
-                    );
-                  })}
-                </tbody>
-              </Table>
-              <InputGroup style={{ paddingTop: '10px', width: '70%'}}>
-                <Label>Validar Carga De Aplicación (PersoMaster)</Label>
-                <Input type="text" placeholder="Ej: " value={cargaAplicacion} onChange={(e) => setCargaAplicacion(e.target.value)}/>
+              <MachineSectionEdit
+                visible={
+                  workOrder?.answers[index].tipo_personalizacion === 'persos'
+                }
+                title=""
+                questions={workOrder.area.formQuestions}
+                roleId={3}
+                questionSlice={[13, 15]}
+                checkedQuestions={checkedQuestions}
+                onCheckToggle={handleCheckboxChange}
+                extras={
+                  <InputGroup style={{ width: '70%' }}>
+                    <Label>Validar Carga De Aplicación (PersoMaster)</Label>
+                    <Input
+                      type="text"
+                      placeholder="Ej: "
+                      value={cargaAplicacion}
+                      onChange={(e) => setCargaAplicacion(e.target.value)}
+                    />
+                  </InputGroup>
+                }
+              />
+            </>
+          )}
+
+          {(workOrder?.answers[index].tipo_personalizacion === 'etiquetadora' ||
+            workOrder?.answers[index].tipo_personalizacion === 'otto' ||
+            workOrder?.answers[index].tipo_personalizacion === 'packsmart' ||
+            workOrder?.answers[index].tipo_personalizacion ===
+              'embolsadora') && (
+            <>
+              <InputGroup style={{ paddingTop: '10px', width: '70%' }}>
+                <Label>No tienes preguntas</Label>
               </InputGroup>
             </>
           )}
-          
-          {
-            (
-              workOrder?.answers[index].tipo_personalizacion === 'etiquetadora' ||
-              workOrder?.answers[index].tipo_personalizacion === 'otto' ||
-              workOrder?.answers[index].tipo_personalizacion === 'packsmart' ||
-              workOrder?.answers[index].tipo_personalizacion === 'embolsadora'
-            ) && (
-              <>
-                <InputGroup style={{ paddingTop: '10px', width: '70%' }}>
-                  <Label>No tienes preguntas</Label>
-                </InputGroup>
-              </>
-            )
-          }
         </NewDataWrapper>
-        
       </NewData>
-      <div style={{ display: 'flex', gap: '1rem'}}>
-      <RechazarButton onClick={() => setShowInconformidad(true)}>Rechazar</RechazarButton>
-      <AceptarButton onClick={() => setShowConfirmModal(true)}>Aprobado</AceptarButton>
+      <div style={{ display: 'flex', gap: '1rem' }}>
+        <RechazarButton onClick={() => setShowInconformidad(true)}>
+          Rechazar
+        </RechazarButton>
+        <AceptarButton onClick={() => setShowConfirmModal(true)}>
+          Aprobado
+        </AceptarButton>
       </div>
       {showConfirmModal && (
         <ModalOverlay>
           <ModalContent>
             <ModalTitle>¿Estás seguro/a de aprobar?</ModalTitle>
             <ModalActions>
-            <Button style= {{ backgroundColor: '#BBBBBB'}}onClick={() => setShowConfirmModal(false)}>Cancelar</Button>
-            <Button onClick={() => {
-                setShowConfirmModal(false);
-                handleSubmit();
-              }}>Sí, aprobar</Button>
+              <Button
+                style={{ backgroundColor: '#BBBBBB' }}
+                onClick={() => setShowConfirmModal(false)}
+              >
+                Cancelar
+              </Button>
+              <Button
+                onClick={() => {
+                  setShowConfirmModal(false);
+                  handleSubmit();
+                }}
+              >
+                Sí, aprobar
+              </Button>
             </ModalActions>
           </ModalContent>
         </ModalOverlay>
       )}
       {showInconformidad && (
-          <ModalOverlay>
-            <ModalBox>
-              <h4>Registrar Inconformidad</h4>
-              <h3>Por favor, describe la inconformidad detectada con las respuestas entregadas.</h3>
-              <Textarea
-                value={inconformidad}
-                onChange={(e) => setInconformidad(e.target.value)}
-                placeholder="Escribe aquí la inconformidad..."
-              />
-              <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '1rem', marginTop: '1rem' }}>
-                <CancelButton onClick={() => setShowInconformidad(false)}>Cancelar</CancelButton>
-                <ConfirmButton onClick={() => {
+        <ModalOverlay>
+          <ModalBox>
+            <h4>Registrar Inconformidad</h4>
+            <h3>
+              Por favor, describe la inconformidad detectada con las respuestas
+              entregadas.
+            </h3>
+            <Textarea
+              value={inconformidad}
+              onChange={(e) => setInconformidad(e.target.value)}
+              placeholder="Escribe aquí la inconformidad..."
+            />
+            <div
+              style={{
+                display: 'flex',
+                justifyContent: 'flex-end',
+                gap: '1rem',
+                marginTop: '1rem',
+              }}
+            >
+              <CancelButton onClick={() => setShowInconformidad(false)}>
+                Cancelar
+              </CancelButton>
+              <ConfirmButton
+                onClick={() => {
                   if (!inconformidad.trim()) {
-                    alert('Debes ingresar una inconformidad antes de continuar.');
+                    alert(
+                      'Debes ingresar una inconformidad antes de continuar.'
+                    );
                     return;
                   }
                   handleSubmitInconformidad();
                   setShowInconformidad(false);
-                }}>Guardar</ConfirmButton>
-              </div>
-            </ModalBox>
-          </ModalOverlay>
-        )}
+                }}
+              >
+                Guardar
+              </ConfirmButton>
+            </div>
+          </ModalBox>
+        </ModalOverlay>
+      )}
     </Container>
-
-
-
   );
 }
 
@@ -587,7 +556,7 @@ const Container = styled.div`
   padding: 2rem;
   margin-top: 1.5rem;
   border-radius: 1rem;
-  box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
   max-width: 800px;
   margin-left: auto;
   margin-right: auto;
@@ -600,9 +569,7 @@ const Title = styled.h2`
   color: #1f2937;
 `;
 
-const NewData = styled.div`
-  
-`;
+const NewData = styled.div``;
 
 const SectionTitle = styled.h3`
   font-size: 1.25rem;
@@ -657,7 +624,7 @@ const Input = styled.input`
   transition: border 0.3s;
 
   &:focus {
-    border-color: #0038A8;
+    border-color: #0038a8;
   }
 `;
 
@@ -676,7 +643,7 @@ const RadioLabel = styled.label`
 `;
 
 const Radio = styled.input`
-  accent-color: #0038A8;
+  accent-color: #0038a8;
 `;
 
 const Textarea = styled.textarea`
@@ -690,14 +657,14 @@ const Textarea = styled.textarea`
   resize: vertical;
 
   &:focus {
-    border-color: #0038A8;
+    border-color: #0038a8;
     outline: none;
   }
 `;
 
 const AceptarButton = styled.button<{ disabled?: boolean }>`
   margin-top: 1.5rem;
-  background-color: #0038A8;
+  background-color: #0038a8;
   color: white;
   padding: 0.5rem 1.25rem;
   border-radius: 0.5rem;
@@ -707,16 +674,16 @@ const AceptarButton = styled.button<{ disabled?: boolean }>`
   cursor: pointer;
 
   transition: background-color 0.3s ease, color 0.3s ease;
-  
+
   &:hover {
-    background-color: #1D4ED8;
-    outline: none
+    background-color: #1d4ed8;
+    outline: none;
   }
 `;
 
 const RechazarButton = styled.button<{ disabled?: boolean }>`
   margin-top: 1.5rem;
-  background-color: #BBBBBB;
+  background-color: #bbbbbb;
   color: white;
   padding: 0.5rem 1.25rem;
   border-radius: 0.5rem;
@@ -729,7 +696,7 @@ const RechazarButton = styled.button<{ disabled?: boolean }>`
 
   &:hover {
     background-color: #a0a0a0;
-    outline: none
+    outline: none;
   }
 `;
 
@@ -737,7 +704,8 @@ const Table = styled.table`
   width: 100%;
   border-collapse: collapse;
   color: black;
-  th, td {
+  th,
+  td {
     padding: 0.75rem;
     text-align: left;
     border-bottom: 1px solid #e5e7eb;
@@ -798,13 +766,13 @@ const ModalBox = styled.div`
   background: white;
   padding: 2rem;
   border-radius: 1rem;
-  box-shadow: 0 8px 24px rgba(0,0,0,0.2);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.2);
   max-width: 400px;
   width: 90%;
 `;
 
 const CancelButton = styled.button`
-  background-color: #BBBBBB;
+  background-color: #bbbbbb;
   color: white;
   padding: 0.5rem 1.5rem;
   border-radius: 0.5rem;
@@ -823,7 +791,7 @@ const CancelButton = styled.button`
 `;
 
 const ConfirmButton = styled.button`
-  background-color: #0038A8;
+  background-color: #0038a8;
   color: white;
   padding: 0.5rem 1.5rem;
   border-radius: 0.5rem;

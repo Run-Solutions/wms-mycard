@@ -5,6 +5,7 @@ import {
   Text,
   StyleSheet,
   ScrollView,
+  TouchableOpacity,
 } from 'react-native';
 import Impresion from './Impresion';
 import Serigrafia from './Serigrafia';
@@ -16,11 +17,14 @@ import HotStamping from './HotStamping';
 import MillingChip from './MillingChip';
 import Personalizacion from './Personalizacion';
 import { getFormQuestionsByArea } from '../../api/configVistosBuenos';
+import { black } from 'react-native-paper/lib/typescript/styles/themes/v2/colors';
 
 export default function ConfiguracionVistosBuenosOption({
   id,
+  onClose,
 }: {
   id: number;
+  onClose: () => void;
 }) {
   const [formQuestions, setFormQuestions] = useState<any>(null);
   const [loading, setLoading] = useState(true);
@@ -76,15 +80,22 @@ export default function ConfiguracionVistosBuenosOption({
   return (
     <ScrollView contentContainerStyle={styles.container}>
       {renderComponentByArea()}
+      <View style={{ marginBottom: 30, alignItems: 'flex-end' }}>
+        <TouchableOpacity onPress={onClose} style={styles.closeButton}>
+          <Text style={styles.closeButtonText}>Cerrar</Text>
+        </TouchableOpacity>
+      </View>
     </ScrollView>
   );
 }
 
 const styles = StyleSheet.create({
   container: {
-    paddingTop: 0,
-    alignItems: 'center',
-    justifyContent: 'flex-start',
+    flexGrow: 1,
+    paddingHorizontal: 20,
+    paddingBottom: 60,
+    backgroundColor: '#fdfaf6', 
+    borderRadius: 12
   },
   centered: {
     flex: 1,
@@ -95,5 +106,15 @@ const styles = StyleSheet.create({
   loadingText: {
     marginTop: 10,
     fontSize: 16,
+  },
+  closeButton: {
+    backgroundColor: '#007AFF',
+    paddingHorizontal: 20,
+    paddingVertical: 10,
+    borderRadius: 8,
+  },
+  closeButtonText: {
+    color: '#fff',
+    fontWeight: '600',
   },
 });

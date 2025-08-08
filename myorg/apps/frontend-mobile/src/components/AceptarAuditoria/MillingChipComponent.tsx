@@ -318,7 +318,7 @@ const MillingChipComponentAcceptAuditory: React.FC<{ workOrder: any }> = ({
         mode="outlined"
         activeOutlineColor="#000"
         theme={{ roundness: 30 }}
-      />{' '}
+      />
       <Text style={styles.subtitle}>Malas:</Text>
       <TouchableOpacity
         onPress={handleOpenBadQuantityModal}
@@ -331,7 +331,7 @@ const MillingChipComponentAcceptAuditory: React.FC<{ workOrder: any }> = ({
           activeOutlineColor="#000"
           keyboardType="numeric"
           placeholder={sumaBadQuantity > 0 ? sumaBadQuantity.toString() : '0'}
-          value={sumaBadQuantity}
+          value={String(sumaBadQuantity)}
           editable={false} // deshabilita edición
           pointerEvents="none" // evita que se abra el teclado
         />
@@ -395,10 +395,10 @@ const MillingChipComponentAcceptAuditory: React.FC<{ workOrder: any }> = ({
             <Text style={styles.modalTitle}>Registrar malas por área</Text>
 
             <ScrollView style={{ maxHeight: 400 }}>
-              {previousFlows.map((flow) => {
+              {previousFlows.map((flow, index) => {
                 const areaKey = flow.area.name.toLowerCase();
                 return (
-                  <View key={flow.id} style={{ marginTop: 16 }}>
+                  <View key={`${flow.id}-${index}`} style={{ marginTop: 16 }}>
                     <Text style={styles.areaLabel}>
                       {flow.area.name.toUpperCase()}
                     </Text>

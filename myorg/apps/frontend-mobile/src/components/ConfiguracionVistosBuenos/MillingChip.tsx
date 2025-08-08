@@ -1,8 +1,20 @@
 import React, { useState } from 'react';
-import { View, Text, Button, Modal, StyleSheet, Alert, ScrollView, Pressable } from 'react-native';
+import {
+  View,
+  Text,
+  Button,
+  Modal,
+  StyleSheet,
+  Alert,
+  ScrollView,
+  Pressable,
+} from 'react-native';
 import { TextInput } from 'react-native-paper';
 import QuestionTable from './QuestionTable';
-import { deleteFormQuestion, updateFormQuestion } from '../../api/configVistosBuenos';
+import {
+  deleteFormQuestion,
+  updateFormQuestion,
+} from '../../api/configVistosBuenos';
 
 interface Props {
   formQuestion: any[];
@@ -22,13 +34,13 @@ export default function MillingChipComponent({ formQuestion }: Props) {
   const [formQuestions, setFormQuestions] = useState<Question[]>(formQuestion);
 
   const handleUpdateTitle = async (id: number, updatedTitle: string) => {
-    const currentTitle = formQuestions.find(q => q.id === id)?.title;
+    const currentTitle = formQuestions.find((q) => q.id === id)?.title;
     if (currentTitle === updatedTitle) {
-      Alert.alert("Atención", "El título no ha cambiado.");
+      Alert.alert('Atención', 'El título no ha cambiado.');
       return;
     }
 
-    const updatedQuestions = formQuestions.map(q => 
+    const updatedQuestions = formQuestions.map((q) =>
       q.id === id ? { ...q, title: updatedTitle } : q
     );
     setFormQuestions(updatedQuestions);
@@ -37,7 +49,7 @@ export default function MillingChipComponent({ formQuestion }: Props) {
     try {
       await updateFormQuestion(id, updatedTitle);
     } catch (error) {
-      console.error("Error actualizando la pregunta:", error);
+      console.error('Error actualizando la pregunta:', error);
     }
   };
 
@@ -45,11 +57,11 @@ export default function MillingChipComponent({ formQuestion }: Props) {
     try {
       const res = await deleteFormQuestion(id);
       if (res) {
-      setFormQuestions(formQuestions.filter(q => q.id !== id));
-      setDeletingId(null);
+        setFormQuestions(formQuestions.filter((q) => q.id !== id));
+        setDeletingId(null);
       }
     } catch (error) {
-      console.error("Error eliminando la pregunta:", error);
+      console.error('Error eliminando la pregunta:', error);
     }
   };
 
@@ -58,39 +70,77 @@ export default function MillingChipComponent({ formQuestion }: Props) {
       <Text style={styles.title}>Área a evaluar: Milling Chip</Text>
 
       <QuestionTable
-        title='Respuestas del operador'
+        title="Respuestas del operador"
         questions={formQuestions}
         areaId={9}
         roleFilter={null}
-        onEdit={(e) => { setEditingId(e.id); setNewTitle(e.title) }}
+        onEdit={(e) => {
+          setEditingId(e.id);
+          setNewTitle(e.title);
+        }}
         onDelete={(e) => setDeletingId(e)}
       />
 
       <Text style={styles.label}>Revisar Tecnología De Chip Y Color Vs Ot</Text>
-      <TextInput style={styles.input} theme={{ roundness: 30 }} mode="outlined" activeOutlineColor="#000" editable={false} />
+      <TextInput
+        style={styles.input}
+        theme={{ roundness: 30 }}
+        mode="outlined"
+        activeOutlineColor="#000"
+        editable={false}
+      />
 
-      <Text style={styles.label}>Validar y anotar KCV, carga de app o prehabilitación</Text>
-      <TextInput style={styles.input} theme={{ roundness: 30 }} mode="outlined" activeOutlineColor="#000" editable={false} />
+      <Text style={styles.label}>
+        Validar y anotar KCV, carga de app o prehabilitación
+      </Text>
+      <TextInput
+        style={styles.input}
+        theme={{ roundness: 30 }}
+        mode="outlined"
+        activeOutlineColor="#000"
+        editable={false}
+      />
 
       <Text style={styles.label}>Muestras entregadas</Text>
-      <TextInput style={styles.input} theme={{ roundness: 30 }} mode="outlined" activeOutlineColor="#000" editable={false} />
+      <TextInput
+        style={styles.input}
+        theme={{ roundness: 30 }}
+        mode="outlined"
+        activeOutlineColor="#000"
+        editable={false}
+      />
       <QuestionTable
-        title='Mis respuestas'
+        title="Mis respuestas"
         questions={formQuestions}
         areaId={9}
         roleFilter={3}
-        onEdit={(e) => { setEditingId(e.id); setNewTitle(e.title) }}
+        onEdit={(e) => {
+          setEditingId(e.id);
+          setNewTitle(e.title);
+        }}
         onDelete={(e) => setDeletingId(e)}
       />
 
       <Text style={styles.label}>Localización de Contactos</Text>
-      <TextInput style={styles.input} theme={{ roundness: 30 }} mode="outlined" activeOutlineColor="#000" editable={false} />
+      <TextInput
+        style={styles.input}
+        theme={{ roundness: 30 }}
+        mode="outlined"
+        activeOutlineColor="#000"
+        editable={false}
+      />
 
       <Text style={styles.label}>Altura Chip Centro</Text>
-      <TextInput style={styles.input} theme={{ roundness: 30 }} mode="outlined" activeOutlineColor="#000" editable={false} />
+      <TextInput
+        style={styles.input}
+        theme={{ roundness: 30 }}
+        mode="outlined"
+        activeOutlineColor="#000"
+        editable={false}
+      />
 
-{/* Edit Modal */}
-<Modal visible={editingId !== null} transparent animationType="fade">
+      {/* Edit Modal */}
+      <Modal visible={editingId !== null} transparent animationType="fade">
         <View style={styles.modalOverlay}>
           <View style={styles.modalBox}>
             <Text style={styles.modalTitle}>Editar Pregunta</Text>
@@ -101,8 +151,18 @@ export default function MillingChipComponent({ formQuestion }: Props) {
               placeholder="Nuevo título"
             />
             <View style={styles.modalButtons}>
-              <Pressable onPress={() => setEditingId(null)} style={styles.cancelButton}><Text>Cancelar</Text></Pressable>
-              <Pressable onPress={() => handleUpdateTitle(editingId!, newTitle)} style={styles.saveButton}><Text>Guardar</Text></Pressable>
+              <Pressable
+                onPress={() => setEditingId(null)}
+                style={styles.cancelButton}
+              >
+                <Text>Cancelar</Text>
+              </Pressable>
+              <Pressable
+                onPress={() => handleUpdateTitle(editingId!, newTitle)}
+                style={styles.saveButton}
+              >
+                <Text>Guardar</Text>
+              </Pressable>
             </View>
           </View>
         </View>
@@ -115,8 +175,18 @@ export default function MillingChipComponent({ formQuestion }: Props) {
             <Text style={styles.modalTitle}>¿Eliminar esta pregunta?</Text>
             <Text>Esta acción no se puede deshacer.</Text>
             <View style={styles.modalButtons}>
-              <Pressable onPress={() => setDeletingId(null)} style={styles.cancelButton}><Text>Cancelar</Text></Pressable>
-              <Pressable onPress={() => handleDeleteQuestion(deletingId!)} style={styles.deleteButton}><Text>Eliminar</Text></Pressable>
+              <Pressable
+                onPress={() => setDeletingId(null)}
+                style={styles.cancelButton}
+              >
+                <Text>Cancelar</Text>
+              </Pressable>
+              <Pressable
+                onPress={() => handleDeleteQuestion(deletingId!)}
+                style={styles.deleteButton}
+              >
+                <Text>Eliminar</Text>
+              </Pressable>
             </View>
           </View>
         </View>
@@ -127,7 +197,8 @@ export default function MillingChipComponent({ formQuestion }: Props) {
 
 const styles = StyleSheet.create({
   container: {
-    padding: 20,
+    backgroundColor: '#fdfaf6',
+    marginTop: 10,
   },
   title: {
     fontSize: 22,

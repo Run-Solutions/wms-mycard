@@ -1,5 +1,5 @@
+// myorg/apps/frontend-web/src/components/LiberarProducto/ColorEdgeComponent.tsx
 'use client';
-
 import { useRouter } from 'next/navigation';
 import { useState, useMemo } from 'react';
 import styled from 'styled-components';
@@ -10,6 +10,8 @@ import {
 import { updateWorkOrderAreas } from '@/api/seguimientoDeOts';
 import { useAuthContext } from '@/context/AuthContext';
 import { calcularCantidadPorLiberar } from './util/calcularCantidadPorLiberar';
+import BadQuantityModal from './util/BadQuantityModal';
+import { AreaData } from './PersonalizacionComponent';
 
 interface Props {
   workOrder: any;
@@ -271,7 +273,7 @@ export default function ColorEdgeComponent({ workOrder }: Props) {
   console.log('Cantidad final por liberar:', cantidadporliberar);
 
   const previousFlows = flowList
-    .slice(0, currentIndex + 1 )
+    .slice(0, currentIndex + 1)
     .filter((flow) => flow.area_id !== 1);
 
   console.log('Áreas anteriores sin Preprensa:', previousFlows);
@@ -289,6 +291,8 @@ export default function ColorEdgeComponent({ workOrder }: Props) {
         badQuantity = flow.areaResponse.impression.bad_quantity;
       } else if (flow.areaResponse?.serigrafia) {
         badQuantity = flow.areaResponse.serigrafia.bad_quantity;
+      } else if (flow.areaResponse?.empalme) {
+        badQuantity = flow.areaResponse.empalme.bad_quantity;
       } else if (flow.areaResponse?.laminacion) {
         badQuantity = flow.areaResponse.laminacion.bad_quantity;
       } else if (flow.areaResponse?.corte) {
@@ -332,12 +336,30 @@ export default function ColorEdgeComponent({ workOrder }: Props) {
     setShowBadQuantity(true);
     console.log('Valores iniciales para malas por área:', initialValues);
   };
+  const normalizedAreas: AreaData[] = previousFlows.map((item) => ({
+    id: item.area?.id ?? item.id,
+    name: item.area?.name ?? item.name ?? '',
+    malas: item.malas ?? 0,
+    defectuoso: item.defectuoso ?? 0,
 
-  const handleSaveChanges = async () => {
+    // Valores ficticios para completar el tipo requerido
+    status: item.status ?? '',
+    response: item.areaResponse ?? {},
+    answers: item.answers ?? [],
+    usuario: item.user?.username ?? '',
+    auditor: '',
+    buenas: 0,
+    cqm: 0,
+    excedente: 0,
+    muestras: 0,
+  }));
+
+  const handleSaveChanges = async (updatedAreas: AreaData[]) => {
+    const effectiveAreas = updatedAreas ?? previousFlows;
     const payload = {
       areas: previousFlows.flatMap((flow) => {
         const areaName = flow.area.name;
-      
+
         const blockMap: Record<string, string> = {
           impresion: 'impression',
           serigrafia: 'serigrafia',
@@ -345,43 +367,38 @@ export default function ColorEdgeComponent({ workOrder }: Props) {
           laminacion: 'laminacion',
           corte: 'corte',
         };
-      
+
         const block = blockMap[areaName] || 'otros';
-      
-        // ⚠️ Si no es un área válida, lo descartamos
-        if (block === 'otros') return [];
-      
-        const blockData = flow.areaResponse?.[block];
-        if (
-          !blockData?.id ||
-          !blockData?.form_auditory_id ||
-          !blockData?.form_answer_id
-        ) {
-          console.warn(`Área inválida o incompleta: ${areaName}`);
-          return []; // ❌ si falta algo, no lo agregamos
+        if (block === 'otros') {
+          return []; // Descarta si no es bloque conocido
         }
-      
+
+        const blockData = flow.areaResponse?.[block];
+        const blockId = blockData?.id || null;
+        const formId = blockData?.form_auditory_id || null;
+        const cqmId = blockData?.form_answer_id || null;
+
         const badKey = `${areaName}_bad`;
         const materialKey = `${areaName}_material`;
-      
+
         const bad_quantity = Number(areaBadQuantities[badKey] || 0);
         const material_quantity =
-          flow.area.id > 6 ? Number(areaBadQuantities[materialKey] || 0) : undefined;
-      
-        return [
-          {
-            areaId: flow.area_id,
-            block,
-            blockId: blockData.id,
-            formId: blockData.form_auditory_id,
-            cqmId: blockData.form_answer_id,
-            data: {
-              bad_quantity,
-              ...(material_quantity !== undefined && { material_quantity }),
-            },
+          flow.area.id > 6
+            ? Number(areaBadQuantities[materialKey] || 0)
+            : undefined;
+
+        return {
+          areaId: flow.area_id,
+          block,
+          blockId,
+          formId,
+          cqmId,
+          data: {
+            bad_quantity,
+            ...(material_quantity !== undefined && { material_quantity }),
           },
-        ];
-      })
+        };
+      }),
     };
 
     console.log('Payload a enviar:', payload);
@@ -587,111 +604,29 @@ export default function ColorEdgeComponent({ workOrder }: Props) {
 
       {/* Modal para marcar malas por areas previas al liberar */}
       {showBadQuantity && (
-        <ModalOverlay>
-          <ModalBox>
-            <h4>Registrar malas por área</h4>
-            {previousFlows.map((flow) => {
-              const areaKey = flow.area.name.toLowerCase(); // para coincidir con las claves
-              return (
-                <div
-                  key={flow.id}
-                  style={{
-                    display: 'flex',
-                    flexDirection: 'column',
-                    alignItems: 'flex-start',
-                    gap: '0.5rem',
-                    marginTop: '1rem',
-                  }}
-                >
-                  <Label style={{ fontWeight: 'bold' }}>
-                    {flow.area.name.toUpperCase()}
-                  </Label>
+        <BadQuantityModal
+          areas={normalizedAreas}
+          areaBadQuantities={areaBadQuantities}
+          setAreaBadQuantities={setAreaBadQuantities}
+          onConfirm={({
+            updatedAreas,
+            totalBad,
+            totalMaterial,
+            lastAreaBad,
+            lastAreaMaterial,
+          }) => {
+            setShowBadQuantity(false);
 
-                  <div style={{ display: 'flex', gap: '1rem' }}>
-                    <div>
-                      <Label>Malas</Label>
-                      <InputBad
-                        type="number"
-                        min="0"
-                        value={areaBadQuantities[`${areaKey}_bad`] || '0'}
-                        onChange={(e) =>
-                          setAreaBadQuantities({
-                            ...areaBadQuantities,
-                            [`${areaKey}_bad`]: e.target.value,
-                          })
-                        }
-                      />
-                    </div>
-                    {flow.area_id >= 6 && (
-                      <div>
-                        <Label>Malo de fábrica</Label>
-                        <InputBad
-                          type="number"
-                          min="0"
-                          value={
-                            areaBadQuantities[`${areaKey}_material`] || '0'
-                          }
-                          onChange={(e) =>
-                            setAreaBadQuantities({
-                              ...areaBadQuantities,
-                              [`${areaKey}_material`]: e.target.value,
-                            })
-                          }
-                        />
-                      </div>
-                    )}
-                  </div>
-                </div>
-              );
-            })}
-            <div
-              style={{
-                display: 'flex',
-                justifyContent: 'flex-end',
-                gap: '1rem',
-                marginTop: '1rem',
-              }}
-            >
-              <CancelButton onClick={() => setShowBadQuantity(false)}>
-                Cancelar
-              </CancelButton>
-              <ConfirmButton
-                disabled={shouldDisableLiberar()}
-                onClick={async () => {
-                  await handleSaveChanges();
-                  const lastFlow = previousFlows[previousFlows.length - 1];
-                  const areaKey = lastFlow.area.name.toLowerCase();
-                  const lastAreaBad =
-                    areaBadQuantities[`${areaKey}_bad`] || '0';
-                  const lastAreaMaterial =
-                    areaBadQuantities[`${areaKey}_material`] || '0';
-                  // Además, suma el total al input principal de malas
+            // Guarda lo necesario
+            handleSaveChanges(updatedAreas);
 
-                  const totalBad = Object.keys(areaBadQuantities)
-                    .filter((key) => key.endsWith('_bad'))
-                    .reduce(
-                      (sum, key) => sum + Number(areaBadQuantities[key] || 0),
-                      0
-                    );
-
-                  const totalMaterial = Object.keys(areaBadQuantities)
-                    .filter((key) => key.endsWith('_material'))
-                    .reduce(
-                      (sum, key) => sum + Number(areaBadQuantities[key] || 0),
-                      0
-                    );
-
-                  setLastBadQuantity(lastAreaBad);
-                  setMaterialBadQuantity(lastAreaMaterial);
-                  setBadQuantity(String(totalBad));
-                  setShowBadQuantity(false);
-                }}
-              >
-                Confirmar
-              </ConfirmButton>
-            </div>
-          </ModalBox>
-        </ModalOverlay>
+            // Actualiza variables como antes
+            setBadQuantity(String(totalBad));
+            setMaterialBadQuantity(String(totalMaterial));
+            setLastBadQuantity(String(lastAreaBad));
+          }}
+          onClose={() => setShowBadQuantity(false)}
+        />
       )}
 
       {/* Modal para enviar a liberacion */}

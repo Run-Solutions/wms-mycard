@@ -189,13 +189,12 @@ const styles = StyleSheet.create({
   input: {
     padding: 10,
     marginBottom: 12,
-    backgroundColor: '#fff',
     height: 30,
     fontSize: 16,
   },
   textarea: {
-    backgroundColor: '#fff',
     padding: 10,
+    marginBottom: 12,
     minHeight: 100,
     fontSize: 16,
     textAlignVertical: 'top',

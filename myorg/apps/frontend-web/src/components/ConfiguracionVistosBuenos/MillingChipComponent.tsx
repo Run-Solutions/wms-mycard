@@ -5,6 +5,7 @@ import { FaEdit, FaTrash } from 'react-icons/fa';
 import { useState } from "react";
 import styled from "styled-components";
 import { deleteFormQuestion, updateFormQuestion } from "@/api/configVistosBuenos";
+import { FormQuestionTable } from "./FormQuestionTable";
 
 interface Props {
   formQuestion: any;
@@ -71,36 +72,17 @@ export default function MillingChipComponent({ formQuestion }: Props) {
       <NewData>
         <SectionTitle>Respuestas del operador</SectionTitle>
         <NewDataWrapper>
-        <Table>
-          <thead>
-            <tr>
-              <th>Pregunta</th>
-              <th>Respuesta</th>
-              <th>Acciones</th>
-            </tr>
-          </thead>
-          <tbody>
-            {formQuestions.filter((question: any) => question.role_id === null && question.areas.some((area: any) => area.id === 9))
-              .map((question: any) => {
-                // Como no mostraste la estructura de las respuestas aquí, lo dejo vacío
-                const frontAnswer = null; 
-                const vueltaAnswer = null;
-                return (
-                  <tr key={question.id}>
-                    <td>{question.title}</td>
-                    <td><input type="checkbox" checked={false} disabled/></td>
-                    <td>
-                      <button style={{ marginRight: '8px' }} onClick={() => {
-                        setEditingId(question.id);
-                        setNewTitle(question.title);
-                        }}><FaEdit /></button>
-                      <button onClick={() => setDeletingId(question.id)}><FaTrash /></button>
-                    </td>
-                  </tr>
-                );
-              })}
-          </tbody>
-        </Table>
+          <FormQuestionTable
+            formQuestions={formQuestions}
+            areaId={9}
+            roleId={null}
+            columns={['Respuesta']}
+            onEdit={(id, title) => {
+              setEditingId(id);
+              setNewTitle(title);
+            }}
+            onDelete={(id) => setDeletingId(id)}
+          />
         <InputGroup style={{ width: '50%', marginTop: '-20px'}}>
               <Label>Revisar Tecnología De Chip Y Color Vs Ot::</Label>
               <Input type="number" readOnly />
@@ -117,36 +99,17 @@ export default function MillingChipComponent({ formQuestion }: Props) {
 
         <InputGroup>
           <SectionTitle>Mis respuestas</SectionTitle>
-          <Table>
-            <thead>
-              <tr>
-                <th>Pregunta</th>
-                <th>Respuesta</th>
-                <th>Acciones</th>
-              </tr>
-            </thead>
-            <tbody>
-            {formQuestions.filter((question: any) => question.role_id === 3 && question.areas.some((area: any) => area.id === 9))
-              .map((question: any) => {
-                // Como no mostraste la estructura de las respuestas aquí, lo dejo vacío
-                const frontAnswer = null; 
-                const vueltaAnswer = null;
-                return (
-                  <tr key={question.id}>
-                    <td>{question.title}</td>
-                    <td><input type="checkbox" checked={false} disabled/></td>
-                    <td>
-                      <button style={{ marginRight: '8px' }} onClick={() => {
-                        setEditingId(question.id);
-                        setNewTitle(question.title);
-                        }}><FaEdit /></button>
-                      <button onClick={() => setDeletingId(question.id)}><FaTrash /></button>
-                    </td>
-                  </tr>
-                );
-              })}
-          </tbody>
-          </Table>
+          <FormQuestionTable
+            formQuestions={formQuestions}
+            areaId={9}
+            roleId={3}
+            columns={['Respuesta']}
+            onEdit={(id, title) => {
+              setEditingId(id);
+              setNewTitle(title);
+            }}
+            onDelete={(id) => setDeletingId(id)}
+          />
           <InputGroup style={{ width: '50%', marginTop: '10px'}}>
               <Label>Localización de Contactos:</Label>
               <Input type="number" readOnly />

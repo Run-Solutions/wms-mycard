@@ -302,11 +302,11 @@ export default function ColorEdgeComponent({ workOrder, currentFlow }: Props) {
         <ModalOverlay>
           <ModalBox>
             <h4>Registrar malas por área</h4>
-            {previousFlows.map((flow) => {
+            {previousFlows.map((flow, index) => {
               const areaKey = flow.area.name.toLowerCase(); // para coincidir con las claves
               return (
                 <div
-                  key={flow.id}
+                  key={`${flow.id}-${index}`}
                   style={{
                     display: 'flex',
                     flexDirection: 'column',

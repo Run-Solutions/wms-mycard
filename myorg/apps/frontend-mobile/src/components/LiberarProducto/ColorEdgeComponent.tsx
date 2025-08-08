@@ -20,6 +20,8 @@ import {
 import { updateWorkOrderAreas } from '../../api/seguimientoDeOts';
 import { useAuth } from '../../contexts/AuthContext';
 import { calcularCantidadPorLiberar } from './util/calcularCantidadPorLiberar';
+import BadQuantityModal from './util/BadQuantityModal';
+import { AreaData } from './PersonalizacionComponent';
 
 interface PartialRelease {
   validated: boolean;
@@ -287,11 +289,29 @@ const ColorEdgeComponent = ({ workOrder }: { workOrder: any }) => {
     setShowBadQuantity(true);
     console.log('Valores iniciales para malas por área:', initialValues);
   };
+  const normalizedAreas: AreaData[] = previousFlows.map((item) => ({
+    id: item.area?.id ?? item.id,
+    name: item.area?.name ?? item.name ?? '',
+    malas: item.malas ?? 0,
+    defectuoso: item.defectuoso ?? 0,
 
-  const handleSaveChanges = async () => {
+    // Valores ficticios para completar el tipo requerido
+    status: item.status ?? '',
+    response: item.areaResponse ?? {},
+    answers: item.answers ?? [],
+    usuario: item.user?.username ?? '',
+    auditor: '',
+    buenas: 0,
+    cqm: 0,
+    excedente: 0,
+    muestras: 0,
+  }));
+
+  const handleSaveChanges = async (updatedAreas: AreaData[]) => {
+    const effectiveAreas = updatedAreas ?? previousFlows;
     const payload = {
       areas: previousFlows.flatMap((flow) => {
-        const areaName = flow.area.name.toLowerCase();
+        const areaKey = flow.area.name.toLowerCase().replace(/\s/g, '');
 
         const blockMap: Record<string, string> = {
           impresion: 'impression',
@@ -301,7 +321,7 @@ const ColorEdgeComponent = ({ workOrder }: { workOrder: any }) => {
           corte: 'corte',
         };
 
-        const block = blockMap[areaName] || 'otros';
+        const block = blockMap[flow.area.name.toLowerCase()] || 'otros';
         if (block === 'otros') {
           return []; // Descarta si no es bloque conocido
         }
@@ -311,9 +331,8 @@ const ColorEdgeComponent = ({ workOrder }: { workOrder: any }) => {
         const formId = blockData?.form_auditory_id || null;
         const cqmId = blockData?.form_answer_id || null;
 
-        const badKey = `${areaName}_bad`;
-        const materialKey = `${areaName}_material`;
-
+        const badKey = `${areaKey}_bad`;
+        const materialKey = `${areaKey}_material`;
         const bad_quantity = Number(areaBadQuantities[badKey] || 0);
         const material_quantity =
           flow.area.id > 6
@@ -536,9 +555,7 @@ const ColorEdgeComponent = ({ workOrder }: { workOrder: any }) => {
           mode="outlined"
           activeOutlineColor="#000"
           keyboardType="numeric"
-          placeholder={
-            sumaBadQuantity > 0 ? sumaBadQuantity.toString() : '0'
-          }
+          placeholder={sumaBadQuantity > 0 ? sumaBadQuantity.toString() : '0'}
           value={sumaBadQuantity}
           editable={false} // deshabilita edición
           pointerEvents="none" // evita que se abra el teclado
@@ -594,115 +611,30 @@ const ColorEdgeComponent = ({ workOrder }: { workOrder: any }) => {
       <View style={{ marginBottom: 60 }}></View>
 
       {/* Modal para marcar malas por areas previas al liberar */}
-      <Modal visible={showBadQuantity} transparent animationType="fade">
-        <View style={styles.modalOverlay}>
-          <View style={styles.modalBoxScrollable}>
-            <Text style={styles.modalTitle}>Registrar malas por área</Text>
+      <BadQuantityModal
+        visible={showBadQuantity}
+        areas={normalizedAreas}
+        areaBadQuantities={areaBadQuantities}
+        setAreaBadQuantities={setAreaBadQuantities}
+        onConfirm={({
+          updatedAreas,
+          totalBad,
+          totalMaterial,
+          lastAreaBad,
+          lastAreaMaterial,
+        }) => {
+          setShowBadQuantity(false);
 
-            <ScrollView style={{ maxHeight: 400 }}>
-              {previousFlows.map((flow) => {
-                const areaKey = flow.area.name.toLowerCase();
-                return (
-                  <View key={flow.id} style={{ marginTop: 16 }}>
-                    <Text style={styles.areaLabel}>
-                      {flow.area.name.toUpperCase()}
-                    </Text>
+          // Guarda lo necesario
+          handleSaveChanges(updatedAreas);
 
-                    <View style={styles.areaInputsContainer}>
-                      <View style={[styles.inputGroup, { maxWidth: '40%' }]}>
-                        <Text style={styles.inputLabel}>Malas</Text>
-                        <TextInput
-                          style={styles.input}
-                          theme={{ roundness: 30 }}
-                          mode="outlined"
-                          activeOutlineColor="#000"
-                          keyboardType="numeric"
-                          value={areaBadQuantities[`${areaKey}_bad`] || '0'}
-                          onChangeText={(text) =>
-                            setAreaBadQuantities((prev) => ({
-                              ...prev,
-                              [`${areaKey}_bad`]: text,
-                            }))
-                          }
-                        />
-                      </View>
-
-                      {flow.area_id >= 6 && (
-                        <View style={[styles.inputGroup, { maxWidth: '40%' }]}>
-                          <Text style={styles.inputLabel}>Malo de fábrica</Text>
-                          <TextInput
-                            style={styles.input}
-                            theme={{ roundness: 30 }}
-                            mode="outlined"
-                            activeOutlineColor="#000"
-                            keyboardType="numeric"
-                            value={
-                              areaBadQuantities[`${areaKey}_material`] || '0'
-                            }
-                            onChangeText={(text) =>
-                              setAreaBadQuantities((prev) => ({
-                                ...prev,
-                                [`${areaKey}_material`]: text,
-                              }))
-                            }
-                          />
-                        </View>
-                      )}
-                    </View>
-                  </View>
-                );
-              })}
-            </ScrollView>
-
-            <View style={styles.modalActions}>
-              <TouchableOpacity
-                style={styles.cancelButton}
-                onPress={() => setShowBadQuantity(false)}
-              >
-                <Text style={styles.modalButtonText}>Cancelar</Text>
-              </TouchableOpacity>
-              <TouchableOpacity
-                style={[
-                  styles.confirmButton,
-                  shouldDisableLiberar() && { opacity: 0.5 },
-                ]}
-                disabled={shouldDisableLiberar()}
-                onPress={async () => {
-                  await handleSaveChanges();
-
-                  const lastFlow = previousFlows[previousFlows.length - 1];
-                  const areaKey = lastFlow.area.name.toLowerCase();
-                  const lastAreaBad =
-                    areaBadQuantities[`${areaKey}_bad`] || '0';
-                  const lastAreaMaterial =
-                    areaBadQuantities[`${areaKey}_material`] || '0';
-
-                  const totalBad = Object.keys(areaBadQuantities)
-                    .filter((key) => key.endsWith('_bad'))
-                    .reduce(
-                      (sum, key) => sum + Number(areaBadQuantities[key] || 0),
-                      0
-                    );
-
-                  const totalMaterial = Object.keys(areaBadQuantities)
-                    .filter((key) => key.endsWith('_material'))
-                    .reduce(
-                      (sum, key) => sum + Number(areaBadQuantities[key] || 0),
-                      0
-                    );
-
-                  setLastBadQuantity(lastAreaBad);
-                  setMaterialBadQuantity(lastAreaMaterial);
-                  setBadQuantity(String(totalBad));
-                  setShowBadQuantity(false);
-                }}
-              >
-                <Text style={styles.modalButtonText}>Confirmar</Text>
-              </TouchableOpacity>
-            </View>
-          </View>
-        </View>
-      </Modal>
+          // Actualiza variables como antes
+          setBadQuantity(String(totalBad));
+          setMaterialBadQuantity(String(totalMaterial));
+          setLastBadQuantity(String(lastAreaBad));
+        }}
+        onClose={() => setShowBadQuantity(false)}
+      />
 
       {/* Modal CQM */}
       <Modal visible={showCqmModal} animationType="slide">

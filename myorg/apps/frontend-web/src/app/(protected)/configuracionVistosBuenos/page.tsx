@@ -3,64 +3,71 @@
 
 import React, { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import styled, { useTheme } from 'styled-components';
+import styled from 'styled-components';
 import { getConfigVistosBuenos } from '@/api/configVistosBuenos';
 
-// Se define el tipo de datos
+// Tipos
+interface Area {
+  id: number;
+  name: string;
+}
+
 interface FormQuestion {
   id: number;
   title: string;
   key: string;
   role_id: number | null;
-  areas: {
-    id: number;
-    name: string;
-  }[];
+  areas: Area[];
   created_at: string;
   updated_at: string;
 }
 
 const ConfigVistosBuenosPage: React.FC = () => {
-  const [FormQuestions, setFormQuestions] = useState<FormQuestion[]>([]);
+  const [formQuestions, setFormQuestions] = useState<FormQuestion[]>([]);
+  const [loading, setLoading] = useState(true);
   const router = useRouter();
 
   useEffect(() => {
-    async function fetchFormQuestions() {
+    async function fetchData() {
       try {
         const data = await getConfigVistosBuenos();
-        console.log('Datos obtenidos: ', data);
         setFormQuestions(data);
       } catch (err) {
-        console.error(err);
-        console.error('Error en fetchWorkOrders:', err);
+        console.error('Error al obtener preguntas:', err);
+      } finally {
+        setLoading(false);
       }
     }
-    fetchFormQuestions();
+    fetchData();
   }, []);
 
-  const uniqueAreas = Array.from(
-    new Map(
-      FormQuestions.flatMap((fq) => fq.areas).map((area) => [area.id, area])
-    ).values()
-  );
-
-  const handleClick = (areaId: any) => {
+  const getUniqueAreas = (): Area[] => {
+    return Array.from(
+      new Map(
+        formQuestions.flatMap((fq) => fq.areas).map((a) => [a.id, a])
+      ).values()
+    );
+  };
+  const handleClick = (areaId: number) => {
     router.push(`/configuracionVistosBuenos/${areaId}`);
   };
+  const uniqueAreas = getUniqueAreas();
+
 
   return (
     <PageContainer>
-      <TitleWrapper>
-        <Title>Configuracion de Vistos Buenos</Title>
-        <div style={{marginTop: '50px'}}className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+      <Title>Configuración de Vistos Buenos</Title>
+      {loading ? (
+        <p className="text-center text-gray-500 mt-10">Cargando áreas...</p>
+      ) : (
+        <CardGrid>
           {uniqueAreas.map((area) => (
             <AreaCard key={area.id} onClick={() => handleClick(area.id)}>
               <h2>{area.name}</h2>
             </AreaCard>
           ))}
-        </div>
-      </TitleWrapper>
-      
+        </CardGrid>
+      )}
     </PageContainer>
   );
 };
@@ -74,16 +81,26 @@ const PageContainer = styled.div`
   margin-top: -70px;
 `;
 
-const TitleWrapper = styled.div`
+const Title = styled.h1`
+  font-size: 2rem;
+  font-weight: 600;
+  color: ${({ theme }) => theme.palette.text.primary};
   text-align: center;
-  margin-bottom: 2rem;
-  filter: drop-shadow(4px 4px 5px rgba(0, 0, 0, 0.4));
+  margin-bottom: 5rem;
+  margin-top: 0.5rem;
+  filter: drop-shadow(3px 3px 5px rgba(0, 0, 0, 0.25));
 `;
 
-const Title = styled.h1<{ theme: any }>`
-  font-size: 2rem;
-  font-weight: 500;
-  color: ${({ theme }) => theme.palette.text.primary}
+const CardGrid = styled.div`
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  max-width: 1100px;
+  margin: 0 auto;
+  gap: 1.5rem;
+
+  @media (min-width: 1200px) {
+    grid-template-columns: repeat(4, 1fr);
+  }
 `;
 
 const AreaCard = styled.div`
@@ -92,14 +109,14 @@ const AreaCard = styled.div`
   padding: 1.5rem;
   border-radius: 1rem;
   cursor: pointer;
-  box-shadow: 0 2px 10px rgba(0,0,0,0.1);
-  transition: all 0.3s ease;
   text-align: center;
   font-weight: 500;
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+  transition: all 0.3s ease;
 
   &:hover {
     transform: translateY(-5px);
-    box-shadow: 0 4px 20px rgba(0,0,0,0.2);
+    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.15);
     background-color: ${({ theme }) => theme.palette.primary.main};
     color: #fff;
   }

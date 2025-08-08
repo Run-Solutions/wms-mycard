@@ -4,15 +4,16 @@
 import { use, useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import styled from 'styled-components';
+import { Card, CardContent } from '@/components/ui/card';
+import ProgressBarAreas from '@/components/SeguimientoDeOts/ProgressBarAreas';
+import InconformitiesHistory from '@/components/SeguimientoDeOts/InconformitiesHistory';
+import BadQuantityModal from '@/components/SeguimientoDeOts/BadQuantityModal';
 import {
   fetchWorkOrderById,
   closeWorkOrder,
   updateWorkOrderAreas,
 } from '@/api/seguimientoDeOts';
 
-interface Props {
-  params: Promise<{ id: string }>;
-}
 
 export type AreaData = {
   id: number;
@@ -40,8 +41,21 @@ export type AreaData = {
   malas: number;
   cqm: number;
   excedente: number;
+  defectuoso: number;
   muestras: number;
 };
+
+export type InconformityData = {
+  id: number;
+  comments: string;
+  createdAt: string;
+  createdBy: string;
+  area: string;
+};
+
+interface Props {
+  params: Promise<{ id: string }>;
+}
 
 export default function SeguimientoDeOtsAuxPage({ params }: Props) {
   const { id } = use(params);
@@ -49,29 +63,112 @@ export default function SeguimientoDeOtsAuxPage({ params }: Props) {
   const [workOrder, setWorkOrder] = useState<any>(null);
   const [showConfirm, setShowConfirm] = useState(false);
   const [areas, setAreas] = useState<AreaData[]>([]);
-
+  const [showBadQuantity, setShowBadQuantity] = useState(false);
+  const [areaBadQuantities, setAreaBadQuantities] = useState<{
+    [key: string]: string;
+  }>({});
+  const [inconformities, setInconformities] = useState<InconformityData[]>([]);
+  const [qualitySectionOpen, setQualitySectionOpen] = useState(false);
+  const toggleQualitySection = () => {
+    setQualitySectionOpen(!qualitySectionOpen);
+  };
+  const [progressWidth, setProgressWidth] = useState(0);
+  const [loading, setLoading] = useState(true);
   useEffect(() => {
+    const alreadyReloaded = sessionStorage.getItem('alreadyReloaded');
+    if (!alreadyReloaded) {
+      sessionStorage.setItem('alreadyReloaded', 'true');
+      window.location.reload();
+    }
+  }, []);
+  useEffect(() => {
+    if (!id) return;
     const loadData = async () => {
-      const data = await fetchWorkOrderById(id);
-      setWorkOrder(data);
-      const areaData =
-        data?.flow?.map((item: any, index: number) => ({
-          id: item.area_id,
-          name: item.area?.name || 'Sin nombre',
-          status: item.status || 'Desconocido',
-          response: item.areaResponse || {},
-          answers: item.answers?.[0] || {},
-          ...getAreaData(
-            item.area_id,
-            item.areaResponse,
-            item.partialReleases,
-            item.user,
-            index
-          ),
-        })) || [];
-      setAreas(areaData);
+      try {
+        // Iniciamos el estado de carga
+        setLoading(true);
+  
+        // Tu llamada original a la API
+        const data = await fetchWorkOrderById(id);
+        setWorkOrder(data);
+  
+        // Procesamiento de áreas
+        const areaData =
+          data?.flow?.map((item: any, index: number) => ({
+            id: item.area_id,
+            name: item.area?.name || 'Sin nombre',
+            status: item.status || 'Desconocido',
+            response: item.areaResponse || {},
+            answers: item.answers?.[0] || {},
+            ...getAreaData(
+              item.area_id,
+              item.areaResponse,
+              item.partialReleases,
+              item.user,
+              index
+            ),
+          })) || [];
+        setAreas(areaData);
+  
+        // Procesamiento de inconformidades
+        const allInconformities =
+          data?.flow?.flatMap((flowItem: any) => {
+            const areaName = flowItem.area?.name || 'Área desconocida';
+  
+            const direct =
+              flowItem?.areaResponse?.inconformities?.map((inc: any) => ({
+                id: inc.id,
+                comments: inc.comments,
+                createdAt: inc.created_at,
+                createdBy: inc.user?.username || 'Desconocido',
+                area: areaName,
+              })) || [];
+  
+            const partials =
+              flowItem?.partialReleases?.flatMap((release: any) =>
+                release.inconformities?.map((inc: any) => ({
+                  id: inc.id,
+                  comments: inc.comments,
+                  createdAt: inc.createdAt,
+                  createdBy: inc.createdBy,
+                  area: areaName,
+                })) || []
+              ) || [];
+  
+            const audits: InconformityData[] = [];
+            if (flowItem.areaResponse) {
+              Object.values(flowItem.areaResponse).forEach((block: any) => {
+                if (block?.formAuditory?.inconformities) {
+                  block.formAuditory.inconformities.forEach((inc: any) => {
+                    audits.push({
+                      id: inc.id,
+                      comments: inc.comments,
+                      createdAt: inc.created_at,
+                      createdBy: inc.user?.username || 'Desconocido',
+                      area: areaName,
+                    });
+                  });
+                }
+              });
+            }
+  
+            return [...direct, ...partials, ...audits];
+          }) || [];
+        setInconformities(allInconformities);
+  
+        // Cálculo del progreso de áreas completadas
+        const completedCount = areaData.filter((a: any) => a.status === 'Completado').length;
+        const percentage = (completedCount / areaData.length) * 100;
+        setTimeout(() => setProgressWidth(percentage), 100);
+  
+      } finally {
+        // Terminamos el estado de carga
+        setLoading(false);
+      }
     };
+  
     loadData();
+
   }, [id]);
 
   const handleCloseOrder = async () => {
@@ -137,7 +234,7 @@ export default function SeguimientoDeOtsAuxPage({ params }: Props) {
     }
 
     // 5. Muestras solo editable de Corte en adelante (id >=6)
-    if (field === 'muestras') {
+    if (field === 'muestras' || field === 'defectuoso') {
       if (area.id >= 6) {
         return (
           <input
@@ -156,6 +253,40 @@ export default function SeguimientoDeOtsAuxPage({ params }: Props) {
         return <span>{area[field]}</span>;
       }
     }
+    if (field === 'malas') {
+      if (area.id >= 6) {
+        return (
+          <input
+            type="number"
+            value={getSumaMalasHasta(area.id)}
+            min={0}
+            onClick={handleOpenBadQuantityModal}
+            readOnly
+            style={{
+              width: '80px',
+              padding: '4px',
+              textAlign: 'center',
+              cursor: 'pointer',
+              backgroundColor: '#f9f9f9',
+            }}
+          />
+        );
+      } else {
+        return (
+          <input
+            type="number"
+            value={area[field]}
+            min={0}
+            onChange={(e) => handleValueChange(area.id, field, e.target.value)}
+            style={{
+              width: '80px',
+              padding: '4px',
+              textAlign: 'center',
+            }}
+          />
+        );
+      }
+    }
 
     // 6. El resto de campos (buenas, malas, excedente) editables si el área está en Completado
     return (
@@ -171,6 +302,29 @@ export default function SeguimientoDeOtsAuxPage({ params }: Props) {
         }}
       />
     );
+  };
+
+  const getSumaMalasHasta = (areaId: number): number => {
+    return areas
+      .filter((a) => a.id <= areaId)
+      .reduce((sum, a) => sum + (a.malas || 0), 0);
+  };
+
+  const handleOpenBadQuantityModal = () => {
+    const initialValues: { [key: string]: string } = {};
+
+    areas.forEach((area) => {
+      const areaKey = area.name.toLowerCase().replace(/\s/g, '');
+
+      initialValues[`${areaKey}_bad`] = area.malas?.toString() || '0';
+      if (area.id >= 6) {
+        initialValues[`${areaKey}_material`] =
+          area.defectuoso?.toString() || '0';
+      }
+    });
+
+    setAreaBadQuantities(initialValues);
+    setShowBadQuantity(true);
   };
 
   // Función para obtener los datos específicos de cada área
@@ -214,6 +368,7 @@ export default function SeguimientoDeOtsAuxPage({ params }: Props) {
           0,
         malas: areaResponse?.[areaKey]?.bad_quantity || 0,
         excedente: areaResponse?.[areaKey]?.excess_quantity || 0,
+        defectuoso: areaResponse?.[areaKey]?.material_quantity || 0,
         cqm: areaResponse?.[areaKey]?.form_answer?.sample_quantity ?? 0,
         muestras: areaResponse?.[areaKey]?.formAuditory?.sample_auditory ?? 0,
         usuario,
@@ -247,6 +402,7 @@ export default function SeguimientoDeOtsAuxPage({ params }: Props) {
           buenas: 0,
           malas: 0,
           excedente: 0,
+          defectuoso: 0,
           cqm: 0,
           muestras: 0,
           usuario: '',
@@ -259,6 +415,10 @@ export default function SeguimientoDeOtsAuxPage({ params }: Props) {
   const cantidadHojas = cantidadHojasRaw > 0 ? Math.ceil(cantidadHojasRaw) : 0;
   const ultimaArea = areas[areas.length - 1];
   const totalMalas = areas.reduce((acc, area) => acc + (area.malas || 0), 0);
+  const totalDefectuoso = areas.reduce(
+    (acc, area) => acc + (area.defectuoso || 0),
+    0
+  );
   const totalCqm = areas
     .filter((area) => area.id >= 6)
     .reduce((acc, area) => acc + (area.cqm || 0), 0);
@@ -273,6 +433,7 @@ export default function SeguimientoDeOtsAuxPage({ params }: Props) {
     totalUltimaBuenas +
     totalUltimaExcedente +
     totalMalas +
+    totalDefectuoso +
     totalCqm +
     totalMuestras;
 
@@ -288,12 +449,14 @@ export default function SeguimientoDeOtsAuxPage({ params }: Props) {
     );
   };
 
-  const handleSaveChanges = async () => {
+  const handleSaveChanges = async (updatedAreas: AreaData[]) => {
+    const effectiveAreas = updatedAreas ?? areas;
     const payload = {
       areas: areas
         .filter((area) => area.status === 'Completado')
         .map((area) => {
-          // Este mapa relaciona nombre del área con el nombre del bloque en el objeto
+          const updated = updatedAreas.find((a) => a.id === area.id) || area;
+
           const blockMap: Record<string, string> = {
             preprensa: 'prepress',
             impresion: 'impression',
@@ -307,29 +470,26 @@ export default function SeguimientoDeOtsAuxPage({ params }: Props) {
             personalizacion: 'personalizacion',
           };
 
-          // Normaliza nombre a minúscula sin espacios
-          const normalizedName = area.name.toLowerCase().replace(/\s/g, '');
-
+          const normalizedName = updated.name.toLowerCase().replace(/\s/g, '');
           const block = blockMap[normalizedName] || 'otros';
-          const blockId = (area.response as any)?.[block]?.id;
-          const formId = (area.response as any)?.[block]?.form_auditory_id;
-          const cqmId = (area.response as any)?.[block]?.form_answer_id;
+          const blockId = (updated.response as any)?.[block]?.id;
+          const formId = (updated.response as any)?.[block]?.form_auditory_id;
+          const cqmId = (updated.response as any)?.[block]?.form_answer_id;
 
-          // Prepara los campos que compartes para la mayoría de áreas
           let data: Record<string, number> = {
-            good_quantity: area.buenas,
-            bad_quantity: area.malas,
-            excess_quantity: area.excedente,
+            good_quantity: updated.buenas,
+            bad_quantity: updated.malas,
+            excess_quantity: updated.excedente,
+            material_quantity: updated.defectuoso,
           };
           let sample_data: Record<string, number> = {
-            sample_quantity: area.cqm,
-            sample_auditory: area.muestras,
+            sample_quantity: updated.cqm,
+            sample_auditory: updated.muestras,
           };
 
-          // Para áreas con campos específicos
           if (block === 'prepress') {
             data = {
-              plates: area.buenas,
+              plates: updated.buenas,
             };
           }
           if (
@@ -338,17 +498,17 @@ export default function SeguimientoDeOtsAuxPage({ params }: Props) {
             )
           ) {
             data = {
-              release_quantity: area.buenas,
-              bad_quantity: area.malas,
-              excess_quantity: area.excedente,
+              release_quantity: updated.buenas,
+              bad_quantity: updated.malas,
+              excess_quantity: updated.excedente,
             };
             sample_data = {
-              sample_quantity: area.cqm,
+              sample_quantity: updated.cqm,
             };
           }
 
           return {
-            areaId: area.id,
+            areaId: updated.id,
             block,
             blockId,
             formId,
@@ -361,147 +521,274 @@ export default function SeguimientoDeOtsAuxPage({ params }: Props) {
 
     console.log('Payload a enviar:', payload);
 
-    // Aquí haces el fetch
-
     try {
       await updateWorkOrderAreas(workOrder.ot_id, payload);
       alert('Cambios guardados correctamente');
+      window.location.reload();
     } catch (err) {
       console.error(err);
       alert('Error al guardar los cambios');
     }
   };
 
+  const getStatusStyle = (status: string) => {
+    switch (status) {
+      case 'Completado':
+        return 'bg-green-100 text-green-800';
+      case 'Pendiente':
+        return 'bg-yellow-100 text-yellow-800';
+      case 'En proceso':
+        return 'bg-blue-100 text-blue-800';
+      case 'Listo':
+      case 'En calidad':
+      case 'Enviado a CQM':
+        return 'bg-yellow-100 text-yellow-800';
+      case 'Enviado a Auditoria':
+        return 'bg-purple-100 text-purple-800';
+      case 'Parcial':
+        return 'bg-orange-100 text-orange-800';
+      default:
+        return 'bg-gray-100 text-gray-800';
+    }
+  };
+
+  const filteredAreas = areas.filter(
+    (area) =>
+      area.status === 'Completado' && area.name.toLowerCase() !== 'preprensa'
+  );
+
+// justo antes de tu return principal
+
+if (loading) {
+  return (
+    <Container>
+      <Title>Cargando Orden de Trabajo...</Title>
+      <div className="flex justify-center items-center h-64">
+        <div className="animate-spin rounded-full h-12 w-12 border-t-4 border-blue-500" />
+      </div>
+    </Container>
+  );
+}
+
+// sólo comprobamos workOrder, no areas
+if (!workOrder) {
+  return (
+    <Container>
+      <Title>No se encontró la orden de trabajo.</Title>
+    </Container>
+  );
+}
+
+// pasar al return normal sin más guards globales
+
   return (
     <>
       <Container>
         <Title>Información Complementaria Orden de Trabajo</Title>
 
-        <DataWrapper>
-          <InfoItem>
-            <Label>Número de Orden: </Label>
-            <Value>{workOrder?.ot_id}</Value>
-          </InfoItem>
-          <InfoItem>
-            <Label>ID del Presupuesto: </Label>
-            <Value>{workOrder?.mycard_id}</Value>
-          </InfoItem>
-          <InfoItem>
-            <Label>Cantidad (TARJETAS): </Label>
-            <Value>{workOrder?.quantity}</Value>
-          </InfoItem>
-          <InfoItem>
-            <Label>Cantidad (KITS): </Label>
-            <Value>{cantidadHojas}</Value>
-          </InfoItem>
-          <InfoItem>
-            <Label>Fecha de Creación: </Label>
-            <Value>{new Date(workOrder?.createdAt).toLocaleDateString()}</Value>
-          </InfoItem>
-        </DataWrapper>
-        <InfoItem>
-          <Label>Comentarios: </Label>
-          <Value>{workOrder?.comments}</Value>
-        </InfoItem>
+        <div className="grid grid-cols-1 md:grid-cols-5 gap-4 mb-6">
+          <Card>
+            <CardContent>
+              <p className="text-sm text-muted-foreground">Número de Orden</p>
+              <p className="text-xl font-semibold">{workOrder?.ot_id}</p>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardContent>
+              <p className="text-sm text-muted-foreground">Presupuesto</p>
+              <p className="text-xl font-semibold">{workOrder?.mycard_id}</p>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardContent>
+              <p className="text-sm text-muted-foreground">
+                Cantidad (Tarjetas)
+              </p>
+              <p className="text-xl font-semibold">{workOrder?.quantity}</p>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardContent>
+              <p className="text-sm text-muted-foreground">Cantidad (Kits)</p>
+              <p className="text-xl font-semibold">{cantidadHojas}</p>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardContent>
+              <p className="text-sm text-muted-foreground">Fecha de Creación</p>
+              <p className="text-xl font-semibold">
+                {new Date(workOrder?.createdAt).toLocaleDateString()}
+              </p>
+            </CardContent>
+          </Card>
+        </div>
+
+        <div className="grid grid-cols-1 md:grid-cols-1 gap-4 mb-6">
+          <Card>
+            <CardContent>
+              <p className="text-sm text-muted-foreground">Comentarios</p>
+              <p className="text-xl font-semibold">{workOrder?.comments}</p>
+            </CardContent>
+          </Card>
+        </div>
+        {areas.length > 0 && (
+          <ProgressBarAreas areas={areas} progressWidth={progressWidth} />
+        )}
 
         <Section>
           <SectionTitle>Datos de Producción</SectionTitle>
           <TableWrapper>
-            <Table>
-              <thead>
-                <tr>
-                  <th />
-                  {areas.map((area, index) => (
-                    <th
-                      key={`${area.id}-${index}`}
-                      title={`Estado: ${area.status}`}
+            <div className="overflow-x-auto">
+              <table className="min-w-full border-collapse bg-white rounded-xl shadow text-sm">
+                <thead className="bg-gray-100 sticky top-0 z-10 text-gray-600 text-xs uppercase tracking-wide">
+                  <tr>
+                    <th className="text-left p-3">Dato</th>
+                    {areas.map((area, index) => (
+                      <th
+                        key={`${area.id}-${index}`}
+                        className="p-3 text-center font-semibold"
+                      >
+                        {area.name}
+                        <div className="text-[0.65rem] text-gray-400 mt-1">
+                          {area.status}
+                        </div>
+                      </th>
+                    ))}
+                  </tr>
+                </thead>
+
+                <tbody className="divide-y divide-gray-200 text-gray-800">
+                  {/* Usuario */}
+                  <tr>
+                    <td className="p-3 font-semibold">Usuario</td>
+                    {areas.map((area, index) => (
+                      <td
+                        key={`${area.id}-usuario-${index}`}
+                        className="text-center"
+                      >
+                        {area.usuario}
+                      </td>
+                    ))}
+                  </tr>
+
+                  {/* Auditor */}
+                  <tr>
+                    <td className="p-3 font-semibold">Auditor</td>
+                    {areas.map((area, index) => (
+                      <td
+                        key={`${area.id}-auditor-${index}`}
+                        className="text-center"
+                      >
+                        {area.auditor}
+                      </td>
+                    ))}
+                  </tr>
+
+                  {/* Estado con Badge visual */}
+                  <tr>
+                    <td className="p-3 font-semibold">Estado</td>
+                    {areas.map((area, index) => (
+                      <td
+                        key={`${area.id}-status-${index}`}
+                        className="text-center"
+                      >
+                        <span
+                          className={`px-2 py-1 rounded-lg text-sm font-medium ${getStatusStyle(
+                            area.status
+                          )}`}
+                        >
+                          {area.status}
+                        </span>
+                      </td>
+                    ))}
+                  </tr>
+
+                  {/* Entradas */}
+                  <tr>
+                    <td
+                      colSpan={areas.length + 1}
+                      className="bg-gray-50 px-3 py-2 font-bold text-gray-500"
                     >
-                      <span>{area.name}</span>
-                    </th>
-                  ))}
-                </tr>
-              </thead>
-              <tbody>
-                <tr>
-                  <td>Usuario</td>
-                  {areas.map((area, index) => (
-                    <td key={`${area.id}-${index}`}>{area.usuario}</td>
-                  ))}
-                </tr>
-                <tr>
-                  <td>Auditor</td>
-                  {areas.map((area, index) => (
-                    <td key={`${area.id}-${index}`}>{area.auditor}</td>
-                  ))}
-                </tr>
-                <tr>
-                  <td>Estado</td>
-                  {areas.map((area, index) => (
-                    <td key={`${area.id}-${index}`}>{area.status}</td>
-                  ))}
-                </tr>
-                <tr>
-                  <td>Buenas</td>
-                  {areas.map((area, index) => (
-                    <td key={`${area.id}-${index}`}>
-                      {renderCell(area, 'buenas')}
+                      📥 Producción
                     </td>
+                  </tr>
+                  {['buenas', 'malas', 'excedente'].map((field) => (
+                    <tr key={field}>
+                      <td className="p-3 capitalize font-semibold">{field}</td>
+                      {areas.map((area, index) => (
+                        <td
+                          key={`${area.id}-${field}-${index}`}
+                          className="text-center"
+                        >
+                          {renderCell(area, field as keyof AreaData)}
+                        </td>
+                      ))}
+                    </tr>
                   ))}
-                </tr>
-                <tr>
-                  <td>Malas</td>
-                  {areas.map((area, index) => (
-                    <td key={`${area.id}-${index}`}>
-                      {renderCell(area, 'malas')}
+
+                  {/* Control de calidad */}
+                  <tr>
+                    <td
+                      colSpan={areas.length + 1}
+                      className="bg-gray-50 px-3 py-2 font-bold text-gray-500"
+                    >
+                      🔍 Calidad
                     </td>
+                  </tr>
+                  {['defectuoso', 'cqm', 'muestras'].map((field, rowIndex) => (
+                    <tr key={field}>
+                      <td className="p-3 capitalize font-semibold">
+                        {field === 'defectuoso'
+                          ? 'materia prima defectuosa'
+                          : field}
+                      </td>
+                      {areas.map((area, colIndex) => (
+                        <td
+                          key={`cell-${rowIndex}-${colIndex}-${field}-${area.name}-${area.id}`}
+                          className="text-center"
+                        >
+                          {renderCell(area, field as keyof AreaData)}
+                        </td>
+                      ))}
+                    </tr>
                   ))}
-                </tr>
-                <tr>
-                  <td>Excedente</td>
-                  {areas.map((area, index) => (
-                    <td key={`${area.id}-${index}`}>
-                      {renderCell(area, 'excedente')}
-                    </td>
-                  ))}
-                </tr>
-                <tr>
-                  <td>CQM</td>
-                  {areas.map((area, index) => (
-                    <td key={`${area.id}-${index}`}>
-                      {renderCell(area, 'cqm')}
-                    </td>
-                  ))}
-                </tr>
-                <tr>
-                  <td>Muestras</td>
-                  {areas.map((area, index) => (
-                    <td key={`${area.id}-${index}`}>
-                      {renderCell(area, 'muestras')}
-                    </td>
-                  ))}
-                </tr>
-                <tr>
-                  <td>SUMA TOTAL</td>
-                  {areas.map((area, index) => (
-                    <td key={`${area.id}-${index}`}>
-                      {area.buenas +
-                        area.malas +
-                        area.excedente +
-                        area.cqm +
-                        area.muestras}
-                    </td>
-                  ))}
-                </tr>
-                <tr style={{ backgroundColor: '#d7e6d1' }}>
-                  <td>BUENAS + EXCEDENTE</td>
-                  {areas.map((area, idx) => (
-                    <td key={`${area.id}-${idx}`}>
-                      {area.id >= 6 ? area.buenas + area.excedente : ''}
-                    </td>
-                  ))}
-                </tr>
-              </tbody>
-            </Table>
+
+                  {/* SUMA TOTAL */}
+                  <tr className="bg-slate-100 font-semibold text-sm">
+                    <td className="p-3">📊 Suma Total</td>
+                    {areas.map((area, index) => (
+                      <td
+                        key={`${area.id}-total-${index}`}
+                        className="text-center"
+                      >
+                        {area.buenas +
+                          area.malas +
+                          area.excedente +
+                          area.cqm +
+                          area.muestras}
+                      </td>
+                    ))}
+                  </tr>
+
+                  {/* Buenas + Excedente */}
+                  <tr className="bg-green-100 font-semibold">
+                    <td className="p-3">✅ Buenas + Excedente</td>
+                    {areas.map((area, index) => (
+                      <td
+                        key={`${area.id}-b+e-${index}`}
+                        className="text-center"
+                      >
+                        {area.id >= 6 ? area.buenas + area.excedente : ''}
+                      </td>
+                    ))}
+                  </tr>
+                </tbody>
+              </table>
+            </div>
           </TableWrapper>
           {workOrder?.status !== 'En proceso' && (
             <>
@@ -536,6 +823,10 @@ export default function SeguimientoDeOtsAuxPage({ params }: Props) {
                       <td>{totalMalas}</td>
                     </tr>
                     <tr>
+                      <td>Total Materia Prima Defectuosa</td>
+                      <td>{totalDefectuoso}</td>
+                    </tr>
+                    <tr>
                       <td>Total CQM</td>
                       <td>{totalCqm}</td>
                     </tr>
@@ -552,10 +843,17 @@ export default function SeguimientoDeOtsAuxPage({ params }: Props) {
               </TableWrapper>
             </>
           )}
+          <InconformitiesHistory
+            inconformities={inconformities}
+            qualitySectionOpen={qualitySectionOpen}
+            toggleQualitySection={toggleQualitySection}
+          />
 
           {workOrder?.status !== 'Cerrado' && (
             <>
-              <SaveButton onClick={handleSaveChanges}>Guardar Cambios</SaveButton>
+              <SaveButton onClick={() => handleSaveChanges(areas)}>
+                Guardar Cambios
+              </SaveButton>
               <CloseButton onClick={() => setShowConfirm(true)}>
                 Cerrar Orden de Trabajo
               </CloseButton>
@@ -563,6 +861,20 @@ export default function SeguimientoDeOtsAuxPage({ params }: Props) {
           )}
         </Section>
       </Container>
+      {showBadQuantity && (
+        <BadQuantityModal
+          areas={filteredAreas}
+          areaBadQuantities={areaBadQuantities}
+          setAreaBadQuantities={setAreaBadQuantities}
+          onConfirm={(updatedAreas) => {
+            setShowBadQuantity(false);
+            // Aquí puedes guardar cambios también
+            console.log('updatedAreas:', updatedAreas);
+            handleSaveChanges(updatedAreas);
+          }}
+          onClose={() => setShowBadQuantity(false)}
+        />
+      )}
       {showConfirm && (
         <ModalOverlay>
           <ModalBox>
@@ -601,32 +913,6 @@ const Title = styled.h2`
   color: ${({ theme }) => theme.palette.text.primary};
 `;
 
-const DataWrapper = styled.div`
-  display: flex;
-  gap: 20px;
-  margin-bottom: 20px;
-`;
-
-const InfoItem = styled.div`
-  background: white;
-  padding: 1.25rem 1.5rem;
-  border-radius: 0.75rem;
-  box-shadow: 0 3px 6px rgba(0, 0, 0, 0.08);
-  flex: 1;
-`;
-
-const Label = styled.span`
-  font-weight: 600;
-  color: black;
-  margin-bottom: 0.25rem;
-`;
-
-const Value = styled.span`
-  font-size: 1.125rem;
-  margin-top: 5px;
-  color: black;
-`;
-
 const Section = styled.div`
   margin-top: 30px;
 `;
@@ -640,33 +926,6 @@ const SectionTitle = styled.h3`
 const TableWrapper = styled.div`
   overflow-x: auto;
   margin-bottom: 2rem;
-`;
-
-const Table = styled.table`
-  width: 100%;
-  border-collapse: collapse;
-  background: white;
-  border-radius: 0.75rem;
-  overflow: hidden;
-  box-shadow: 0 4px 10px rgba(0, 0, 0, 0.05);
-
-  th,
-  td {
-    padding: 0.75rem;
-    text-align: center;
-    color: rgb(4, 4, 4);
-    border-bottom: 1px solid #e5e7eb;
-  }
-
-  th {
-    background: #f3f4f6;
-    color: #374151;
-    font-weight: 600;
-  }
-
-  tr:nth-child(even) {
-    background: #fafafa;
-  }
 `;
 
 const TableCuadres = styled.table`
@@ -697,7 +956,7 @@ const TableCuadres = styled.table`
 `;
 
 const SaveButton = styled.button`
-  background-color: #A9A9A9;
+  background-color: #a9a9a9;
   color: white;
   padding: 0.9rem 1.5rem;
   margin-right: 1rem;
@@ -741,15 +1000,19 @@ const ModalOverlay = styled.div`
   align-items: center;
   justify-content: center;
   z-index: 999;
+  overflow-y: auto;
 `;
 
 const ModalBox = styled.div`
   background: white;
   padding: 2rem;
   border-radius: 1rem;
-  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.2);
-  max-width: 400px;
+  justify-content: center;
+  max-width: 500px;
+  max-height: 80%;
+  overflow-y: auto;
   width: 90%;
+  box-shadow: 0 10px 25px rgba(0, 0, 0, 0.2);
 `;
 
 const ConfirmButton = styled.button`
@@ -787,5 +1050,21 @@ const CancelButton = styled.button`
   &:focus {
     background-color: #a0a0a0;
     outline: none;
+  }
+`;
+
+const InputBad = styled.input`
+  width: 100%;
+  color: black;
+  padding: 0.75rem 1rem;
+  border: 2px solid #d1d5db;
+  border-radius: 0.5rem;
+  margin-top: 0.25rem;
+  outline: none;
+  font-size: 1rem;
+  transition: border 0.3s;
+
+  &:focus {
+    border-color: #0038a8;
   }
 `;

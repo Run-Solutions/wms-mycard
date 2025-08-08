@@ -135,8 +135,8 @@ export default function Impresion({ formQuestion }: Props) {
 
 const styles = StyleSheet.create({
   container: {
-    padding: 16,
-    backgroundColor: '#fff',
+    backgroundColor: '#fdfaf6',
+    marginTop: 10,
   },
   title: {
     fontSize: 22,
@@ -144,9 +144,11 @@ const styles = StyleSheet.create({
     marginBottom: 16,
   },
   sectionTitle: {
-    fontSize: 18,
-    fontWeight: '600',
-    marginVertical: 12,
+    fontSize: 22,
+    fontWeight: 'bold',
+    marginBottom: 16,
+    textAlign: 'left',
+    color: '#1f2937',
   },
   label: {
     marginTop: 12,

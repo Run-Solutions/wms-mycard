@@ -161,8 +161,8 @@ export default function Serigrafia({ formQuestion }: Props) {
 
 const styles = StyleSheet.create({
   container: {
-    padding: 16,
-    backgroundColor: '#fff',
+    backgroundColor: '#fdfaf6',
+    marginTop: 10,
   },
   title: {
     fontSize: 22,
