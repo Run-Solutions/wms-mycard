@@ -130,57 +130,6 @@ export default function ImpresionComponent({ workOrder }: Props) {
     setQualitySectionOpen(!qualitySectionOpen);
   };
 
-  const handleSelectAllFrente = (isChecked: boolean) => {
-    const questionIds = workOrder.area.formQuestions
-      .filter((q: any) => q.role_id === null)
-      .map((q: any) => q.id);
-    if (isChecked) {
-      setCheckedQuestionsFrente(questionIds);
-      setResponses((prevResponses) => {
-        const updatedResponses = prevResponses.filter(
-          (response) => !questionIds.includes(response.questionId)
-        );
-        const newResponses = questionIds.map((id: number) => ({
-          questionId: id,
-          answer: true,
-        }));
-        return [...updatedResponses, ...newResponses];
-      });
-    } else {
-      setCheckedQuestionsFrente([]);
-      setResponses((prevResponses) =>
-        prevResponses.filter(
-          (response) => !questionIds.includes(response.questionId)
-        )
-      );
-    }
-  };
-  const handleSelectAllVuelta = (isChecked: boolean) => {
-    const questionIds = workOrder.area.formQuestions
-      .filter((q: any) => q.role_id === null)
-      .map((q: any) => q.id);
-    if (isChecked) {
-      setCheckedQuestionsVuelta(questionIds);
-      setResponses((prevResponses) => {
-        const updatedResponses = prevResponses.filter(
-          (response) => !questionIds.includes(response.questionId)
-        );
-        const newResponses = questionIds.map((id: number) => ({
-          questionId: id,
-          answer: true,
-        }));
-        return [...updatedResponses, ...newResponses];
-      });
-    } else {
-      setCheckedQuestionsVuelta([]);
-      setResponses((prevResponses) =>
-        prevResponses.filter(
-          (response) => !questionIds.includes(response.questionId)
-        )
-      );
-    }
-  };
-
   console.log('El mismo workOrder (workOrder)', workOrder);
   const flowList = [...workOrder.workOrder.flow];
 
@@ -502,35 +451,11 @@ export default function ImpresionComponent({ workOrder }: Props) {
                   <th>
                     <div style={{ display: 'flex', alignItems: 'center' }}>
                       Hoja Frente
-                      <input
-                        type="checkbox"
-                        checked={workOrder.area.formQuestions
-                          .filter((q: any) => q.role_id === null)
-                          .every((q: any) =>
-                            checkedQuestionsFrente.includes(q.id)
-                          )}
-                        onChange={(e) =>
-                          handleSelectAllFrente(e.target.checked)
-                        }
-                        style={{ marginLeft: '8px' }}
-                      />
                     </div>
                   </th>
                   <th>
                     <div style={{ display: 'flex', alignItems: 'center' }}>
                       Hoja Vuelta
-                      <input
-                        type="checkbox"
-                        checked={workOrder.area.formQuestions
-                          .filter((q: any) => q.role_id === null)
-                          .every((q: any) =>
-                            checkedQuestionsVuelta.includes(q.id)
-                          )}
-                        onChange={(e) =>
-                          handleSelectAllVuelta(e.target.checked)
-                        }
-                        style={{ marginLeft: '8px' }}
-                      />
                     </div>
                   </th>
                 </tr>

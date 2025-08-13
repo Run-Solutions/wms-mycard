@@ -176,36 +176,6 @@ export default function PersonalizacionComponent({ workOrder }: Props) {
     setQualitySectionOpen(!qualitySectionOpen);
   };
 
-  const handleSelectAll = (isChecked: boolean, init: number, end: number) => {
-    const questionIds = workOrder.area.formQuestions
-      .slice(init, end)
-      .map((q: { id: number }) => q.id);
-    if (isChecked) {
-      // Marcar todas las preguntas
-      setCheckedQuestions(questionIds);
-      setResponses((prevResponses) => {
-        // Filtrar respuestas viejas de esas preguntas
-        const updatedResponses = prevResponses.filter(
-          (response) => !questionIds.includes(response.questionId)
-        );
-        // Agregar todas como true
-        const newResponses = questionIds.map((id: number) => ({
-          questionId: id,
-          answer: true,
-        }));
-        return [...updatedResponses, ...newResponses];
-      });
-    } else {
-      // Desmarcar todas
-      setCheckedQuestions([]);
-      setResponses((prevResponses) =>
-        prevResponses.filter(
-          (response) => !questionIds.includes(response.questionId)
-        )
-      );
-    }
-  };
-
   console.log('El mismo workOrder (workOrder)', workOrder);
   const flowList = [...workOrder.workOrder.flow];
 

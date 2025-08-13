@@ -76,36 +76,6 @@ export default function PersonalizacionComponent({ workOrder }: Props) {
       isChecked ? [...prev, questionId] : prev.filter((id) => id !== questionId)
     );
   };
-  const handleSelectAllPersos = (isChecked: boolean) => {
-    const questionIds = workOrder.area.formQuestions
-      .slice(13, 15)
-      .map((q: { id: number }) => q.id);
-    if (isChecked) {
-      // Marcar todas las preguntas
-      setCheckedQuestions(questionIds);
-      setResponses((prevResponses) => {
-        // Filtrar respuestas viejas de esas preguntas
-        const updatedResponses = prevResponses.filter(
-          (response) => !questionIds.includes(response.questionId)
-        );
-        // Agregar todas como true
-        const newResponses = questionIds.map((id: number) => ({
-          questionId: id,
-          answer: true,
-        }));
-        return [...updatedResponses, ...newResponses];
-      });
-    } else {
-      // Desmarcar todas
-      setCheckedQuestions([]);
-      setResponses((prevResponses) =>
-        prevResponses.filter(
-          (response) => !questionIds.includes(response.questionId)
-        )
-      );
-    }
-  };
-
   const handleSubmit = async () => {
     const formAnswerId = workOrder.answers[index]?.id; // id de FormAnswer
     if (!formAnswerId) {
