@@ -63,41 +63,6 @@ export default function SerigrafiaComponent({ workOrder }: Props) {
       isChecked ? [...prev, questionId] : prev.filter((id) => id !== questionId)
     );
   };
-  const handleSelectAll = (isChecked: boolean) => {
-    const questionIds = workOrder.area.formQuestions
-      .filter((question: { role_id: number | null }) => question.role_id === 3)
-      .map((q: { id: number }) => q.id);
-
-    if (isChecked) {
-      // Marcar todas las preguntas
-      setCheckedQuestions(questionIds);
-
-      setResponses((prevResponses) => {
-        // Filtrar respuestas viejas de esas preguntas
-        const updatedResponses = prevResponses.filter(
-          (response) => !questionIds.includes(response.questionId)
-        );
-
-        // Agregar todas como true
-        const newResponses = questionIds.map((id: number) => ({
-          questionId: id,
-          answer: true,
-        }));
-
-        return [...updatedResponses, ...newResponses];
-      });
-    } else {
-      // Desmarcar todas
-      setCheckedQuestions([]);
-
-      setResponses((prevResponses) =>
-        prevResponses.filter(
-          (response) => !questionIds.includes(response.questionId)
-        )
-      );
-    }
-  };
-
   const handleSubmit = async () => {
     const formAnswerId = workOrder.answers[index]?.id; // id de FormAnswer
     if (!formAnswerId) {
@@ -243,21 +208,7 @@ export default function SerigrafiaComponent({ workOrder }: Props) {
             <thead>
               <tr>
                 <th>Pregunta</th>
-                <th>
-                  Respuesta
-                  <input
-                    type="checkbox"
-                    checked={workOrder.area.formQuestions
-                      .filter(
-                        (q: { role_id: number | null }) => q.role_id === 3
-                      )
-                      .every((q: { id: number }) =>
-                        checkedQuestions.includes(q.id)
-                      )}
-                    onChange={(e) => handleSelectAll(e.target.checked)}
-                    style={{ marginLeft: '8px' }}
-                  />
-                </th>
+                <th>Respuesta</th>
               </tr>
             </thead>
             <tbody>

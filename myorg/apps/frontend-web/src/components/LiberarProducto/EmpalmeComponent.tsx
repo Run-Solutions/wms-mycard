@@ -107,38 +107,6 @@ export default function EmpalmeComponent({ workOrder }: Props) {
     setQualitySectionOpen(!qualitySectionOpen);
   };
 
-  const handleSelectAll = (isChecked: boolean) => {
-    const questionIds = workOrder.area.formQuestions
-      .filter(
-        (question: { role_id: number | null }) => question.role_id === null
-      )
-      .map((q: { id: number }) => q.id);
-    if (isChecked) {
-      // Marcar todas las preguntas
-      setCheckedQuestions(questionIds);
-      setResponses((prevResponses) => {
-        // Filtrar respuestas viejas de esas preguntas
-        const updatedResponses = prevResponses.filter(
-          (response) => !questionIds.includes(response.questionId)
-        );
-        // Agregar todas como true
-        const newResponses = questionIds.map((id: number) => ({
-          questionId: id,
-          answer: true,
-        }));
-        return [...updatedResponses, ...newResponses];
-      });
-    } else {
-      // Desmarcar todas
-      setCheckedQuestions([]);
-      setResponses((prevResponses) =>
-        prevResponses.filter(
-          (response) => !questionIds.includes(response.questionId)
-        )
-      );
-    }
-  };
-
   console.log('El mismo workOrder (workOrder)', workOrder);
   const flowList = [...workOrder.workOrder.flow];
 
@@ -446,21 +414,7 @@ export default function EmpalmeComponent({ workOrder }: Props) {
               <thead>
                 <tr>
                   <th>Pregunta</th>
-                  <th style={{ display: 'flex' }}>
-                    Respuesta
-                    <input
-                      type="checkbox"
-                      checked={workOrder.area.formQuestions
-                        .filter(
-                          (q: { role_id: number | null }) => q.role_id === null
-                        )
-                        .every((q: { id: number }) =>
-                          checkedQuestions.includes(q.id)
-                        )}
-                      onChange={(e) => handleSelectAll(e.target.checked)}
-                      style={{ marginLeft: '8px' }}
-                    />
-                  </th>
+                  <th style={{ display: 'flex' }}>Respuesta</th>
                 </tr>
               </thead>
               <tbody>
