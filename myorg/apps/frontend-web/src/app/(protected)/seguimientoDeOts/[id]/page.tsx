@@ -13,7 +13,7 @@ import {
   closeWorkOrder,
   updateWorkOrderAreas,
 } from '@/api/seguimientoDeOts';
-
+import { VistosBuenosHistory } from '@/components/SeguimientoDeOts/VistosBuenosHistory';
 
 export type AreaData = {
   id: number;
@@ -69,11 +69,17 @@ export default function SeguimientoDeOtsAuxPage({ params }: Props) {
   }>({});
   const [inconformities, setInconformities] = useState<InconformityData[]>([]);
   const [qualitySectionOpen, setQualitySectionOpen] = useState(false);
+  const [inconformitySectionOpen, setInconformitySectionOpen] = useState(false);
   const toggleQualitySection = () => {
     setQualitySectionOpen(!qualitySectionOpen);
   };
+  const toggleInconformitySection = () => {
+    setInconformitySectionOpen(!inconformitySectionOpen);
+  };
   const [progressWidth, setProgressWidth] = useState(0);
   const [loading, setLoading] = useState(true);
+  const [vistosBuenosHistory, setVistosBuenosHistory] = useState([]);
+
   useEffect(() => {
     const alreadyReloaded = sessionStorage.getItem('alreadyReloaded');
     if (!alreadyReloaded) {
@@ -81,17 +87,69 @@ export default function SeguimientoDeOtsAuxPage({ params }: Props) {
       window.location.reload();
     }
   }, []);
+  console.log(vistosBuenosHistory);
   useEffect(() => {
     if (!id) return;
     const loadData = async () => {
       try {
         // Iniciamos el estado de carga
         setLoading(true);
-  
+
         // Tu llamada original a la API
         const data = await fetchWorkOrderById(id);
         setWorkOrder(data);
-  
+        const historyData = data.flow
+          .filter((item: any) => item.answers?.length > 0)
+          .map((item: any) => {
+            const areaName = item.area?.name?.toLowerCase() || '';
+            const mode = ['impresion'].includes(
+              areaName
+            )
+              ? 'doble'
+              : 'simple';
+
+            return {
+              areaName: item.area?.name || 'Sin nombre',
+              username: item.user?.username || '',
+              questions: item.area?.formQuestions || [],
+              formAnswers: item.answers.map((a: any) => ({
+                accepted: a.accepted,
+                altura_chip: a.altura_chip,
+                apariencia_quemado: a.apariencia_quemado,
+                carga_aplicacion: a.carga_aplicacion,
+                codigo_barras: a.codigo_barras,
+                color: a.color,
+                color_edge: a.color_edge,
+                color_foil: a.color_foil,
+                color_personalizacion: a.color_personalizacion,
+                finish_validation: a.finish_validation,
+                holographic_type: a.holographic_type,
+                imagen_holograma: a.imagen_holograma,
+                localizacion_contactos: a.localizacion_contactos,
+                magnetic_band: a.magnetic_band,
+                revisar_posicion: a.revisar_posicion,
+                revisar_tecnologia: a.revisar_tecnologia,
+                sample_quantity: a.sample_quantity,
+                testtype_cqm: a.testtype_cqm,
+                tipo_personalizacion: a.tipo_personalizacion,
+                track_type: a.track_type,
+                validar_inlays: a.validar_inlays,
+                validar_kvc: a.validar_kvc,
+                validar_kvc_perso: a.validar_kvc_perso,
+                valor_anclaje: a.valor_anclaje,
+                verificar_etiqueta: a.verificar_etiqueta,
+                verificar_script: a.verificar_script,
+                created_at: a.created_at,
+                
+                reviewer: a.reviewer || [],
+                FormAnswerResponse: a.FormAnswerResponse || [],
+              })),
+              mode,
+            };
+          });
+
+        setVistosBuenosHistory(historyData);
+
         // Procesamiento de áreas
         const areaData =
           data?.flow?.map((item: any, index: number) => ({
@@ -109,12 +167,12 @@ export default function SeguimientoDeOtsAuxPage({ params }: Props) {
             ),
           })) || [];
         setAreas(areaData);
-  
+
         // Procesamiento de inconformidades
         const allInconformities =
           data?.flow?.flatMap((flowItem: any) => {
             const areaName = flowItem.area?.name || 'Área desconocida';
-  
+
             const direct =
               flowItem?.areaResponse?.inconformities?.map((inc: any) => ({
                 id: inc.id,
@@ -123,18 +181,19 @@ export default function SeguimientoDeOtsAuxPage({ params }: Props) {
                 createdBy: inc.user?.username || 'Desconocido',
                 area: areaName,
               })) || [];
-  
+
             const partials =
-              flowItem?.partialReleases?.flatMap((release: any) =>
-                release.inconformities?.map((inc: any) => ({
-                  id: inc.id,
-                  comments: inc.comments,
-                  createdAt: inc.createdAt,
-                  createdBy: inc.createdBy,
-                  area: areaName,
-                })) || []
+              flowItem?.partialReleases?.flatMap(
+                (release: any) =>
+                  release.inconformities?.map((inc: any) => ({
+                    id: inc.id,
+                    comments: inc.comments,
+                    createdAt: inc.createdAt,
+                    createdBy: inc.createdBy,
+                    area: areaName,
+                  })) || []
               ) || [];
-  
+
             const audits: InconformityData[] = [];
             if (flowItem.areaResponse) {
               Object.values(flowItem.areaResponse).forEach((block: any) => {
@@ -151,24 +210,24 @@ export default function SeguimientoDeOtsAuxPage({ params }: Props) {
                 }
               });
             }
-  
+
             return [...direct, ...partials, ...audits];
           }) || [];
         setInconformities(allInconformities);
-  
+
         // Cálculo del progreso de áreas completadas
-        const completedCount = areaData.filter((a: any) => a.status === 'Completado').length;
+        const completedCount = areaData.filter(
+          (a: any) => a.status === 'Completado'
+        ).length;
         const percentage = (completedCount / areaData.length) * 100;
         setTimeout(() => setProgressWidth(percentage), 100);
-  
       } finally {
         // Terminamos el estado de carga
         setLoading(false);
       }
     };
-  
-    loadData();
 
+    loadData();
   }, [id]);
 
   const handleCloseOrder = async () => {
@@ -557,29 +616,29 @@ export default function SeguimientoDeOtsAuxPage({ params }: Props) {
       area.status === 'Completado' && area.name.toLowerCase() !== 'preprensa'
   );
 
-// justo antes de tu return principal
+  // justo antes de tu return principal
 
-if (loading) {
-  return (
-    <Container>
-      <Title>Cargando Orden de Trabajo...</Title>
-      <div className="flex justify-center items-center h-64">
-        <div className="animate-spin rounded-full h-12 w-12 border-t-4 border-blue-500" />
-      </div>
-    </Container>
-  );
-}
+  if (loading) {
+    return (
+      <Container>
+        <Title>Cargando Orden de Trabajo...</Title>
+        <div className="flex justify-center items-center h-64">
+          <div className="animate-spin rounded-full h-12 w-12 border-t-4 border-blue-500" />
+        </div>
+      </Container>
+    );
+  }
 
-// sólo comprobamos workOrder, no areas
-if (!workOrder) {
-  return (
-    <Container>
-      <Title>No se encontró la orden de trabajo.</Title>
-    </Container>
-  );
-}
+  // sólo comprobamos workOrder, no areas
+  if (!workOrder) {
+    return (
+      <Container>
+        <Title>No se encontró la orden de trabajo.</Title>
+      </Container>
+    );
+  }
 
-// pasar al return normal sin más guards globales
+  // pasar al return normal sin más guards globales
 
   return (
     <>
@@ -589,38 +648,38 @@ if (!workOrder) {
         <div className="grid grid-cols-1 md:grid-cols-5 gap-4 mb-6">
           <Card>
             <CardContent>
-              <p className="text-sm text-muted-foreground">Número de Orden</p>
-              <p className="text-xl font-semibold">{workOrder?.ot_id}</p>
+              <p className="text-sm text-muted-foreground text-black">Número de Orden</p>
+              <p className="text-xl font-semibold text-black">{workOrder?.ot_id}</p>
             </CardContent>
           </Card>
 
           <Card>
             <CardContent>
-              <p className="text-sm text-muted-foreground">Presupuesto</p>
-              <p className="text-xl font-semibold">{workOrder?.mycard_id}</p>
+              <p className="text-sm text-muted-foreground text-black">Presupuesto</p>
+              <p className="text-xl font-semibold text-black">{workOrder?.mycard_id}</p>
             </CardContent>
           </Card>
 
           <Card>
             <CardContent>
-              <p className="text-sm text-muted-foreground">
+              <p className="text-sm text-muted-foreground text-black">
                 Cantidad (Tarjetas)
               </p>
-              <p className="text-xl font-semibold">{workOrder?.quantity}</p>
+              <p className="text-xl font-semibold text-black">{workOrder?.quantity}</p>
             </CardContent>
           </Card>
 
           <Card>
             <CardContent>
-              <p className="text-sm text-muted-foreground">Cantidad (Kits)</p>
-              <p className="text-xl font-semibold">{cantidadHojas}</p>
+              <p className="text-sm text-muted-foreground text-black">Cantidad (Hojas Frente / Hojas Vuelta)</p>
+              <p className="text-xl font-semibold text-black">{cantidadHojas}</p>
             </CardContent>
           </Card>
 
           <Card>
             <CardContent>
-              <p className="text-sm text-muted-foreground">Fecha de Creación</p>
-              <p className="text-xl font-semibold">
+              <p className="text-sm text-muted-foreground text-black">Fecha de Creación</p>
+              <p className="text-xl font-semibold text-black">
                 {new Date(workOrder?.createdAt).toLocaleDateString()}
               </p>
             </CardContent>
@@ -630,8 +689,8 @@ if (!workOrder) {
         <div className="grid grid-cols-1 md:grid-cols-1 gap-4 mb-6">
           <Card>
             <CardContent>
-              <p className="text-sm text-muted-foreground">Comentarios</p>
-              <p className="text-xl font-semibold">{workOrder?.comments}</p>
+              <p className="text-sm text-muted-foreground text-black">Comentarios</p>
+              <p className="text-xl font-semibold text-black">{workOrder?.comments}</p>
             </CardContent>
           </Card>
         </div>
@@ -843,10 +902,15 @@ if (!workOrder) {
               </TableWrapper>
             </>
           )}
-          <InconformitiesHistory
-            inconformities={inconformities}
+          <VistosBuenosHistory
+            history={vistosBuenosHistory}
             qualitySectionOpen={qualitySectionOpen}
             toggleQualitySection={toggleQualitySection}
+          />
+          <InconformitiesHistory
+            inconformities={inconformities}
+            qualitySectionOpen={inconformitySectionOpen}
+            toggleQualitySection={toggleInconformitySection}
           />
 
           {workOrder?.status !== 'Cerrado' && (
@@ -926,6 +990,7 @@ const SectionTitle = styled.h3`
 const TableWrapper = styled.div`
   overflow-x: auto;
   margin-bottom: 2rem;
+  border-radius: 15px;
 `;
 
 const TableCuadres = styled.table`

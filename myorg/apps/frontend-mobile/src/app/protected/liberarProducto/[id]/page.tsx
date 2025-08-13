@@ -105,7 +105,7 @@ const LiberarProductoAuxScreen: React.FC = () => {
               <Text style={styles.value}>{workOrder.workOrder.quantity}</Text>
             </Text>
             <Text style={styles.label}>
-              Cantidad (KITS): <Text style={styles.value}>{cantidadHojas}</Text>
+              Cantidad (Hojas Frente / Hojas Vuelta): <Text style={styles.value}>{cantidadHojas}</Text>
             </Text>
             <Text style={styles.label}>
               Comentarios:{' '}

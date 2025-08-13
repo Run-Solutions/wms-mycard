@@ -155,7 +155,7 @@ export default function ImpresionComponentAccept({ workOrder }: Props) {
           <Value>{workOrder.workOrder.quantity || 'No definida'}</Value>
         </InfoItem>
         <InfoItem style={{ backgroundColor: '#eaeaf5', borderRadius: '8px' }}>
-          <Label>Cantidad (KITS):</Label>
+          <Label>Cantidad (Hojas Frente / Hojas Vuelta):</Label>
           <Value>{cantidadHojas}</Value>
         </InfoItem>
       </DataWrapper>
@@ -180,7 +180,7 @@ export default function ImpresionComponentAccept({ workOrder }: Props) {
         <SectionTitle>Datos de Producción</SectionTitle>
         <NewDataWrapper>
           <InputGroup>
-            <Label>Cantidad entregada (KITS):</Label>
+            <Label>Cantidad entregada (Hojas Frente / Hojas Vuelta):</Label>
             <Input
               type="number"
               name="release_quantity"

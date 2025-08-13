@@ -131,6 +131,7 @@ export default function CloseWorkOrderAuxPage({ params }: Props) {
         };
     }
   };
+  console.log('Work Order Data id:', workOrder);
 
   const areas: AreaData[] =
     workOrder?.workOrder.flow
@@ -188,7 +189,7 @@ export default function CloseWorkOrderAuxPage({ params }: Props) {
             <Value>{workOrder?.workOrder.quantity}</Value>
           </InfoItem>
           <InfoItem>
-            <Label>Cantidad (KITS): </Label>
+            <Label>Cantidad (Hojas Frente / Hojas Vuelta): </Label>
             <Value>{cantidadHojas}</Value>
           </InfoItem>
         </DataWrapper>

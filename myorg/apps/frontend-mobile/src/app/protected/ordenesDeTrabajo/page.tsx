@@ -58,6 +58,159 @@ const OrdenesDeTrabajoScreen: React.FC = () => {
     setFiles((prev) => ({ ...prev, [type]: undefined }));
   };
 
+  const handleAreaChange = (callback: any, index: number) => {
+    const value = typeof callback === 'function' ? callback(null) : callback;
+
+    // Validación para el primer área (debe ser 1 - Preprensa)
+    if (index === 0 && value !== '1') {
+      Alert.alert(
+        '⚠️ Área inicial incorrecta',
+        'La primera área debe ser la de Preprensa (ID: 1).',
+        [
+          {
+            text: 'Limpiar áreas',
+            onPress: () => {
+              setFormData((prev) => ({
+                ...prev,
+                areasOperatorIds: [],
+              }));
+              setDropdowns(1);
+            },
+            style: 'destructive',
+          },
+          {
+            text: 'Cancelar',
+            style: 'cancel',
+          },
+        ]
+      );
+      return;
+    }
+
+    // Validación para el segundo área (debe ser 2 o 3)
+    if (index === 1 && value !== '2' && value !== '3' && value !== '') {
+      Alert.alert(
+        '⚠️ Área no permitida',
+        'La siguiente área solo puede ser Impresión o Serigrafia'
+      );
+      return;
+    }
+
+    if (
+      index === 2 &&
+      value !== '2' &&
+      value !== '3' &&
+      value !== '4' &&
+      value !== ''
+    ) {
+      Alert.alert(
+        '⚠️ Área no permitida',
+        'La siguiente área solo puede ser Serigrafia, Empalme o Impresion'
+      );
+      return;
+    }
+
+    if (
+      index === 3 &&
+      value !== '2' &&
+      value !== '4' &&
+      value !== '6' &&
+      value !== ''
+    ) {
+      Alert.alert(
+        '⚠️ Área no permitida',
+        'La siguiente área solo puede ser Impresión, Empalme o Corte'
+      );
+      return;
+    }
+
+    if (index === 4 && value !== '5' && value !== '') {
+      Alert.alert(
+        '⚠️ Área no permitida',
+        'La siguiente área solo puede ser Laminación'
+      );
+      return;
+    }
+
+    if (index === 5 && value !== '3' && value !== '6' && value !== '') {
+      Alert.alert(
+        '⚠️ Área no permitida',
+        'La siguiente área solo puede ser Corte o Serigrafia'
+      );
+      return;
+    }
+
+    if (
+      index === 6 &&
+      value !== '8' &&
+      value !== '9' &&
+      value !== '10' &&
+      value !== '7' &&
+      value !== ''
+    ) {
+      Alert.alert(
+        '⚠️ Área no permitida',
+        'La siguiente área solo puede ser Hot Stamping, Milling Chip, Personalización o Color Edge'
+      );
+      return;
+    }
+
+    if (
+      index === 7 &&
+      value !== '8' &&
+      value !== '9' &&
+      value !== '10' &&
+      value !== ''
+    ) {
+      Alert.alert(
+        '⚠️ Área no permitida',
+        'La siguiente área solo puede ser Hot Stamping, Milling Chip o Personalización'
+      );
+      return;
+    }
+
+    if (
+      index === 8 &&
+      value !== '9' &&
+      value !== '10' &&
+      value !== '7' &&
+      value !== ''
+    ) {
+      Alert.alert(
+        '⚠️ Área no permitida',
+        'La siguiente área solo puede ser Milling Chip, Personalización o Color Edge'
+      );
+      return;
+    }
+
+    if (
+      index === 9 &&
+      value !== '7' &&
+      value !== '9' &&
+      value !== '10' &&
+      value !== ''
+    ) {
+      Alert.alert(
+        '⚠️ Área no permitida',
+        'La siguiente área solo puede ser Color Edge, Hot Stamping o Personalización'
+      );
+      return;
+    }
+
+    if (index === 10 && value !== '7' && value !== '10' && value !== '') {
+      Alert.alert(
+        '⚠️ Área no permitida',
+        'La siguiente área solo puede ser Color Edge o Personalización'
+      );
+      return;
+    }
+
+    // Actualizar el estado si pasa todas las validaciones
+    const updated = [...formData.areasOperatorIds];
+    updated[index] = value;
+    setFormData({ ...formData, areasOperatorIds: updated });
+  };
+
   const handleSubmit = async () => {
     const { ot_id, mycard_id, quantity, comments, areasOperatorIds } = formData;
 
@@ -166,7 +319,7 @@ const OrdenesDeTrabajoScreen: React.FC = () => {
           onChangeText={(text) => setFormData({ ...formData, quantity: text })}
         />
         <TextInput
-          placeholder="Cantidad (KITS)"
+          placeholder="Cantidad (Hojas Frente / Hojas Vuelta)"
           style={[
             styles.input,
             focusedInput === 'quantity' && styles.inputFocused,
@@ -222,13 +375,7 @@ const OrdenesDeTrabajoScreen: React.FC = () => {
               });
             }}
             value={formData.areasOperatorIds[i] || null}
-            setValue={(callback: any) => {
-              const value =
-                typeof callback === 'function' ? callback(null) : callback;
-              const updated = [...formData.areasOperatorIds];
-              updated[i] = value;
-              setFormData({ ...formData, areasOperatorIds: updated });
-            }}
+            setValue={(callback) => handleAreaChange(callback, i)}
             placeholder="Selecciona un área"
             containerStyle={{ marginBottom: 10 }}
             zIndex={1000 - i}
@@ -240,7 +387,7 @@ const OrdenesDeTrabajoScreen: React.FC = () => {
             title="➕ Área"
             onPress={() => {
               setDropdowns((d) => {
-                setOpenStates((prev) => ({ ...prev, [d]: false })); // 👈 aquí estaba mal
+                setOpenStates((prev) => ({ ...prev, [d]: false }));
                 return d + 1;
               });
             }}

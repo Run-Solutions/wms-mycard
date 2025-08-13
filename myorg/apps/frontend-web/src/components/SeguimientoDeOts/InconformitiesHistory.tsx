@@ -22,7 +22,7 @@ const InconformitiesHistory: React.FC<Props> = ({
   return (
     <div className="mt-10">
       <div className="flex items-center justify-between mb-3">
-        <h3 className="text-lg font-semibold text-gray-800">
+      <h3 className="text-lg font-semibold text-[color:var(--text-primary)]">
           Historial de Inconformidades
         </h3>
         <button

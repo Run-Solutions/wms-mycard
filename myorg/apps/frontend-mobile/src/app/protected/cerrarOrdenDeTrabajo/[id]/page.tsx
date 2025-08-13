@@ -204,7 +204,7 @@ const CerrarOrdenDeTrabajoAuxScreen: React.FC = () => {
         <Text style={styles.label}>Cantidad (TARJETAS): </Text>
         <Text style={styles.value}>{workOrder?.quantity}</Text>
 
-        <Text style={styles.label}>Cantidad (KITS): </Text>
+        <Text style={styles.label}>Cantidad (Hojas Frente / Hojas Vuelta): </Text>
         <Text style={styles.value}>{cantidadHojas}</Text>
 
         <Text style={styles.label}>Comentarios:</Text>

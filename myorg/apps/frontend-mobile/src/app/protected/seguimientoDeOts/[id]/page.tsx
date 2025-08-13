@@ -23,6 +23,7 @@ import InconformitiesHistory from '../../../../components/SeguimientoDeOts/Incon
 import { InconformityData } from '../../../../components/SeguimientoDeOts/InconformitiesHistory';
 import ProgressBarAreas from '../../../../components/SeguimientoDeOts/ProgressBarAreas';
 import BadQuantityModal from '../../../../components/SeguimientoDeOts/BadQuantityModal';
+import { VistosBuenosHistory } from '../../../../components/SeguimientoDeOts/VistosBuenosHistory';
 
 type WorkOrderDetailRouteProp = RouteProp<
   InternalStackParamList,
@@ -79,15 +80,69 @@ const WorkOrderDetailScreen: React.FC = () => {
   const toggleQualitySection = () => {
     setQualitySectionOpen(!qualitySectionOpen);
   };
+  const toggleInconformitySection = () => {
+    setInconformitySectionOpen(!inconformitySectionOpen);
+  };
   const [qualitySectionOpen, setQualitySectionOpen] = useState(false);
+  const [inconformitySectionOpen, setInconformitySectionOpen] = useState(false);
   const [showBadQuantity, setShowBadQuantity] = useState(false);
   const [areaBadQuantities, setAreaBadQuantities] = useState<{
     [key: string]: string;
   }>({});
+  const [vistosBuenosHistory, setVistosBuenosHistory] = useState([]);
 
   const loadData = async () => {
     const data = await fetchWorkOrderById(id);
     setWorkOrder(data);
+    const historyData = data.flow
+      .filter((item: any) => item.answers?.length > 0)
+      .map((item: any) => {
+        const areaName = item.area?.name?.toLowerCase() || '';
+        const mode = ['impresion'].includes(areaName) ? 'doble' : 'simple';
+
+        return {
+          areaName: item.area?.name || 'Sin nombre',
+          username: item.user?.username || '',
+          questions: item.area?.formQuestions || [],
+          formAnswers: item.answers.map((a: any) => ({
+            accepted: a.accepted,
+            altura_chip: a.altura_chip,
+            apariencia_quemado: a.apariencia_quemado,
+            carga_aplicacion: a.carga_aplicacion,
+            codigo_barras: a.codigo_barras,
+            color: a.color,
+            color_edge: a.color_edge,
+            color_foil: a.color_foil,
+            color_personalizacion: a.color_personalizacion,
+            finish_validation: a.finish_validation,
+            holographic_type: a.holographic_type,
+            imagen_holograma: a.imagen_holograma,
+            localizacion_contactos: a.localizacion_contactos,
+            magnetic_band: a.magnetic_band,
+            revisar_posicion: a.revisar_posicion,
+            revisar_tecnologia: a.revisar_tecnologia,
+            sample_quantity: a.sample_quantity,
+            testtype_cqm: a.testtype_cqm,
+            tipo_personalizacion: a.tipo_personalizacion,
+            track_type: a.track_type,
+            validar_inlays: a.validar_inlays,
+            validar_kvc: a.validar_kvc,
+            validar_kvc_perso: a.validar_kvc_perso,
+            valor_anclaje: a.valor_anclaje,
+            verificar_etiqueta: a.verificar_etiqueta,
+            verificar_script: a.verificar_script,
+            created_at: a.created_at,
+
+            reviewer: a.reviewer || [],
+            FormAnswerResponse: a.FormAnswerResponse || [],
+          })),
+          mode,
+        };
+      });
+
+    setVistosBuenosHistory(historyData);
+
+    // Procesamiento de áreas
     const areaData =
       data?.flow?.map((item: any, index: number) => ({
         id: item.area_id,
@@ -104,11 +159,12 @@ const WorkOrderDetailScreen: React.FC = () => {
         ),
       })) || [];
     setAreas(areaData);
+
+     // Procesamiento de inconformidades
     const allInconformities =
       data?.flow?.flatMap((flowItem: any) => {
         const areaName = flowItem.area?.name || 'Area desconocida';
 
-        // Filtra las inconformidades del AreaResponse
         const direct =
           flowItem?.areaResponse?.inconformities?.map((inc: any) => ({
             id: inc.id,
@@ -118,7 +174,6 @@ const WorkOrderDetailScreen: React.FC = () => {
             area: flowItem.area?.name || 'Área desconocida',
           })) || [];
 
-        // Filtra las inconformidades de los partialReleases
         const partials =
           flowItem?.partialReleases?.flatMap(
             (release: any) =>
@@ -130,8 +185,8 @@ const WorkOrderDetailScreen: React.FC = () => {
                 area: areaName,
               })) || []
           ) || [];
-        // Filtra las inconformidades de auditorias
-        const audits: InconformityData[] = [];
+
+          const audits: InconformityData[] = [];
 
         if (flowItem.areaResponse) {
           Object.values(flowItem.areaResponse).forEach((block: any) => {
@@ -153,6 +208,7 @@ const WorkOrderDetailScreen: React.FC = () => {
       }) || [];
 
     setInconformities(allInconformities);
+
     // Cálculo del progreso de áreas completadas
     const completedCount = areaData.filter(
       (a: any) => a.status === 'Completado'
@@ -557,7 +613,10 @@ const WorkOrderDetailScreen: React.FC = () => {
           label="Cantidad (TARJETAS)"
           value={String(workOrder?.quantity)}
         />
-        <InfoCard label="Cantidad (KITS)" value={String(cantidadHojas)} />
+        <InfoCard
+          label="Cantidad (Hojas Frente / Hojas Vuelta)"
+          value={String(cantidadHojas)}
+        />
         <InfoCard
           label="Fecha de Creación"
           value={new Date(workOrder?.createdAt).toLocaleDateString()}
@@ -757,7 +816,9 @@ const WorkOrderDetailScreen: React.FC = () => {
               <Text style={styles.cellValue}>{totalMalas}</Text>
             </View>
             <View style={styles.row}>
-              <Text style={styles.cellLabel}>Total Materia Prima Defectuosa</Text>
+              <Text style={styles.cellLabel}>
+                Total Materia Prima Defectuosa
+              </Text>
               <Text style={styles.cellValue}>{totalDefectuoso}</Text>
             </View>
             <View style={styles.row}>
@@ -775,10 +836,15 @@ const WorkOrderDetailScreen: React.FC = () => {
           </View>
         </>
       )}
+      <VistosBuenosHistory
+            history={vistosBuenosHistory}
+            qualitySectionOpen={qualitySectionOpen}
+            toggleQualitySection={toggleQualitySection}
+      />
       <InconformitiesHistory
-        inconformities={inconformities}
-        qualitySectionOpen={qualitySectionOpen}
-        toggleQualitySection={toggleQualitySection}
+            inconformities={inconformities}
+            qualitySectionOpen={inconformitySectionOpen}
+            toggleQualitySection={toggleInconformitySection}
       />
 
       {workOrder?.status !== 'Cerrado' && (
@@ -911,7 +977,7 @@ const styles = StyleSheet.create({
     borderTopStartRadius: 6,
     fontSize: 17,
     height: 40,
-    alignContent: 'center'
+    alignContent: 'center',
   },
   row: {
     flexDirection: 'row',

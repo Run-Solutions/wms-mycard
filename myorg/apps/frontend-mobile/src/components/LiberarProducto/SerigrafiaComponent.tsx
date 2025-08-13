@@ -162,12 +162,12 @@ const SerigrafiaComponent = ({ workOrder }: { workOrder: any }) => {
     : 'Cantidad faltante por liberar (TARJETAS):';
 
   const cantidadEntregadaLabelKits = lastCompletedOrPartial.areaResponse
-    ? 'Cantidad entregada (KITS):'
+    ? 'Cantidad entregada (Hojas Frente / Hojas Vuelta):'
     : lastCompletedOrPartial.partialReleases?.some(
         (r: PartialRelease) => r.validated
       )
-    ? 'Cantidad entregada validada (KITS):'
-    : 'Cantidad faltante por liberar (KITS):';
+    ? 'Cantidad entregada validada (Hojas Frente / Hojas Vuelta):'
+    : 'Cantidad faltante por liberar (Hojas Frente / Hojas Vuelta):';
 
   const cantidadEntregadaValue = lastCompletedOrPartial.areaResponse
     ? // Mostrar cantidad según sub-área disponible
@@ -261,7 +261,7 @@ const SerigrafiaComponent = ({ workOrder }: { workOrder: any }) => {
 
       <View style={styles.cardDetail}>
         <Text style={styles.labelDetail}>
-          Cantidad (KITS):
+          Cantidad (Hojas Frente / Hojas Vuelta):
           <Text style={styles.valueDetail}> {cantidadHojas}</Text>
         </Text>
         <Text style={styles.labelDetail}>
@@ -296,7 +296,7 @@ const SerigrafiaComponent = ({ workOrder }: { workOrder: any }) => {
               <Text style={styles.valueDetail}> {cantidadporliberar}</Text>
             </Text>
             <Text style={styles.labelDetail}>
-              Cantidad por Liberar (KITS):
+              Cantidad por Liberar (Hojas Frente / Hojas Vuelta):
               <Text style={styles.valueDetail}>
                 {' '}
                 {Math.ceil(cantidadporliberar / 24)}
@@ -306,7 +306,7 @@ const SerigrafiaComponent = ({ workOrder }: { workOrder: any }) => {
         )}
       </View>
 
-      <Text style={styles.label}>Cantidad a liberar (KITS):</Text>
+      <Text style={styles.label}>Cantidad a liberar (Hojas Frente / Hojas Vuelta):</Text>
       <TextInput
         style={styles.input}
         theme={{ roundness: 30 }}
