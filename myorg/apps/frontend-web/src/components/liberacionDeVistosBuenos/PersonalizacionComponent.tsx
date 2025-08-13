@@ -628,24 +628,6 @@ const Input = styled.input`
   }
 `;
 
-const RadioGroup = styled.div`
-  display: flex;
-  gap: 2rem;
-  margin-top: 0.5rem;
-`;
-
-const RadioLabel = styled.label`
-  display: flex;
-  align-items: center;
-  gap: 0.5rem;
-  font-weight: 500;
-  color: #374151;
-`;
-
-const Radio = styled.input`
-  accent-color: #0038a8;
-`;
-
 const Textarea = styled.textarea`
   width: 100%;
   height: 120px;

@@ -149,7 +149,7 @@ const LaminacionComponentAccept: React.FC<{ workOrder: any }> = ({
         <Text style={styles.label}>Cantidad (TARJETAS):</Text>
         <Text style={styles.value}>{workOrder.workOrder.quantity}</Text>
 
-        <Text style={styles.label}>Cantidad (KITS):</Text>
+        <Text style={styles.label}>Cantidad (Hojas Frente / Hojas Vuelta):</Text>
         <Text style={styles.value}>{cantidadHojas}</Text>
 
         <Text style={styles.label}>Área que lo envía:</Text>
@@ -166,7 +166,7 @@ const LaminacionComponentAccept: React.FC<{ workOrder: any }> = ({
         <Text style={styles.value}>{workOrder.workOrder.comments}</Text>
       </View>
 
-      <Text style={styles.subtitle}>Cantidad entregada (KITS)</Text>
+      <Text style={styles.subtitle}>Cantidad entregada (Hojas Frente / Hojas Vuelta)</Text>
       <Text style={styles.input}>
         {Math.ceil(defaultValues.release_quantity / 24)}
       </Text>

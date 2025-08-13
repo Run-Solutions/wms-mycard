@@ -43,26 +43,91 @@ const WorkOrdersPage: React.FC = () => {
 
   // Para manejar los cambios de los campos del formulario
   const handleChange = (
-    e: React.ChangeEvent<
-      HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement
-    >,
+    e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>,
     areaIndex?: number
   ) => {
     const target = e.target;
     const name = target.name;
-    const value =
-      target.type === 'checkbox'
-        ? (target as HTMLInputElement).checked
-        : target.value;
+    const value = target.type === 'checkbox'
+      ? (target as HTMLInputElement).checked
+      : target.value;
+  
     if (areaIndex !== undefined) {
-      setFormData((prev) => {
+      // Validación para el primer área (debe ser 1 - Preprensa)
+      if (areaIndex === 0 && value !== '1') {
+        const shouldReset = window.confirm(
+          'La primera área debe ser Preprensa (ID: 1). ¿Deseas limpiar todas las áreas seleccionadas?'
+        );
+        
+        if (shouldReset) {
+          setFormData(prev => ({
+            ...prev,
+            areasOperatorIds: []
+          }));
+          setDropdownCount(4);
+        }
+        return;
+      }
+  
+      // Validación para el segundo área (debe ser 2 o 3)
+      if (areaIndex === 1 && value !== '2' && value !== '3' && value !== '') {
+        alert('La siguiente área solo puede ser Impresión o Serigrafia');
+        e.preventDefault();
+        return;
+      }
+      if (areaIndex === 2 && value !== '2' && value !== '3' && value !== '4' && value !== '') {
+        alert('La siguiente área solo puede ser Serigrafia, Empalme o Impresion');
+        e.preventDefault();
+        return;
+      }
+      if (areaIndex === 3 && value !== '2' && value !== '4' && value !== '6' && value !== '') {
+        alert('La siguiente área solo puede ser Impresión, Empalme o Corte');
+        e.preventDefault();
+        return;
+      }
+      if (areaIndex === 4 && value !== '5' && value !== '') {
+        alert('La siguiente área solo puede ser Laminación');
+        e.preventDefault();
+        return;
+      }
+      if (areaIndex === 5 && value !== '3' && value !== '6' && value !== '') {
+        alert('La siguiente área solo puede ser Corte o Serigrafia');
+        e.preventDefault();
+        return;
+      }
+      if (areaIndex === 6 && value !== '8' && value !== '9' && value !== '10' &&  value !== '7' && value !== '') {
+        alert('La siguiente área solo puede ser Hot Stamping, Milling Chip, Personalización o Color Edge');
+        e.preventDefault();
+        return;
+      }
+      if (areaIndex === 7 && value !== '8' && value !== '9' && value !== '10' && value !== '') {
+        alert('La siguiente área solo puede ser Hot Stamping, Milling Chip o Personalización');
+        e.preventDefault();
+        return;
+      }
+      if (areaIndex === 8 && value !== '9' && value !== '10' && value !== '7' && value !== '') {
+        alert('La siguiente área solo puede ser Milling Chip, Personalización o Color Edge');
+        e.preventDefault();
+        return;
+      }
+      if (areaIndex === 9 && value !== '7' && value !== '9' && value !== '10' && value !== '') {
+        alert('La siguiente área solo puede ser Color Edge, Hot Stamping o Personalización');
+        e.preventDefault();
+        return;
+      }
+      if (areaIndex === 10 && value !== '7' && value !== '10' && value !== '') {
+        alert('La siguiente área solo puede ser Color Edge o Personalización');
+        e.preventDefault();
+        return;
+      }
+  
+      setFormData(prev => {
         const updatedFlows = [...prev.areasOperatorIds];
-        updatedFlows[areaIndex] = (value as string) || ''; // Asignamos el valor al índice correspondiente
-        //const filteredFlows = updatedFlows.filter(area => area !== "");
+        updatedFlows[areaIndex] = value as string;
         return { ...prev, areasOperatorIds: updatedFlows };
       });
     } else {
-      setFormData((prev) => ({ ...prev, [name]: value }));
+      setFormData(prev => ({ ...prev, [name]: value }));
     }
   };
 
@@ -210,7 +275,7 @@ const WorkOrdersPage: React.FC = () => {
             />
           </Auxiliar>
           <Auxiliar>
-            <Label>Cantidad (KITS):</Label>
+            <Label>Cantidad (Hojas Frente / Hojas Vuelta):</Label>
             <Input
               type="number"
               name="quantity"
@@ -317,7 +382,7 @@ const WorkOrdersPage: React.FC = () => {
             />
           </Auxiliar>
 
-          <Auxiliar>
+          <Auxiliar style={{ width:'30%'}}>
             <Label>Subir OT (PDF):</Label>
             <label
               htmlFor="upload-ot"
@@ -551,7 +616,7 @@ const Arrow = styled.div`
 const Auxiliar = styled.div`
   display: flex;
   flex-direction: column; // Pone el Label arriba del Input
-  flex: 1; // Permite que todos los campos ocupen el mismo espacio
+   // Permite que todos los campos ocupen el mismo espacio
 `;
 
 const Label = styled.label`

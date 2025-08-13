@@ -279,6 +279,7 @@ export class WorkOrderService {
             },
             answers: {
               include: {
+                reviewer: true,
                 FormAnswerResponse: true,
                 inconformities: {
                   include: {

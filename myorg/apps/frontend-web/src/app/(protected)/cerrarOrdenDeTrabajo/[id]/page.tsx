@@ -189,7 +189,7 @@ export default function CloseWorkOrderAuxPage({ params }: Props) {
             <Value>{workOrder?.workOrder.quantity}</Value>
           </InfoItem>
           <InfoItem>
-            <Label>Cantidad (KITS): </Label>
+            <Label>Cantidad (Hojas Frente / Hojas Vuelta): </Label>
             <Value>{cantidadHojas}</Value>
           </InfoItem>
         </DataWrapper>

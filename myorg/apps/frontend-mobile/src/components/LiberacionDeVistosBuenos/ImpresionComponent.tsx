@@ -155,7 +155,7 @@ const ImpresionComponent = ({ workOrder }: { workOrder: any }) => {
         <Text style={styles.label}>Cantidad (TARJETAS):</Text>
         <Text style={styles.value}>{workOrder.workOrder.quantity}</Text>
 
-        <Text style={styles.label}>Cantidad (KITS):</Text>
+        <Text style={styles.label}>Cantidad (Hojas Frente / Hojas Vuelta):</Text>
         <Text style={styles.value}>{cantidadHojas}</Text>
 
         <Text style={styles.label}>Operador:</Text>

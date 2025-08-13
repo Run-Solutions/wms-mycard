@@ -1,4 +1,4 @@
-// components/SeguimientoDeOts/InconformitiesHistory.tsx
+// myorg/apps/frontend-mobile/src/components/SeguimientoDeOts/InconformitiesHistory.tsx
 import React from 'react';
 import {
   View,
@@ -27,13 +27,17 @@ const InconformitiesHistory: React.FC<Props> = ({
   qualitySectionOpen,
   toggleQualitySection,
 }) => {
-  if (inconformities.length === 0) return null;
+  if (inconformities.length === 0) return (
+    <View style={[styles.container, { backgroundColor: '#FEF3C7' }]}>
+      <Text style={{ color: '#B45309' }}>⚠️ No hay inconformidades registradas.</Text>
+    </View>
+  );
 
   return (
     <View style={styles.container}>
       <TouchableOpacity onPress={toggleQualitySection}>
         <Text style={styles.title}>
-          🧾 Historial de Inconformidades{' '}
+          Historial de Inconformidades{' '}
           <Text style={styles.toggle}>
             ({qualitySectionOpen ? '▼' : '▶'})
           </Text>
