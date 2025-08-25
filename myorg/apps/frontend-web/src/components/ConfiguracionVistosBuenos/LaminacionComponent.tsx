@@ -9,7 +9,7 @@ import {
   deleteFormQuestion,
   updateFormQuestion,
 } from '@/api/configVistosBuenos';
-import { FormQuestionTable } from './FormQuestionTable';
+import { FormQuestionTable } from './util/FormQuestionTable';
 
 interface Props {
   formQuestion: any;
@@ -95,21 +95,25 @@ export default function LaminacionComponent({ formQuestion }: Props) {
             <RadioGroup>
               <RadioLabel>
                 <Radio type="radio" disabled />
-                B/B
+                Brillo/Brillo
               </RadioLabel>
               <RadioLabel>
                 <Radio type="radio" disabled />
-                M/M
+                Mate/Mate
+              </RadioLabel>
+              <RadioLabel>
+                <Radio type="radio" disabled />
+                Brillo/Mate
+              </RadioLabel>
+              <RadioLabel>
+                <Radio type="radio" disabled />
+                Mate/Brillo
               </RadioLabel>
               <RadioLabel>
                 <Radio type="radio" disabled />
                 Otro
               </RadioLabel>
             </RadioGroup>
-            <InputGroup style={{ width: '50%', marginTop: '10px' }}>
-              <Label>Valor de Anclaje Obtenido:</Label>
-              <Input type="number" readOnly />
-            </InputGroup>
             <InputGroup style={{ width: '50%', marginTop: '10px' }}>
               <Label>Muestras entregadas:</Label>
               <Input type="number" readOnly />
@@ -130,6 +134,18 @@ export default function LaminacionComponent({ formQuestion }: Props) {
             }}
             onDelete={(id) => setDeletingId(id)}
           />
+          <InputGroup style={{ width: '50%', marginTop: '10px' }}>
+            <Label>Prueba Over:</Label>
+            <Input type="number" readOnly />
+          </InputGroup>
+          <InputGroup style={{ width: '50%', marginTop: '10px' }}>
+            <Label>Prueba Cinta Magnética:</Label>
+            <Input type="number" readOnly />
+          </InputGroup>
+          <InputGroup style={{ width: '50%', marginTop: '10px' }}>
+            <Label>Prueba Centro (entre capas):</Label>
+            <Input type="number" readOnly />
+          </InputGroup>
         </InputGroup>
       </NewData>
       {editingId !== null && (

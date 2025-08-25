@@ -23,10 +23,10 @@ const LoginForm: React.FC<LoginFormProps> = ({
 }) => {
   return (
     <Form onSubmit={onSubmit}>
-      <Title>Welcome!!</Title>
+      <Title>Bienvenido</Title>
 
       <FlexColumn>
-        <label style={{ color: 'white', fontWeight: 600 }}>User</label>
+        <label style={{ color: 'white', fontWeight: 600 }}>Usuario</label>
       </FlexColumn>
       <InputForm>
         <svg
@@ -49,7 +49,7 @@ const LoginForm: React.FC<LoginFormProps> = ({
       </InputForm>
 
       <FlexColumn>
-        <label style={{ color: 'white', fontWeight: 600 }}>Password</label>
+        <label style={{ color: 'white', fontWeight: 600 }}>Contraseña</label>
       </FlexColumn>
       <InputForm>
         <svg
@@ -78,18 +78,18 @@ const LoginForm: React.FC<LoginFormProps> = ({
 
       <FlexRow>
         <div style={{ display: 'flex', alignItems: 'center' }}>
-          <input type='radio' id='remember' style={{ marginRight:'5px'}}/>
+          <input type='checkbox' id='remember' style={{ marginRight:'5px'}}/>
           <label
             htmlFor='remember'
             style={{ fontSize: '14px', color: 'white', fontWeight: '400' }}
             >Remember me</label>
         </div>
-        <Span>Forgot password?</Span>
+        <Span>Olvidó su contraseña?</Span>
       </FlexRow>
-      <ButtonSubmit type='submit'>Sign In</ButtonSubmit>
+      <ButtonSubmit type='submit'>Ingresar</ButtonSubmit>
       <Paragraph>
-        Don't have an account?{' '}
-        <Span onClick={onSignUpClick}>Sign Up</Span>
+        No tienes una cuenta?{' '}
+        <Span onClick={onSignUpClick}>Registrate</Span>
       </Paragraph>
     </Form>
   );

@@ -357,21 +357,31 @@ export class FreeWorkOrderService {
           formAnswerId = newFormAnswer.id;
         }
         // Mapear las respuestas de cada pregunta, primero del frente
-        const respuestasFrente = question_id
-          .filter((_, index) => frente[index])
-          .map((questionId, index) => ({
-            question_id: questionId,
-            response_operator: frente[index],
-            form_answer_id: formAnswerId,
-          }));
-        // Mapear las respuestas de cada pregunta, luego de vuelta
-        const respuestasVuelta = question_id
-          .filter((_, index) => vuelta[index])
-          .map((questionId, index) => ({
-            question_id: questionId,
-            response_operator: vuelta[index],
-            form_answer_id: formAnswerId,
-          }));
+        // Frente
+        const respuestasFrente = question_id.flatMap((questionId, idx) =>
+          frente[idx]
+            ? [
+                {
+                  question_id: questionId,
+                  response_operator: frente[idx],
+                  form_answer_id: formAnswerId,
+                },
+              ]
+            : [],
+        );
+
+        // Vuelta
+        const respuestasVuelta = question_id.flatMap((questionId, idx) =>
+          vuelta[idx]
+            ? [
+                {
+                  question_id: questionId,
+                  response_operator: vuelta[idx],
+                  form_answer_id: formAnswerId,
+                },
+              ]
+            : [],
+        );
         // Crear todas las respuestas
         await tx.formAnswerResponse.createMany({
           data: [...respuestasFrente, ...respuestasVuelta],
@@ -415,7 +425,6 @@ export class FreeWorkOrderService {
       question_id,
       work_order_id,
       finish_validation,
-      valor_anclaje,
       response,
       user_id,
       area_id,
@@ -433,7 +442,6 @@ export class FreeWorkOrderService {
             area_id,
             sample_quantity,
             finish_validation,
-            valor_anclaje,
             work_order_id,
             reviewed: reviewed ?? false,
             work_order_flow_id,
@@ -1293,7 +1301,7 @@ export class FreeWorkOrderService {
       });
       // Crear FormAuditory
       const formAuditory = await tx.formAuditory.create({
-        data: { 
+        data: {
           reviewed_by_id: null,
           work_order_flow_id: dto.workOrderFlowId,
         },
@@ -1506,10 +1514,10 @@ export class FreeWorkOrderService {
       });
       // Crear FormAuditory
       const formAuditory = await tx.formAuditory.create({
-        data: { 
+        data: {
           reviewed_by_id: null,
           work_order_flow_id: dto.workOrderFlowId,
-         },
+        },
       });
       // Crear PersonalizacionResponse
       await tx.colorEdgeResponse.create({
@@ -1616,7 +1624,7 @@ export class FreeWorkOrderService {
       });
       // Crear FormAuditory
       const formAuditory = await tx.formAuditory.create({
-        data: { 
+        data: {
           reviewed_by_id: null,
           work_order_flow_id: dto.workOrderFlowId,
         },
@@ -1726,7 +1734,7 @@ export class FreeWorkOrderService {
       });
       // Crear FormAuditory
       const formAuditory = await tx.formAuditory.create({
-        data: { 
+        data: {
           reviewed_by_id: null,
           work_order_flow_id: dto.workOrderFlowId,
         },
@@ -1835,7 +1843,7 @@ export class FreeWorkOrderService {
       });
       // Crear FormAuditory
       const formAuditory = await tx.formAuditory.create({
-        data: { 
+        data: {
           reviewed_by_id: null,
           work_order_flow_id: dto.workOrderFlowId,
         },

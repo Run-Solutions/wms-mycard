@@ -1,4 +1,4 @@
-// myorg/apps/frontend-mobile/src/components/RecepcionCQM/ImpresionComponent.tsx
+// myorg/apps/frontend-mobile/src/components/LiberacionDeVistosBuenos/ImpresionComponent.tsx
 
 import React, { useState } from 'react';
 import {
@@ -19,6 +19,8 @@ import {
   submitExtraImpresion,
   sendInconformidadCQM,
 } from '../../api/recepcionCQM';
+import { OperatorAdvancedTable } from './util/FormQuestionTable';
+import SelectionQuestionTable from './util/SelectionQuestionTable';
 
 // Tipos y constantes globales
 
@@ -38,12 +40,13 @@ const ImpresionComponent = ({ workOrder }: { workOrder: any }) => {
   const navigation =
     useNavigation<NativeStackNavigationProp<RootStackParamList>>();
 
-  const [checkedQuestionsFrente, setCheckedQuestionsFrente] = useState<
-    number[]
-  >([]);
-  const [checkedQuestionsVuelta, setCheckedQuestionsVuelta] = useState<
-    number[]
-  >([]);
+  const [checkedFrenteOK, setCheckedFrenteOK] = useState<number[]>([]);
+  const [checkedFrenteNG, setCheckedFrenteNG] = useState<number[]>([]);
+
+  // ✅ Vuelta
+  const [checkedVueltaOK, setCheckedVueltaOK] = useState<number[]>([]);
+  const [checkedVueltaNG, setCheckedVueltaNG] = useState<number[]>([]);
+
   const [testTypes, setTestTypes] = useState<string>('');
   const [showConfirmModal, setShowConfirmModal] = useState(false);
   const [showInconformidad, setShowInconformidad] = useState(false);
@@ -56,72 +59,69 @@ const ImpresionComponent = ({ workOrder }: { workOrder: any }) => {
     .reverse()
     .find((a: Answer) => a.reviewed === false)?.index;
 
-  const questions =
-    workOrder.area.formQuestions?.filter((q: any) => q.role_id === null) || [];
   const qualityQuestions =
     workOrder.area.formQuestions?.filter((q: any) => q.role_id === 3) || [];
-  const currentFlow = [...workOrder.workOrder.flow].find(
-    (f: any) => f.id === workOrder.id
-  );
 
-  const isDisabled = workOrder.status === 'En proceso';
-  const nextFlowIndex =
-    workOrder.workOrder.flow.findIndex((f: any) => f.id === workOrder.id) + 1;
-  const nextFlow = workOrder.workOrder.flow[nextFlowIndex] ?? null;
-
-  const allParcialsValidated = workOrder.partialReleases?.every(
-    (r: { validated: boolean }) => r.validated
-  );
-
-  const handleSubmit = async () => {
-    const formAnswerId = workOrder.answers[index]?.id;
-    if (!formAnswerId) {
-      Alert.alert('No se encontró el Id del formulario');
-      return;
-    }
-
-    const questions = workOrder.area.formQuestions.filter(
-      (q: any) => q.role_id === 3
-    );
-
-    const isFrenteVueltaValid = questions.some(
-      (q: any) =>
-        checkedQuestionsFrente.includes(q.id) ||
-        checkedQuestionsVuelta.includes(q.id)
-    );
-
-    if (!questions.length || !isFrenteVueltaValid) {
-      Alert.alert(
-        'Por favor, completa las preguntas, selecciona al menos un Frente o Vuelta y la cantidad de muestra.'
-      );
-      return;
-    }
-
-    const frentePayload = checkedQuestionsFrente.map((questionId: number) => ({
-      question_id: questionId,
-    }));
-    const vueltaPayload = checkedQuestionsVuelta.map((questionId: number) => ({
-      question_id: questionId,
-    }));
-
-    const payload = {
-      form_answer_id: formAnswerId,
-      frente: frentePayload,
-      vuelta: vueltaPayload,
-      radio: {
-        value: testTypes,
-      },
+    const handleSubmit = async () => {
+      const formAnswerId = workOrder.answers[index]?.id;
+      if (!formAnswerId) {
+        Alert.alert('No se encontró el Id del formulario');
+        return;
+      }
+    
+      // 1) Preguntas visibles (CQM: role_id === 3). Aplica slice si lo usas en la UI.
+      const visibleQuestions =
+        (workOrder.area.formQuestions ?? []).filter((q: any) => q.role_id === 3);
+    
+      // 2) Helper: estado por columna (0 = Frente, 1 = Vuelta)
+      const getAnswerFor = (qid: number, colIndex: number): boolean | undefined => {
+        if (colIndex === 0) {
+          if (checkedFrenteOK.includes(qid)) return true;
+          if (checkedFrenteNG.includes(qid)) return false;
+          return undefined;
+        } else {
+          if (checkedVueltaOK.includes(qid)) return true;
+          if (checkedVueltaNG.includes(qid)) return false;
+          return undefined;
+        }
+      };
+    
+      // 3) Validar que TODAS las visibles tengan selección en ambas columnas
+      for (const q of visibleQuestions) {
+        const a0 = getAnswerFor(q.id, 0);
+        const a1 = getAnswerFor(q.id, 1);
+        if (a0 === undefined || a1 === undefined) {
+          Alert.alert('Completa todas las preguntas y cantidad de muestra.');
+          return;
+        }
+      }
+    
+      // 4) Construir payload que el tipo espera:
+      //    frente/vuelta = SOLO ids con respuesta OK en cada columna
+      const frente = visibleQuestions
+        .filter((q: any) => getAnswerFor(q.id, 0) === true)
+        .map((q: any) => ({ question_id: q.id }));
+    
+      const vuelta = visibleQuestions
+        .filter((q: any) => getAnswerFor(q.id, 1) === true)
+        .map((q: any) => ({ question_id: q.id }));
+    
+      const payload = {
+        form_answer_id: formAnswerId,
+        frente, // {question_id}[]
+        vuelta, // {question_id}[]
+        radio: { value: testTypes },
+      };
+    
+      try {
+        const success = await submitExtraImpresion(payload);
+        setShowConfirmModal(false);
+        Alert.alert('Producto evaluado correctamente');
+        navigation.goBack();
+      } catch (err) {
+        Alert.alert('Error al liberar el producto.');
+      }
     };
-
-    try {
-      const success = await submitExtraImpresion(payload);
-      setShowConfirmModal(false);
-      Alert.alert('Producto evaluado correctamente');
-      navigation.goBack();
-    } catch (err) {
-      Alert.alert('Error al liberar el producto.');
-    }
-  };
 
   const handleInconformidad = async () => {
     if (!inconformidad.trim()) {
@@ -136,6 +136,50 @@ const ImpresionComponent = ({ workOrder }: { workOrder: any }) => {
     } catch (error) {
       console.error(error);
       Alert.alert('Error al enviar la inconformidad.');
+    }
+  };
+
+  const handleToggleFrenteVuelta = (
+    questionId: number,
+    columnIndex: number, // 0 = Frente, 1 = Vuelta
+    type: 'ok' | 'ng',
+    checked: boolean
+  ) => {
+    if (columnIndex === 0) {
+      // FRENTE
+      if (type === 'ok') {
+        setCheckedFrenteOK((prev) =>
+          checked
+            ? Array.from(new Set([...prev, questionId]))
+            : prev.filter((id) => id !== questionId)
+        );
+        // Quita la contraria en el mismo tick
+        setCheckedFrenteNG((prev) => prev.filter((id) => id !== questionId));
+      } else {
+        setCheckedFrenteNG((prev) =>
+          checked
+            ? Array.from(new Set([...prev, questionId]))
+            : prev.filter((id) => id !== questionId)
+        );
+        setCheckedFrenteOK((prev) => prev.filter((id) => id !== questionId));
+      }
+    } else {
+      // VUELTA
+      if (type === 'ok') {
+        setCheckedVueltaOK((prev) =>
+          checked
+            ? Array.from(new Set([...prev, questionId]))
+            : prev.filter((id) => id !== questionId)
+        );
+        setCheckedVueltaNG((prev) => prev.filter((id) => id !== questionId));
+      } else {
+        setCheckedVueltaNG((prev) =>
+          checked
+            ? Array.from(new Set([...prev, questionId]))
+            : prev.filter((id) => id !== questionId)
+        );
+        setCheckedVueltaOK((prev) => prev.filter((id) => id !== questionId));
+      }
     }
   };
 
@@ -155,7 +199,9 @@ const ImpresionComponent = ({ workOrder }: { workOrder: any }) => {
         <Text style={styles.label}>Cantidad (TARJETAS):</Text>
         <Text style={styles.value}>{workOrder.workOrder.quantity}</Text>
 
-        <Text style={styles.label}>Cantidad (Hojas Frente / Hojas Vuelta):</Text>
+        <Text style={styles.label}>
+          Cantidad (Hojas Frente / Hojas Vuelta):
+        </Text>
         <Text style={styles.value}>{cantidadHojas}</Text>
 
         <Text style={styles.label}>Operador:</Text>
@@ -166,56 +212,15 @@ const ImpresionComponent = ({ workOrder }: { workOrder: any }) => {
       </View>
 
       <Text style={styles.modalTitle}>Respuestas del operador</Text>
-      {/* Encabezado estilo tabla */}
-      <View style={styles.tableHeader}>
-        <Text style={[styles.tableCell, { flex: 2 }]}>Pregunta</Text>
-        <Text style={styles.tableCell}>Hoja Frente</Text>
-        <Text style={styles.tableCell}>Hoja Vuelta</Text>
-      </View>
 
       {/* Preguntas normales */}
-      {questions.map((q: any) => {
-        const responses = workOrder.answers[index]?.FormAnswerResponse?.filter(
-          (resp: any) => resp.question_id === q.id
-        );
-        console.log(responses);
-        // Encuentra la respuesta del operador por pregunta_id
-        const frontAnswer = responses[0]?.response_operator;
-        const vueltaAnswer = responses[1]?.response_operator;
-
-        return (
-          <View key={q.id} style={styles.tableRow}>
-            {/* Pregunta */}
-            <View style={[styles.tableCell, { flex: 2 }]}>
-              <Text style={styles.questionText}>{q.title}</Text>
-            </View>
-
-            {/* Frente */}
-            <View style={[styles.tableCell, { flex: 1, alignItems: 'center' }]}>
-              <View
-                style={[
-                  styles.radioCircle,
-                  frontAnswer && styles.radioDisabled,
-                ]}
-              >
-                {frontAnswer && <View style={styles.radioDot} />}
-              </View>
-            </View>
-
-            {/* Vuelta */}
-            <View style={[styles.tableCell, { flex: 1, alignItems: 'center' }]}>
-              <View
-                style={[
-                  styles.radioCircle,
-                  vueltaAnswer && styles.radioDisabled,
-                ]}
-              >
-                {vueltaAnswer && <View style={styles.radioDot} />}
-              </View>
-            </View>
-          </View>
-        );
-      })}
+      <OperatorAdvancedTable
+        questions={workOrder.area.formQuestions ?? []}
+        answers={workOrder.answers[index]?.FormAnswerResponse ?? []}
+        mode={'doble'}
+        readOnly
+        columns={['Hoja Frente', 'Hoja Vuelta']}
+      />
 
       {/* Muestras */}
       <Text style={styles.label}>Muestras entregadas:</Text>
@@ -239,65 +244,18 @@ const ImpresionComponent = ({ workOrder }: { workOrder: any }) => {
       )}
 
       <Text style={[styles.modalTitle, { marginTop: 40 }]}>Mis respuestas</Text>
-      {/* Encabezado estilo tabla */}
-      <View style={styles.tableHeader}>
-        <Text style={[styles.tableCell, { flex: 2 }]}>Pregunta</Text>
-        <Text style={styles.tableCell}>Hoja Frente</Text>
-        <Text style={styles.tableCell}>Hoja Vuelta</Text>
-      </View>
-      {/* Preguntas normales */}
-      {qualityQuestions.map((q: any) => (
-        <View key={q.id} style={styles.tableRow}>
-          {/* Pregunta */}
-          <View style={[styles.tableCell, { flex: 2 }]}>
-            <Text style={styles.questionText}>{q.title}</Text>
-          </View>
+      <SelectionQuestionTable
+        formQuestions={workOrder.area.formQuestions}
+        roleId={3}
+        columns={['Hoja Frente', 'Hoja Vuelta']}
+        checkedQuestions={[
+          { ok: checkedFrenteOK, ng: checkedFrenteNG },
+          { ok: checkedVueltaOK, ng: checkedVueltaNG },
+        ]}
+        onToggle={handleToggleFrenteVuelta}
+      />
 
-          {/* Frente */}
-          <View style={[styles.tableCell, { flex: 1, alignItems: 'center' }]}>
-            <TouchableOpacity
-              onPress={() =>
-                setCheckedQuestionsFrente((prev) =>
-                  prev.includes(q.id)
-                    ? prev.filter((id) => id !== q.id)
-                    : [...prev, q.id]
-                )
-              }
-              style={[
-                styles.radioCircle,
-                checkedQuestionsFrente.includes(q.id) && styles.checkedBox,
-              ]}
-            >
-              {checkedQuestionsFrente.includes(q.id) && (
-                <View style={styles.radioDot} />
-              )}
-            </TouchableOpacity>
-          </View>
-
-          {/* Vuelta */}
-          <View style={[styles.tableCell, { flex: 1, alignItems: 'center' }]}>
-            <TouchableOpacity
-              onPress={() =>
-                setCheckedQuestionsVuelta((prev) =>
-                  prev.includes(q.id)
-                    ? prev.filter((id) => id !== q.id)
-                    : [...prev, q.id]
-                )
-              }
-              style={[
-                styles.radioCircle,
-                checkedQuestionsVuelta.includes(q.id) && styles.checkedBox,
-              ]}
-            >
-              {checkedQuestionsVuelta.includes(q.id) && (
-                <View style={styles.radioDot} />
-              )}
-            </TouchableOpacity>
-          </View>
-        </View>
-      ))}
-
-      <Text style={styles.label}>Tipo de prueba:</Text>
+      <Text style={styles.label}>Tonos y/o Densidades Contra:</Text>
       <View style={styles.radioGroup}>
         {radioOptions.map((option) => (
           <TouchableOpacity
@@ -312,23 +270,6 @@ const ImpresionComponent = ({ workOrder }: { workOrder: any }) => {
           </TouchableOpacity>
         ))}
       </View>
-
-      {showQuality && (
-        <>
-          {qualityQuestions.map((q: any) => (
-            <View key={q.id} style={styles.qualityRow}>
-              <Text style={styles.qualityQuestion}>{q.title}</Text>
-            </View>
-          ))}
-
-          <Text style={styles.subtitle}>Tipo de Prueba</Text>
-          {['color', 'perfil', 'fisica'].map((type) => (
-            <View key={type} style={styles.radioDisabled}>
-              <Text>{`Prueba ${type}`}</Text>
-            </View>
-          ))}
-        </>
-      )}
 
       {/* Botones */}
       <View style={styles.modalButtonRow}>
@@ -451,13 +392,6 @@ const styles = StyleSheet.create({
     marginBottom: 24,
     elevation: 3,
   },
-  button: {
-    backgroundColor: '#0038A8',
-    padding: 12,
-    borderRadius: 16,
-    alignItems: 'center',
-    marginTop: 24,
-  },
   radioCircle: {
     width: 22,
     height: 22,
@@ -475,22 +409,11 @@ const styles = StyleSheet.create({
     borderRadius: 6,
     backgroundColor: '#2563eb',
   },
-  buttonSecondary: {
-    backgroundColor: '#9CA3AF',
-    padding: 12,
-    borderRadius: 16,
-    alignItems: 'center',
-    marginTop: 16,
-  },
-  buttonText: { color: '#fff', fontWeight: 'bold' },
   modalOverlay: {
     flex: 1,
     backgroundColor: 'rgba(0,0,0,0.4)',
     justifyContent: 'center',
     alignItems: 'center',
-  },
-  modalScrollContent: {
-    padding: 20,
   },
   questionText: {
     fontSize: 15,
@@ -530,15 +453,6 @@ const styles = StyleSheet.create({
     color: '#fff',
     fontWeight: '600',
   },
-  scrollArea: {
-    flex: 1,
-  },
-  modalContainer: {
-    flex: 1,
-    padding: 20,
-    marginTop: 60,
-    backgroundColor: '#fdfaf6',
-  },
   modalTitle: {
     fontSize: 22,
     fontWeight: 'bold',
@@ -546,38 +460,9 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     color: '#1f2937',
   },
-  questionGroup: {
-    marginBottom: 16,
-    backgroundColor: '#fff',
-    padding: 12,
-    borderRadius: 12,
-    borderColor: '#e5e7eb',
-    borderWidth: 1,
-  },
-  checkboxRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-around',
-    marginTop: 8,
-  },
-  checkbox: {
-    paddingVertical: 6,
-    paddingHorizontal: 12,
-    borderWidth: 1,
-    borderColor: '#ccc',
-    borderRadius: 10,
-    backgroundColor: '#f9fafb',
-  },
   checkedBox: {
     backgroundColor: '#dbeafe',
     borderColor: '#2563eb',
-  },
-  checkboxText: {
-    fontSize: 14,
-    color: '#111827',
-  },
-  disabledButton: {
-    backgroundColor: '#9CA3AF', // gris como en web
-    opacity: 0.7,
   },
   tableHeader: {
     flexDirection: 'row',
@@ -597,36 +482,6 @@ const styles = StyleSheet.create({
     flex: 1,
     textAlign: 'center',
     fontSize: 16,
-  },
-  checkboxBox: {
-    borderWidth: 1,
-    borderColor: '#ccc',
-    paddingVertical: 5,
-    paddingHorizontal: 12,
-    borderRadius: 8,
-    backgroundColor: '#fff',
-  },
-  toggleSection: {
-    marginTop: 24,
-    marginBottom: 8,
-  },
-  qualityRow: {
-    paddingVertical: 8,
-    borderBottomWidth: 1,
-    borderColor: '#eee',
-  },
-  qualityQuestion: {
-    fontSize: 14,
-    color: '#374151',
-  },
-  radioDisabled: {
-    padding: 8,
-    borderWidth: 1,
-    opacity: 0.4,
-    borderColor: '#ddd',
-    borderRadius: 10,
-    marginBottom: 8,
-    backgroundColor: '#f3f4f6',
   },
   modalButtonRow: {
     flexDirection: 'row',

@@ -507,7 +507,13 @@ model FormAnswer {
 
   sample_quantity            Int?
   finish_validation          String?
+
+  //laminacion
   valor_anclaje              String?
+  prueba_over                String?
+  prueba_cinta_magnetica     String?
+  prueba_centro              String?
+
   testtype_cqm               String?
   magnetic_band              String?
   track_type                 String?

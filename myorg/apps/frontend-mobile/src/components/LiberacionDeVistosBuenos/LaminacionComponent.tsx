@@ -1,6 +1,5 @@
-// myorg/apps/frontend-mobile/src/components/RecepcionCQM/LaminacionComponent.tsx
-
-import React, { useState } from 'react';
+// myorg/apps/frontend-mobile/src/components/LiberacionDeVistosBuenos/LaminacionComponent.tsx
+import React, { useState, useMemo } from 'react';
 import {
   View,
   Text,
@@ -19,81 +18,162 @@ import {
   submitExtraLaminacion,
   sendInconformidadCQM,
 } from '../../api/recepcionCQM';
+import { OperatorAdvancedTable } from './util/FormQuestionTable';
+import SelectionQuestionTable from './util/SelectionQuestionTable';
 
-// Tipos y constantes globales
-
+// Tipos
 type Answer = {
   reviewed: boolean;
   sample_quantity: number;
 };
 
 const LaminacionComponent = ({ workOrder }: { workOrder: any }) => {
-  // Hooks y estados
+  // Navegación
   const navigation =
     useNavigation<NativeStackNavigationProp<RootStackParamList>>();
 
-  const [checkedQuestions, setCheckedQuestions] = useState<number[]>([]);
+  // Modales y campos
   const [showConfirmModal, setShowConfirmModal] = useState(false);
   const [showInconformidad, setShowInconformidad] = useState(false);
   const [inconformidad, setInconformidad] = useState('');
-  const [showQuality, setShowQuality] = useState<boolean>(false);
 
-  // Derivaciones
+  // --- NUEVO: pruebas (igual que en web)
+  const [pruebaOver, setPruebaOver] = useState<string>('');
+  const [pruebaCintaMagnetica, setPruebaCintaMagnetica] = useState<string>('');
+  const [pruebaCentro, setPruebaCentro] = useState<string>('');
+
+  // --- NUEVO: modal / código de excepción (igual que en web)
+  const [showCodigoModal, setShowCodigoModal] = useState(false);
+  const [codigoIngresado, setCodigoIngresado] = useState('');
+  const CODIGO_VALIDO = 'a7F9K3n1#';
+
+  // Helpers
+  const parseNum = (v: any) => {
+    const n = Number(v);
+    return Number.isFinite(n) ? n : 0;
+  };
+
+  // Último FormAnswer no revisado
   const index = workOrder?.answers
     ?.map((a: Answer, i: number) => ({ ...a, index: i }))
     .reverse()
     .find((a: Answer) => a.reviewed === false)?.index;
 
-  const questions =
-    workOrder.area.formQuestions?.filter((q: any) => q.role_id === null) || [];
-  const qualityQuestions =
-    workOrder.area.formQuestions?.filter((q: any) => q.role_id === 3) || [];
-  const currentFlow = [...workOrder.workOrder.flow].find(
-    (f: any) => f.id === workOrder.id
+  // Estado de las respuestas por pregunta (true = OK, false = NG)
+  const [answersByQuestion, setAnswersByQuestion] = useState<
+    Record<number, boolean | undefined>
+  >({});
+
+  // Preguntas visibles: Calidad (role_id = 3) — igual que web
+  const visibleQuestions =
+    workOrder.area.formQuestions?.filter((q: any) => q.role_id === 3) ?? [];
+
+  // Para SelectionQuestionTable (igual que web)
+  const checkedRespuestaOK = useMemo(
+    () =>
+      Object.entries(answersByQuestion)
+        .filter(([, v]) => v === true)
+        .map(([k]) => Number(k)),
+    [answersByQuestion]
+  );
+  const checkedRespuestaNG = useMemo(
+    () =>
+      Object.entries(answersByQuestion)
+        .filter(([, v]) => v === false)
+        .map(([k]) => Number(k)),
+    [answersByQuestion]
   );
 
-  const isDisabled = workOrder.status === 'En proceso';
-  const nextFlowIndex =
-    workOrder.workOrder.flow.findIndex((f: any) => f.id === workOrder.id) + 1;
-  const nextFlow = workOrder.workOrder.flow[nextFlowIndex] ?? null;
+  const handleToggleRespuesta = (
+    questionId: number,
+    _columnIndex: number,
+    type: 'ok' | 'ng',
+    checked: boolean
+  ) => {
+    setAnswersByQuestion((prev) => {
+      const next = { ...prev };
+      if (checked) {
+        next[questionId] = type === 'ok';
+      } else {
+        if (
+          (type === 'ok' && next[questionId] === true) ||
+          (type === 'ng' && next[questionId] === false)
+        ) {
+          delete next[questionId];
+        }
+      }
+      return next;
+    });
+  };
 
-  const allParcialsValidated = workOrder.partialReleases?.every(
-    (r: { validated: boolean }) => r.validated
-  );
-
-  const handleSubmit = async () => {
-    const formAnswerId = workOrder.answers[index]?.id;
+  // --- NUEVO: precheck igual que en web
+  const precheckAndSubmit = async () => {
+    const formAnswerId = workOrder.answers?.[index]?.id;
     if (!formAnswerId) {
       Alert.alert('No se encontró el Id del formulario');
       return;
     }
 
-    const questions = workOrder.area.formQuestions.filter(
-      (q: any) => q.role_id === 3
-    );
-
-    const isCheckedQuestionsValid = questions.some((q: any) =>
-      checkedQuestions.includes(q.id)
-    );
-
-    if (!questions.length || !isCheckedQuestionsValid) {
-      Alert.alert(
-        'Por favor, completa las preguntas, selecciona al menos un Frente o Vuelta y la cantidad de muestra.'
-      );
+    // Exigir todas las preguntas de Calidad respondidas (igual que web)
+    const question_id: number[] = [];
+    visibleQuestions.forEach((q: any) => {
+      const ans = answersByQuestion[q.id];
+      if (ans !== undefined) question_id.push(q.id);
+    });
+    if (question_id.length !== visibleQuestions.length) {
+      Alert.alert('Completa todas las preguntas.');
       return;
     }
 
-    const checkboxPayload = checkedQuestions.map((questionId: number) => ({
-      question_id: questionId,
-    }));
+    // Validar pruebas (igual que web: >= 5 salvo código válido)
+    const over = parseNum(pruebaOver);
+    const cinta = parseNum(pruebaCintaMagnetica);
+    const centro = parseNum(pruebaCentro);
+    const necesitaCodigo = [over, cinta, centro].some((v) => v < 5);
+
+    if (necesitaCodigo && codigoIngresado !== CODIGO_VALIDO) {
+      setShowConfirmModal(false);
+      setShowCodigoModal(true);
+      return;
+    }
+
+    // Si no necesita código o el código ya es válido → enviar
+    await handleSubmit({ over, cinta, centro });
+  };
+
+  // --- ACTUALIZADO: handleSubmit como en web
+  //     - checkboxes desde answersByQuestion
+  //     - extra_data con strings
+  const handleSubmit = async (nums?: { over: number; cinta: number; centro: number }) => {
+    const formAnswerId = workOrder.answers?.[index]?.id;
+    if (!formAnswerId) {
+      Alert.alert('No se encontró el Id del formulario');
+      return;
+    }
+
+    const checkboxPayload = Object.entries(answersByQuestion).map(
+      ([questionId, answer]) => ({
+        question_id: Number(questionId),
+        answer: answer === true ? true : answer === false ? false : null,
+      })
+    );
+
+    const over = nums?.over ?? parseNum(pruebaOver);
+    const cinta = nums?.cinta ?? parseNum(pruebaCintaMagnetica);
+    const centro = nums?.centro ?? parseNum(pruebaCentro);
 
     const payload = {
       form_answer_id: formAnswerId,
       checkboxes: checkboxPayload,
+      extra_data: {
+        prueba_over: String(over),
+        prueba_cinta_magnetica: String(cinta),
+        prueba_centro: String(centro),
+      },
     };
 
     try {
-      const success = await submitExtraLaminacion(payload);
+      await submitExtraLaminacion(payload);
       setShowConfirmModal(false);
       Alert.alert('Producto evaluado correctamente');
       navigation.goBack();
@@ -134,7 +214,9 @@ const LaminacionComponent = ({ workOrder }: { workOrder: any }) => {
         <Text style={styles.label}>Cantidad (TARJETAS):</Text>
         <Text style={styles.value}>{workOrder.workOrder.quantity}</Text>
 
-        <Text style={styles.label}>Cantidad (Hojas Frente / Hojas Vuelta):</Text>
+        <Text style={styles.label}>
+          Cantidad (Hojas Frente / Hojas Vuelta):
+        </Text>
         <Text style={styles.value}>{cantidadHojas}</Text>
 
         <Text style={styles.label}>Operador:</Text>
@@ -145,44 +227,14 @@ const LaminacionComponent = ({ workOrder }: { workOrder: any }) => {
       </View>
 
       <Text style={styles.modalTitle}>Respuestas del operador</Text>
-      {/* Encabezado estilo tabla */}
-      <View style={styles.tableHeader}>
-        <Text style={[styles.tableCell, { flex: 2 }]}>Pregunta</Text>
-        <Text style={styles.tableCell}>Respuesta</Text>
-      </View>
+      <OperatorAdvancedTable
+        questions={workOrder.area.formQuestions ?? []}
+        answers={workOrder.answers?.[index]?.FormAnswerResponse ?? []}
+        mode={'simple'}
+        readOnly
+        columns={['Respuesta']}
+      />
 
-      {/* Preguntas normales */}
-      {questions.map((q: any) => {
-        const responses = workOrder.answers[index]?.FormAnswerResponse?.find(
-          (resp: any) => resp.question_id === q.id
-        );
-        console.log(responses);
-        // Encuentra la respuesta del operador por pregunta_id
-        const operatorResponse = responses?.response_operator;
-
-        return (
-          <View key={q.id} style={styles.tableRow}>
-            {/* Pregunta */}
-            <View style={[styles.tableCell, { flex: 2 }]}>
-              <Text style={styles.questionText}>{q.title}</Text>
-            </View>
-
-            {/* Respuesta */}
-            <View style={[styles.tableCell, { flex: 1, alignItems: 'center' }]}>
-              <View
-                style={[
-                  styles.radioCircle,
-                  operatorResponse && styles.radioDisabled,
-                ]}
-              >
-                {operatorResponse && <View style={styles.radioDot} />}
-              </View>
-            </View>
-          </View>
-        );
-      })}
-
-      {/* Respuestas libres */}
       <Text style={styles.label}>Validar Acabado Vs Orden De Trabajo:</Text>
       <TextInput
         style={styles.input}
@@ -190,24 +242,12 @@ const LaminacionComponent = ({ workOrder }: { workOrder: any }) => {
         mode="outlined"
         activeOutlineColor="#000"
         value={
-          workOrder?.answers[index].finish_validation ??
+          workOrder?.answers?.[index]?.finish_validation ??
           'No se reconoce la muestra enviada'
         }
         editable={false}
       />
-      <Text style={styles.label}>Valor de Anclaje Obtenido:</Text>
-      <TextInput
-        style={styles.input}
-        theme={{ roundness: 30 }}
-        mode="outlined"
-        activeOutlineColor="#000"
-        value={
-          workOrder?.answers[index].valor_anclaje ??
-          'No se reconoce la muestra enviada'
-        }
-        editable={false}
-      />
-      {/* Muestras */}
+
       <Text style={styles.label}>Muestras entregadas:</Text>
       <TextInput
         style={styles.input}
@@ -216,12 +256,11 @@ const LaminacionComponent = ({ workOrder }: { workOrder: any }) => {
         activeOutlineColor="#000"
         value={
           typeof workOrder?.answers?.[index]?.sample_quantity === 'number'
-            ? workOrder.answers[index].sample_quantity.toString()
+            ? String(workOrder.answers[index].sample_quantity)
             : ''
         }
         editable={false}
       />
-
       {typeof workOrder?.answers?.[index]?.sample_quantity !== 'number' && (
         <Text style={{ color: '#b91c1c', marginTop: 8, textAlign: 'center' }}>
           No se reconoce la muestra enviada
@@ -229,56 +268,50 @@ const LaminacionComponent = ({ workOrder }: { workOrder: any }) => {
       )}
 
       <Text style={[styles.modalTitle, { marginTop: 40 }]}>Mis respuestas</Text>
-      {/* Encabezado estilo tabla */}
-      <View style={styles.tableHeader}>
-        <Text style={[styles.tableCell, { flex: 2 }]}>Pregunta</Text>
-        <Text style={styles.tableCell}>Respuesta</Text>
-      </View>
-      {/* Preguntas normales */}
-      {qualityQuestions.map((q: any) => (
-        <View key={q.id} style={styles.tableRow}>
-          {/* Pregunta */}
-          <View style={[styles.tableCell, { flex: 2 }]}>
-            <Text style={styles.questionText}>{q.title}</Text>
-          </View>
+      <SelectionQuestionTable
+        formQuestions={workOrder.area.formQuestions}
+        roleId={3} // Calidad (igual que web)
+        columns={['Respuesta']}
+        checkedQuestions={[{ ok: checkedRespuestaOK, ng: checkedRespuestaNG }]}
+        onToggle={handleToggleRespuesta}
+      />
 
-          {/* Respuestas */}
-          <View style={[styles.tableCell, { flex: 1, alignItems: 'center' }]}>
-            <TouchableOpacity
-              onPress={() =>
-                setCheckedQuestions((prev) =>
-                  prev.includes(q.id)
-                    ? prev.filter((id) => id !== q.id)
-                    : [...prev, q.id]
-                )
-              }
-              style={[
-                styles.radioCircle,
-                checkedQuestions.includes(q.id) && styles.checkedBox,
-              ]}
-            >
-              {checkedQuestions.includes(q.id) && (
-                <View style={styles.radioDot} />
-              )}
-            </TouchableOpacity>
-          </View>
-        </View>
-      ))}
-      {showQuality && (
-        <>
-          {qualityQuestions.map((q: any) => (
-            <View key={q.id} style={styles.qualityRow}>
-              <Text style={styles.qualityQuestion}>{q.title}</Text>
-            </View>
-          ))}
-          <Text style={styles.subtitle}>Tipo de Prueba</Text>
-          {['color', 'perfil', 'fisica'].map((type) => (
-            <View key={type} style={styles.radioDisabled}>
-              <Text>{`Prueba ${type}`}</Text>
-            </View>
-          ))}
-        </>
-      )}
+      {/* --- NUEVO: Inputs de pruebas (igual que web) */}
+      <Text style={styles.label}>Prueba Over:</Text>
+      <TextInput
+        style={styles.input}
+        theme={{ roundness: 30 }}
+        mode="outlined"
+        activeOutlineColor="#000"
+        keyboardType="numeric"
+        placeholder="Ej: 5"
+        value={pruebaOver}
+        onChangeText={setPruebaOver}
+      />
+
+      <Text style={styles.label}>Prueba Cinta Magnética:</Text>
+      <TextInput
+        style={styles.input}
+        theme={{ roundness: 30 }}
+        mode="outlined"
+        activeOutlineColor="#000"
+        keyboardType="numeric"
+        placeholder="Ej: 5"
+        value={pruebaCintaMagnetica}
+        onChangeText={setPruebaCintaMagnetica}
+      />
+
+      <Text style={styles.label}>Prueba Centro (entre capas):</Text>
+      <TextInput
+        style={styles.input}
+        theme={{ roundness: 30 }}
+        mode="outlined"
+        activeOutlineColor="#000"
+        keyboardType="numeric"
+        placeholder="Ej: 5"
+        value={pruebaCentro}
+        onChangeText={setPruebaCentro}
+      />
 
       {/* Botones */}
       <View style={styles.modalButtonRow}>
@@ -296,7 +329,7 @@ const LaminacionComponent = ({ workOrder }: { workOrder: any }) => {
         </TouchableOpacity>
       </View>
 
-      {/* Modal confirmación de liberación */}
+      {/* Modal confirmación de aprobación (igual que web: llama precheck) */}
       <Modal visible={showConfirmModal} transparent animationType="fade">
         <View style={styles.modalOverlay}>
           <View style={styles.modalBox}>
@@ -310,7 +343,7 @@ const LaminacionComponent = ({ workOrder }: { workOrder: any }) => {
               </TouchableOpacity>
               <TouchableOpacity
                 style={styles.confirmButton}
-                onPress={handleSubmit}
+                onPress={precheckAndSubmit}
               >
                 <Text style={styles.modalButtonText}>Confirmar</Text>
               </TouchableOpacity>
@@ -318,6 +351,52 @@ const LaminacionComponent = ({ workOrder }: { workOrder: any }) => {
           </View>
         </View>
       </Modal>
+
+      {/* --- NUEVO: Modal de código (igual que web) */}
+      <Modal visible={showCodigoModal} transparent animationType="fade">
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalBox}>
+            <Text style={styles.modalText}>
+              Alguna prueba es menor a 5. Ingresa el código de excepción para continuar.
+            </Text>
+            <TextInput
+              style={styles.input}
+              theme={{ roundness: 30 }}
+              mode="outlined"
+              activeOutlineColor="#000"
+              placeholder="Código de excepción"
+              value={codigoIngresado}
+              onChangeText={setCodigoIngresado}
+            />
+            <View style={styles.modalActions}>
+              <TouchableOpacity
+                style={styles.cancelButton}
+                onPress={() => {
+                  setShowCodigoModal(false);
+                  setCodigoIngresado('');
+                }}
+              >
+                <Text style={styles.modalButtonText}>Cancelar</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={styles.confirmButton}
+                onPress={async () => {
+                  if (codigoIngresado !== CODIGO_VALIDO) {
+                    Alert.alert('Código inválido. Verifica e intenta nuevamente.');
+                    return;
+                  }
+                  setShowCodigoModal(false);
+                  // Reintenta precheck ahora que hay código válido
+                  await precheckAndSubmit();
+                }}
+              >
+                <Text style={styles.modalButtonText}>Validar y Aprobar</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
+
       {/* Modal inconformidad */}
       <Modal visible={showInconformidad} transparent animationType="slide">
         <View style={styles.modalOverlay}>
@@ -372,19 +451,13 @@ const styles = StyleSheet.create({
     color: 'black',
     padding: Platform.OS === 'ios' ? 10 : 0,
   },
-  subtitle: {
-    fontSize: 16,
-    fontWeight: 'bold',
-    marginTop: 20,
-    marginBottom: 12,
-  },
   label: { fontWeight: '600', marginTop: 12, fontSize: 16 },
   value: { marginBottom: 0 },
   input: {
     padding: 10,
     marginBottom: 12,
     backgroundColor: '#fff',
-    height: 30,
+    height: 40,
     fontSize: 16,
   },
   textarea: {
@@ -401,50 +474,11 @@ const styles = StyleSheet.create({
     marginBottom: 24,
     elevation: 3,
   },
-  button: {
-    backgroundColor: '#0038A8',
-    padding: 12,
-    borderRadius: 16,
-    alignItems: 'center',
-    marginTop: 24,
-  },
-  radioCircle: {
-    width: 22,
-    height: 22,
-    borderRadius: 12,
-    borderWidth: 1,
-    borderColor: '#2563eb',
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: '#fff',
-    marginHorizontal: 'auto',
-  },
-  radioDot: {
-    width: 12,
-    height: 12,
-    borderRadius: 6,
-    backgroundColor: '#2563eb',
-  },
-  buttonSecondary: {
-    backgroundColor: '#9CA3AF',
-    padding: 12,
-    borderRadius: 16,
-    alignItems: 'center',
-    marginTop: 16,
-  },
-  buttonText: { color: '#fff', fontWeight: 'bold' },
   modalOverlay: {
     flex: 1,
     backgroundColor: 'rgba(0,0,0,0.4)',
     justifyContent: 'center',
     alignItems: 'center',
-  },
-  modalScrollContent: {
-    padding: 20,
-  },
-  questionText: {
-    fontSize: 15,
-    color: '#1f2937',
   },
   modalBox: {
     backgroundColor: '#fff',
@@ -480,15 +514,6 @@ const styles = StyleSheet.create({
     color: '#fff',
     fontWeight: '600',
   },
-  scrollArea: {
-    flex: 1,
-  },
-  modalContainer: {
-    flex: 1,
-    padding: 20,
-    marginTop: 60,
-    backgroundColor: '#fdfaf6',
-  },
   modalTitle: {
     fontSize: 22,
     fontWeight: 'bold',
@@ -496,106 +521,9 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     color: '#1f2937',
   },
-  questionGroup: {
-    marginBottom: 16,
-    backgroundColor: '#fff',
-    padding: 12,
-    borderRadius: 12,
-    borderColor: '#e5e7eb',
-    borderWidth: 1,
-  },
-  checkboxRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-around',
-    marginTop: 8,
-  },
-  checkbox: {
-    paddingVertical: 6,
-    paddingHorizontal: 12,
-    borderWidth: 1,
-    borderColor: '#ccc',
-    borderRadius: 10,
-    backgroundColor: '#f9fafb',
-  },
-  checkedBox: {
-    backgroundColor: '#dbeafe',
-    borderColor: '#2563eb',
-  },
-  checkboxText: {
-    fontSize: 14,
-    color: '#111827',
-  },
-  disabledButton: {
-    backgroundColor: '#9CA3AF', // gris como en web
-    opacity: 0.7,
-  },
-  tableHeader: {
-    flexDirection: 'row',
-    backgroundColor: '#f3f4f6',
-    paddingVertical: 10,
-    borderBottomWidth: 1,
-    borderColor: '#ccc',
-  },
-  tableRow: {
-    flexDirection: 'row',
-    borderBottomWidth: 1,
-    borderColor: '#e5e7eb',
-    paddingVertical: 10,
-    alignItems: 'center',
-  },
-  tableCell: {
-    flex: 1,
-    textAlign: 'center',
-    fontSize: 16,
-  },
-  checkboxBox: {
-    borderWidth: 1,
-    borderColor: '#ccc',
-    paddingVertical: 5,
-    paddingHorizontal: 12,
-    borderRadius: 8,
-    backgroundColor: '#fff',
-  },
-  toggleSection: {
-    marginTop: 24,
-    marginBottom: 8,
-  },
-  qualityRow: {
-    paddingVertical: 8,
-    borderBottomWidth: 1,
-    borderColor: '#eee',
-  },
-  qualityQuestion: {
-    fontSize: 14,
-    color: '#374151',
-  },
-  radioDisabled: {
-    padding: 8,
-    borderWidth: 1,
-    opacity: 0.4,
-    borderColor: '#ddd',
-    borderRadius: 10,
-    marginBottom: 8,
-    backgroundColor: '#f3f4f6',
-  },
   modalButtonRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     marginTop: 20,
-  },
-  radioGroup: {
-    marginTop: 12,
-    alignItems: 'flex-start',
-  },
-
-  radioLabel: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginBottom: 12,
-    gap: 10,
-  },
-  radioText: {
-    fontSize: 16,
-    color: '#1f2937',
   },
 });

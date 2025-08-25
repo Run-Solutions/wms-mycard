@@ -3,6 +3,7 @@ import styled from 'styled-components';
 import { useRouter } from 'next/navigation';
 import { useState } from 'react';
 import { acceptCQMInconformity } from '@/api/inconformidades';
+import { OperatorAdvanceMachineTable } from '../liberacionDeVistosBuenos/util/MachineSection';
 
 interface Props {
   workOrder: any;
@@ -10,7 +11,6 @@ interface Props {
 type Answer = {
   reviewed: boolean;
   sample_quantity: number;
-  // lo que más tenga...
 };
 
 export default function PersonalizacionComponentCQM({ workOrder }: Props) {
@@ -69,149 +69,85 @@ export default function PersonalizacionComponentCQM({ workOrder }: Props) {
               {workOrder?.answers[index].tipo_personalizacion ===
                 'etiquetadora' && (
                 <>
-                  <Table>
-                    <thead>
-                      <tr>
-                        <th>Pregunta</th>
-                        <th>Respuesta</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {workOrder.area.formQuestions
-                        .slice(0, 1)
-                        .map((question: { id: number; title: string }) => {
-                          // Buscar la respuesta correspondiente a esta pregunta
-                          const answer = workOrder.answers[
-                            index
-                          ]?.FormAnswerResponse?.find(
-                            (resp: any) => resp.question_id === question.id
-                          );
-
-                          // Obtener la respuesta del operador (response_operator)
-                          const operatorResponse = answer?.response_operator;
-                          return (
-                            <tr key={question.id}>
-                              <td>{question.title}</td>
-                              <td>
-                                {typeof operatorResponse === 'boolean' ? (
-                                  <input
-                                    type="checkbox"
-                                    checked={operatorResponse}
-                                    disabled
-                                  />
-                                ) : (
-                                  <span>
-                                    {operatorResponse !== undefined &&
-                                    operatorResponse !== null
-                                      ? operatorResponse.toString()
-                                      : ''}
-                                  </span>
-                                )}
-                              </td>
-                            </tr>
-                          );
-                        })}
-                    </tbody>
-                  </Table>
-                  <InputGroup style={{ marginTop: '10px', width: '70%' }}>
-                    <Label>
-                      Verificar Tipo De Etiqueta Vs Ot Y Pegar Utilizada:
-                    </Label>
-                    <Input
-                      type="text"
-                      value={
-                        workOrder?.answers[index].verificar_etiqueta ??
-                        'No se reconoce la muestra enviada'
-                      }
-                      readOnly
-                    />
-                    <Label>Muestras entregadas:</Label>
-                    <Input
-                      type="number"
-                      value={
-                        workOrder?.answers[index].sample_quantity ??
-                        'No se reconoce la muestra enviada'
-                      }
-                      readOnly
-                    />
-                  </InputGroup>
+                  <OperatorAdvanceMachineTable
+                    visible
+                    machine="etiquetadora"
+                    title=""
+                    questions={workOrder.area.formQuestions}
+                    areaId={10}
+                    questionSlice={[0, 1]}
+                    answers={workOrder.answers[index]?.FormAnswerResponse ?? []}
+                    extras={
+                      <InputGroup style={{ width: '70%' }}>
+                        <Label>
+                          Verificar Tipo De Etiqueta Vs Ot Y Pegar Utilizada:
+                        </Label>
+                        <Input
+                          type="text"
+                          value={
+                            workOrder?.answers[index].verificar_etiqueta ??
+                            'No se reconoce la muestra enviada'
+                          }
+                          readOnly
+                        />
+                        <Label>Muestras entregadas:</Label>
+                        <Input
+                          type="number"
+                          value={
+                            workOrder?.answers[index].sample_quantity ??
+                            'No se reconoce la muestra enviada'
+                          }
+                          readOnly
+                        />
+                      </InputGroup>
+                    }
+                  />
                 </>
               )}
               {workOrder?.answers[index].tipo_personalizacion === 'persos' && (
                 <>
-                  <Table>
-                    <thead>
-                      <tr>
-                        <th>Pregunta</th>
-                        <th>Respuesta</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {workOrder.area.formQuestions
-                        .slice(1, 10)
-                        .map((question: { id: number; title: string }) => {
-                          // Buscar la respuesta correspondiente a esta pregunta
-                          const answer = workOrder.answers[
-                            index
-                          ]?.FormAnswerResponse?.find(
-                            (resp: any) => resp.question_id === question.id
-                          );
-
-                          // Obtener la respuesta del operador (response_operator)
-                          const operatorResponse = answer?.response_operator;
-                          return (
-                            <tr key={question.id}>
-                              <td>{question.title}</td>
-                              <td>
-                                {typeof operatorResponse === 'boolean' ? (
-                                  <input
-                                    type="checkbox"
-                                    checked={operatorResponse}
-                                    disabled
-                                  />
-                                ) : (
-                                  <span>
-                                    {operatorResponse !== undefined &&
-                                    operatorResponse !== null
-                                      ? operatorResponse.toString()
-                                      : ''}
-                                  </span>
-                                )}
-                              </td>
-                            </tr>
-                          );
-                        })}
-                    </tbody>
-                  </Table>
-                  <InputGroup style={{ paddingTop: '10px', width: '70%' }}>
-                    <Label>Color De Personalización:</Label>
-                    <Input
-                      type="text"
-                      value={
-                        workOrder?.answers[index].color_personalizacion ??
-                        'No se reconoce la muestra enviada'
-                      }
-                      readOnly
-                    />
-                    <Label>Tipo de Código de Barras Que Se Personaliza:</Label>
-                    <Input
-                      type="text"
-                      value={
-                        workOrder?.answers[index].codigo_barras ??
-                        'No se reconoce la muestra enviada'
-                      }
-                      readOnly
-                    />
-                    <Label>Muestras entregadas:</Label>
-                    <Input
-                      type="number"
-                      value={
-                        workOrder?.answers[index].sample_quantity ??
-                        'No se reconoce la muestra enviada'
-                      }
-                      readOnly
-                    />
-                  </InputGroup>
+                  <OperatorAdvanceMachineTable
+                    visible
+                    machine="Personalización"
+                    title=""
+                    questions={workOrder.area.formQuestions}
+                    areaId={10}
+                    questionSlice={[1, 10]}
+                    answers={workOrder.answers[index]?.FormAnswerResponse ?? []}
+                    extras={
+                      <InputGroup style={{ width: '70%' }}>
+                        <Label>Color De Personalización:</Label>
+                        <Input
+                          type="text"
+                          value={
+                            workOrder?.answers[index].color_personalizacion ??
+                            'No se reconoce la muestra enviada'
+                          }
+                          readOnly
+                        />
+                        <Label>
+                          Tipo de Código de Barras Que Se Personaliza:
+                        </Label>
+                        <Input
+                          type="text"
+                          value={
+                            workOrder?.answers[index].codigo_barras ??
+                            'No se reconoce la muestra enviada'
+                          }
+                          readOnly
+                        />
+                        <Label>Muestras entregadas:</Label>
+                        <Input
+                          type="number"
+                          value={
+                            workOrder?.answers[index].sample_quantity ??
+                            'No se reconoce la muestra enviada'
+                          }
+                          readOnly
+                        />
+                      </InputGroup>
+                    }
+                  />
                 </>
               )}
               {workOrder?.answers[index].tipo_personalizacion === 'laser' && (
@@ -232,180 +168,81 @@ export default function PersonalizacionComponentCQM({ workOrder }: Props) {
               {workOrder?.answers[index].tipo_personalizacion ===
                 'packsmart' && (
                 <>
-                  <Table>
-                    <thead>
-                      <tr>
-                        <th>Pregunta</th>
-                        <th>Respuesta</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {workOrder.area.formQuestions
-                        .slice(14, 20)
-                        .map((question: { id: number; title: string }) => {
-                          // Buscar la respuesta correspondiente a esta pregunta
-                          const answer = workOrder.answers[
-                            index
-                          ]?.FormAnswerResponse?.find(
-                            (resp: any) => resp.question_id === question.id
-                          );
-
-                          // Obtener la respuesta del operador (response_operator)
-                          const operatorResponse = answer?.response_operator;
-                          return (
-                            <tr key={question.id}>
-                              <td>{question.title}</td>
-                              <td>
-                                {typeof operatorResponse === 'boolean' ? (
-                                  <input
-                                    type="checkbox"
-                                    checked={operatorResponse}
-                                    disabled
-                                  />
-                                ) : (
-                                  <span>
-                                    {operatorResponse !== undefined &&
-                                    operatorResponse !== null
-                                      ? operatorResponse.toString()
-                                      : ''}
-                                  </span>
-                                )}
-                              </td>
-                            </tr>
-                          );
-                        })}
-                    </tbody>
-                  </Table>
-                  <InputGroup style={{ marginTop: '10px', width: '70%' }}>
-                    <Label>Muestras entregadas:</Label>
-                    <Input
-                      type="number"
-                      value={
-                        workOrder?.answers[index].sample_quantity ??
-                        'No se reconoce la muestra enviada'
-                      }
-                      readOnly
-                    />
-                  </InputGroup>
+                  <OperatorAdvanceMachineTable
+                    visible
+                    machine="packsmart"
+                    title=""
+                    questions={workOrder.area.formQuestions}
+                    areaId={10}
+                    questionSlice={[14, 20]}
+                    answers={workOrder.answers[index]?.FormAnswerResponse ?? []}
+                    extras={
+                      <InputGroup style={{ width: '70%' }}>
+                        <Label>Muestras entregadas:</Label>
+                        <Input
+                          type="number"
+                          value={
+                            workOrder?.answers[index].sample_quantity ??
+                            'No se reconoce la muestra enviada'
+                          }
+                          readOnly
+                        />
+                      </InputGroup>
+                    }
+                  />
                 </>
               )}
               {workOrder?.answers[index].tipo_personalizacion === 'otto' && (
                 <>
-                  <Table>
-                    <thead>
-                      <tr>
-                        <th>Pregunta</th>
-                        <th>Respuesta</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {workOrder.area.formQuestions
-                        .slice(20, 28)
-                        .map((question: { id: number; title: string }) => {
-                          // Buscar la respuesta correspondiente a esta pregunta
-                          const answer = workOrder.answers[
-                            index
-                          ]?.FormAnswerResponse?.find(
-                            (resp: any) => resp.question_id === question.id
-                          );
-
-                          // Obtener la respuesta del operador (response_operator)
-                          const operatorResponse = answer?.response_operator;
-                          return (
-                            <tr key={question.id}>
-                              <td>{question.title}</td>
-                              <td>
-                                {typeof operatorResponse === 'boolean' ? (
-                                  <input
-                                    type="checkbox"
-                                    checked={operatorResponse}
-                                    disabled
-                                  />
-                                ) : (
-                                  <span>
-                                    {operatorResponse !== undefined &&
-                                    operatorResponse !== null
-                                      ? operatorResponse.toString()
-                                      : ''}
-                                  </span>
-                                )}
-                              </td>
-                            </tr>
-                          );
-                        })}
-                    </tbody>
-                  </Table>
-                  <InputGroup style={{ marginTop: '10px', width: '70%' }}>
-                    <Label>Muestras entregadas:</Label>
-                    <Input
-                      type="number"
-                      value={
-                        workOrder?.answers[index].sample_quantity ??
-                        'No se reconoce la muestra enviada'
-                      }
-                      readOnly
-                    />
-                  </InputGroup>
+                  <OperatorAdvanceMachineTable
+                    visible
+                    machine="otto"
+                    title=""
+                    questions={workOrder.area.formQuestions}
+                    areaId={10}
+                    questionSlice={[20, 28]}
+                    answers={workOrder.answers[index]?.FormAnswerResponse ?? []}
+                    extras={
+                      <InputGroup style={{ width: '70%' }}>
+                        <Label>Muestras entregadas:</Label>
+                        <Input
+                          type="number"
+                          value={
+                            workOrder?.answers[index].sample_quantity ??
+                            'No se reconoce la muestra enviada'
+                          }
+                          readOnly
+                        />
+                      </InputGroup>
+                    }
+                  />
                 </>
               )}
               {workOrder?.answers[index].tipo_personalizacion ===
                 'embolsadora' && (
                 <>
-                  <Table>
-                    <thead>
-                      <tr>
-                        <th>Pregunta</th>
-                        <th>Respuesta</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {workOrder.area.formQuestions
-                        .slice(28, 30)
-                        .map((question: { id: number; title: string }) => {
-                          // Buscar la respuesta correspondiente a esta pregunta
-                          const answer = workOrder.answers[
-                            index
-                          ]?.FormAnswerResponse?.find(
-                            (resp: any) => resp.question_id === question.id
-                          );
-
-                          // Obtener la respuesta del operador (response_operator)
-                          const operatorResponse = answer?.response_operator;
-                          return (
-                            <tr key={question.id}>
-                              <td>{question.title}</td>
-                              <td>
-                                {typeof operatorResponse === 'boolean' ? (
-                                  <input
-                                    type="checkbox"
-                                    checked={operatorResponse}
-                                    disabled
-                                  />
-                                ) : (
-                                  <span>
-                                    {operatorResponse !== undefined &&
-                                    operatorResponse !== null
-                                      ? operatorResponse.toString()
-                                      : ''}
-                                  </span>
-                                )}
-                              </td>
-                            </tr>
-                          );
-                        })}
-                    </tbody>
-                  </Table>
-                  <InputGroup style={{ marginTop: '10px', width: '70%' }}>
-                    <Label>Muestras entregadas:</Label>
-                    <Input
-                      type="number"
-                      value={
-                        workOrder?.answers[index].sample_quantity ??
-                        'No se reconoce la muestra enviada'
-                      }
-                      readOnly
-                    />
-                  </InputGroup>
+                  <OperatorAdvanceMachineTable
+                    visible
+                    machine="embolsadora"
+                    title=""
+                    questions={workOrder.area.formQuestions}
+                    areaId={10}
+                    questionSlice={[28, 30]}
+                    answers={workOrder.answers[index]?.FormAnswerResponse ?? []}
+                    extras={
+                      <InputGroup style={{ width: '70%' }}>
+                        <Label>Muestras entregadas:</Label>
+                        <Input
+                          type="number"
+                          value={
+                            workOrder?.answers[index].sample_quantity ??
+                            'No se reconoce la muestra enviada'
+                          }
+                          readOnly
+                        />
+                      </InputGroup>
+                    }
+                  />
                 </>
               )}
             </NewDataWrapper>

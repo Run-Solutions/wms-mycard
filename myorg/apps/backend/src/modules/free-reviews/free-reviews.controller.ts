@@ -12,9 +12,8 @@ import {
 import { FreeReviewsService } from './free-reviews.service';
 import { JwtAuthGuard } from 'src/auth/jwt-auth.guard';
 import { CreateFormExtraDto } from './dto/create-form-extra.dto';
-import { CreateFormExtraEmpalDto } from './dto/create-form-extra.dto';
-import { CreateFormExtraMillingDto } from './dto/create-form-extra.dto';
-import { CreateFormExtraPersonalizacionDto } from './dto/create-form-extra.dto';
+import { CreateFormExtraEmpalDto, CreateFormExtraLaminacionDto, CreateFormExtraMillingDto, CreateFormExtraPersonalizacionDto } from './dto/create-form-extra.dto';
+
 
 interface AuthenticatedUser {
   id: number;
@@ -93,6 +92,10 @@ export class FreeReviewsController {
   @Post('form-extra-empal')
   async postFormExtraEmpal(@Body() dto: CreateFormExtraEmpalDto) {
     return await this.FreeReviewsService.postFormExtraEmpal(dto);
+  }
+  @Post('form-extra-laminacion')
+  async postFormExtraLaminacion(@Body() dto: CreateFormExtraLaminacionDto) {
+    return await this.FreeReviewsService.postFormExtraLaminacion(dto);
   }
 
   // Para adjuntar las respuestas de calidad

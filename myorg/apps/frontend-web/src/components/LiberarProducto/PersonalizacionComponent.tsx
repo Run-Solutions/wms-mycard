@@ -64,6 +64,55 @@ export default function PersonalizacionComponent({ workOrder }: Props) {
   }>({});
   const [materialBadQuantity, setMaterialBadQuantity] = useState<string>('0');
   const [lastAreaBadQuantity, setLastBadQuantity] = useState<string>('0');
+  const [checkedQuestions, setCheckedQuestions] = useState<number[]>([]);
+  const [checkedRespuestaOK, setCheckedRespuestaOK] = useState<number[]>([]);
+  const [checkedRespuestaNG, setCheckedRespuestaNG] = useState<number[]>([]);
+
+  const handleToggleRespuesta = (
+    questionId: number,
+    _columnIndex: number, // por ahora 0, si solo tienes 'Respuesta'
+    type: 'ok' | 'ng',
+    checked: boolean
+  ) => {
+    if (type === 'ok') {
+      // Marcar OK ⇒ true
+      setCheckedRespuestaOK((prev) =>
+        checked ? [...prev, questionId] : prev.filter((id) => id !== questionId)
+      );
+      // Desmarcar NG si se marcó OK
+      if (checked)
+        setCheckedRespuestaNG((prev) => prev.filter((id) => id !== questionId));
+
+      setResponses((prev) => {
+        // Si se marcó OK, answer=true; si se desmarcó y NG no está marcado, eliminar
+        const without = prev.filter((r) => r.questionId !== questionId);
+        if (checked) return [...without, { questionId, answer: true }];
+        // si no está marcado OK, pero NG está marcado, mantener NG=false en responses
+        if (checkedRespuestaNG.includes(questionId)) {
+          return [...without, { questionId, answer: false }];
+        }
+        return without; // ninguno marcado => sin respuesta
+      });
+    } else {
+      // Marcar NG ⇒ false
+      setCheckedRespuestaNG((prev) =>
+        checked ? [...prev, questionId] : prev.filter((id) => id !== questionId)
+      );
+      // Desmarcar OK si se marcó NG
+      if (checked)
+        setCheckedRespuestaOK((prev) => prev.filter((id) => id !== questionId));
+
+      setResponses((prev) => {
+        const without = prev.filter((r) => r.questionId !== questionId);
+        if (checked) return [...without, { questionId, answer: false }];
+        // si no está marcado NG, pero OK sí lo está, mantener OK=true en responses
+        if (checkedRespuestaOK.includes(questionId)) {
+          return [...without, { questionId, answer: true }];
+        }
+        return without; // ninguno marcado => sin respuesta
+      });
+    }
+  };
   const closeModal = () => {
     setShowModal(false);
   };
@@ -143,7 +192,6 @@ export default function PersonalizacionComponent({ workOrder }: Props) {
   const [badQuantity, setBadQuantity] = useState<number | string>('');
   const [excessQuantity, setExcessQuantity] = useState<number | string>('');
   // Para controlar qué preguntas están marcadas
-  const [checkedQuestions, setCheckedQuestions] = useState<number[]>([]);
   // Función para manejar el cambio en el campo de muestras y color edge
   const handleSampleQuantityChange = (
     e: React.ChangeEvent<HTMLInputElement>
@@ -795,9 +843,11 @@ export default function PersonalizacionComponent({ workOrder }: Props) {
                   areaId={10}
                   roleId={null}
                   questionSlice={[0, 1]} // ✅ Solo la primera pregunta
-                  checkedQuestions={checkedQuestions}
-                  onCheckToggle={handleCheckboxChange}
-                  title=""
+                  columns={['Respuesta']} // una columna => pares OK/NG
+                  checkedQuestions={[
+                    { ok: checkedRespuestaOK, ng: checkedRespuestaNG },
+                  ]}
+                  onToggle={handleToggleRespuesta}
                   extras={
                     <InputGroup style={{ paddingTop: '30px', width: '70%' }}>
                       <Label>
@@ -824,9 +874,11 @@ export default function PersonalizacionComponent({ workOrder }: Props) {
                   areaId={10}
                   roleId={null}
                   questionSlice={[1, 10]} // ✅ Solo la primera pregunta
-                  checkedQuestions={checkedQuestions}
-                  onCheckToggle={handleCheckboxChange}
-                  title=""
+                  columns={['Respuesta']} // una columna => pares OK/NG
+                  checkedQuestions={[
+                    { ok: checkedRespuestaOK, ng: checkedRespuestaNG },
+                  ]}
+                  onToggle={handleToggleRespuesta}
                   extras={
                     <InputGroup style={{ paddingTop: '30px', width: '70%' }}>
                       <Label>Color De Personalización:</Label>
@@ -868,11 +920,13 @@ export default function PersonalizacionComponent({ workOrder }: Props) {
                   machine="packsmart"
                   questions={workOrder.area.formQuestions}
                   areaId={10}
-                  roleId={null}
-                  questionSlice={[14, 20]} // ✅ Solo la primera pregunta
-                  checkedQuestions={checkedQuestions}
-                  onCheckToggle={handleCheckboxChange}
-                  title=""
+                  roleId={null} // ver nota abajo para filtrar por rol
+                  questionSlice={[14, 15]} // ✅ solo la pregunta en índice 14 (fin exclusivo)
+                  columns={['Respuesta']} // una columna => pares OK/NG
+                  checkedQuestions={[
+                    { ok: checkedRespuestaOK, ng: checkedRespuestaNG },
+                  ]}
+                  onToggle={handleToggleRespuesta}
                   extras={<></>}
                 />
               </>
@@ -887,9 +941,11 @@ export default function PersonalizacionComponent({ workOrder }: Props) {
                   areaId={10}
                   roleId={null}
                   questionSlice={[20, 28]} // ✅ Solo la primera pregunta
-                  checkedQuestions={checkedQuestions}
-                  onCheckToggle={handleCheckboxChange}
-                  title=""
+                  columns={['Respuesta']} // una columna => pares OK/NG
+                  checkedQuestions={[
+                    { ok: checkedRespuestaOK, ng: checkedRespuestaNG },
+                  ]}
+                  onToggle={handleToggleRespuesta}
                   extras={<></>}
                 />
               </>
@@ -904,9 +960,11 @@ export default function PersonalizacionComponent({ workOrder }: Props) {
                   areaId={10}
                   roleId={null}
                   questionSlice={[28, 30]} // ✅ Solo la primera pregunta
-                  checkedQuestions={checkedQuestions}
-                  onCheckToggle={handleCheckboxChange}
-                  title=""
+                  columns={['Respuesta']} // una columna => pares OK/NG
+                  checkedQuestions={[
+                    { ok: checkedRespuestaOK, ng: checkedRespuestaNG },
+                  ]}
+                  onToggle={handleToggleRespuesta}
                   extras={<></>}
                 />
               </>

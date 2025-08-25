@@ -306,7 +306,7 @@ const VistosBuenosPage: React.FC = () => {
 
       <PageContainer>
         <TitleWrapper>
-          <Title theme={theme}>Vistos Buenos</Title>
+          <Title theme={theme}>Recepción De Vistos Buenos</Title>
         </TitleWrapper>
         <CardsContainer>
           {Array.isArray(CQMWorkOrders) && CQMWorkOrders.length > 0 ? (

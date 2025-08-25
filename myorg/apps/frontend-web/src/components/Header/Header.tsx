@@ -47,7 +47,7 @@ const Header: React.FC = () => {
         <img src='/logos/mycard-logo.svg' alt='MyCard Logo' style={{ height: 40 }} />
       </LogoContainer>
       {/* Ajusta la ruta del logo de soporte técnico */}
-      <SupportLogo src='/images/support.svg' alt='Soporte Técnico' />
+      {/*<SupportLogo src='/images/support.svg' alt='Soporte Técnico' />*/}
     </HeaderContainer>
   );
 };

@@ -56,7 +56,7 @@ const RecepcionCQMPage: React.FC = () => {
   return (
     <PageContainer>
       <TitleWrapper>
-        <Title>Recepcion CQM</Title>
+        <Title>Liberación de Vistos Buenos</Title>
       </TitleWrapper>
       <WorkOrderTable orders={CQMWorkOrders} title="Órdenes en Calidad" statusFilter="En calidad" />
     </PageContainer>

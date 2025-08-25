@@ -22,6 +22,7 @@ import { updateWorkOrderAreas } from '../../api/seguimientoDeOts';
 import { useAuth } from '../../contexts/AuthContext';
 import { calcularCantidadPorLiberar } from './util/calcularCantidadPorLiberar';
 import BadQuantityModal from './util/BadQuantityModal';
+import MachineSection from './util/MachineSection';
 
 interface PartialRelease {
   validated: boolean;
@@ -56,6 +57,15 @@ export type AreaData = {
   defectuoso: number;
   muestras: number;
 };
+const slicesByOption: Record<string, [number, number]> = {
+  etiquetadora: [0, 1],
+  persos: [1, 10],
+  otto: [20, 28],
+  packsmart: [14, 15],
+  embolsadora: [28, 30],
+  laser: [0, 0], // sin preguntas
+};
+
 const PersonalizacionComponent = ({ workOrder }: { workOrder: any }) => {
   console.log('Order', workOrder);
   const navigation =
@@ -67,7 +77,6 @@ const PersonalizacionComponent = ({ workOrder }: { workOrder: any }) => {
   const [comments, setComments] = useState('');
   const [showCqmModal, setShowCqmModal] = useState(false);
   const [showConfirm, setShowConfirm] = useState(false);
-  const [checkedQuestion, setCheckedQuestion] = useState<number[]>([]);
   const [showQuality, setShowQuality] = useState<boolean>(false);
   const [selectedOption, setSelectedOption] = useState('etiquetadora');
   const [verificarEtiqueta, setVerificarEtiqueta] = useState('');
@@ -79,13 +88,38 @@ const PersonalizacionComponent = ({ workOrder }: { workOrder: any }) => {
   }>({});
   const [materialBadQuantity, setMaterialBadQuantity] = useState<string>('0');
   const [lastAreaBadQuantity, setLastBadQuantity] = useState<string>('0');
+  const [sliceStart, sliceEnd] = slicesByOption[selectedOption] ?? [0, 0];
 
-  const questions =
-    workOrder.area.formQuestions?.filter((q: any) => q.role_id === null) || [];
-  const qualityQuestions =
-    workOrder.area.formQuestions?.filter((q: any) => q.role_id === 3) || [];
   const isDisabled = workOrder.status === 'En proceso';
+  // Una sola fuente de verdad: por pregunta guarda true (OK), false (NG) o undefined (sin respuesta)
+  const [answersByQuestion, setAnswersByQuestion] = useState<
+    Record<number, boolean | undefined>
+  >({});
 
+  // Preguntas visibles en la tabla (mismo filtro que pasas al child con roleId=null)
+  const visibleQuestions = useMemo(() => {
+    const all = workOrder.area.formQuestions ?? [];
+    // Siempre basadas en slice:
+    return all.slice(sliceStart, sliceEnd);
+  }, [workOrder.area.formQuestions, sliceStart, sliceEnd]);
+  // Mapa único de slices [inicio, fin) por máquina/opción
+
+  // Listas derivadas para el componente de tabla (no se guardan aparte)
+  const checkedRespuestaOK = useMemo(
+    () =>
+      visibleQuestions
+        .filter((q: any) => answersByQuestion[q.id] === true)
+        .map((q: any) => q.id),
+    [visibleQuestions, answersByQuestion]
+  );
+
+  const checkedRespuestaNG = useMemo(
+    () =>
+      visibleQuestions
+        .filter((q: any) => answersByQuestion[q.id] === false)
+        .map((q: any) => q.id),
+    [visibleQuestions, answersByQuestion]
+  );
   const { user } = useAuth();
   const currentUserId = user?.sub;
   console.log('currentUserId:', currentUserId);
@@ -136,21 +170,34 @@ const PersonalizacionComponent = ({ workOrder }: { workOrder: any }) => {
       Alert.alert('Cantidad de muestra inválida');
       return;
     }
-    if (!questions.length) {
-      Alert.alert('Completa todas las preguntas y cantidad de muestra.');
+
+    // Construir arrays alineados **sólo** con visibleQuestions por slice
+    const question_id: number[] = [];
+    const response: boolean[] = [];
+
+    visibleQuestions.forEach((q: any) => {
+      const ans = answersByQuestion[q.id];
+      if (ans !== undefined) {
+        question_id.push(q.id);
+        response.push(!!ans);
+      }
+    });
+
+    // Exigir todas respondidas (solo si hay preguntas en ese slice)
+    if (
+      visibleQuestions.length > 0 &&
+      question_id.length !== visibleQuestions.length
+    ) {
+      Alert.alert('Completa todas las preguntas y la cantidad de muestra.');
       return;
     }
 
-    const answeredQuestions = questions.filter((q: any) =>
-      checkedQuestion.includes(q.id)
-    );
-
     const basePayload = {
-      question_id: answeredQuestions.map((q: any) => q.id),
+      question_id,
       work_order_flow_id: currentFlow.id,
       work_order_id: currentFlow.workOrder.id,
       area_id: currentFlow.area.id,
-      response: answeredQuestions.map(() => true), // todas las marcadas son true
+      response,
       reviewed: false,
       user_id: currentFlow.assigned_user,
       sample_quantity: Number(sampleQuantity),
@@ -326,7 +373,7 @@ const PersonalizacionComponent = ({ workOrder }: { workOrder: any }) => {
             ? String(badQuantity)
             : '';
       }
-  
+
       if (
         flow.area.id >= 6 &&
         initialValues[`${areaName}_material`] === undefined
@@ -508,6 +555,30 @@ const PersonalizacionComponent = ({ workOrder }: { workOrder: any }) => {
       isNextInvalid
     );
   };
+
+  const handleToggleRespuesta = (
+    questionId: number,
+    _columnIndex: number,
+    type: 'ok' | 'ng',
+    checked: boolean
+  ) => {
+    setAnswersByQuestion((prev) => {
+      const next = { ...prev };
+      if (checked) {
+        // marcar OK => true, NG => false (exclusivo)
+        next[questionId] = type === 'ok';
+      } else {
+        // si desmarcan la opción activa, borramos la respuesta
+        if (
+          (type === 'ok' && next[questionId] === true) ||
+          (type === 'ng' && next[questionId] === false)
+        ) {
+          delete next[questionId];
+        }
+      }
+      return next;
+    });
+  };
   const shouldDisableCQM = () => {
     const estadosBloqueadosBase = [
       'Enviado a CQM',
@@ -618,9 +689,7 @@ const PersonalizacionComponent = ({ workOrder }: { workOrder: any }) => {
           mode="outlined"
           activeOutlineColor="#000"
           keyboardType="numeric"
-          placeholder={
-            sumaBadQuantity > 0 ? sumaBadQuantity.toString() : '0'
-          }
+          placeholder={sumaBadQuantity > 0 ? sumaBadQuantity.toString() : '0'}
           value={sumaBadQuantity}
           editable={false} // deshabilita edición
           pointerEvents="none" // evita que se abra el teclado
@@ -702,8 +771,14 @@ const PersonalizacionComponent = ({ workOrder }: { workOrder: any }) => {
       />
 
       {/* Modal CQM */}
-      <Modal visible={showCqmModal} animationType="slide">
-        <ScrollView contentContainerStyle={styles.modalContainer}>
+      <Modal visible={showCqmModal} animationType="slide" presentationStyle="fullScreen">
+  <ScrollView
+    style={{ flex: 1 }}                       // ocupa la pantalla
+    contentContainerStyle={styles.modalContent} // sin flex:1 aquí
+    keyboardShouldPersistTaps="handled"
+    nestedScrollEnabled
+    showsVerticalScrollIndicator
+  >
           <Text style={styles.title}>
             Preguntas del Área: {workOrder.area.name}
           </Text>
@@ -746,261 +821,139 @@ const PersonalizacionComponent = ({ workOrder }: { workOrder: any }) => {
           {/* Tabla de preguntas */}
           {selectedOption === 'etiquetadora' && firstQuestion && (
             <>
-              {/* Encabezado estilo tabla */}
-              <View style={styles.tableHeader}>
-                <Text style={[styles.tableCell, { flex: 2 }]}>Pregunta</Text>
-                <Text style={styles.tableCell}>Respuesta</Text>
-              </View>
-
-              {/* Preguntas normales */}
-              {
-                <View key={firstQuestion.id} style={styles.tableRow}>
-                  {/* Pregunta */}
-                  <View style={[styles.tableCell, { flex: 2 }]}>
-                    <Text style={styles.questionText}>
-                      {firstQuestion.title}
+              <MachineSection
+                visible={selectedOption === 'etiquetadora'}
+                machine="etiquetadora"
+                questions={workOrder.area.formQuestions}
+                areaId={10}
+                roleId={null}
+                questionSlice={[0, 1]} // ✅ Solo la primera pregunta
+                columns={['Respuesta']} // una columna => pares OK/NG
+                checkedQuestions={[
+                  { ok: checkedRespuestaOK, ng: checkedRespuestaNG },
+                ]}
+                onToggle={handleToggleRespuesta}
+                extras={
+                  <>
+                    <Text style={styles.label}>
+                      Verificar Tipo De Etiqueta Vs Ot Y Pegar Utilizada:
                     </Text>
-                  </View>
-
-                  {/* Respuesta */}
-                  <View
-                    style={[
-                      styles.tableCell,
-                      { flex: 1, alignItems: 'center' },
-                    ]}
-                  >
-                    <TouchableOpacity
-                      onPress={() =>
-                        toggleCheckbox(
-                          firstQuestion.id,
-                          checkedQuestion,
-                          setCheckedQuestion
-                        )
-                      }
-                      style={styles.radioCircle}
-                    >
-                      {checkedQuestion.includes(firstQuestion.id) && (
-                        <View style={styles.radioDot} />
-                      )}
-                    </TouchableOpacity>
-                  </View>
-                </View>
-              }
-
-              {/* Inputs */}
-              <Text style={styles.label}>
-                Verificar Tipo De Etiqueta Vs Ot Y Pegar Utilizada:
-              </Text>
-              <TextInput
-                placeholder="Ej:"
-                value={verificarEtiqueta}
-                onChangeText={setVerificarEtiqueta}
-                style={styles.input}
-                theme={{ roundness: 30 }}
-                mode="outlined"
-                activeOutlineColor="#000"
+                    <TextInput
+                      placeholder="Ej:"
+                      value={verificarEtiqueta}
+                      onChangeText={setVerificarEtiqueta}
+                      style={styles.input}
+                      theme={{ roundness: 30 }}
+                      mode="outlined"
+                      activeOutlineColor="#000"
+                    />
+                  </>
+                }
               />
             </>
           )}
           {selectedOption === 'persos' && (
             <>
-              <ScrollView style={styles.scrollArea}>
-                {/* Encabezado estilo tabla */}
-                <View style={styles.tableHeader}>
-                  <Text style={[styles.tableCell, { flex: 2 }]}>Pregunta</Text>
-                  <Text style={styles.tableCell}>Respuesta</Text>
-                </View>
-
-                {/* Preguntas normales */}
-                {workOrder.area.formQuestions.slice(1, 10).map((q: any) => (
-                  <View key={q.id} style={styles.tableRow}>
-                    {/* Pregunta */}
-                    <View style={[styles.tableCell, { flex: 2 }]}>
-                      <Text style={styles.questionText}>{q.title}</Text>
-                    </View>
-
-                    {/* Respuesta */}
-                    <View
-                      style={[
-                        styles.tableCell,
-                        { flex: 1, alignItems: 'center' },
-                      ]}
-                    >
-                      <TouchableOpacity
-                        onPress={() =>
-                          toggleCheckbox(
-                            q.id,
-                            checkedQuestion,
-                            setCheckedQuestion
-                          )
-                        }
-                        style={styles.radioCircle}
-                      >
-                        {checkedQuestion.includes(q.id) && (
-                          <View style={styles.radioDot} />
-                        )}
-                      </TouchableOpacity>
-                    </View>
-                  </View>
-                ))}
-              </ScrollView>
-              {/* Campo de muestras */}
-              <Text style={styles.label}>Color De Personalización:</Text>
-              <TextInput
-                placeholder="Ej: "
-                value={colorPersonalizacion}
-                onChangeText={setColorPersonalizacion}
-                style={styles.input}
-                theme={{ roundness: 30 }}
-                mode="outlined"
-                activeOutlineColor="#000"
-              />
-              {/* Campo de muestras */}
-              <Text style={styles.label}>
-                Tipo de Código de Barras Que Se Personaliza:
-              </Text>
-              <TextInput
-                placeholder="Ej: "
-                value={codigoBarras}
-                onChangeText={setCodigoBarras}
-                style={styles.input}
-                theme={{ roundness: 30 }}
-                mode="outlined"
-                activeOutlineColor="#000"
+              <MachineSection
+                visible={selectedOption === 'persos'}
+                machine="persos"
+                questions={workOrder.area.formQuestions}
+                areaId={10}
+                roleId={null}
+                questionSlice={[1, 10]} // ✅ Solo la primera pregunta
+                columns={['Respuesta']} // una columna => pares OK/NG
+                checkedQuestions={[
+                  { ok: checkedRespuestaOK, ng: checkedRespuestaNG },
+                ]}
+                onToggle={handleToggleRespuesta}
+                extras={
+                  <>
+                    <Text style={styles.label}>Color De Personalización:</Text>
+                    <TextInput
+                      placeholder="Ej: "
+                      value={colorPersonalizacion}
+                      onChangeText={setColorPersonalizacion}
+                      style={styles.input}
+                      theme={{ roundness: 30 }}
+                      mode="outlined"
+                      activeOutlineColor="#000"
+                    />
+                    {/* Campo de muestras */}
+                    <Text style={styles.label}>
+                      Tipo de Código de Barras Que Se Personaliza:
+                    </Text>
+                    <TextInput
+                      placeholder="Ej: "
+                      value={codigoBarras}
+                      onChangeText={setCodigoBarras}
+                      style={styles.input}
+                      theme={{ roundness: 30 }}
+                      mode="outlined"
+                      activeOutlineColor="#000"
+                    />
+                  </>
+                }
               />
             </>
           )}
           {selectedOption === 'otto' && (
             <>
-              <ScrollView style={styles.scrollArea}>
-                {/* Encabezado estilo tabla */}
-                <View style={styles.tableHeader}>
-                  <Text style={[styles.tableCell, { flex: 2 }]}>Pregunta</Text>
-                  <Text style={styles.tableCell}>Respuesta</Text>
-                </View>
-
-                {/* Preguntas normales */}
-                {workOrder.area.formQuestions.slice(20, 28).map((q: any) => (
-                  <View key={q.id} style={styles.tableRow}>
-                    {/* Pregunta */}
-                    <View style={[styles.tableCell, { flex: 2 }]}>
-                      <Text style={styles.questionText}>{q.title}</Text>
-                    </View>
-
-                    {/* Respuesta */}
-                    <View
-                      style={[
-                        styles.tableCell,
-                        { flex: 1, alignItems: 'center' },
-                      ]}
-                    >
-                      <TouchableOpacity
-                        onPress={() =>
-                          toggleCheckbox(
-                            q.id,
-                            checkedQuestion,
-                            setCheckedQuestion
-                          )
-                        }
-                        style={styles.radioCircle}
-                      >
-                        {checkedQuestion.includes(q.id) && (
-                          <View style={styles.radioDot} />
-                        )}
-                      </TouchableOpacity>
-                    </View>
-                  </View>
-                ))}
-              </ScrollView>
+              <MachineSection
+                visible={selectedOption === 'otto'}
+                machine="otto"
+                questions={workOrder.area.formQuestions}
+                areaId={10}
+                roleId={null}
+                questionSlice={[20, 28]} // ✅ Solo la primera pregunta
+                columns={['Respuesta']} // una columna => pares OK/NG
+                checkedQuestions={[
+                  { ok: checkedRespuestaOK, ng: checkedRespuestaNG },
+                ]}
+                onToggle={handleToggleRespuesta}
+                extras={<></>}
+              />
+            </>
+          )}
+          {selectedOption === 'laser' && (
+            <>
+              <Text>No hay preguntas por parte del operador.</Text>
             </>
           )}
           {selectedOption === 'packsmart' && (
             <>
-              <ScrollView style={styles.scrollArea}>
-                {/* Encabezado estilo tabla */}
-                <View style={styles.tableHeader}>
-                  <Text style={[styles.tableCell, { flex: 2 }]}>Pregunta</Text>
-                  <Text style={styles.tableCell}>Respuesta</Text>
-                </View>
-
-                {/* Preguntas normales */}
-                {workOrder.area.formQuestions.slice(14, 20).map((q: any) => (
-                  <View key={q.id} style={styles.tableRow}>
-                    {/* Pregunta */}
-                    <View style={[styles.tableCell, { flex: 2 }]}>
-                      <Text style={styles.questionText}>{q.title}</Text>
-                    </View>
-
-                    {/* Respuesta */}
-                    <View
-                      style={[
-                        styles.tableCell,
-                        { flex: 1, alignItems: 'center' },
-                      ]}
-                    >
-                      <TouchableOpacity
-                        onPress={() =>
-                          toggleCheckbox(
-                            q.id,
-                            checkedQuestion,
-                            setCheckedQuestion
-                          )
-                        }
-                        style={styles.radioCircle}
-                      >
-                        {checkedQuestion.includes(q.id) && (
-                          <View style={styles.radioDot} />
-                        )}
-                      </TouchableOpacity>
-                    </View>
-                  </View>
-                ))}
-              </ScrollView>
+              <MachineSection
+                visible={selectedOption === 'packsmart'}
+                machine="packsmart"
+                questions={workOrder.area.formQuestions}
+                areaId={10}
+                roleId={null} // ver nota abajo para filtrar por rol
+                questionSlice={[14, 15]} // ✅ solo la pregunta en índice 14 (fin exclusivo)
+                columns={['Respuesta']} // una columna => pares OK/NG
+                checkedQuestions={[
+                  { ok: checkedRespuestaOK, ng: checkedRespuestaNG },
+                ]}
+                onToggle={handleToggleRespuesta}
+                extras={<></>}
+              />
             </>
           )}
 
           {selectedOption === 'embolsadora' && (
             <>
-              <ScrollView style={styles.scrollArea}>
-                {/* Encabezado estilo tabla */}
-                <View style={styles.tableHeader}>
-                  <Text style={[styles.tableCell, { flex: 2 }]}>Pregunta</Text>
-                  <Text style={styles.tableCell}>Respuesta</Text>
-                </View>
-
-                {/* Preguntas normales */}
-                {workOrder.area.formQuestions.slice(28, 30).map((q: any) => (
-                  <View key={q.id} style={styles.tableRow}>
-                    {/* Pregunta */}
-                    <View style={[styles.tableCell, { flex: 2 }]}>
-                      <Text style={styles.questionText}>{q.title}</Text>
-                    </View>
-
-                    {/* Respuesta */}
-                    <View
-                      style={[
-                        styles.tableCell,
-                        { flex: 1, alignItems: 'center' },
-                      ]}
-                    >
-                      <TouchableOpacity
-                        onPress={() =>
-                          toggleCheckbox(
-                            q.id,
-                            checkedQuestion,
-                            setCheckedQuestion
-                          )
-                        }
-                        style={styles.radioCircle}
-                      >
-                        {checkedQuestion.includes(q.id) && (
-                          <View style={styles.radioDot} />
-                        )}
-                      </TouchableOpacity>
-                    </View>
-                  </View>
-                ))}
-              </ScrollView>
+              <MachineSection
+                visible={selectedOption === 'embolsadora'}
+                machine="embolsadora"
+                questions={workOrder.area.formQuestions}
+                areaId={10}
+                roleId={null}
+                questionSlice={[28, 30]} // ✅ Solo la primera pregunta
+                columns={['Respuesta']} // una columna => pares OK/NG
+                checkedQuestions={[
+                  { ok: checkedRespuestaOK, ng: checkedRespuestaNG },
+                ]}
+                onToggle={handleToggleRespuesta}
+                extras={<></>}
+              />
             </>
           )}
 
@@ -1484,5 +1437,11 @@ const styles = StyleSheet.create({
   },
   inputGroup: {
     width: '100%',
+  },
+  modalContent: {
+    padding: 20,
+    paddingBottom: 40,   // deja espacio para los botones
+    marginTop: 20,
+    backgroundColor: '#fdfaf6',
   },
 });

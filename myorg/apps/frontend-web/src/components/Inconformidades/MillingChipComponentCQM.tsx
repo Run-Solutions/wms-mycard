@@ -3,6 +3,7 @@ import styled from 'styled-components';
 import { useRouter } from 'next/navigation';
 import { useState } from 'react';
 import { acceptCQMInconformity } from '@/api/inconformidades';
+import { OperatorAdvancedTable } from './util/QuestionTable';
 
 interface Props {
   workOrder: any;
@@ -10,7 +11,6 @@ interface Props {
 type Answer = {
   reviewed: boolean;
   sample_quantity: number;
-  // lo que más tenga...
 };
 
 export default function MillingChipComponentCQM({ workOrder }: Props) {
@@ -55,54 +55,13 @@ export default function MillingChipComponentCQM({ workOrder }: Props) {
           <NewData>
             <SectionTitle>Entregaste:</SectionTitle>
             <NewDataWrapper>
-              <Table>
-                <thead>
-                  <tr>
-                    <th>Pregunta</th>
-                    <th>Respuesta</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {workOrder.area.formQuestions
-                    .filter(
-                      (question: { role_id: number | null }) =>
-                        question.role_id === null
-                    )
-                    .map((question: { id: number; title: string }) => {
-                      // Buscar la respuesta correspondiente a esta pregunta
-                      const answer = workOrder.answers[
-                        index
-                      ]?.FormAnswerResponse?.find(
-                        (resp: any) => resp.question_id === question.id
-                      );
-
-                      // Obtener la respuesta del operador (response_operator)
-                      const operatorResponse = answer?.response_operator;
-
-                      return (
-                        <tr key={question.id}>
-                          <td>{question.title}</td>
-                          <td>
-                            {typeof operatorResponse === 'boolean' ? (
-                              <input
-                                type="checkbox"
-                                checked={operatorResponse}
-                                disabled
-                              />
-                            ) : (
-                              <span>
-                                {operatorResponse !== undefined &&
-                                operatorResponse !== null
-                                  ? operatorResponse.toString()
-                                  : ''}
-                              </span>
-                            )}
-                          </td>
-                        </tr>
-                      );
-                    })}
-                </tbody>
-              </Table>
+              <OperatorAdvancedTable
+                questions={workOrder.area.formQuestions ?? []}
+                answers={workOrder.answers[index]?.FormAnswerResponse ?? []}
+                mode={'simple'}
+                readOnly
+                columns={['Respuesta']}
+              />
               <InputGroup style={{ marginTop: '-7rem' }}>
                 <Label>Revisar Tecnología De Chip y Color Vs Ot:</Label>
                 <Input
@@ -342,22 +301,5 @@ const CancelButton = styled.button`
   &:focus {
     background-color: #a0a0a0;
     outline: none;
-  }
-`;
-
-const Table = styled.table`
-  width: 100%;
-  border-collapse: collapse;
-  color: black;
-  th,
-  td {
-    padding: 0.75rem;
-    text-align: left;
-    border-bottom: 1px solid #e5e7eb;
-  }
-
-  th {
-    background-color: #f3f4f6;
-    color: #374151;
   }
 `;

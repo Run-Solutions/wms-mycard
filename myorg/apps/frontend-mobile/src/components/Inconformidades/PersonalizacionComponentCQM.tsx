@@ -13,6 +13,12 @@ import {
 import { TextInput } from 'react-native-paper';
 import { acceptCQMInconformity } from '../../api/inconformidades';
 import { useNavigation } from '@react-navigation/native';
+import { OperatorAdvancedTable } from '../LiberacionDeVistosBuenos/util/FormQuestionTable';
+
+type Answer = {
+  reviewed: boolean;
+  sample_quantity: number;
+};
 
 const PersonalizacionComponentCQM = ({ workOrder }: { workOrder: any }) => {
   const navigation = useNavigation();
@@ -23,15 +29,40 @@ const PersonalizacionComponentCQM = ({ workOrder }: { workOrder: any }) => {
     { questionId: number; answer: boolean }[]
   >([]);
 
-  const index = workOrder?.answers
-    ?.map((a: any, i: number) => ({ ...a, index: i }))
-    .reverse()
-    .find((a: any) => a.reviewed === false)?.index;
+  // Derivaciones
+  // --- Derivaciones (mueve esto arriba, justo después de useState) ---
+  const index =
+    workOrder?.answers
+      ?.map((a: Answer, i: number) => ({ ...a, index: i }))
+      .reverse()
+      .find((a: Answer) => a.reviewed === false)?.index ?? null;
+
+  const hasIndex = index !== null && index !== undefined;
 
   const lastIndex =
     workOrder.answers[index].inconformities.length > 1
       ? workOrder.answers[index].inconformities.length - 1
       : 0;
+
+  // Helper: según tipo de personalización, devolver el slice de preguntas del OPERADOR
+  const getOperatorQuestions = () => {
+    const qs = workOrder?.area?.formQuestions ?? [];
+    if (!hasIndex) return [];
+    switch (workOrder?.answers?.[index!]?.tipo_personalizacion) {
+      case 'persos':
+        return qs.slice(1, 10);
+      case 'etiquetadora':
+        return qs.slice(0, 1);
+      case 'packsmart':
+        return qs.slice(14, 20);
+      case 'otto':
+        return qs.slice(20, 28);
+      case 'embolsadora':
+        return qs.slice(28, 30);
+      default:
+        return [];
+    }
+  };
 
   const handleSubmit = async () => {
     try {
@@ -67,11 +98,13 @@ const PersonalizacionComponentCQM = ({ workOrder }: { workOrder: any }) => {
 
   return (
     <View>
-      <ScrollView contentContainerStyle={[styles.container, { paddingBottom: 230 }]}>
+      <ScrollView
+        contentContainerStyle={[styles.container, { paddingBottom: 230 }]}
+      >
         <Text style={styles.sectionTitle}>Entregaste</Text>
         <Text style={styles.label}>Tipo de Personalizacion:</Text>
         <TextInput
-          style={styles.inputDetail}
+          style={styles.input}
           value={
             workOrder?.answers[index].tipo_personalizacion ??
             'No se reconoce la muestra enviada'
@@ -86,7 +119,7 @@ const PersonalizacionComponentCQM = ({ workOrder }: { workOrder: any }) => {
           <>
             <Text style={styles.label}>Muestras entregadas:</Text>
             <TextInput
-              style={styles.inputDetail}
+              style={styles.input}
               value={
                 workOrder?.answers[index].sample_quantity !== null
                   ? String(workOrder?.answers[index].sample_quantity)
@@ -101,49 +134,13 @@ const PersonalizacionComponentCQM = ({ workOrder }: { workOrder: any }) => {
         )}
         {workOrder?.answers[index].tipo_personalizacion === 'persos' && (
           <>
-            {/* Encabezado estilo tabla */}
-            <View style={styles.tableHeader}>
-              <Text style={[styles.tableCell, { flex: 2 }]}>Pregunta</Text>
-              <Text style={styles.tableCell}>Respuesta</Text>
-            </View>
-
-            {/* Preguntas normales */}
-            {questions.slice(1, 10).map((q: any) => {
-              const responses = workOrder.answers[
-                index
-              ]?.FormAnswerResponse?.find(
-                (resp: any) => resp.question_id === q.id
-              );
-              console.log(responses);
-              // Encuentra la respuesta del operador por pregunta_id
-              const operatorResponse = responses?.response_operator;
-
-              return (
-                <View key={q.id} style={styles.tableRow}>
-                  {/* Pregunta */}
-                  <View style={[styles.tableCell, { flex: 2 }]}>
-                    <Text style={styles.questionText}>{q.title}</Text>
-                  </View>
-
-                  {/* Respuesta */}
-                  <View
-                    style={[
-                      styles.tableCell,
-                      { flex: 1, alignItems: 'center' },
-                    ]}
-                  >
-                    <View
-                      style={[
-                        styles.radioCircle,
-                        operatorResponse && styles.radioDisabled,
-                      ]}
-                    >
-                      {operatorResponse && <View style={styles.radioDot} />}
-                    </View>
-                  </View>
-                </View>
-              );
-            })}
+            <OperatorAdvancedTable
+              questions={getOperatorQuestions()}
+              answers={workOrder?.answers?.[index]?.FormAnswerResponse ?? []}
+              mode="simple"
+              readOnly
+              columns={['Respuesta']}
+            />
             <Text style={styles.label}>Color De Personalización:</Text>
             <TextInput
               style={styles.input}
@@ -189,49 +186,13 @@ const PersonalizacionComponentCQM = ({ workOrder }: { workOrder: any }) => {
 
         {workOrder?.answers[index].tipo_personalizacion === 'etiquetadora' && (
           <>
-            {/* Encabezado estilo tabla */}
-            <View style={styles.tableHeader}>
-              <Text style={[styles.tableCell, { flex: 2 }]}>Pregunta</Text>
-              <Text style={styles.tableCell}>Respuesta</Text>
-            </View>
-
-            {/* Preguntas normales */}
-            {questions.slice(0, 1).map((q: any) => {
-              const responses = workOrder.answers[
-                index
-              ]?.FormAnswerResponse?.find(
-                (resp: any) => resp.question_id === q.id
-              );
-              console.log(responses);
-              // Encuentra la respuesta del operador por pregunta_id
-              const operatorResponse = responses?.response_operator;
-
-              return (
-                <View key={q.id} style={styles.tableRow}>
-                  {/* Pregunta */}
-                  <View style={[styles.tableCell, { flex: 2 }]}>
-                    <Text style={styles.questionText}>{q.title}</Text>
-                  </View>
-
-                  {/* Respuesta */}
-                  <View
-                    style={[
-                      styles.tableCell,
-                      { flex: 1, alignItems: 'center' },
-                    ]}
-                  >
-                    <View
-                      style={[
-                        styles.radioCircle,
-                        operatorResponse && styles.radioDisabled,
-                      ]}
-                    >
-                      {operatorResponse && <View style={styles.radioDot} />}
-                    </View>
-                  </View>
-                </View>
-              );
-            })}
+            <OperatorAdvancedTable
+              questions={getOperatorQuestions()}
+              answers={workOrder?.answers?.[index]?.FormAnswerResponse ?? []}
+              mode="simple"
+              readOnly
+              columns={['Respuesta']}
+            />
             <Text style={styles.label}>
               Verificar Tipo De Etiqueta Vs Ot Y Pegar Utilizada:
             </Text>
@@ -264,49 +225,13 @@ const PersonalizacionComponentCQM = ({ workOrder }: { workOrder: any }) => {
 
         {workOrder?.answers[index].tipo_personalizacion === 'packsmart' && (
           <>
-            {/* Encabezado estilo tabla */}
-            <View style={styles.tableHeader}>
-              <Text style={[styles.tableCell, { flex: 2 }]}>Pregunta</Text>
-              <Text style={styles.tableCell}>Respuesta</Text>
-            </View>
-
-            {/* Preguntas normales */}
-            {questions.slice(10, 16).map((q: any) => {
-              const responses = workOrder.answers[
-                index
-              ]?.FormAnswerResponse?.find(
-                (resp: any) => resp.question_id === q.id
-              );
-              console.log(responses);
-              // Encuentra la respuesta del operador por pregunta_id
-              const operatorResponse = responses?.response_operator;
-
-              return (
-                <View key={q.id} style={styles.tableRow}>
-                  {/* Pregunta */}
-                  <View style={[styles.tableCell, { flex: 2 }]}>
-                    <Text style={styles.questionText}>{q.title}</Text>
-                  </View>
-
-                  {/* Respuesta */}
-                  <View
-                    style={[
-                      styles.tableCell,
-                      { flex: 1, alignItems: 'center' },
-                    ]}
-                  >
-                    <View
-                      style={[
-                        styles.radioCircle,
-                        operatorResponse && styles.radioDisabled,
-                      ]}
-                    >
-                      {operatorResponse && <View style={styles.radioDot} />}
-                    </View>
-                  </View>
-                </View>
-              );
-            })}
+            <OperatorAdvancedTable
+              questions={getOperatorQuestions()}
+              answers={workOrder?.answers?.[index]?.FormAnswerResponse ?? []}
+              mode="simple"
+              readOnly
+              columns={['Respuesta']}
+            />
             <Text style={styles.label}>Muestras entregadas:</Text>
             <TextInput
               style={styles.input}
@@ -325,49 +250,13 @@ const PersonalizacionComponentCQM = ({ workOrder }: { workOrder: any }) => {
 
         {workOrder?.answers[index].tipo_personalizacion === 'otto' && (
           <>
-            {/* Encabezado estilo tabla */}
-            <View style={styles.tableHeader}>
-              <Text style={[styles.tableCell, { flex: 2 }]}>Pregunta</Text>
-              <Text style={styles.tableCell}>Respuesta</Text>
-            </View>
-
-            {/* Preguntas normales */}
-            {questions.slice(16, 24).map((q: any) => {
-              const responses = workOrder.answers[
-                index
-              ]?.FormAnswerResponse?.find(
-                (resp: any) => resp.question_id === q.id
-              );
-              console.log(responses);
-              // Encuentra la respuesta del operador por pregunta_id
-              const operatorResponse = responses?.response_operator;
-
-              return (
-                <View key={q.id} style={styles.tableRow}>
-                  {/* Pregunta */}
-                  <View style={[styles.tableCell, { flex: 2 }]}>
-                    <Text style={styles.questionText}>{q.title}</Text>
-                  </View>
-
-                  {/* Respuesta */}
-                  <View
-                    style={[
-                      styles.tableCell,
-                      { flex: 1, alignItems: 'center' },
-                    ]}
-                  >
-                    <View
-                      style={[
-                        styles.radioCircle,
-                        operatorResponse && styles.radioDisabled,
-                      ]}
-                    >
-                      {operatorResponse && <View style={styles.radioDot} />}
-                    </View>
-                  </View>
-                </View>
-              );
-            })}
+            <OperatorAdvancedTable
+              questions={getOperatorQuestions()}
+              answers={workOrder?.answers?.[index]?.FormAnswerResponse ?? []}
+              mode="simple"
+              readOnly
+              columns={['Respuesta']}
+            />
             <Text style={styles.label}>Muestras entregadas:</Text>
             <TextInput
               style={styles.input}
@@ -386,49 +275,13 @@ const PersonalizacionComponentCQM = ({ workOrder }: { workOrder: any }) => {
 
         {workOrder?.answers[index].tipo_personalizacion === 'embolsadora' && (
           <>
-            {/* Encabezado estilo tabla */}
-            <View style={styles.tableHeader}>
-              <Text style={[styles.tableCell, { flex: 2 }]}>Pregunta</Text>
-              <Text style={styles.tableCell}>Respuesta</Text>
-            </View>
-
-            {/* Preguntas normales */}
-            {questions.slice(24, 26).map((q: any) => {
-              const responses = workOrder.answers[
-                index
-              ]?.FormAnswerResponse?.find(
-                (resp: any) => resp.question_id === q.id
-              );
-              console.log(responses);
-              // Encuentra la respuesta del operador por pregunta_id
-              const operatorResponse = responses?.response_operator;
-
-              return (
-                <View key={q.id} style={styles.tableRow}>
-                  {/* Pregunta */}
-                  <View style={[styles.tableCell, { flex: 2 }]}>
-                    <Text style={styles.questionText}>{q.title}</Text>
-                  </View>
-
-                  {/* Respuesta */}
-                  <View
-                    style={[
-                      styles.tableCell,
-                      { flex: 1, alignItems: 'center' },
-                    ]}
-                  >
-                    <View
-                      style={[
-                        styles.radioCircle,
-                        operatorResponse && styles.radioDisabled,
-                      ]}
-                    >
-                      {operatorResponse && <View style={styles.radioDot} />}
-                    </View>
-                  </View>
-                </View>
-              );
-            })}
+            <OperatorAdvancedTable
+              questions={getOperatorQuestions()}
+              answers={workOrder?.answers?.[index]?.FormAnswerResponse ?? []}
+              mode="simple"
+              readOnly
+              columns={['Respuesta']}
+            />
             <Text style={styles.label}>Muestras entregadas:</Text>
             <TextInput
               style={styles.input}

@@ -41,7 +41,32 @@ const WorkOrdersPage: React.FC = () => {
       .catch(() => alert('Error: No se pudieron cargar las áreas'));
   }, []);
 
-  // Para manejar los cambios de los campos del formulario
+  const AREA_NAMES: Record<string, string> = {
+    '1': 'Preprensa',
+    '2': 'Impresión',
+    '3': 'Serigrafía',
+    '4': 'Empalme',
+    '5': 'Laminación',
+    '6': 'Corte',
+    '7': 'Color Edge',
+    '8': 'Hot Stamping',
+    '9': 'Milling Chip',
+    '10': 'Personalización',
+  };
+  
+  const allowedNextAreas: Record<string, string[]> = {
+    '1': ['2', '3'],          // después de Preprensa → Impresión o Serigrafía
+    '2': ['2', '3', '4'],     // después de Impresión → Serigrafía, Empalme o Impresión
+    '3': ['2', '4', '6'],     // después de Serigrafía → Impresión, Empalme o Corte
+    '4': ['5'],               // después de Empalme → Laminación
+    '5': ['3', '6'],          // después de Laminación → Corte o Serigrafía
+    '6': ['8', '9', '10', '7'], // después de Corte → Hot Stamping, Milling Chip, Personalización o Color Edge
+    '7': ['8', '9', '10'],    // después de Color Edge → Hot Stamping, Milling Chip o Personalización
+    '8': ['9', '10', '7'],    // después de Hot Stamping → Milling Chip, Personalización o Color Edge
+    '9': ['7', '9', '10'],    // después de Milling Chip → Color Edge, Hot Stamping o Personalización
+    '10': ['7', '10'],        // después de Personalización → Color Edge o Personalización
+  };
+  
   const handleChange = (
     e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>,
     areaIndex?: number
@@ -53,80 +78,64 @@ const WorkOrdersPage: React.FC = () => {
       : target.value;
   
     if (areaIndex !== undefined) {
-      // Validación para el primer área (debe ser 1 - Preprensa)
-      if (areaIndex === 0 && value !== '1') {
+      // 1) El primer área SIEMPRE debe ser '1' (Preprensa)
+      if (areaIndex === 0 && value !== '1' && value !== '') {
         const shouldReset = window.confirm(
           'La primera área debe ser Preprensa (ID: 1). ¿Deseas limpiar todas las áreas seleccionadas?'
         );
-        
         if (shouldReset) {
-          setFormData(prev => ({
-            ...prev,
-            areasOperatorIds: []
-          }));
+          setFormData(prev => ({ ...prev, areasOperatorIds: [] }));
           setDropdownCount(4);
         }
-        return;
-      }
-  
-      // Validación para el segundo área (debe ser 2 o 3)
-      if (areaIndex === 1 && value !== '2' && value !== '3' && value !== '') {
-        alert('La siguiente área solo puede ser Impresión o Serigrafia');
-        e.preventDefault();
-        return;
-      }
-      if (areaIndex === 2 && value !== '2' && value !== '3' && value !== '4' && value !== '') {
-        alert('La siguiente área solo puede ser Serigrafia, Empalme o Impresion');
-        e.preventDefault();
-        return;
-      }
-      if (areaIndex === 3 && value !== '2' && value !== '4' && value !== '6' && value !== '') {
-        alert('La siguiente área solo puede ser Impresión, Empalme o Corte');
-        e.preventDefault();
-        return;
-      }
-      if (areaIndex === 4 && value !== '5' && value !== '') {
-        alert('La siguiente área solo puede ser Laminación');
-        e.preventDefault();
-        return;
-      }
-      if (areaIndex === 5 && value !== '3' && value !== '6' && value !== '') {
-        alert('La siguiente área solo puede ser Corte o Serigrafia');
-        e.preventDefault();
-        return;
-      }
-      if (areaIndex === 6 && value !== '8' && value !== '9' && value !== '10' &&  value !== '7' && value !== '') {
-        alert('La siguiente área solo puede ser Hot Stamping, Milling Chip, Personalización o Color Edge');
-        e.preventDefault();
-        return;
-      }
-      if (areaIndex === 7 && value !== '8' && value !== '9' && value !== '10' && value !== '') {
-        alert('La siguiente área solo puede ser Hot Stamping, Milling Chip o Personalización');
-        e.preventDefault();
-        return;
-      }
-      if (areaIndex === 8 && value !== '9' && value !== '10' && value !== '7' && value !== '') {
-        alert('La siguiente área solo puede ser Milling Chip, Personalización o Color Edge');
-        e.preventDefault();
-        return;
-      }
-      if (areaIndex === 9 && value !== '7' && value !== '9' && value !== '10' && value !== '') {
-        alert('La siguiente área solo puede ser Color Edge, Hot Stamping o Personalización');
-        e.preventDefault();
-        return;
-      }
-      if (areaIndex === 10 && value !== '7' && value !== '10' && value !== '') {
-        alert('La siguiente área solo puede ser Color Edge o Personalización');
         e.preventDefault();
         return;
       }
   
+      // Permitir limpiar (value === '') sin más validación
+      if (value === '') {
+        setFormData(prev => {
+          const updated = [...(prev.areasOperatorIds || [])];
+          updated[areaIndex] = '';
+          // Limpieza en cascada para evitar inconsistencias
+          for (let i = areaIndex + 1; i < updated.length; i++) updated[i] = '';
+          return { ...prev, areasOperatorIds: updated };
+        });
+        return;
+      }
+  
+      // 2) Para índices > 0, validar contra el VALOR PREVIO (no el índice)
+      if (areaIndex > 0) {
+        // OJO: usamos el estado actual para leer el valor previo
+        const previousValue =
+          (formData?.areasOperatorIds && formData.areasOperatorIds[areaIndex - 1]) || '';
+  
+        if (!previousValue) {
+          alert('Selecciona primero el área anterior antes de continuar.');
+          e.preventDefault();
+          return;
+        }
+  
+        const allowed = allowedNextAreas[previousValue] || [];
+        if (!allowed.includes(value as string)) {
+          const allowedNames = allowed.map(v => AREA_NAMES[v] ?? v).join(', ');
+          alert(
+            `Después de ${AREA_NAMES[previousValue] ?? previousValue} solo puede ir: ${allowedNames}`
+          );
+          e.preventDefault();
+          return;
+        }
+      }
+  
+      // Actualiza y limpia en cascada lo que viene después para mantener la secuencia válida
       setFormData(prev => {
-        const updatedFlows = [...prev.areasOperatorIds];
-        updatedFlows[areaIndex] = value as string;
-        return { ...prev, areasOperatorIds: updatedFlows };
+        const updated = [...(prev.areasOperatorIds || [])];
+        updated[areaIndex] = value as string;
+        for (let i = areaIndex + 1; i < updated.length; i++) updated[i] = '';
+        return { ...prev, areasOperatorIds: updated };
       });
+  
     } else {
+      // Campos que no son de áreas
       setFormData(prev => ({ ...prev, [name]: value }));
     }
   };

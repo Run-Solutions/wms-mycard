@@ -13,12 +13,11 @@ import {
 import { TextInput } from 'react-native-paper';
 import { acceptCQMInconformity } from '../../api/inconformidades';
 import { useNavigation } from '@react-navigation/native';
+import { OperatorAdvancedTable } from '../LiberacionDeVistosBuenos/util/FormQuestionTable';
 
 const LaminacionComponentCQM = ({ workOrder }: { workOrder: any }) => {
   const navigation = useNavigation();
   const [showModal, setShowModal] = useState(false);
-  const questions =
-    workOrder.area.formQuestions?.filter((q: any) => q.role_id === null) || [];
 
   const index = workOrder?.answers
     ?.map((a: any, i: number) => ({ ...a, index: i }))
@@ -51,46 +50,13 @@ const LaminacionComponentCQM = ({ workOrder }: { workOrder: any }) => {
         <Text style={styles.sectionTitle}>Entregaste</Text>
 
         <View style={styles.card}>
-          {/* Encabezado estilo tabla */}
-          <View style={styles.tableHeader}>
-            <Text style={[styles.tableCell, { flex: 2 }]}>Pregunta</Text>
-            <Text style={styles.tableCell}>Respuesta</Text>
-          </View>
-
-          {/* Preguntas normales */}
-          {questions.map((q: any) => {
-            const responses = workOrder.answers[
-              index
-            ]?.FormAnswerResponse?.find(
-              (resp: any) => resp.question_id === q.id
-            );
-            console.log(responses);
-            // Encuentra la respuesta del operador por pregunta_id
-            const operatorResponse = responses?.response_operator;
-
-            return (
-              <View key={q.id} style={styles.tableRow}>
-                {/* Pregunta */}
-                <View style={[styles.tableCell, { flex: 2 }]}>
-                  <Text style={styles.questionText}>{q.title}</Text>
-                </View>
-
-                {/* Respuesta */}
-                <View
-                  style={[styles.tableCell, { flex: 1, alignItems: 'center' }]}
-                >
-                  <View
-                    style={[
-                      styles.radioCircle,
-                      operatorResponse && styles.radioDisabled,
-                    ]}
-                  >
-                    {operatorResponse && <View style={styles.radioDot} />}
-                  </View>
-                </View>
-              </View>
-            );
-          })}
+          <OperatorAdvancedTable
+            questions={workOrder.area.formQuestions ?? []}
+            answers={workOrder.answers[index]?.FormAnswerResponse ?? []}
+            mode={'simple'}
+            readOnly
+            columns={['Respuesta']}
+          />
 
           {/* Muestras */}
           <Text style={styles.label}>Validar Acabado Vs Orden De Trabajo:</Text>
@@ -106,18 +72,6 @@ const LaminacionComponentCQM = ({ workOrder }: { workOrder: any }) => {
             theme={{ roundness: 30 }}
           />
           {/* Muestras */}
-          <Text style={styles.label}>Valor de Anclaje Obtenido:</Text>
-          <TextInput
-            style={styles.input}
-            value={
-              workOrder?.answers[index].valor_anclaje ??
-              'No se reconoce la muestra enviada'
-            }
-            editable={false}
-            mode="outlined"
-            activeOutlineColor="#000"
-            theme={{ roundness: 30 }}
-          />
           <Text style={styles.label}>Muestras entregadas:</Text>
           <TextInput
             style={styles.input}

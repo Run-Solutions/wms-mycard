@@ -1,12 +1,14 @@
 'use client';
 
 import { useRouter } from 'next/navigation';
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
 import styled from 'styled-components';
 import {
   submitExtraLaminacion,
   sendInconformidadCQM,
 } from '@/api/recepcionCQM';
+import { OperatorAdvancedTable } from './util/QuestionTable';
+import SelectionQuestionTable from './util/FormQuestionTable';
 
 interface Props {
   workOrder: any;
@@ -14,13 +16,30 @@ interface Props {
 type Answer = {
   reviewed: boolean;
   sample_quantity: number;
-  // lo que más tenga...
 };
 
 export default function EmpalmeComponent({ workOrder }: Props) {
   const router = useRouter();
   const [showInconformidad, setShowInconformidad] = useState(false);
   const [inconformidad, setInconformidad] = useState<string>('');
+  const [pruebaOver, setPruebaOver] = useState<string>('');
+  const [pruebaCintaMagnetica, setPruebaCintaMagnetica] = useState<string>('');
+  const [pruebaCentro, setPruebaCentro] = useState<string>('');
+
+  // --- NUEVO: modal y estado para el código de excepción
+  const [showConfirmModal, setShowConfirmModal] = useState(false);
+  const [showCodigoModal, setShowCodigoModal] = useState(false);
+  const [codigoIngresado, setCodigoIngresado] = useState('');
+
+  // Puedes configurar el código por env var o usar uno por defecto
+  const CODIGO_VALIDO = 'a7F9K3n1#';
+
+  // Helpers para validar números
+  const parseNum = (v: any) => {
+    const n = Number(v);
+    return Number.isFinite(n) ? n : 0;
+  };
+  const anyExtraBelow5 = (vals: number[]) => vals.some((v) => v < 5);
 
   // Para obtener el ultimo FormAnswer
   const index = workOrder?.answers
@@ -29,54 +48,129 @@ export default function EmpalmeComponent({ workOrder }: Props) {
     .find((a: Answer) => a.reviewed === false)?.index;
   console.log('el index', index);
 
-  // Para mostrar formulario de CQM y enviarlo
-  const [showConfirmModal, setShowConfirmModal] = useState(false);
+  // Para controlar qué preguntas están marcadas
+  const [answersByQuestion, setAnswersByQuestion] = useState<
+    Record<number, boolean | undefined>
+  >({});
 
-  //Para guardar las respuestas
-  const [responses, setResponses] = useState<
-    { questionId: number; answer: boolean }[]
-  >(
-    workOrder.area.formQuestions
-      .filter((question: { role_id: number | null }) => question.role_id === 3)
-      .map((question: { id: number }) => ({
-        questionId: question.id,
-        answer: false,
-      }))
+  // Preguntas visibles en la tabla (mismo filtro que pasas al child con roleId=null)
+  const visibleQuestions =
+    workOrder.area.formQuestions?.filter((q: any) => q.role_id === 3) ?? [];
+
+  // Listas derivadas para el componente de tabla (no se guardan aparte)
+  const checkedRespuestaOK = useMemo(
+    () =>
+      Object.entries(answersByQuestion)
+        .filter(([, v]) => v === true)
+        .map(([k]) => Number(k)),
+    [answersByQuestion]
   );
 
-  // Para controlar qué preguntas están marcadas
-  const [checkedQuestions, setCheckedQuestions] = useState<number[]>([]);
-  const handleCheckboxChange = (questionId: number, isChecked: boolean) => {
-    setResponses((prevResponses) =>
-      prevResponses.map((response) =>
-        response.questionId === questionId
-          ? { ...response, answer: isChecked }
-          : response
-      )
-    );
+  const checkedRespuestaNG = useMemo(
+    () =>
+      Object.entries(answersByQuestion)
+        .filter(([, v]) => v === false)
+        .map(([k]) => Number(k)),
+    [answersByQuestion]
+  );
 
-    // Actualizar visualmente el checkbox
-    setCheckedQuestions((prev) =>
-      isChecked ? [...prev, questionId] : prev.filter((id) => id !== questionId)
-    );
+  const handleToggleRespuesta = (
+    questionId: number,
+    _columnIndex: number,
+    type: 'ok' | 'ng',
+    checked: boolean
+  ) => {
+    setAnswersByQuestion((prev) => {
+      const next = { ...prev };
+      if (checked) {
+        // marcar OK => true, NG => false (exclusivo)
+        next[questionId] = type === 'ok';
+      } else {
+        // si desmarcan la opción activa, borramos la respuesta
+        if (
+          (type === 'ok' && next[questionId] === true) ||
+          (type === 'ng' && next[questionId] === false)
+        ) {
+          delete next[questionId];
+        }
+      }
+      return next;
+    });
   };
 
-  const handleSubmit = async () => {
+  // --- NUEVO: prevalidación que decide si pide código o envía
+  const precheckAndSubmit = async () => {
+    // Validación previa: todas las preguntas respondidas
+    const question_id: number[] = [];
+    const response: boolean[] = [];
+
+    visibleQuestions.forEach((q: any) => {
+      const ans = answersByQuestion[q.id];
+      if (ans !== undefined) {
+        question_id.push(q.id);
+        response.push(!!ans);
+      }
+    });
+
+    if (question_id.length !== visibleQuestions.length) {
+      alert('Completa todas las preguntas y cantidad de muestra.');
+      return;
+    }
+
+    // Validación de extra_data
+    const over = parseNum(pruebaOver);
+    const cinta = parseNum(pruebaCintaMagnetica);
+    const centro = parseNum(pruebaCentro);
+
+    const necesitaCodigo = anyExtraBelow5([over, cinta, centro]);
+
+    // Si alguno < 5 y el código no es válido, abre modal para ingresarlo
+    if (necesitaCodigo && codigoIngresado !== CODIGO_VALIDO) {
+      setShowCodigoModal(true);
+      return;
+    }
+
+    // Si no necesita código o el código ya es válido → enviar
+    await handleSubmit({ over, cinta, centro });
+  };
+
+  // --- ACTUALIZADO: handleSubmit ahora acepta los números ya parseados
+  const handleSubmit = async (nums?: {
+    over: number;
+    cinta: number;
+    centro: number;
+  }) => {
     const formAnswerId = workOrder.answers[index]?.id; // id de FormAnswer
     if (!formAnswerId) {
       alert('No se encontró el ID del formulario.');
       return;
     }
-    const checkboxPayload = responses.map(({ questionId, answer }) => ({
-      question_id: questionId,
-      answer: answer,
-    }));
+
+    const checkboxPayload = Object.entries(answersByQuestion).map(
+      ([questionId, answer]) => ({
+        question_id: Number(questionId),
+        answer: answer === true ? true : answer === false ? false : null, // boolean | null
+      })
+    );
+
+    // Usa los números provenientes de precheck si existen, o parsea desde los estados
+    const over = nums?.over ?? parseNum(pruebaOver);
+    const cinta = nums?.cinta ?? parseNum(pruebaCintaMagnetica);
+    const centro = nums?.centro ?? parseNum(pruebaCentro);
+
     const payload = {
       form_answer_id: formAnswerId,
       checkboxes: checkboxPayload,
+      extra_data: {
+        // Corregido: prueba_over ahora usa 'pruebaOver'
+        prueba_over: String(over),
+        prueba_cinta_magnetica: String(cinta),
+        prueba_centro: String(centro),
+      },
     };
+
     try {
-      const res = await submitExtraLaminacion(payload);
+      await submitExtraLaminacion(payload);
       router.push('/liberacionDeVistosBuenos');
     } catch (error) {
       console.log('Error al guardar la respuesta: ', error);
@@ -136,65 +230,13 @@ export default function EmpalmeComponent({ workOrder }: Props) {
       <NewData>
         <SectionTitle>Respuestas del operador</SectionTitle>
         <NewDataWrapper>
-          <Table>
-            <thead>
-              <tr>
-                <th>Pregunta</th>
-                <th>Respuesta</th>
-              </tr>
-            </thead>
-            <tbody>
-              {workOrder.area.formQuestions
-                .filter(
-                  (question: { role_id: number | null }) =>
-                    question.role_id === null
-                )
-                .map((question: { id: number; title: string }) => {
-                  // Buscar la respuesta correspondiente a esta pregunta
-                  const answer = workOrder.answers[
-                    index
-                  ]?.FormAnswerResponse?.find(
-                    (resp: any) => resp.question_id === question.id
-                  );
-
-                  // Obtener la respuesta del operador (response_operator)
-                  const operatorResponse = answer?.response_operator;
-
-                  return (
-                    <tr key={question.id}>
-                      <td>{question.title}</td>
-                      <td>
-                        {typeof operatorResponse === 'boolean' ? (
-                          <input
-                            type="checkbox"
-                            checked={operatorResponse}
-                            disabled
-                          />
-                        ) : (
-                          <span>
-                            {operatorResponse !== undefined &&
-                            operatorResponse !== null
-                              ? operatorResponse.toString()
-                              : ''}
-                          </span>
-                        )}
-                      </td>
-                    </tr>
-                  );
-                })}
-            </tbody>
-          </Table>
-          <InputGroup style={{ width: '50%' }}>
-            <Label>Valor de Anclaje Obtenido:</Label>
-            <Input
-              type="number"
-              value={
-                workOrder?.answers[index].valor_anclaje ??
-                'No se reconoce la muestra enviada'
-              }
-              readOnly
-            />
-          </InputGroup>
+          <OperatorAdvancedTable
+            questions={workOrder.area.formQuestions ?? []}
+            answers={workOrder.answers[index]?.FormAnswerResponse ?? []}
+            mode={'doble'}
+            readOnly
+            columns={['Respuesta']}
+          />
           <InputGroup style={{ width: '50%' }}>
             <Label>Validar Acabado Vs Orden De Trabajo:</Label>
             <Input
@@ -221,43 +263,35 @@ export default function EmpalmeComponent({ workOrder }: Props) {
 
         <SectionTitle>Mis respuestas</SectionTitle>
         <NewDataWrapper>
-          <Table>
-            <thead>
-              <tr>
-                <th>Pregunta</th>
-                <th>Respuesta</th>
-              </tr>
-            </thead>
-            <tbody>
-              {workOrder.area.formQuestions
-                .filter(
-                  (question: { role_id: number | null }) =>
-                    question.role_id === 3
-                )
-                .map((question: { id: number; title: string }) => {
-                  // Buscar la respuesta correspondiente a esta pregunta
-                  const answer = workOrder.answers[
-                    index
-                  ]?.FormAnswerResponse?.find(
-                    (resp: any) => resp.question_id === question.id
-                  );
-                  return (
-                    <tr key={question.id}>
-                      <td>{question.title}</td>
-                      <td>
-                        <input
-                          type="checkbox"
-                          checked={checkedQuestions.includes(question.id)}
-                          onChange={(e) =>
-                            handleCheckboxChange(question.id, e.target.checked)
-                          }
-                        />
-                      </td>
-                    </tr>
-                  );
-                })}
-            </tbody>
-          </Table>
+          <SelectionQuestionTable
+            formQuestions={workOrder.area.formQuestions}
+            roleId={3} // Calidad
+            columns={['Respuesta']}
+            checkedQuestions={[
+              { ok: checkedRespuestaOK, ng: checkedRespuestaNG },
+            ]}
+            onToggle={handleToggleRespuesta}
+          />
+          <InputGroup style={{ width: '50%' }}>
+            <Label>Prueba Over:</Label>
+            <Input
+              type="number"
+              value={pruebaOver}
+              onChange={(e) => setPruebaOver(e.target.value)}
+            />
+            <Label>Prueba Cinta Magnetica:</Label>
+            <Input
+              type="number"
+              value={pruebaCintaMagnetica}
+              onChange={(e) => setPruebaCintaMagnetica(e.target.value)}
+            />
+            <Label>Prueba Centro (entre capas):</Label>
+            <Input
+              type="number"
+              value={pruebaCentro}
+              onChange={(e) => setPruebaCentro(e.target.value)}
+            />
+          </InputGroup>
         </NewDataWrapper>
       </NewData>
       <div style={{ display: 'flex', gap: '1rem' }}>
@@ -268,6 +302,8 @@ export default function EmpalmeComponent({ workOrder }: Props) {
           Aprobado
         </AceptarButton>
       </div>
+
+      {/* Modal de confirmación de Aprobado */}
       {showConfirmModal && (
         <ModalOverlay>
           <ModalContent>
@@ -282,7 +318,8 @@ export default function EmpalmeComponent({ workOrder }: Props) {
               <Button
                 onClick={() => {
                   setShowConfirmModal(false);
-                  handleSubmit();
+                  // --- NUEVO: prevalidar y decidir si pide código o envía
+                  precheckAndSubmit();
                 }}
               >
                 Sí, aprobar
@@ -291,6 +328,8 @@ export default function EmpalmeComponent({ workOrder }: Props) {
           </ModalContent>
         </ModalOverlay>
       )}
+
+      {/* Modal de Inconformidad */}
       {showInconformidad && (
         <ModalOverlay>
           <ModalBox>
@@ -328,6 +367,55 @@ export default function EmpalmeComponent({ workOrder }: Props) {
                 }}
               >
                 Guardar
+              </ConfirmButton>
+            </div>
+          </ModalBox>
+        </ModalOverlay>
+      )}
+
+      {/* --- NUEVO: Modal para ingresar código de excepción */}
+      {showCodigoModal && (
+        <ModalOverlay>
+          <ModalBox>
+            <h4>Ingresar código de excepción</h4>
+            <h3>
+              Alguno de los valores de pruebas es menor a 5. Ingresa el código
+              para continuar.
+            </h3>
+            <Input
+              type="text"
+              value={codigoIngresado}
+              onChange={(e) => setCodigoIngresado(e.target.value)}
+              placeholder="Ingresa el código…"
+            />
+            <div
+              style={{
+                display: 'flex',
+                justifyContent: 'flex-end',
+                gap: '1rem',
+                marginTop: '1rem',
+              }}
+            >
+              <CancelButton
+                onClick={() => {
+                  setShowCodigoModal(false);
+                  setCodigoIngresado('');
+                }}
+              >
+                Cancelar
+              </CancelButton>
+              <ConfirmButton
+                onClick={async () => {
+                  if (codigoIngresado !== CODIGO_VALIDO) {
+                    alert('Código inválido. Verifica e intenta nuevamente.');
+                    return;
+                  }
+                  setShowCodigoModal(false);
+                  // Reintenta el submit ahora que el código es válido.
+                  await precheckAndSubmit();
+                }}
+              >
+                Validar y aprobar
               </ConfirmButton>
             </div>
           </ModalBox>
@@ -516,23 +604,6 @@ const RechazarButton = styled.button<{ disabled?: boolean }>`
   }
 `;
 
-const Table = styled.table`
-  width: 100%;
-  border-collapse: collapse;
-  color: black;
-  th,
-  td {
-    padding: 0.75rem;
-    text-align: left;
-    border-bottom: 1px solid #e5e7eb;
-  }
-
-  th {
-    background-color: #f3f4f6;
-    color: #374151;
-  }
-`;
-
 const ModalOverlay = styled.div`
   position: fixed;
   top: 0;
@@ -560,7 +631,7 @@ const ModalTitle = styled.h3`
 `;
 
 const ModalActions = styled.div`
-  display: flex;
+  display: flex,
   justify-content: space-around;
   margin-top: 1.5rem;
 `;

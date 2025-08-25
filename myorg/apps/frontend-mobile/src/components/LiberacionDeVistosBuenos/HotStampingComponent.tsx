@@ -1,6 +1,6 @@
-// myorg/apps/frontend-mobile/src/components/RecepcionCQM/ColorEdgeComponent.tsx
+// myorg/apps/frontend-mobile/src/components/LiberacionDeVistosBuenos/HotStampingComponent.tsx
 
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import {
   View,
   Text,
@@ -19,9 +19,10 @@ import {
   submitExtraHotStamping,
   sendInconformidadCQM,
 } from '../../api/recepcionCQM';
+import { OperatorAdvancedTable } from './util/FormQuestionTable';
+import SelectionQuestionTable from './util/SelectionQuestionTable';
 
 // Tipos y constantes globales
-
 type Answer = {
   reviewed: boolean;
   sample_quantity: number;
@@ -32,11 +33,9 @@ const HotStampingComponent = ({ workOrder }: { workOrder: any }) => {
   const navigation =
     useNavigation<NativeStackNavigationProp<RootStackParamList>>();
 
-  const [checkedQuestions, setCheckedQuestions] = useState<number[]>([]);
   const [showConfirmModal, setShowConfirmModal] = useState(false);
   const [showInconformidad, setShowInconformidad] = useState(false);
   const [inconformidad, setInconformidad] = useState('');
-  const [showQuality, setShowQuality] = useState<boolean>(false);
 
   // Derivaciones
   const index = workOrder?.answers
@@ -48,22 +47,51 @@ const HotStampingComponent = ({ workOrder }: { workOrder: any }) => {
   const imagenHologramaValue =
     workOrder?.answers[index]?.imagen_holograma ?? '';
 
-  const questions =
-    workOrder.area.formQuestions?.filter((q: any) => q.role_id === null) || [];
-  const qualityQuestions =
-    workOrder.area.formQuestions?.filter((q: any) => q.role_id === 3) || [];
-  const currentFlow = [...workOrder.workOrder.flow].find(
-    (f: any) => f.id === workOrder.id
+  //Para guardar las respuestas
+  const [answersByQuestion, setAnswersByQuestion] = useState<
+    Record<number, boolean | undefined>
+  >({});
+
+  // Listas derivadas para el componente de tabla (no se guardan aparte)
+  const checkedRespuestaOK = useMemo(
+    () =>
+      Object.entries(answersByQuestion)
+        .filter(([, v]) => v === true)
+        .map(([k]) => Number(k)),
+    [answersByQuestion]
   );
 
-  const isDisabled = workOrder.status === 'En proceso';
-  const nextFlowIndex =
-    workOrder.workOrder.flow.findIndex((f: any) => f.id === workOrder.id) + 1;
-  const nextFlow = workOrder.workOrder.flow[nextFlowIndex] ?? null;
-
-  const allParcialsValidated = workOrder.partialReleases?.every(
-    (r: { validated: boolean }) => r.validated
+  const checkedRespuestaNG = useMemo(
+    () =>
+      Object.entries(answersByQuestion)
+        .filter(([, v]) => v === false)
+        .map(([k]) => Number(k)),
+    [answersByQuestion]
   );
+
+  const handleToggleRespuesta = (
+    questionId: number,
+    _columnIndex: number,
+    type: 'ok' | 'ng',
+    checked: boolean
+  ) => {
+    setAnswersByQuestion((prev) => {
+      const next = { ...prev };
+      if (checked) {
+        // marcar OK => true, NG => false (exclusivo)
+        next[questionId] = type === 'ok';
+      } else {
+        // si desmarcan la opción activa, borramos la respuesta
+        if (
+          (type === 'ok' && next[questionId] === true) ||
+          (type === 'ng' && next[questionId] === false)
+        ) {
+          delete next[questionId];
+        }
+      }
+      return next;
+    });
+  };
 
   const handleSubmit = async () => {
     const formAnswerId = workOrder.answers[index]?.id;
@@ -71,24 +99,16 @@ const HotStampingComponent = ({ workOrder }: { workOrder: any }) => {
       Alert.alert('No se encontró el Id del formulario');
       return;
     }
-
-    const questions = workOrder.area.formQuestions.filter(
-      (q: any) => q.role_id === 3
+    const checkboxPayload = Object.entries(answersByQuestion).map(
+      ([questionId, answer]) => ({
+        question_id: Number(questionId),
+        answer: answer === true ? true : answer === false ? false : null, // <-- boolean | null
+      })
     );
-
-    const isCheckedQuestionsValid = questions.some((q: any) =>
-      checkedQuestions.includes(q.id)
-    );
-
-    const checkboxPayload = checkedQuestions.map((questionId: number) => ({
-      question_id: questionId,
-    }));
-
     const payload = {
       form_answer_id: formAnswerId,
       checkboxes: checkboxPayload,
     };
-
     try {
       const success = await submitExtraHotStamping(payload);
       setShowConfirmModal(false);
@@ -136,42 +156,13 @@ const HotStampingComponent = ({ workOrder }: { workOrder: any }) => {
       </View>
 
       <Text style={styles.modalTitle}>Respuestas del operador</Text>
-      {/* Encabezado estilo tabla */}
-      <View style={styles.tableHeader}>
-        <Text style={[styles.tableCell, { flex: 2 }]}>Pregunta</Text>
-        <Text style={styles.tableCell}>Respuesta</Text>
-      </View>
-
-      {/* Preguntas normales */}
-      {questions.map((q: any) => {
-        const responses = workOrder.answers[index]?.FormAnswerResponse?.find(
-          (resp: any) => resp.question_id === q.id
-        );
-        console.log(responses);
-        // Encuentra la respuesta del operador por pregunta_id
-        const operatorResponse = responses?.response_operator;
-
-        return (
-          <View key={q.id} style={styles.tableRow}>
-            {/* Pregunta */}
-            <View style={[styles.tableCell, { flex: 2 }]}>
-              <Text style={styles.questionText}>{q.title}</Text>
-            </View>
-
-            {/* Respuesta */}
-            <View style={[styles.tableCell, { flex: 1, alignItems: 'center' }]}>
-              <View
-                style={[
-                  styles.radioCircle,
-                  operatorResponse && styles.radioDisabled,
-                ]}
-              >
-                {operatorResponse && <View style={styles.radioDot} />}
-              </View>
-            </View>
-          </View>
-        );
-      })}
+      <OperatorAdvancedTable
+        questions={workOrder.area.formQuestions ?? []}
+        answers={workOrder.answers[index]?.FormAnswerResponse ?? []}
+        mode={'simple'}
+        readOnly
+        columns={['Respuesta']}
+      />
       {/* Muestras */}
       <Text style={styles.label}>Color Foil:</Text>
       <TextInput
@@ -243,55 +234,13 @@ const HotStampingComponent = ({ workOrder }: { workOrder: any }) => {
       )}
 
       <Text style={[styles.modalTitle, { marginTop: 40 }]}>Mis respuestas</Text>
-      {/* Encabezado estilo tabla */}
-      <View style={styles.tableHeader}>
-        <Text style={[styles.tableCell, { flex: 2 }]}>Pregunta</Text>
-        <Text style={styles.tableCell}>Respuesta</Text>
-      </View>
-      {/* Preguntas normales */}
-      {qualityQuestions.map((q: any) => (
-        <View key={q.id} style={styles.tableRow}>
-          {/* Pregunta */}
-          <View style={[styles.tableCell, { flex: 2 }]}>
-            <Text style={styles.questionText}>{q.title}</Text>
-          </View>
-          {/* Respuestas */}
-          <View style={[styles.tableCell, { flex: 1, alignItems: 'center' }]}>
-            <TouchableOpacity
-              onPress={() =>
-                setCheckedQuestions((prev) =>
-                  prev.includes(q.id)
-                    ? prev.filter((id) => id !== q.id)
-                    : [...prev, q.id]
-                )
-              }
-              style={[
-                styles.radioCircle,
-                checkedQuestions.includes(q.id) && styles.checkedBox,
-              ]}
-            >
-              {checkedQuestions.includes(q.id) && (
-                <View style={styles.radioDot} />
-              )}
-            </TouchableOpacity>
-          </View>
-        </View>
-      ))}
-      {showQuality && (
-        <>
-          {qualityQuestions.map((q: any) => (
-            <View key={q.id} style={styles.qualityRow}>
-              <Text style={styles.qualityQuestion}>{q.title}</Text>
-            </View>
-          ))}
-          <Text style={styles.subtitle}>Tipo de Prueba</Text>
-          {['color', 'perfil', 'fisica'].map((type) => (
-            <View key={type} style={styles.radioDisabled}>
-              <Text>{`Prueba ${type}`}</Text>
-            </View>
-          ))}
-        </>
-      )}
+      <SelectionQuestionTable
+        formQuestions={workOrder.area.formQuestions}
+        roleId={3} // Calidad
+        columns={['Respuesta']}
+        checkedQuestions={[{ ok: checkedRespuestaOK, ng: checkedRespuestaNG }]}
+        onToggle={handleToggleRespuesta}
+      />
 
       {/* Botones */}
       <View style={styles.modalButtonRow}>

@@ -8,7 +8,7 @@ import {
   deleteFormQuestion,
   updateFormQuestion,
 } from '@/api/configVistosBuenos';
-import { MachineSection } from './MachineSection';
+import { MachineSection } from './util/MachineSection';
 
 interface Props {
   formQuestion: any;

@@ -1,14 +1,23 @@
 import React, { useState } from 'react';
-import { View, Text, Button, Alert, Modal, TouchableOpacity, ScrollView, StyleSheet, Platform } from 'react-native';
-import { TextInput } from "react-native-paper";
+import {
+  View,
+  Text,
+  Button,
+  Alert,
+  Modal,
+  TouchableOpacity,
+  ScrollView,
+  StyleSheet,
+  Platform,
+} from 'react-native';
+import { TextInput } from 'react-native-paper';
 import { acceptCQMInconformity } from '../../api/inconformidades';
 import { useNavigation } from '@react-navigation/native';
+import { OperatorAdvancedTable } from '../LiberacionDeVistosBuenos/util/FormQuestionTable';
 
 const EmpalmeComponentCQM = ({ workOrder }: { workOrder: any }) => {
   const navigation = useNavigation();
   const [showModal, setShowModal] = useState(false);
-  const questions = workOrder.area.formQuestions?.filter((q: any) => q.role_id === null) || [];
-
   const index = workOrder?.answers
     ?.map((a: any, i: number) => ({ ...a, index: i }))
     .reverse()
@@ -34,41 +43,19 @@ const EmpalmeComponentCQM = ({ workOrder }: { workOrder: any }) => {
 
   return (
     <View>
-      <ScrollView contentContainerStyle={[styles.container, { paddingBottom: 230 }]}>
+      <ScrollView
+        contentContainerStyle={[styles.container, { paddingBottom: 230 }]}
+      >
         <Text style={styles.sectionTitle}>Entregaste</Text>
 
         <View style={styles.card}>
-          {/* Encabezado estilo tabla */}
-          <View style={styles.tableHeader}>
-            <Text style={[styles.tableCell, { flex: 2 }]}>Pregunta</Text>
-            <Text style={styles.tableCell}>Respuesta</Text>
-          </View>
-
-          {/* Preguntas normales */}
-          {questions.map((q: any) => {
-            const responses = workOrder.answers[index]?.FormAnswerResponse?.find(
-              (resp: any) => resp.question_id === q.id
-            );
-            console.log(responses);
-            // Encuentra la respuesta del operador por pregunta_id
-            const operatorResponse = responses?.response_operator;
-
-            return (
-              <View key={q.id} style={styles.tableRow}>
-                {/* Pregunta */}
-                <View style={[styles.tableCell, { flex: 2 }]}>
-                  <Text style={styles.questionText}>{q.title}</Text>
-                </View>
-
-                {/* Respuesta */}
-                <View style={[styles.tableCell, { flex: 1, alignItems: 'center' }]}>
-                  <View style={[styles.radioCircle, operatorResponse && styles.radioDisabled]}>
-                    {operatorResponse && <View style={styles.radioDot} />}
-                  </View>
-                </View>
-              </View>
-            );
-          })}
+          <OperatorAdvancedTable
+            questions={workOrder.area.formQuestions ?? []}
+            answers={workOrder.answers[index]?.FormAnswerResponse ?? []}
+            mode={'simple'}
+            readOnly
+            columns={['Respuesta']}
+          />
 
           {/* Muestras */}
           <Text style={styles.label}>Muestras entregadas:</Text>
@@ -86,7 +73,9 @@ const EmpalmeComponentCQM = ({ workOrder }: { workOrder: any }) => {
           />
 
           {typeof workOrder?.answers?.[index]?.sample_quantity !== 'number' && (
-            <Text style={{ color: '#b91c1c', marginTop: 8, textAlign: 'center' }}>
+            <Text
+              style={{ color: '#b91c1c', marginTop: 8, textAlign: 'center' }}
+            >
               No se reconoce la muestra enviada
             </Text>
           )}
@@ -96,7 +85,9 @@ const EmpalmeComponentCQM = ({ workOrder }: { workOrder: any }) => {
         <View style={styles.card}>
           <Text style={styles.label}>Usuario:</Text>
           <TextInput
-            value={workOrder.answers[index].inconformities[lastIndex].user.username}
+            value={
+              workOrder.answers[index].inconformities[lastIndex].user.username
+            }
             editable={false}
             style={styles.input}
             mode="outlined"
@@ -115,7 +106,10 @@ const EmpalmeComponentCQM = ({ workOrder }: { workOrder: any }) => {
           />
         </View>
 
-        <TouchableOpacity style={styles.button} onPress={() => setShowModal(true)}>
+        <TouchableOpacity
+          style={styles.button}
+          onPress={() => setShowModal(true)}
+        >
           <Text style={styles.buttonText}>Aceptar Inconformidad</Text>
         </TouchableOpacity>
 
@@ -125,12 +119,21 @@ const EmpalmeComponentCQM = ({ workOrder }: { workOrder: any }) => {
         <Modal visible={showModal} transparent animationType="fade">
           <View style={styles.modalOverlay}>
             <View style={styles.modalBox}>
-              <Text style={styles.modalText}>¿Estás segura/o que deseas aceptar la inconformidad? Deberás liberar nuevamente.</Text>
+              <Text style={styles.modalText}>
+                ¿Estás segura/o que deseas aceptar la inconformidad? Deberás
+                liberar nuevamente.
+              </Text>
               <View style={styles.modalButtons}>
-                <TouchableOpacity style={styles.cancelButton} onPress={() => setShowModal(false)}>
+                <TouchableOpacity
+                  style={styles.cancelButton}
+                  onPress={() => setShowModal(false)}
+                >
                   <Text style={styles.modalButtonText}>Cancelar</Text>
                 </TouchableOpacity>
-                <TouchableOpacity style={styles.confirmButton} onPress={handleSubmit}>
+                <TouchableOpacity
+                  style={styles.confirmButton}
+                  onPress={handleSubmit}
+                >
                   <Text style={styles.modalButtonText}>Confirmar</Text>
                 </TouchableOpacity>
               </View>
@@ -157,25 +160,6 @@ const styles = StyleSheet.create({
     marginBottom: 16,
     textAlign: 'left',
     color: '#1f2937',
-  },
-  tableHeader: {
-    flexDirection: 'row',
-    backgroundColor: '#f3f4f6',
-    paddingVertical: 10,
-    borderBottomWidth: 1,
-    borderColor: '#ccc',
-  },
-  tableRow: {
-    flexDirection: 'row',
-    borderBottomWidth: 1,
-    borderColor: '#e5e7eb',
-    paddingVertical: 10,
-    alignItems: 'center',
-  },
-  tableCell: {
-    flex: 1,
-    textAlign: 'center',
-    fontSize: 16,
   },
   card: {
     backgroundColor: '#fff',

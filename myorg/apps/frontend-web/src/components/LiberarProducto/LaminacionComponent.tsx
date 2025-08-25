@@ -9,7 +9,7 @@ import {
 } from '@/api/liberarProducto';
 import { useAuthContext } from '@/context/AuthContext';
 import { calcularCantidadPorLiberar } from './util/calcularCantidadPorLiberar';
-
+import SelectionQuestionTable from './util/FormQuestionTable';
 interface Props {
   workOrder: any;
 }
@@ -22,7 +22,6 @@ export default function LaminacionComponent({ workOrder }: Props) {
   const router = useRouter();
   const [otherValue, setOtherValue] = useState('');
   const [selectedOption, setSelectedOption] = useState('');
-  const [valorAnclaje, setValorAnclaje] = useState('');
   // Para habilitar entre las opciones en caso de que sea otro
   const handleOptionChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     setSelectedOption(e.target.value);
@@ -33,6 +32,8 @@ export default function LaminacionComponent({ workOrder }: Props) {
   // Para bloquear liberacion hasta que sea aprobado por CQM
   const isDisabled = workOrder.status === 'En proceso';
   const [showModal, setShowModal] = useState(false);
+  const [checkedRespuestaOK, setCheckedRespuestaOK] = useState<number[]>([]);
+  const [checkedRespuestaNG, setCheckedRespuestaNG] = useState<number[]>([]);
   const openModal = () => {
     setShowModal(true);
   };
@@ -107,6 +108,51 @@ export default function LaminacionComponent({ workOrder }: Props) {
       isChecked ? [...prev, questionId] : prev.filter((id) => id !== questionId)
     );
   };
+  const handleToggleRespuesta = (
+    questionId: number,
+    _columnIndex: number, // por ahora 0, si solo tienes 'Respuesta'
+    type: 'ok' | 'ng',
+    checked: boolean
+  ) => {
+    if (type === 'ok') {
+      // Marcar OK ⇒ true
+      setCheckedRespuestaOK((prev) =>
+        checked ? [...prev, questionId] : prev.filter((id) => id !== questionId)
+      );
+      // Desmarcar NG si se marcó OK
+      if (checked)
+        setCheckedRespuestaNG((prev) => prev.filter((id) => id !== questionId));
+
+      setResponses((prev) => {
+        // Si se marcó OK, answer=true; si se desmarcó y NG no está marcado, eliminar
+        const without = prev.filter((r) => r.questionId !== questionId);
+        if (checked) return [...without, { questionId, answer: true }];
+        // si no está marcado OK, pero NG está marcado, mantener NG=false en responses
+        if (checkedRespuestaNG.includes(questionId)) {
+          return [...without, { questionId, answer: false }];
+        }
+        return without; // ninguno marcado => sin respuesta
+      });
+    } else {
+      // Marcar NG ⇒ false
+      setCheckedRespuestaNG((prev) =>
+        checked ? [...prev, questionId] : prev.filter((id) => id !== questionId)
+      );
+      // Desmarcar OK si se marcó NG
+      if (checked)
+        setCheckedRespuestaOK((prev) => prev.filter((id) => id !== questionId));
+
+      setResponses((prev) => {
+        const without = prev.filter((r) => r.questionId !== questionId);
+        if (checked) return [...without, { questionId, answer: false }];
+        // si no está marcado NG, pero OK sí lo está, mantener OK=true en responses
+        if (checkedRespuestaOK.includes(questionId)) {
+          return [...without, { questionId, answer: true }];
+        }
+        return without; // ninguno marcado => sin respuesta
+      });
+    }
+  };
   // Para ver las preguntas de calidad
   const [questionsOpen, setQuestionsOpen] = useState(false);
   const toggleQuestions = () => {
@@ -172,11 +218,6 @@ export default function LaminacionComponent({ workOrder }: Props) {
       alert('Por favor, ingresa una cantidad de muestra válida.');
       return;
     }
-    const valorAnclajeNum = Number(valorAnclaje);
-    if (isNaN(valorAnclajeNum) || valorAnclajeNum < 0) {
-      alert('Por favor, ingresa un valor de anclaje numérico valido.');
-      return;
-    }
     if (responses.length === 0) {
       alert('Por favor, selecciona al menos una respuesta antes de enviar.');
       return;
@@ -192,7 +233,6 @@ export default function LaminacionComponent({ workOrder }: Props) {
       sample_quantity: Number(sampleQuantity),
       finish_validation:
         selectedOption === 'otro' ? otherValue : selectedOption,
-      valor_anclaje: valorAnclaje,
     };
     try {
       await submitToCQMLaminacion(payload);
@@ -428,35 +468,15 @@ export default function LaminacionComponent({ workOrder }: Props) {
         <ModalOverlay>
           <ModalContent>
             <ModalTitle>Preguntas del Área: {workOrder.area.name}</ModalTitle>
-            <Table>
-              <thead>
-                <tr>
-                  <th>Pregunta</th>
-                  <th style={{ display: 'flex' }}>Respuesta</th>
-                </tr>
-              </thead>
-              <tbody>
-                {workOrder.area.formQuestions
-                  .filter(
-                    (question: { role_id: number | null }) =>
-                      question.role_id === null
-                  )
-                  .map((question: { id: number; title: string }) => (
-                    <tr key={question.id}>
-                      <td>{question.title}</td>
-                      <td>
-                        <input
-                          type="checkbox"
-                          checked={checkedQuestions.includes(question.id)}
-                          onChange={(e) =>
-                            handleCheckboxChange(question.id, e.target.checked)
-                          }
-                        />
-                      </td>
-                    </tr>
-                  ))}
-              </tbody>
-            </Table>
+            <SelectionQuestionTable
+              formQuestions={workOrder.area.formQuestions}
+              roleId={null} // Operación
+              columns={['Respuesta']} // genera subcolumnas OK/NG
+              checkedQuestions={[
+                { ok: checkedRespuestaOK, ng: checkedRespuestaNG },
+              ]}
+              onToggle={handleToggleRespuesta}
+            />
             <InputGroup style={{ paddingTop: '30px', width: '70%' }}>
               <Label>Validar Acabado Vs Orden De Trabajo:</Label>
               <RadioGroup>
@@ -464,21 +484,41 @@ export default function LaminacionComponent({ workOrder }: Props) {
                   <Radio
                     type="radio"
                     name="validar_acabado"
-                    value="b/b"
-                    checked={selectedOption === 'b/b'}
+                    value="Brillo/Brillo"
+                    checked={selectedOption === 'Brillo/Brillo'}
                     onChange={handleOptionChange}
                   />
-                  B/B
+                  Brillo/Brillo
                 </RadioLabel>
                 <RadioLabel>
                   <Radio
                     type="radio"
                     name="validar_acabado"
-                    value="m/m"
-                    checked={selectedOption === 'm/m'}
+                    value="Mate/Mate"
+                    checked={selectedOption === 'Mate/Mate'}
                     onChange={handleOptionChange}
                   />
-                  M/M
+                  Mate/Mate
+                </RadioLabel>
+                <RadioLabel>
+                  <Radio
+                    type="radio"
+                    name="validar_acabado"
+                    value="Brillo/Mate"
+                    checked={selectedOption === 'Brillo/Mate'}
+                    onChange={handleOptionChange}
+                  />
+                  Brillo/Mate
+                </RadioLabel>
+                <RadioLabel>
+                  <Radio
+                    type="radio"
+                    name="validar_acabado"
+                    value="Mate/Brillo"
+                    checked={selectedOption === 'Mate/Brillo'}
+                    onChange={handleOptionChange}
+                  />
+                  Mate/Brillo
                 </RadioLabel>
                 <RadioLabel>
                   <Radio
@@ -500,16 +540,6 @@ export default function LaminacionComponent({ workOrder }: Props) {
                   style={{ marginTop: '10px' }}
                 />
               )}
-            </InputGroup>
-            <InputGroup style={{ paddingTop: '30px' }}>
-              <Label>Valor de Anclaje Obtenido:</Label>
-              <Input
-                type="number"
-                min={0}
-                placeholder="Ej: 2"
-                value={valorAnclaje}
-                onChange={(e) => setValorAnclaje(e.target.value)}
-              />
             </InputGroup>
             <InputGroup style={{ paddingTop: '30px' }}>
               <Label>Muestras:</Label>
@@ -537,27 +567,38 @@ export default function LaminacionComponent({ workOrder }: Props) {
             </ModalTitle>
             {qualitySectionOpen && (
               <>
-                <Table>
-                  <thead>
-                    <tr>
-                      <th>Pregunta</th>
-                      <th>Respuesta</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {workOrder.area.formQuestions
-                      .filter(
-                        (question: { role_id: number | null }) =>
-                          question.role_id === 3
-                      )
-                      .map((question: { id: number; title: string }) => (
-                        <tr key={question.id}>
-                          <td>{question.title}</td>
-                          <td></td>
-                        </tr>
-                      ))}
-                  </tbody>
-                </Table>
+                <SelectionQuestionTable
+                  formQuestions={workOrder.area.formQuestions}
+                  roleId={null} // Operación
+                  columns={[]} // genera subcolumnas OK/NG
+                  checkedQuestions={[
+                    { ok: checkedRespuestaOK, ng: checkedRespuestaNG },
+                  ]}
+                  onToggle={handleToggleRespuesta}
+                />
+                <InputGroup style={{ paddingTop: '30px' }}>
+                  <Label>Prueba Over:</Label>
+                  <Input
+                    type="number"
+                    min={0}
+                    placeholder="Ej: 5"
+                    readOnly
+                  />
+                  <Label>Prueba Cinta Magnética:</Label>
+                  <Input
+                    type="number"
+                    min={0}
+                    placeholder="Ej: 5"
+                    readOnly
+                  />
+                  <Label>Prueba Centro (entre capas):</Label>
+                  <Input
+                    type="number"
+                    min={0}
+                    placeholder="Ej: 5"
+                    readOnly
+                  />
+                </InputGroup>
               </>
             )}
             <div style={{ display: 'flex', gap: '1rem' }}>

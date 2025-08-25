@@ -9,21 +9,24 @@ import {
   Modal,
 } from 'react-native';
 import { TextInput } from 'react-native-paper';
-import QuestionTable from './QuestionTable';
 import {
   deleteFormQuestion,
   updateFormQuestion,
 } from '../../api/configVistosBuenos';
+import { AdvancedQuestionTable } from './util/FormQuestionTable';
 
-interface Props {
-  formQuestion: any[];
+interface Area {
+  id: number;
+  name: string;
 }
-
 interface Question {
   id: number;
   title: string;
   role_id: number | null;
-  areas: { id: number }[];
+  areas: Area[];
+}
+interface Props {
+  formQuestion: Question[];
 }
 
 export default function Serigrafia({ formQuestion }: Props) {
@@ -70,16 +73,16 @@ export default function Serigrafia({ formQuestion }: Props) {
     <ScrollView style={styles.container}>
       <Text style={styles.title}>Área a evaluar: Serigrafía</Text>
 
-      <QuestionTable
+      <AdvancedQuestionTable
         title="Respuestas del operador"
-        questions={formQuestions}
+        formQuestions={formQuestions}
         areaId={3}
-        roleFilter={null}
-        onEdit={(e) => {
-          setEditingId(e.id);
-          setNewTitle(e.title);
+        roleId={null}
+        onEdit={(id, title) => {
+          setEditingId(id);
+          setNewTitle(title ?? '');
         }}
-        onDelete={(e) => setDeletingId(e)}
+        onDelete={(id) => setDeletingId(id)}
       />
 
       <Text style={styles.label}>Muestras entregadas:</Text>
@@ -91,16 +94,16 @@ export default function Serigrafia({ formQuestion }: Props) {
         editable={false}
       />
 
-      <QuestionTable
+      <AdvancedQuestionTable
         title="Mis respuestas"
-        questions={formQuestions}
+        formQuestions={formQuestions}
         areaId={3}
-        roleFilter={3}
-        onEdit={(e) => {
-          setEditingId(e.id);
-          setNewTitle(e.title);
+        roleId={3}
+        onEdit={(id, title) => {
+          setEditingId(id);
+          setNewTitle(title ?? '');
         }}
-        onDelete={(e) => setDeletingId(e)}
+        onDelete={(id) => setDeletingId(id)}
       />
 
       {/* Edit Modal */}

@@ -1,9 +1,11 @@
-'use client'
+'use client';
 
-import { useRouter } from "next/navigation";
-import { useState } from "react";
-import styled from "styled-components";
-import { submitExtraMilling, sendInconformidadCQM } from "@/api/recepcionCQM";
+import { useRouter } from 'next/navigation';
+import { useState, useMemo } from 'react';
+import styled from 'styled-components';
+import { submitExtraMilling, sendInconformidadCQM } from '@/api/recepcionCQM';
+import { OperatorAdvancedTable } from './util/QuestionTable';
+import SelectionQuestionTable from './util/FormQuestionTable';
 
 interface Props {
   workOrder: any;
@@ -11,63 +13,88 @@ interface Props {
 type Answer = {
   reviewed: boolean;
   sample_quantity: number;
-  // lo que más tenga...
 };
 
 export default function MillingChipComponent({ workOrder }: Props) {
   const router = useRouter();
   const [showInconformidad, setShowInconformidad] = useState(false);
   const [inconformidad, setInconformidad] = useState<string>('');
+  const [localizacionContactos, setLocalizacionContactos] = useState('');
+  const [alturaChip, setAlturaChip] = useState('');
 
-  // Para obtener el ultimo FormAnswer 
+  // Para obtener el ultimo FormAnswer
   const index = workOrder?.answers
-  ?.map((a: Answer, i: number) => ({ ...a, index: i }))
-  .reverse().find((a: Answer) => a.reviewed === false)?.index;
+    ?.map((a: Answer, i: number) => ({ ...a, index: i }))
+    .reverse()
+    .find((a: Answer) => a.reviewed === false)?.index;
   console.log('el index', index);
 
   // Para mostrar formulario de CQM y enviarlo
   const [showConfirmModal, setShowConfirmModal] = useState(false);
 
-  //Para guardar las respuestas 
-  const [responses, setResponses] = useState<{questionId: number, answer: boolean}[]>(
-    workOrder.area.formQuestions
-      .filter((question: {role_id: number | null}) => question.role_id === 3)
-      .map((question: {id: number}) => ({
-        questionId: question.id,
-        answer: false
-      }))
-  );
-  const [localizacionContactos, setLocalizacionContactos] = useState('');
-  const [alturaChip, setAlturaChip] = useState('');
-
   // Para controlar qué preguntas están marcadas
-  const [checkedQuestions, setCheckedQuestions] = useState<number[]>([]);
-  const handleCheckboxChange = (questionId: number, isChecked: boolean) => {
-    setResponses(prevResponses => 
-      prevResponses.map(response =>
-        response.questionId === questionId 
-          ? {...response, answer: isChecked}
-          : response
-      )
-    );
-  
-    // Actualizar visualmente el checkbox
-    setCheckedQuestions(prev =>
-      isChecked ? [...prev, questionId] : prev.filter(id => id !== questionId)
-    );
+  //Para guardar las respuestas
+  const [answersByQuestion, setAnswersByQuestion] = useState<
+    Record<number, boolean | undefined>
+  >({});
+
+  // Preguntas visibles en la tabla (mismo filtro que pasas al child con roleId=null)
+  const visibleQuestions =
+    workOrder.area.formQuestions?.filter((q: any) => q.role_id === null) ?? [];
+
+  // Listas derivadas para el componente de tabla (no se guardan aparte)
+  const checkedRespuestaOK = useMemo(
+    () =>
+      Object.entries(answersByQuestion)
+        .filter(([, v]) => v === true)
+        .map(([k]) => Number(k)),
+    [answersByQuestion]
+  );
+
+  const checkedRespuestaNG = useMemo(
+    () =>
+      Object.entries(answersByQuestion)
+        .filter(([, v]) => v === false)
+        .map(([k]) => Number(k)),
+    [answersByQuestion]
+  );
+
+  const handleToggleRespuesta = (
+    questionId: number,
+    _columnIndex: number,
+    type: 'ok' | 'ng',
+    checked: boolean
+  ) => {
+    setAnswersByQuestion((prev) => {
+      const next = { ...prev };
+      if (checked) {
+        // marcar OK => true, NG => false (exclusivo)
+        next[questionId] = type === 'ok';
+      } else {
+        // si desmarcan la opción activa, borramos la respuesta
+        if (
+          (type === 'ok' && next[questionId] === true) ||
+          (type === 'ng' && next[questionId] === false)
+        ) {
+          delete next[questionId];
+        }
+      }
+      return next;
+    });
   };
 
-  
   const handleSubmit = async () => {
     const formAnswerId = workOrder.answers[index]?.id; // id de FormAnswer
     if (!formAnswerId) {
-      alert("No se encontró el ID del formulario.");
+      alert('No se encontró el ID del formulario.');
       return;
     }
-    const checkboxPayload = responses.map(({ questionId, answer }) => ({
-      question_id: questionId,
-      answer: answer,     
-    }));
+    const checkboxPayload = Object.entries(answersByQuestion).map(
+      ([questionId, answer]) => ({
+        question_id: Number(questionId),
+        answer: answer === true ? true : answer === false ? false : null, // <-- boolean | null
+      })
+    );
     const payload = {
       form_answer_id: formAnswerId,
       checkboxes: checkboxPayload,
@@ -76,9 +103,9 @@ export default function MillingChipComponent({ workOrder }: Props) {
     };
     try {
       const res = await submitExtraMilling(payload);
-      router.push("/liberacionDeVistosBuenos");
+      router.push('/liberacionDeVistosBuenos');
     } catch (error) {
-      console.log("Error al guardar la respuesta: ", error);
+      console.log('Error al guardar la respuesta: ', error);
     }
   };
 
@@ -94,7 +121,7 @@ export default function MillingChipComponent({ workOrder }: Props) {
       console.error(error);
       alert('Error al conectar con el servidor');
     }
-  }
+  };
 
   return (
     <Container>
@@ -126,140 +153,151 @@ export default function MillingChipComponent({ workOrder }: Props) {
       <NewData>
         <SectionTitle>Respuestas del operador</SectionTitle>
         <NewDataWrapper>
-          <Table>
-            <thead>
-              <tr>
-                <th>Pregunta</th>
-                <th>Respuesta</th>
-              </tr>
-            </thead>
-            <tbody>
-              {workOrder.area.formQuestions
-              .filter((question: { role_id: number | null }) => question.role_id === null)
-              .map((question: { id: number; title: string }) => {
-                // Buscar la respuesta correspondiente a esta pregunta
-                const answer = workOrder.answers[index]?.FormAnswerResponse?.find(
-                  (resp: any) => resp.question_id === question.id
-                );
-                
-                // Obtener la respuesta del operador (response_operator)
-                const operatorResponse = answer?.response_operator;
-
-                return (
-                  <tr key={question.id}>
-                    <td>{question.title}</td>
-                    <td>
-                      {typeof operatorResponse === 'boolean' ? (
-                        <input 
-                          type="checkbox" 
-                          checked={operatorResponse} 
-                          disabled 
-                        />
-                      ) : (
-                        <span>{operatorResponse !== undefined && operatorResponse !== null 
-                          ? operatorResponse.toString() 
-                          : ''}</span>
-                      )}
-                    </td>
-                  </tr>
-                );
-              })}
-            </tbody>
-          </Table>
-          <InputGroup style={{ width: '70%'}}>
-              <Label>Revisar Tecnología De Chip y Color Vs Ot:</Label>
-              <Input type="text" value={workOrder?.answers[index].revisar_tecnologia ?? 'No se reconoce la muestra enviada' } readOnly />
-              <Label>Validar y Anotar KCV (Intercambio De Llaves), Carga De Aplicación o Prehabilitación (Si Aplica):</Label>
-                <Input type="text" value={workOrder?.answers[index].validar_kvc ?? 'No se reconoce la muestra enviada' } readOnly />
-              <Label>Muestras entregadas:</Label>
-              <Input type="number" value={workOrder?.answers[index].sample_quantity ?? 'No se reconoce la muestra enviada' } readOnly />
+          <OperatorAdvancedTable
+            questions={workOrder.area.formQuestions ?? []}
+            answers={workOrder.answers[index]?.FormAnswerResponse ?? []}
+            mode={'doble'}
+            readOnly
+            columns={['Respuesta']}
+          />
+          <InputGroup style={{ width: '70%' }}>
+            <Label>Revisar Tecnología De Chip y Color Vs Ot:</Label>
+            <Input
+              type="text"
+              value={
+                workOrder?.answers[index].revisar_tecnologia ??
+                'No se reconoce la muestra enviada'
+              }
+              readOnly
+            />
+            <Label>
+              Validar y Anotar KCV (Intercambio De Llaves), Carga De Aplicación
+              o Prehabilitación (Si Aplica):
+            </Label>
+            <Input
+              type="text"
+              value={
+                workOrder?.answers[index].validar_kvc ??
+                'No se reconoce la muestra enviada'
+              }
+              readOnly
+            />
+            <Label>Muestras entregadas:</Label>
+            <Input
+              type="number"
+              value={
+                workOrder?.answers[index].sample_quantity ??
+                'No se reconoce la muestra enviada'
+              }
+              readOnly
+            />
           </InputGroup>
         </NewDataWrapper>
         <SectionTitle>Mis respuestas</SectionTitle>
         <NewDataWrapper>
-          <Table>
-            <thead>
-              <tr>
-                <th>Pregunta</th>
-                <th>Respuesta</th>
-              </tr>
-            </thead>
-            <tbody>
-              {workOrder.area.formQuestions
-              .filter((question: { role_id: number | null }) => question.role_id === 3)
-              .map((question: { id: number; title: string }) => {
-                // Buscar la respuesta correspondiente a esta pregunta
-                const answer = workOrder.answers[index]?.FormAnswerResponse?.find(
-                  (resp: any) => resp.question_id === question.id
-                );
-                return (
-                  <tr key={question.id}>
-                    <td>{question.title}</td>
-                    <td>
-                      <input type="checkbox" checked={checkedQuestions.includes(question.id)} onChange={(e) => handleCheckboxChange(question.id, e.target.checked)}/>
-                    </td>
-                  </tr>
-                );
-              })}
-            </tbody>
-          </Table>
-          <InputGroup style={{ width: '70%'}}>
+          <SelectionQuestionTable
+            formQuestions={workOrder.area.formQuestions}
+            roleId={3} // Calidad
+            columns={['Respuesta']}
+            checkedQuestions={[
+              { ok: checkedRespuestaOK, ng: checkedRespuestaNG },
+            ]}
+            onToggle={handleToggleRespuesta}
+          />
+          <InputGroup style={{ width: '70%' }}>
             <Label>Localización De Contactos:</Label>
-            <Input type="text" placeholder="Ej: " value={localizacionContactos} onChange={(e) => setLocalizacionContactos(e.target.value)}/>
+            <Input
+              type="text"
+              placeholder="Ej: "
+              value={localizacionContactos}
+              onChange={(e) => setLocalizacionContactos(e.target.value)}
+            />
           </InputGroup>
-          <InputGroup style={{ width: '70%'}}>
+          <InputGroup style={{ width: '70%' }}>
             <Label>Altura Chip Centro:</Label>
-            <Input type="text" placeholder="Ej: " value={alturaChip} onChange={(e) => setAlturaChip(e.target.value)}/>
+            <Input
+              type="text"
+              placeholder="Ej: "
+              value={alturaChip}
+              onChange={(e) => setAlturaChip(e.target.value)}
+            />
           </InputGroup>
         </NewDataWrapper>
-        
       </NewData>
-      <div style={{ display: 'flex', gap: '1rem'}}>
-      <RechazarButton onClick={() => setShowInconformidad(true)}>Rechazar</RechazarButton>
-      <AceptarButton onClick={() => setShowConfirmModal(true)}>Aprobado</AceptarButton>
+      <div style={{ display: 'flex', gap: '1rem' }}>
+        <RechazarButton onClick={() => setShowInconformidad(true)}>
+          Rechazar
+        </RechazarButton>
+        <AceptarButton onClick={() => setShowConfirmModal(true)}>
+          Aprobado
+        </AceptarButton>
       </div>
       {showConfirmModal && (
         <ModalOverlay>
           <ModalContent>
             <ModalTitle>¿Estás segura de aprobar?</ModalTitle>
             <ModalActions>
-              <Button style= {{ backgroundColor: '#BBBBBB'}} onClick={() => setShowConfirmModal(false)}>Cancelar</Button>
-              <Button onClick={() => {
-                setShowConfirmModal(false);
-                handleSubmit();
-              }}>Sí, aprobar</Button>
+              <Button
+                style={{ backgroundColor: '#BBBBBB' }}
+                onClick={() => setShowConfirmModal(false)}
+              >
+                Cancelar
+              </Button>
+              <Button
+                onClick={() => {
+                  setShowConfirmModal(false);
+                  handleSubmit();
+                }}
+              >
+                Sí, aprobar
+              </Button>
             </ModalActions>
           </ModalContent>
         </ModalOverlay>
       )}
       {showInconformidad && (
-          <ModalOverlay>
-            <ModalBox>
-              <h4>Registrar Inconformidad</h4>
-              <h3>Por favor, describe la inconformidad detectada con las respuestas entregadas.</h3>
-              <Textarea
-                value={inconformidad}
-                onChange={(e) => setInconformidad(e.target.value)}
-                placeholder="Escribe aquí la inconformidad..."
-              />
-              <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '1rem', marginTop: '1rem' }}>
-                <CancelButton onClick={() => setShowInconformidad(false)}>Cancelar</CancelButton>
-                <ConfirmButton onClick={() => {
+        <ModalOverlay>
+          <ModalBox>
+            <h4>Registrar Inconformidad</h4>
+            <h3>
+              Por favor, describe la inconformidad detectada con las respuestas
+              entregadas.
+            </h3>
+            <Textarea
+              value={inconformidad}
+              onChange={(e) => setInconformidad(e.target.value)}
+              placeholder="Escribe aquí la inconformidad..."
+            />
+            <div
+              style={{
+                display: 'flex',
+                justifyContent: 'flex-end',
+                gap: '1rem',
+                marginTop: '1rem',
+              }}
+            >
+              <CancelButton onClick={() => setShowInconformidad(false)}>
+                Cancelar
+              </CancelButton>
+              <ConfirmButton
+                onClick={() => {
                   if (!inconformidad.trim()) {
-                    alert('Debes ingresar una inconformidad antes de continuar.');
+                    alert(
+                      'Debes ingresar una inconformidad antes de continuar.'
+                    );
                     return;
                   }
                   handleSubmitInconformidad();
                   setShowInconformidad(false);
-                }}>Guardar</ConfirmButton>
-              </div>
-            </ModalBox>
-          </ModalOverlay>
-        )}
+                }}
+              >
+                Guardar
+              </ConfirmButton>
+            </div>
+          </ModalBox>
+        </ModalOverlay>
+      )}
     </Container>
-
-
-
   );
 }
 
@@ -270,7 +308,7 @@ const Container = styled.div`
   padding: 2rem;
   margin-top: 1.5rem;
   border-radius: 1rem;
-  box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
   max-width: 800px;
   margin-left: auto;
   margin-right: auto;
@@ -283,9 +321,7 @@ const Title = styled.h2`
   color: #1f2937;
 `;
 
-const NewData = styled.div`
-  
-`;
+const NewData = styled.div``;
 
 const SectionTitle = styled.h3`
   font-size: 1.25rem;
@@ -340,7 +376,7 @@ const Input = styled.input`
   transition: border 0.3s;
 
   &:focus {
-    border-color: #0038A8;
+    border-color: #0038a8;
   }
 `;
 
@@ -359,7 +395,7 @@ const RadioLabel = styled.label`
 `;
 
 const Radio = styled.input`
-  accent-color: #0038A8;
+  accent-color: #0038a8;
 `;
 
 const Textarea = styled.textarea`
@@ -373,14 +409,14 @@ const Textarea = styled.textarea`
   resize: vertical;
 
   &:focus {
-    border-color: #0038A8;
+    border-color: #0038a8;
     outline: none;
   }
 `;
 
 const AceptarButton = styled.button<{ disabled?: boolean }>`
   margin-top: 1.5rem;
-  background-color: #0038A8;
+  background-color: #0038a8;
   color: white;
   padding: 0.5rem 1.25rem;
   border-radius: 0.5rem;
@@ -390,16 +426,16 @@ const AceptarButton = styled.button<{ disabled?: boolean }>`
   cursor: pointer;
 
   transition: background-color 0.3s ease, color 0.3s ease;
-  
+
   &:hover {
-    background-color: #1D4ED8;
-    outline: none
+    background-color: #1d4ed8;
+    outline: none;
   }
 `;
 
 const RechazarButton = styled.button<{ disabled?: boolean }>`
   margin-top: 1.5rem;
-  background-color: #BBBBBB;
+  background-color: #bbbbbb;
   color: white;
   padding: 0.5rem 1.25rem;
   border-radius: 0.5rem;
@@ -412,13 +448,13 @@ const RechazarButton = styled.button<{ disabled?: boolean }>`
 
   &:hover {
     background-color: #a0a0a0;
-    outline: none
+    outline: none;
   }
 `;
 
 const CqmButton = styled.button`
   margin-top: 2rem;
-  background-color: #0038A8;
+  background-color: #0038a8;
   color: white;
   padding: 0.75rem 2rem;
   border-radius: 0.5rem;
@@ -434,7 +470,8 @@ const Table = styled.table`
   width: 100%;
   border-collapse: collapse;
   color: black;
-  th, td {
+  th,
+  td {
     padding: 0.75rem;
     text-align: left;
     border-bottom: 1px solid #e5e7eb;
@@ -448,7 +485,7 @@ const Table = styled.table`
 
 const CloseButton = styled.button`
   margin-top: 1.5rem;
-  background-color: #BBBBBB;
+  background-color: #bbbbbb;
   color: white;
   padding: 0.5rem 1.25rem;
   border-radius: 0.5rem;
@@ -463,7 +500,7 @@ const CloseButton = styled.button`
 
   &:hover {
     background-color: #a0a0a0;
-    outline: none
+    outline: none;
   }
 `;
 
@@ -516,13 +553,13 @@ const ModalBox = styled.div`
   background: white;
   padding: 2rem;
   border-radius: 1rem;
-  box-shadow: 0 8px 24px rgba(0,0,0,0.2);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.2);
   max-width: 400px;
   width: 90%;
 `;
 
 const CancelButton = styled.button`
-  background-color: #BBBBBB;
+  background-color: #bbbbbb;
   color: white;
   padding: 0.5rem 1.5rem;
   border-radius: 0.5rem;
@@ -541,7 +578,7 @@ const CancelButton = styled.button`
 `;
 
 const ConfirmButton = styled.button`
-  background-color: #0038A8;
+  background-color: #0038a8;
   color: white;
   padding: 0.5rem 1.5rem;
   border-radius: 0.5rem;

@@ -7,7 +7,8 @@ import {
   submitExtraPersonalizacion,
   sendInconformidadCQM,
 } from '@/api/recepcionCQM';
-import { MachineSection } from './util/MachineSection';
+import { CheckedState } from './util/MachineSectionEdit';
+import { OperatorAdvanceMachineTable } from './util/MachineSection';
 import { MachineSectionEdit } from './util/MachineSectionEdit';
 
 interface Props {
@@ -16,7 +17,6 @@ interface Props {
 type Answer = {
   reviewed: boolean;
   sample_quantity: number;
-  // lo que más tenga...
 };
 
 export default function PersonalizacionComponent({ workOrder }: Props) {
@@ -61,19 +61,54 @@ export default function PersonalizacionComponent({ workOrder }: Props) {
   const [aparienciaQuemado, setAparienciaQuemado] = useState('');
 
   // Para controlar qué preguntas están marcadas
-  const [checkedQuestions, setCheckedQuestions] = useState<number[]>([]);
-  const handleCheckboxChange = (questionId: number, isChecked: boolean) => {
-    setResponses((prevResponses) =>
-      prevResponses.map((response) =>
-        response.questionId === questionId
-          ? { ...response, answer: isChecked }
-          : response
-      )
-    );
-
-    // Actualizar visualmente el checkbox
-    setCheckedQuestions((prev) =>
-      isChecked ? [...prev, questionId] : prev.filter((id) => id !== questionId)
+  const [checkedQuestions, setCheckedQuestions] = useState<CheckedState[]>([
+    { ok: [], ng: [] },
+  ]);
+  const handleCheckToggle = (
+    id: number,
+    colIndex: number,
+    type: 'ok' | 'ng',
+    checked: boolean
+  ) => {
+    setCheckedQuestions((prev) => {
+      const next = [...prev];
+      if (!next[colIndex]) next[colIndex] = { ok: [], ng: [] };
+  
+      const current = next[colIndex];
+  
+      // Conjuntos para manipular sin duplicados
+      const setOk = new Set<number>(current.ok);
+      const setNg = new Set<number>(current.ng);
+  
+      if (type === 'ok') {
+        if (checked) {
+          setOk.add(id);
+          setNg.delete(id); // exclusión mutua
+        } else {
+          setOk.delete(id);
+        }
+      } else {
+        if (checked) {
+          setNg.add(id);
+          setOk.delete(id); // exclusión mutua
+        } else {
+          setNg.delete(id);
+        }
+      }
+  
+      next[colIndex] = { ok: Array.from(setOk), ng: Array.from(setNg) };
+      return next;
+    });
+  
+    // Mantener responses consistente con los checks
+    setResponses((prev) =>
+      prev.map((r) => {
+        if (r.questionId !== id) return r;
+        // Si se marca OK => answer=true; si se marca NG => answer=false
+        // Si se desmarca cualquiera => answer=false (sin respuesta positiva)
+        if (!checked) return { ...r, answer: false };
+        return { ...r, answer: type === 'ok' };
+      })
     );
   };
   const handleSubmit = async () => {
@@ -197,13 +232,12 @@ export default function PersonalizacionComponent({ workOrder }: Props) {
 
           {workOrder?.answers[index].tipo_personalizacion === 'persos' && (
             <>
-              <MachineSection
+              <OperatorAdvanceMachineTable
                 visible
                 machine="Personalización"
                 title=""
                 questions={workOrder.area.formQuestions}
                 areaId={10}
-                roleId={null}
                 questionSlice={[1, 10]}
                 answers={workOrder.answers[index]?.FormAnswerResponse ?? []}
                 extras={
@@ -244,13 +278,12 @@ export default function PersonalizacionComponent({ workOrder }: Props) {
           {workOrder?.answers[index].tipo_personalizacion ===
             'etiquetadora' && (
             <>
-              <MachineSection
+              <OperatorAdvanceMachineTable
                 visible
                 machine="etiquetadora"
                 title=""
                 questions={workOrder.area.formQuestions}
                 areaId={10}
-                roleId={null}
                 questionSlice={[0, 1]}
                 answers={workOrder.answers[index]?.FormAnswerResponse ?? []}
                 extras={
@@ -282,46 +315,79 @@ export default function PersonalizacionComponent({ workOrder }: Props) {
           )}
           {workOrder?.answers[index].tipo_personalizacion === 'packsmart' && (
             <>
-              <MachineSection
+              <OperatorAdvanceMachineTable
                 visible
                 machine="packsmart"
                 title=""
                 questions={workOrder.area.formQuestions}
                 areaId={10}
-                roleId={null}
                 questionSlice={[14, 20]}
                 answers={workOrder.answers[index]?.FormAnswerResponse ?? []}
-                extras={<> </>}
+                extras={
+                  <InputGroup style={{ width: '70%' }}>
+                    <Label>Muestras entregadas:</Label>
+                    <Input
+                      type="number"
+                      value={
+                        workOrder?.answers[index].sample_quantity ??
+                        'No se reconoce la muestra enviada'
+                      }
+                      readOnly
+                    />
+                  </InputGroup>
+                }
               />
             </>
           )}
           {workOrder?.answers[index].tipo_personalizacion === 'otto' && (
             <>
-              <MachineSection
+              <OperatorAdvanceMachineTable
                 visible
                 machine="otto"
                 title=""
                 questions={workOrder.area.formQuestions}
                 areaId={10}
-                roleId={null}
                 questionSlice={[20, 28]}
                 answers={workOrder.answers[index]?.FormAnswerResponse ?? []}
-                extras={<> </>}
+                extras={
+                  <InputGroup style={{ width: '70%' }}>
+                    <Label>Muestras entregadas:</Label>
+                    <Input
+                      type="number"
+                      value={
+                        workOrder?.answers[index].sample_quantity ??
+                        'No se reconoce la muestra enviada'
+                      }
+                      readOnly
+                    />
+                  </InputGroup>
+                }
               />
             </>
           )}
           {workOrder?.answers[index].tipo_personalizacion === 'embolsadora' && (
             <>
-              <MachineSection
+              <OperatorAdvanceMachineTable
                 visible
                 machine="embolsadora"
                 title=""
                 questions={workOrder.area.formQuestions}
                 areaId={10}
-                roleId={null}
                 questionSlice={[28, 30]}
                 answers={workOrder.answers[index]?.FormAnswerResponse ?? []}
-                extras={<> </>}
+                extras={
+                  <InputGroup style={{ width: '70%' }}>
+                    <Label>Muestras entregadas:</Label>
+                    <Input
+                      type="number"
+                      value={
+                        workOrder?.answers[index].sample_quantity ??
+                        'No se reconoce la muestra enviada'
+                      }
+                      readOnly
+                    />
+                  </InputGroup>
+                }
               />
             </>
           )}
@@ -330,75 +396,49 @@ export default function PersonalizacionComponent({ workOrder }: Props) {
         <NewDataWrapper>
           {workOrder?.answers[index].tipo_personalizacion === 'laser' && (
             <>
-              <Table>
-                <thead>
-                  <tr>
-                    <th>Pregunta</th>
-                    <th>Respuesta</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {workOrder.area.formQuestions
-                    .slice(9, 13)
-                    .filter(
-                      (question: { role_id: number | null }) =>
-                        question.role_id === 3
-                    )
-                    .map((question: { id: number; title: string }) => {
-                      // Buscar la respuesta correspondiente a esta pregunta
-                      const answer = workOrder.answers[
-                        index
-                      ]?.FormAnswerResponse?.find(
-                        (resp: any) => resp.question_id === question.id
-                      );
-                      return (
-                        <tr key={question.id}>
-                          <td>{question.title}</td>
-                          <td>
-                            <input
-                              type="checkbox"
-                              checked={checkedQuestions.includes(question.id)}
-                              onChange={(e) =>
-                                handleCheckboxChange(
-                                  question.id,
-                                  e.target.checked
-                                )
-                              }
-                            />
-                          </td>
-                        </tr>
-                      );
-                    })}
-                </tbody>
-              </Table>
-              <InputGroup style={{ paddingTop: '10px', width: '70%' }}>
-                <Label>Verificar Script / Layout Vs Ot / Autorizacion:</Label>
-                <Input
-                  type="text"
-                  placeholder="Ej: "
-                  value={verificarScript}
-                  onChange={(e) => setVerificarScript(e.target.value)}
-                />
-                <Label>
-                  Validar, Anotar KVC (Llaves), Carga de Aplicación o
-                  Prehabilitación:
-                </Label>
-                <Input
-                  type="text"
-                  placeholder="Ej: "
-                  value={validarKVC}
-                  onChange={(e) => setValidarKVC(e.target.value)}
-                />
-                <Label>
-                  Describir Apariencia Del Quemado Del Laser (Color):
-                </Label>
-                <Input
-                  type="text"
-                  placeholder="Ej: "
-                  value={aparienciaQuemado}
-                  onChange={(e) => setAparienciaQuemado(e.target.value)}
-                />
-              </InputGroup>
+              <MachineSectionEdit
+                visible={
+                  workOrder?.answers[index].tipo_personalizacion === 'laser'
+                }
+                title=""
+                questions={workOrder.area.formQuestions}
+                roleId={3}
+                questionSlice={[9, 13]}
+                checkedQuestions={checkedQuestions}
+                onCheckToggle={handleCheckToggle}
+                extras={
+                  <InputGroup style={{ width: '70%' }}>
+                    <Label>
+                      Verificar Script / Layout Vs Ot / Autorizacion:
+                    </Label>
+                    <Input
+                      type="text"
+                      placeholder="Ej: "
+                      value={verificarScript}
+                      onChange={(e) => setVerificarScript(e.target.value)}
+                    />
+                    <Label>
+                      Validar, Anotar KVC (Llaves), Carga de Aplicación o
+                      Prehabilitación:
+                    </Label>
+                    <Input
+                      type="text"
+                      placeholder="Ej: "
+                      value={validarKVC}
+                      onChange={(e) => setValidarKVC(e.target.value)}
+                    />
+                    <Label>
+                      Describir Apariencia Del Quemado Del Laser (Color):
+                    </Label>
+                    <Input
+                      type="text"
+                      placeholder="Ej: "
+                      value={aparienciaQuemado}
+                      onChange={(e) => setAparienciaQuemado(e.target.value)}
+                    />
+                  </InputGroup>
+                }
+              />
             </>
           )}
 
@@ -413,7 +453,7 @@ export default function PersonalizacionComponent({ workOrder }: Props) {
                 roleId={3}
                 questionSlice={[13, 15]}
                 checkedQuestions={checkedQuestions}
-                onCheckToggle={handleCheckboxChange}
+                onCheckToggle={handleCheckToggle}
                 extras={
                   <InputGroup style={{ width: '70%' }}>
                     <Label>Validar Carga De Aplicación (PersoMaster)</Label>
@@ -649,23 +689,6 @@ const RechazarButton = styled.button<{ disabled?: boolean }>`
   &:hover {
     background-color: #a0a0a0;
     outline: none;
-  }
-`;
-
-const Table = styled.table`
-  width: 100%;
-  border-collapse: collapse;
-  color: black;
-  th,
-  td {
-    padding: 0.75rem;
-    text-align: left;
-    border-bottom: 1px solid #e5e7eb;
-  }
-
-  th {
-    background-color: #f3f4f6;
-    color: #374151;
   }
 `;
 
