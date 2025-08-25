@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import {
   View,
   Text,
@@ -20,6 +20,7 @@ import {
 import { RadioButton } from 'react-native-paper';
 import { useAuth } from '../../contexts/AuthContext';
 import { calcularCantidadPorLiberar } from './util/calcularCantidadPorLiberar';
+import SelectionQuestionTable from './util/FormQuestionTable';
 
 interface PartialRelease {
   validated: boolean;
@@ -33,17 +34,36 @@ const LaminacionComponent = ({ workOrder }: { workOrder: any }) => {
   const [comments, setComments] = useState('');
   const [showCqmModal, setShowCqmModal] = useState(false);
   const [showConfirm, setShowConfirm] = useState(false);
-  const [checkedQuestion, setCheckedQuestion] = useState<number[]>([]);
   const [showQuality, setShowQuality] = useState<boolean>(false);
   const [value, setValue] = useState('');
   const [otherValue, setOtherValue] = useState('');
-  const [valorAnclaje, setValorAnclaje] = useState('');
 
-  const questions =
-    workOrder.area.formQuestions?.filter((q: any) => q.role_id === null) || [];
-  const qualityQuestions =
-    workOrder.area.formQuestions?.filter((q: any) => q.role_id === 3) || [];
   const isDisabled = workOrder.status === 'En proceso';
+  // Una sola fuente de verdad: por pregunta guarda true (OK), false (NG) o undefined (sin respuesta)
+  const [answersByQuestion, setAnswersByQuestion] = useState<
+    Record<number, boolean | undefined>
+  >({});
+
+  // Preguntas visibles en la tabla (mismo filtro que pasas al child con roleId=null)
+  const visibleQuestions =
+    workOrder.area.formQuestions?.filter((q: any) => q.role_id === null) ?? [];
+
+  // Listas derivadas para el componente de tabla (no se guardan aparte)
+  const checkedRespuestaOK = useMemo(
+    () =>
+      visibleQuestions
+        .filter((q: any) => answersByQuestion[q.id] === true)
+        .map((q: any) => q.id),
+    [visibleQuestions, answersByQuestion]
+  );
+
+  const checkedRespuestaNG = useMemo(
+    () =>
+      visibleQuestions
+        .filter((q: any) => answersByQuestion[q.id] === false)
+        .map((q: any) => q.id),
+    [visibleQuestions, answersByQuestion]
+  );
 
   const { user } = useAuth();
   const currentUserId = user?.sub;
@@ -99,33 +119,38 @@ const LaminacionComponent = ({ workOrder }: { workOrder: any }) => {
       Alert.alert('Cantidad de muestra inválida');
       return;
     }
-    const valorAnclajeNum = Number(valorAnclaje);
-    if (isNaN(valorAnclajeNum) || valorAnclajeNum < 0) {
-      alert('Por favor, ingresa un valor de anclaje numérico valido.');
-      return;
-    }
-    const isFrenteVueltaValid =
-      checkedQuestion.length > 0 || checkedQuestion.length > 0;
-    if (!questions.length || !isFrenteVueltaValid) {
+
+    // Construir arrays Alineados según el ORDEN de visibleQuestions
+    const question_id: number[] = [];
+    const response: boolean[] = [];
+    visibleQuestions.forEach((q: any) => {
+      const ans = answersByQuestion[q.id];
+      if (ans !== undefined) {
+        question_id.push(q.id);
+        response.push(!!ans);
+      }
+    });
+
+    // Exigir todas respondidas (o ajusta a tu regla)
+    if (question_id.length !== visibleQuestions.length) {
       Alert.alert('Completa todas las preguntas y cantidad de muestra.');
       return;
     }
-
-    const answeredQuestions = questions.filter((q: any) =>
-      checkedQuestion.includes(q.id)
-    );
-
+    // Exigir todas respondidas (o ajusta a tu regla)
+    if (question_id.length !== visibleQuestions.length) {
+      Alert.alert('Completa todas las preguntas y cantidad de muestra.');
+      return;
+    }
     const payload = {
-      question_id: answeredQuestions.map((q: any) => q.id),
+      question_id,
       work_order_flow_id: currentFlow.id,
       work_order_id: currentFlow.workOrder.id,
       area_id: currentFlow.area.id,
-      response: answeredQuestions.map(() => true), // todas las marcadas son true
+      response,
       reviewed: false,
       user_id: currentFlow.assigned_user,
       sample_quantity: Number(sampleQuantity),
       finish_validation: value === 'otro' ? otherValue : value,
-      valor_anclaje: valorAnclaje,
     };
 
     try {
@@ -244,6 +269,31 @@ const LaminacionComponent = ({ workOrder }: { workOrder: any }) => {
       isNextInvalid
     );
   };
+
+  const handleToggleRespuesta = (
+    questionId: number,
+    _columnIndex: number,
+    type: 'ok' | 'ng',
+    checked: boolean
+  ) => {
+    setAnswersByQuestion((prev) => {
+      const next = { ...prev };
+      if (checked) {
+        // marcar OK => true, NG => false (exclusivo)
+        next[questionId] = type === 'ok';
+      } else {
+        // si desmarcan la opción activa, borramos la respuesta
+        if (
+          (type === 'ok' && next[questionId] === true) ||
+          (type === 'ng' && next[questionId] === false)
+        ) {
+          delete next[questionId];
+        }
+      }
+      return next;
+    });
+  };
+
   const shouldDisableCQM = () => {
     const estadosBloqueados = ['Enviado a CQM', 'En Calidad', 'Listo'];
     const isDisabled = estadosBloqueados.includes(currentFlow.status);
@@ -318,7 +368,9 @@ const LaminacionComponent = ({ workOrder }: { workOrder: any }) => {
         )}
       </View>
 
-      <Text style={styles.label}>Cantidad a liberar (Hojas Frente / Hojas Vuelta):</Text>
+      <Text style={styles.label}>
+        Cantidad a liberar (Hojas Frente / Hojas Vuelta):
+      </Text>
       <TextInput
         style={styles.input}
         theme={{ roundness: 30 }}
@@ -386,37 +438,15 @@ const LaminacionComponent = ({ workOrder }: { workOrder: any }) => {
               Preguntas del Área: {workOrder.area.name}
             </Text>
 
-            {/* Encabezado estilo tabla */}
-            <View style={styles.tableHeader}>
-              <Text style={[styles.tableCell, { flex: 2 }]}>Pregunta</Text>
-              <Text style={styles.tableCell}>Respuesta</Text>
-            </View>
-
-            {/* Preguntas normales */}
-            {questions.map((q: any) => (
-              <View key={q.id} style={styles.tableRow}>
-                {/* Pregunta */}
-                <View style={[styles.tableCell, { flex: 2 }]}>
-                  <Text style={styles.questionText}>{q.title}</Text>
-                </View>
-
-                {/* Respuesta */}
-                <View
-                  style={[styles.tableCell, { flex: 1, alignItems: 'center' }]}
-                >
-                  <TouchableOpacity
-                    onPress={() =>
-                      toggleCheckbox(q.id, checkedQuestion, setCheckedQuestion)
-                    }
-                    style={styles.radioCircle}
-                  >
-                    {checkedQuestion.includes(q.id) && (
-                      <View style={styles.radioDot} />
-                    )}
-                  </TouchableOpacity>
-                </View>
-              </View>
-            ))}
+            <SelectionQuestionTable
+              formQuestions={workOrder.area.formQuestions}
+              roleId={null}
+              columns={['Respuesta']}
+              checkedQuestions={[
+                { ok: checkedRespuestaOK, ng: checkedRespuestaNG },
+              ]}
+              onToggle={handleToggleRespuesta}
+            />
 
             <Text style={styles.label}>
               Validar Acabado Vs Orden De Trabajo
@@ -428,12 +458,20 @@ const LaminacionComponent = ({ workOrder }: { workOrder: any }) => {
             >
               <View style={styles.radioRow}>
                 <View style={styles.radioItem}>
-                  <RadioButton value="B/B" />
-                  <Text style={styles.radioLabel}>B/B</Text>
+                  <RadioButton value="Brillo/Brillo" />
+                  <Text style={styles.radioLabel}>Brillo/Brillo</Text>
                 </View>
                 <View style={styles.radioItem}>
-                  <RadioButton value="M/M" />
-                  <Text style={styles.radioLabel}>M/M</Text>
+                  <RadioButton value="Mate/Mate" />
+                  <Text style={styles.radioLabel}>Mate/Mate</Text>
+                </View>
+                <View style={styles.radioItem}>
+                  <RadioButton value="Brillo/Mate" />
+                  <Text style={styles.radioLabel}>Brillo/Mate</Text>
+                </View>
+                <View style={styles.radioItem}>
+                  <RadioButton value="Mate/Brillo" />
+                  <Text style={styles.radioLabel}>Mate/Brillo</Text>
                 </View>
                 <View style={styles.radioItem}>
                   <RadioButton value="Otro" />
@@ -452,19 +490,6 @@ const LaminacionComponent = ({ workOrder }: { workOrder: any }) => {
                 onChangeText={setOtherValue}
               />
             )}
-
-            {/* Preguntas */}
-            <Text style={styles.label}>Valor de Anclaje Obtenido:</Text>
-            <TextInput
-              style={styles.input}
-              theme={{ roundness: 30 }}
-              mode="outlined"
-              activeOutlineColor="#000"
-              keyboardType="numeric"
-              placeholder="Ej: 2"
-              value={valorAnclaje.toString()}
-              onChangeText={(text) => setValorAnclaje(text)}
-            />
             {/* Muestras */}
             <Text style={styles.label}>Muestras:</Text>
             <TextInput
@@ -490,11 +515,46 @@ const LaminacionComponent = ({ workOrder }: { workOrder: any }) => {
 
             {showQuality && (
               <>
-                {qualityQuestions.map((q: any) => (
-                  <View key={q.id} style={styles.qualityRow}>
-                    <Text style={styles.qualityQuestion}>{q.title}</Text>
-                  </View>
-                ))}
+                <SelectionQuestionTable
+                  formQuestions={workOrder.area.formQuestions}
+                  roleId={3}
+                  columns={['Respuesta']}
+                  checkedQuestions={[
+                    { ok: checkedRespuestaOK, ng: checkedRespuestaNG },
+                  ]}
+                  readOnly={true}
+                  onToggle={handleToggleRespuesta}
+                />
+                <Text style={styles.label}>Prueba Over:</Text>
+                <TextInput
+                  style={styles.input}
+                  theme={{ roundness: 30 }}
+                  mode="outlined"
+                  activeOutlineColor="#000"
+                  keyboardType="numeric"
+                  placeholder="Ej: 2"
+                  readOnly
+                />
+                <Text style={styles.label}>Prueba Cinta Magnética:</Text>
+                <TextInput
+                  style={styles.input}
+                  theme={{ roundness: 30 }}
+                  mode="outlined"
+                  activeOutlineColor="#000"
+                  keyboardType="numeric"
+                  placeholder="Ej: 2"
+                  readOnly
+                />
+                <Text style={styles.label}>Prueba Centro (entre capas):</Text>
+                <TextInput
+                  style={styles.input}
+                  theme={{ roundness: 30 }}
+                  mode="outlined"
+                  activeOutlineColor="#000"
+                  keyboardType="numeric"
+                  placeholder="Ej: 2"
+                  readOnly
+                />
               </>
             )}
 
@@ -645,6 +705,7 @@ const styles = StyleSheet.create({
     borderRadius: 16,
     alignItems: 'center',
     marginTop: 16,
+    marginBottom: 50,
   },
   buttonText: { color: '#fff', fontWeight: 'bold' },
   modalOverlay: {

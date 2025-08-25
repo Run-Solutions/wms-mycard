@@ -1,12 +1,14 @@
 'use client';
 
 import { useRouter } from 'next/navigation';
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
 import styled from 'styled-components';
 import {
   submitExtraHotStamping,
   sendInconformidadCQM,
 } from '@/api/recepcionCQM';
+import { OperatorAdvancedTable } from './util/QuestionTable';
+import SelectionQuestionTable from './util/FormQuestionTable';
 
 interface Props {
   workOrder: any;
@@ -14,7 +16,6 @@ interface Props {
 type Answer = {
   reviewed: boolean;
   sample_quantity: number;
-  // lo que más tenga...
 };
 
 export default function HotStampingComponent({ workOrder }: Props) {
@@ -36,32 +37,55 @@ export default function HotStampingComponent({ workOrder }: Props) {
   // Para mostrar formulario de CQM y enviarlo
   const [showConfirmModal, setShowConfirmModal] = useState(false);
 
-  //Para guardar las respuestas
-  const [responses, setResponses] = useState<
-    { questionId: number; answer: boolean }[]
-  >(
-    workOrder.area.formQuestions
-      .filter((question: { role_id: number | null }) => question.role_id === 3)
-      .map((question: { id: number }) => ({
-        questionId: question.id,
-        answer: false,
-      }))
-  );
   // Para controlar qué preguntas están marcadas
-  const [checkedQuestions, setCheckedQuestions] = useState<number[]>([]);
-  const handleCheckboxChange = (questionId: number, isChecked: boolean) => {
-    setResponses((prevResponses) =>
-      prevResponses.map((response) =>
-        response.questionId === questionId
-          ? { ...response, answer: isChecked }
-          : response
-      )
-    );
+  //Para guardar las respuestas
+  const [answersByQuestion, setAnswersByQuestion] = useState<
+    Record<number, boolean | undefined>
+  >({});
 
-    // Actualizar visualmente el checkbox
-    setCheckedQuestions((prev) =>
-      isChecked ? [...prev, questionId] : prev.filter((id) => id !== questionId)
-    );
+  // Preguntas visibles en la tabla (mismo filtro que pasas al child con roleId=null)
+  const visibleQuestions =
+    workOrder.area.formQuestions?.filter((q: any) => q.role_id === null) ?? [];
+
+  // Listas derivadas para el componente de tabla (no se guardan aparte)
+  const checkedRespuestaOK = useMemo(
+    () =>
+      Object.entries(answersByQuestion)
+        .filter(([, v]) => v === true)
+        .map(([k]) => Number(k)),
+    [answersByQuestion]
+  );
+
+  const checkedRespuestaNG = useMemo(
+    () =>
+      Object.entries(answersByQuestion)
+        .filter(([, v]) => v === false)
+        .map(([k]) => Number(k)),
+    [answersByQuestion]
+  );
+
+  const handleToggleRespuesta = (
+    questionId: number,
+    _columnIndex: number,
+    type: 'ok' | 'ng',
+    checked: boolean
+  ) => {
+    setAnswersByQuestion((prev) => {
+      const next = { ...prev };
+      if (checked) {
+        // marcar OK => true, NG => false (exclusivo)
+        next[questionId] = type === 'ok';
+      } else {
+        // si desmarcan la opción activa, borramos la respuesta
+        if (
+          (type === 'ok' && next[questionId] === true) ||
+          (type === 'ng' && next[questionId] === false)
+        ) {
+          delete next[questionId];
+        }
+      }
+      return next;
+    });
   };
 
   const handleSubmit = async () => {
@@ -70,10 +94,12 @@ export default function HotStampingComponent({ workOrder }: Props) {
       alert('No se encontró el ID del formulario.');
       return;
     }
-    const checkboxPayload = responses.map(({ questionId, answer }) => ({
-      question_id: questionId,
-      answer: answer,
-    }));
+    const checkboxPayload = Object.entries(answersByQuestion).map(
+      ([questionId, answer]) => ({
+        question_id: Number(questionId),
+        answer: answer === true ? true : answer === false ? false : null, // <-- boolean | null
+      })
+    );
     const payload = {
       form_answer_id: formAnswerId,
       checkboxes: checkboxPayload,
@@ -130,54 +156,13 @@ export default function HotStampingComponent({ workOrder }: Props) {
       <NewData>
         <SectionTitle>Respuestas del operador</SectionTitle>
         <NewDataWrapper>
-          <Table>
-            <thead>
-              <tr>
-                <th>Pregunta</th>
-                <th>Respuesta</th>
-              </tr>
-            </thead>
-            <tbody>
-              {workOrder.area.formQuestions
-                .filter(
-                  (question: { role_id: number | null }) =>
-                    question.role_id === null
-                )
-                .map((question: { id: number; title: string }) => {
-                  // Buscar la respuesta correspondiente a esta pregunta
-                  const answer = workOrder.answers[
-                    index
-                  ]?.FormAnswerResponse?.find(
-                    (resp: any) => resp.question_id === question.id
-                  );
-
-                  // Obtener la respuesta del operador (response_operator)
-                  const operatorResponse = answer?.response_operator;
-
-                  return (
-                    <tr key={question.id}>
-                      <td>{question.title}</td>
-                      <td>
-                        {typeof operatorResponse === 'boolean' ? (
-                          <input
-                            type="checkbox"
-                            checked={operatorResponse}
-                            disabled
-                          />
-                        ) : (
-                          <span>
-                            {operatorResponse !== undefined &&
-                            operatorResponse !== null
-                              ? operatorResponse.toString()
-                              : ''}
-                          </span>
-                        )}
-                      </td>
-                    </tr>
-                  );
-                })}
-            </tbody>
-          </Table>
+          <OperatorAdvancedTable
+            questions={workOrder.area.formQuestions ?? []}
+            answers={workOrder.answers[index]?.FormAnswerResponse ?? []}
+            mode={'doble'}
+            readOnly
+            columns={['Respuesta']}
+          />
           <InputGroup style={{ width: '50%' }}>
             <Label>Color Foil:</Label>
             <Input
@@ -255,43 +240,15 @@ export default function HotStampingComponent({ workOrder }: Props) {
         </NewDataWrapper>
         <SectionTitle>Mis respuestas</SectionTitle>
         <NewDataWrapper>
-          <Table>
-            <thead>
-              <tr>
-                <th>Pregunta</th>
-                <th>Respuesta</th>
-              </tr>
-            </thead>
-            <tbody>
-              {workOrder.area.formQuestions
-                .filter(
-                  (question: { role_id: number | null }) =>
-                    question.role_id === 3
-                )
-                .map((question: { id: number; title: string }) => {
-                  // Buscar la respuesta correspondiente a esta pregunta
-                  const answer = workOrder.answers[
-                    index
-                  ]?.FormAnswerResponse?.find(
-                    (resp: any) => resp.question_id === question.id
-                  );
-                  return (
-                    <tr key={question.id}>
-                      <td>{question.title}</td>
-                      <td>
-                        <input
-                          type="checkbox"
-                          checked={checkedQuestions.includes(question.id)}
-                          onChange={(e) =>
-                            handleCheckboxChange(question.id, e.target.checked)
-                          }
-                        />
-                      </td>
-                    </tr>
-                  );
-                })}
-            </tbody>
-          </Table>
+          <SelectionQuestionTable
+            formQuestions={workOrder.area.formQuestions}
+            roleId={3} // Calidad
+            columns={['Respuesta']}
+            checkedQuestions={[
+              { ok: checkedRespuestaOK, ng: checkedRespuestaNG },
+            ]}
+            onToggle={handleToggleRespuesta}
+          />
         </NewDataWrapper>
       </NewData>
       <div style={{ display: 'flex', gap: '1rem' }}>

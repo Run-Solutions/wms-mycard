@@ -4,7 +4,8 @@ import { useRouter } from 'next/navigation';
 import { useState } from 'react';
 import styled from 'styled-components';
 import { submitExtraImpresion, sendInconformidadCQM } from '@/api/recepcionCQM';
-
+import { OperatorAdvancedTable } from './util/QuestionTable';
+import SelectionQuestionTable from './util/FormQuestionTable';
 interface Props {
   workOrder: any;
 }
@@ -19,6 +20,12 @@ export default function ImpresionComponent({ workOrder }: Props) {
   const [testTypes, SetTestTypes] = useState('');
   const [showInconformidad, setShowInconformidad] = useState(false);
   const [inconformidad, setInconformidad] = useState<string>('');
+  const [checkedFrenteOK, setCheckedFrenteOK] = useState<number[]>([]);
+  const [checkedFrenteNG, setCheckedFrenteNG] = useState<number[]>([]);
+
+  // ✅ Vuelta
+  const [checkedVueltaOK, setCheckedVueltaOK] = useState<number[]>([]);
+  const [checkedVueltaNG, setCheckedVueltaNG] = useState<number[]>([]);
 
   // Obtener todos los índices de respuestas no revisadas
   const index = workOrder?.answers
@@ -69,6 +76,49 @@ export default function ImpresionComponent({ workOrder }: Props) {
       isChecked ? [...prev, questionId] : prev.filter((id) => id !== questionId)
     );
   };
+  const handleToggleFrenteVuelta = (
+    questionId: number,
+    columnIndex: number, // 0 = Frente, 1 = Vuelta
+    type: 'ok' | 'ng',
+    checked: boolean
+  ) => {
+    if (columnIndex === 0) {
+      // FRENTE
+      if (type === 'ok') {
+        setCheckedFrenteOK((prev) =>
+          checked
+            ? Array.from(new Set([...prev, questionId]))
+            : prev.filter((id) => id !== questionId)
+        );
+        // Quita la contraria en el mismo tick
+        setCheckedFrenteNG((prev) => prev.filter((id) => id !== questionId));
+      } else {
+        setCheckedFrenteNG((prev) =>
+          checked
+            ? Array.from(new Set([...prev, questionId]))
+            : prev.filter((id) => id !== questionId)
+        );
+        setCheckedFrenteOK((prev) => prev.filter((id) => id !== questionId));
+      }
+    } else {
+      // VUELTA
+      if (type === 'ok') {
+        setCheckedVueltaOK((prev) =>
+          checked
+            ? Array.from(new Set([...prev, questionId]))
+            : prev.filter((id) => id !== questionId)
+        );
+        setCheckedVueltaNG((prev) => prev.filter((id) => id !== questionId));
+      } else {
+        setCheckedVueltaNG((prev) =>
+          checked
+            ? Array.from(new Set([...prev, questionId]))
+            : prev.filter((id) => id !== questionId)
+        );
+        setCheckedVueltaOK((prev) => prev.filter((id) => id !== questionId));
+      }
+    }
+  };
 
   // Uso:
   const handleCheckboxChangeFrente = (
@@ -95,26 +145,18 @@ export default function ImpresionComponent({ workOrder }: Props) {
     const questions = workOrder.area.formQuestions.filter(
       (q: any) => q.role_id === 3
     );
-    // Validación: al menos un check en Frente o Vuelta
-    const isFrenteVueltaValid = questions.some(
-      (q: any) =>
-        checkedQuestionsFrente.includes(q.id) ||
-        checkedQuestionsVuelta.includes(q.id)
-    );
-    if (!questions.length || !isFrenteVueltaValid) {
-      alert(
-        'Por favor, completa las preguntas, selecciona al menos un Frente o Vuelta y la cantidad de muestra.'
-      );
+    // --- NUEVA construcción de respuestas usando tus estados OK/NG ---
+    // 1) Si hay algún NG marcado, no permitimos "Aprobado"
+
+    // 2) Construye payloads SOLO con OK (formato { question_id })
+    const frentePayload = checkedFrenteOK.map((id) => ({ question_id: id }));
+    const vueltaPayload = checkedVueltaOK.map((id) => ({ question_id: id }));
+
+    // 3) Valida que haya al menos un OK en cualquier lado
+    if (frentePayload.length === 0 && vueltaPayload.length === 0) {
+      alert('Selecciona al menos un OK en Frente o Vuelta para aprobar.');
       return;
     }
-    // Preparar payload de frente
-    const frentePayload = checkedQuestionsFrente.map((questionId: number) => ({
-      question_id: questionId,
-    }));
-    // Preparar payload de vuelta
-    const vueltaPayload = checkedQuestionsVuelta.map((questionId: number) => ({
-      question_id: questionId,
-    }));
     // Payload final
     const payload = {
       form_answer_id: formAnswerId,
@@ -124,6 +166,7 @@ export default function ImpresionComponent({ workOrder }: Props) {
         value: testTypes,
       },
     };
+    console.log('Payload a enviar:', payload);
     try {
       const res = await submitExtraImpresion(payload);
       router.push('/liberacionDeVistosBuenos');
@@ -185,70 +228,13 @@ export default function ImpresionComponent({ workOrder }: Props) {
       <NewData>
         <SectionTitle>Respuestas del operador</SectionTitle>
         <NewDataWrapper>
-          <Table>
-            <thead>
-              <tr>
-                <th>Pregunta</th>
-                <th>Hoja Frente</th>
-                <th>Hoja Vuelta</th>
-              </tr>
-            </thead>
-            <tbody>
-              {workOrder.area.formQuestions
-                .filter(
-                  (question: { role_id: number | null }) =>
-                    question.role_id === null
-                )
-                .map((question: { id: number; title: string }) => {
-                  // Buscar la respuesta correspondiente a esta pregunta
-                  const answer = workOrder.answers[
-                    index
-                  ]?.FormAnswerResponse?.filter(
-                    (resp: any) => resp.question_id === question.id
-                  );
-
-                  // Obtener la respuesta del operador (response_operator)
-                  const frontAnswer = answer[0]?.response_operator;
-                  const vueltaAnswer = answer[1]?.response_operator;
-
-                  return (
-                    <tr key={question.id}>
-                      <td>{question.title}</td>
-                      <td>
-                        {typeof frontAnswer === 'boolean' ? (
-                          <input
-                            type="checkbox"
-                            checked={frontAnswer}
-                            disabled
-                          />
-                        ) : (
-                          <span>
-                            {frontAnswer !== undefined && frontAnswer !== null
-                              ? frontAnswer.toString()
-                              : ''}
-                          </span>
-                        )}
-                      </td>
-                      <td>
-                        {typeof vueltaAnswer === 'boolean' ? (
-                          <input
-                            type="checkbox"
-                            checked={vueltaAnswer}
-                            disabled
-                          />
-                        ) : (
-                          <span>
-                            {vueltaAnswer !== undefined && vueltaAnswer !== null
-                              ? vueltaAnswer.toString()
-                              : ''}
-                          </span>
-                        )}
-                      </td>
-                    </tr>
-                  );
-                })}
-            </tbody>
-          </Table>
+          <OperatorAdvancedTable
+            questions={workOrder.area.formQuestions ?? []}
+            answers={workOrder.answers[index]?.FormAnswerResponse ?? []}
+            mode={'doble'}
+            readOnly
+            columns={['Hoja Frente', 'Hoja Vuelta']}
+          />
           <InputGroup style={{ width: '50%' }}>
             <Label>Muestras entregadas:</Label>
             <Input
@@ -264,60 +250,17 @@ export default function ImpresionComponent({ workOrder }: Props) {
 
         <InputGroup>
           <SectionTitle>Mis respuestas</SectionTitle>
-          <Table>
-            <thead>
-              <tr>
-                <th>Pregunta</th>
-                <th>
-                  <div style={{ display: 'flex', alignItems: 'center' }}>
-                    Hoja Frente
-                  </div>
-                </th>
-                <th>
-                  <div style={{ display: 'flex', alignItems: 'center' }}>
-                    Hoja Vuelta
-                  </div>
-                </th>
-              </tr>
-            </thead>
-            <tbody>
-              {workOrder.area.formQuestions
-                .filter(
-                  (question: { role_id: number | null }) =>
-                    question.role_id === 3
-                )
-                .map((question: { id: number; title: string }) => (
-                  <tr key={question.id}>
-                    <td>{question.title}</td>
-                    <td>
-                      <input
-                        type="checkbox"
-                        checked={checkedQuestionsFrente.includes(question.id)}
-                        onChange={(e) =>
-                          handleCheckboxChangeFrente(
-                            question.id,
-                            e.target.checked
-                          )
-                        }
-                      />
-                    </td>
-                    <td>
-                      <input
-                        type="checkbox"
-                        checked={checkedQuestionsVuelta.includes(question.id)}
-                        onChange={(e) =>
-                          handleCheckboxChangeVuelta(
-                            question.id,
-                            e.target.checked
-                          )
-                        }
-                      />
-                    </td>
-                  </tr>
-                ))}
-            </tbody>
-          </Table>
-          <SectionTitle>Tipo de Prueba</SectionTitle>
+          <SelectionQuestionTable
+            formQuestions={workOrder.area.formQuestions}
+            roleId={3} // Calidad
+            columns={['Hoja Frente', 'Hoja Vuelta']}
+            checkedQuestions={[
+              { ok: checkedFrenteOK, ng: checkedFrenteNG },
+              { ok: checkedVueltaOK, ng: checkedVueltaNG },
+            ]}
+            onToggle={handleToggleFrenteVuelta}
+          />
+          <SectionTitle>Tonos y/o Densidades Contra</SectionTitle>
           <RadioGroup>
             <RadioLabel>
               <Radio

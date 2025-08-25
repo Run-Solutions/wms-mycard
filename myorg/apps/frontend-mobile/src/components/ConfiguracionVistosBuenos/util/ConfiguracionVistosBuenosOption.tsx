@@ -7,16 +7,16 @@ import {
   ScrollView,
   TouchableOpacity,
 } from 'react-native';
-import Impresion from './Impresion';
-import Serigrafia from './Serigrafia';
-import Empalme from './Empalme';
-import Laminacion from './Laminacion';
-import Corte from './Corte';
-import ColorEdge from './ColorEdge';
-import HotStamping from './HotStamping';
-import MillingChip from './MillingChip';
-import Personalizacion from './Personalizacion';
-import { getFormQuestionsByArea } from '../../api/configVistosBuenos';
+import Impresion from '../Impresion';
+import Serigrafia from '../Serigrafia';
+import Empalme from '../Empalme';
+import Laminacion from '../Laminacion';
+import Corte from '../Corte';
+import ColorEdge from '../ColorEdge';
+import HotStamping from '../HotStamping';
+import MillingChip from '../MillingChip';
+import Personalizacion from '../Personalizacion';
+import { getFormQuestionsByArea } from '../../../api/configVistosBuenos';
 import { black } from 'react-native-paper/lib/typescript/styles/themes/v2/colors';
 
 export default function ConfiguracionVistosBuenosOption({

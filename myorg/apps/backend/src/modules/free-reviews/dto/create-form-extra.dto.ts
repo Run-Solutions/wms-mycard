@@ -16,6 +16,12 @@ export class ExtraDataEmpalDto {
   validar_inlays: string;
   holographic_type: string;
 }
+
+export class ExtraDataLaminacionDto {
+  prueba_over: string;
+  prueba_cinta_magnetica: string;
+  prueba_centro: string;
+}
   
 export class CreateFormExtraDto {
   form_answer_id: number;
@@ -30,6 +36,11 @@ export class CreateFormExtraEmpalDto {
   checkboxes: CheckboxDto[];
   radio: RadioEmpalDto;
   extra_data: ExtraDataEmpalDto;
+}
+export class CreateFormExtraLaminacionDto {
+  form_answer_id: number;
+  checkboxes: CheckboxDto[];
+  extra_data: ExtraDataLaminacionDto;
 }
 
 export class CreateFormExtraMillingDto {

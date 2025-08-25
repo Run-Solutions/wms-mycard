@@ -8,7 +8,7 @@ import {
   deleteFormQuestion,
   updateFormQuestion,
 } from '@/api/configVistosBuenos';
-import { FormQuestionTable } from './FormQuestionTable';
+import { FormQuestionTable } from './util/FormQuestionTable';
 
 interface Props {
   formQuestion: any;

@@ -1,6 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import { PrismaService } from 'prisma/prisma.service';
-import { CreateFormExtraDto } from './dto/create-form-extra.dto';
+import { CreateFormExtraDto, CreateFormExtraLaminacionDto } from './dto/create-form-extra.dto';
 import { CreateFormExtraEmpalDto } from './dto/create-form-extra.dto';
 import { CreateFormExtraMillingDto } from './dto/create-form-extra.dto';
 import { CreateFormExtraPersonalizacionDto } from './dto/create-form-extra.dto';
@@ -249,6 +249,77 @@ export class FreeReviewsService {
         where: { id: form_answer_id },
         data: {
           testtype_cqm: null,
+          accepted: true,
+          reviewed: true,
+        },
+      }),
+
+      this.prisma.workOrderFlow.update({
+        where: { id: formAnswer?.work_order_flow_id },
+        data: {
+          status: 'Listo',
+        },
+      }),
+
+      ...checkboxes.map((cb) =>
+        this.prisma.formAnswerResponse.create({
+          data: {
+            formAnswer: {
+              connect: { id: form_answer_id },
+            },
+            question: {
+              connect: { id: cb.question_id },
+            },
+            response_cqm: cb.answer,
+            response_operator: false,
+          },
+        }),
+      ),
+    ]);
+    const workOrderFlowId = formAnswer?.work_order_flow_id;
+    const workOrderFlow = await this.prisma.workOrderFlow.findUnique({
+      where: { id: formAnswer?.work_order_flow_id },
+      select: { assigned_user: true, work_order_id: true },
+    });
+    const assignedUserId = workOrderFlow?.assigned_user;
+    const workOrderId = await this.prisma.workOrder.findUnique({
+      where: { id: workOrderFlow?.work_order_id },
+      select: { ot_id: true },
+    });
+
+    const workOrderName = workOrderId?.ot_id;
+    if (assignedUserId) {
+      await this.notificationsService.createAndSendNotification(
+        assignedUserId,
+        'Flujo listo',
+        `El flujo de la orden #${workOrderName} pasó a estado LISTO.`,
+        {
+          workOrderId,
+          workOrderFlowId,
+        },
+      );
+    }
+
+    return { message: 'Datos guardados correctamente' };
+  }
+
+  async postFormExtraLaminacion(dto: CreateFormExtraLaminacionDto) {
+    const { form_answer_id, checkboxes } = dto;
+
+    const formAnswer = await this.prisma.formAnswer.findUnique({
+      where: { id: form_answer_id },
+      select: { work_order_flow_id: true },
+    });
+
+    // Agrupamos todo en una transacción
+    await this.prisma.$transaction([
+      this.prisma.formAnswer.update({
+        where: { id: form_answer_id },
+        data: {
+          testtype_cqm: null,
+          prueba_over: dto.extra_data.prueba_over,
+          prueba_cinta_magnetica: dto.extra_data.prueba_cinta_magnetica,
+          prueba_centro: dto.extra_data.prueba_centro,
           accepted: true,
           reviewed: true,
         },

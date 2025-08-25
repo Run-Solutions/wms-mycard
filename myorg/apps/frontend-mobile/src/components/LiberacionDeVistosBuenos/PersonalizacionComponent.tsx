@@ -1,6 +1,6 @@
-// myorg/apps/frontend-mobile/src/components/RecepcionCQM/MillingChipComponent.tsx
+// myorg/apps/frontend-mobile/src/components/LiberacionDeVistosBuenos/PersonalizacionComponent.tsx
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   View,
   Text,
@@ -19,7 +19,8 @@ import {
   submitExtraPersonalizacion,
   sendInconformidadCQM,
 } from '../../api/recepcionCQM';
-import { useEffect } from 'react';
+import { OperatorAdvancedTable } from './util/FormQuestionTable';
+import SelectionQuestionTable from './util/SelectionQuestionTable';
 
 // Tipos y constantes globales
 type Answer = {
@@ -32,7 +33,6 @@ const PersonalizacionComponent = ({ workOrder }: { workOrder: any }) => {
   const navigation =
     useNavigation<NativeStackNavigationProp<RootStackParamList>>();
 
-  const [checkedQuestions, setCheckedQuestions] = useState<number[]>([]);
   const [showConfirmModal, setShowConfirmModal] = useState(false);
   const [showInconformidad, setShowInconformidad] = useState(false);
   const [inconformidad, setInconformidad] = useState('');
@@ -40,116 +40,154 @@ const PersonalizacionComponent = ({ workOrder }: { workOrder: any }) => {
   const [validarKVC, setValidarKVC] = useState('');
   const [aparienciaQuemado, setAparienciaQuemado] = useState('');
   const [cargaAplicacion, setCargaAplicacion] = useState('');
-  const [responses, setResponses] = useState<
-    { questionId: number; answer: boolean }[]
-  >([]);
+
+  // Estructura para SelectionQuestionTable (una sola columna "Respuesta")
+  type CheckedGroup = { ok: number[]; ng: number[] };
+  // Estado para CQM (mi respuesta)
+  const [cqmChecked, setCqmChecked] = useState<CheckedGroup[]>([
+    { ok: [], ng: [] },
+  ]);
+
+  // Helper: según tipo de personalización, devolver el slice de preguntas del OPERADOR
+  const getOperatorQuestions = () => {
+    const qs = workOrder?.area?.formQuestions ?? [];
+    if (!hasIndex) return [];
+    switch (workOrder?.answers?.[index!]?.tipo_personalizacion) {
+      case 'persos':
+        return qs.slice(1, 10);
+      case 'etiquetadora':
+        return qs.slice(0, 1);
+      case 'packsmart':
+        return qs.slice(14, 20);
+      case 'otto':
+        return qs.slice(20, 28);
+      case 'embolsadora':
+        return qs.slice(28, 30);
+      default:
+        return [];
+    }
+  };
+
+  const getCqmQuestions = () => {
+    const qs = workOrder?.area?.formQuestions ?? [];
+    if (!hasIndex) return [];
+    switch (workOrder?.answers?.[index!]?.tipo_personalizacion) {
+      case 'laser':
+        return qs.slice(10, 13);
+      case 'persos':
+        return qs.slice(13, 15);
+      default:
+        return [];
+    }
+  };
+
   // Derivaciones
-  const index = workOrder?.answers
-    ?.map((a: Answer, i: number) => ({ ...a, index: i }))
-    .reverse()
-    .find((a: Answer) => a.reviewed === false)?.index;
+  // --- Derivaciones (mueve esto arriba, justo después de useState) ---
+  const index =
+    workOrder?.answers
+      ?.map((a: Answer, i: number) => ({ ...a, index: i }))
+      .reverse()
+      .find((a: Answer) => a.reviewed === false)?.index ?? null;
 
-  const questions =
-    workOrder.area.formQuestions?.filter((q: any) => q.role_id === null) || [];
-  const qualityQuestions =
-    workOrder.area.formQuestions?.filter((q: any) => q.role_id === 3) || [];
-  const currentFlow = [...workOrder.workOrder.flow].find(
-    (f: any) => f.id === workOrder.id
-  );
-  const isDisabled = workOrder.status === 'En proceso';
-  const nextFlowIndex =
-    workOrder.workOrder.flow.findIndex((f: any) => f.id === workOrder.id) + 1;
-  const nextFlow = workOrder.workOrder.flow[nextFlowIndex] ?? null;
+  const hasIndex = index !== null && index !== undefined;
 
-  const allParcialsValidated = workOrder.partialReleases?.every(
-    (r: { validated: boolean }) => r.validated
-  );
   const tipoPersonalizacion = workOrder?.answers[index].tipo_personalizacion;
   useEffect(() => {
-    const initial = selectedQuestions
-      .filter((q) => q.role_id === 3)
-      .map((q) => ({
-        questionId: q.id,
-        answer: false,
-      }));
-    setResponses(initial);
-  }, [tipoPersonalizacion]);
+    if (!hasIndex) {
+      setCqmChecked([{ ok: [], ng: [] }]);
+      return;
+    }
+    const cqmQs = getCqmQuestions();
+    const far = workOrder?.answers?.[index!]?.FormAnswerResponse ?? [];
+    const ok: number[] = [];
+    const ng: number[] = [];
+    cqmQs.forEach((q: any) => {
+      const r = far.find((x: any) => x.question_id === q.id);
+      if (r?.response_cqm === true) ok.push(q.id);
+      else if (r?.response_cqm === false) ng.push(q.id);
+    });
+    setCqmChecked([{ ok, ng }]);
+  }, [
+    hasIndex,
+    workOrder?.id,
+    index,
+    workOrder?.answers?.[index!]?.FormAnswerResponse,
+  ]);
 
-  const handleCheckboxChange = (questionId: number) => {
-    setCheckedQuestions((prev) =>
-      prev.includes(questionId)
-        ? prev.filter((id) => id !== questionId)
-        : [...prev, questionId]
-    );
+  const handleToggleCqm = (
+    questionId: number,
+    columnIndex: number, // siempre 0 en 'simple'
+    type: 'ok' | 'ng',
+    checked: boolean
+  ) => {
+    setCqmChecked((prev) => {
+      const next = [...prev];
+      const group = { ...(next[columnIndex] ?? { ok: [], ng: [] }) };
 
-    setResponses((prev) =>
-      prev.map((resp) =>
-        resp.questionId === questionId
-          ? { ...resp, answer: !resp.answer }
-          : resp
-      )
-    );
+      // exclusividad: quita de ambos
+      group.ok = group.ok.filter((id) => id !== questionId);
+      group.ng = group.ng.filter((id) => id !== questionId);
+
+      // añade si se marcó
+      if (checked) {
+        if (type === 'ok') group.ok.push(questionId);
+        else group.ng.push(questionId);
+      }
+      next[columnIndex] = group;
+      return next;
+    });
   };
 
   const handleSubmit = async () => {
-    const formAnswerId = workOrder.answers[index]?.id;
+    if (!hasIndex) {
+      Alert.alert('No se encontró una respuesta pendiente para esta OT.');
+      return;
+    }
+    const formAnswerId = workOrder.answers[index!]?.id;
     if (!formAnswerId) {
       Alert.alert('No se encontró el Id del formulario');
       return;
     }
 
-    const questions = workOrder.area.formQuestions.filter(
-      (q: any) => q.role_id === 3
-    );
+    const okIds = new Set(cqmChecked?.[0]?.ok ?? []);
+    const ngIds = new Set(cqmChecked?.[0]?.ng ?? []);
+    const checkboxPayload = [
+      ...Array.from(okIds).map((question_id) => ({
+        question_id,
+        answer: true,
+      })),
+      ...Array.from(ngIds).map((question_id) => ({
+        question_id,
+        answer: false,
+      })),
+    ];
 
-    const isCheckedQuestionsValid = questions.some((q: any) =>
-      checkedQuestions.includes(q.id)
-    );
+    const basePayload = { form_answer_id: formAnswerId };
+    const type = workOrder?.answers?.[index!]?.tipo_personalizacion;
+    let aditionalFields: any = { checkboxes: checkboxPayload };
 
-    const checkboxPayload = checkedQuestions.map((questionId: number) => ({
-      question_id: questionId,
-    }));
-
-    const basePayload = {
-      form_answer_id: formAnswerId,
-    };
-    let aditionalFields = {};
-    if (workOrder?.answers[index].tipo_personalizacion === 'laser') {
-      const checkboxPayload = responses.map(({ questionId, answer }) => ({
-        question_id: questionId,
-        answer: answer,
-      }));
+    if (type === 'laser') {
       aditionalFields = {
-        verificar_script: verificarScript,
-        validar_kvc_perso: validarKVC,
-        apariencia_quemado: aparienciaQuemado,
-        checkboxes: checkboxPayload,
+        ...aditionalFields,
+        verificar_script: verificarScript || '',
+        validar_kvc_perso: validarKVC || '',
+        apariencia_quemado: aparienciaQuemado || '',
       };
-    } else if (workOrder?.answers[index].tipo_personalizacion === 'persos') {
-      const checkboxPayload = responses.map(({ questionId, answer }) => ({
-        question_id: questionId,
-        answer: answer,
-      }));
+    } else if (type === 'persos') {
       aditionalFields = {
-        carga_aplicacion: cargaAplicacion,
-        checkboxes: checkboxPayload,
+        ...aditionalFields,
+        carga_aplicacion: cargaAplicacion || '',
       };
-    } else if (
-      workOrder?.answers[index].tipo_personalizacion === 'etiquetadora'
-    ) {
-      aditionalFields = {};
     }
-    const payload = {
-      ...basePayload,
-      ...aditionalFields,
-    };
+
+    const payload = { ...basePayload, ...aditionalFields };
 
     try {
-      const success = await submitExtraPersonalizacion(payload);
+      await submitExtraPersonalizacion(payload);
       setShowConfirmModal(false);
       Alert.alert('Producto evaluado correctamente');
       navigation.goBack();
-    } catch (err) {
+    } catch {
       Alert.alert('Error al liberar el producto.');
     }
   };
@@ -169,16 +207,6 @@ const PersonalizacionComponent = ({ workOrder }: { workOrder: any }) => {
       Alert.alert('Error al enviar la inconformidad.');
     }
   };
-
-  //Para guardar las respuestas
-
-  let selectedQuestions: { id: number; role_id: number | null }[] = [];
-
-  if (tipoPersonalizacion === 'laser') {
-    selectedQuestions = workOrder.area.formQuestions.slice(9, 13);
-  } else if (tipoPersonalizacion === 'persos') {
-    selectedQuestions = workOrder.area.formQuestions.slice(13, 17);
-  }
 
   return (
     <ScrollView style={styles.container}>
@@ -233,46 +261,13 @@ const PersonalizacionComponent = ({ workOrder }: { workOrder: any }) => {
       )}
       {workOrder?.answers[index].tipo_personalizacion === 'persos' && (
         <>
-          {/* Encabezado estilo tabla */}
-          <View style={styles.tableHeader}>
-            <Text style={[styles.tableCell, { flex: 2 }]}>Pregunta</Text>
-            <Text style={styles.tableCell}>Respuesta</Text>
-          </View>
-
-          {/* Preguntas normales */}
-          {questions.slice(1, 10).map((q: any) => {
-            const responses = workOrder.answers[
-              index
-            ]?.FormAnswerResponse?.find(
-              (resp: any) => resp.question_id === q.id
-            );
-            console.log(responses);
-            // Encuentra la respuesta del operador por pregunta_id
-            const operatorResponse = responses?.response_operator;
-
-            return (
-              <View key={q.id} style={styles.tableRow}>
-                {/* Pregunta */}
-                <View style={[styles.tableCell, { flex: 2 }]}>
-                  <Text style={styles.questionText}>{q.title}</Text>
-                </View>
-
-                {/* Respuesta */}
-                <View
-                  style={[styles.tableCell, { flex: 1, alignItems: 'center' }]}
-                >
-                  <View
-                    style={[
-                      styles.radioCircle,
-                      operatorResponse && styles.radioDisabled,
-                    ]}
-                  >
-                    {operatorResponse && <View style={styles.radioDot} />}
-                  </View>
-                </View>
-              </View>
-            );
-          })}
+          <OperatorAdvancedTable
+            questions={getOperatorQuestions()}
+            answers={workOrder?.answers?.[index]?.FormAnswerResponse ?? []}
+            mode="simple"
+            readOnly
+            columns={['Respuesta']}
+          />
           <Text style={styles.label}>Color De Personalización:</Text>
           <TextInput
             style={styles.input}
@@ -318,46 +313,13 @@ const PersonalizacionComponent = ({ workOrder }: { workOrder: any }) => {
 
       {workOrder?.answers[index].tipo_personalizacion === 'etiquetadora' && (
         <>
-          {/* Encabezado estilo tabla */}
-          <View style={styles.tableHeader}>
-            <Text style={[styles.tableCell, { flex: 2 }]}>Pregunta</Text>
-            <Text style={styles.tableCell}>Respuesta</Text>
-          </View>
-
-          {/* Preguntas normales */}
-          {questions.slice(0, 1).map((q: any) => {
-            const responses = workOrder.answers[
-              index
-            ]?.FormAnswerResponse?.find(
-              (resp: any) => resp.question_id === q.id
-            );
-            console.log(responses);
-            // Encuentra la respuesta del operador por pregunta_id
-            const operatorResponse = responses?.response_operator;
-
-            return (
-              <View key={q.id} style={styles.tableRow}>
-                {/* Pregunta */}
-                <View style={[styles.tableCell, { flex: 2 }]}>
-                  <Text style={styles.questionText}>{q.title}</Text>
-                </View>
-
-                {/* Respuesta */}
-                <View
-                  style={[styles.tableCell, { flex: 1, alignItems: 'center' }]}
-                >
-                  <View
-                    style={[
-                      styles.radioCircle,
-                      operatorResponse && styles.radioDisabled,
-                    ]}
-                  >
-                    {operatorResponse && <View style={styles.radioDot} />}
-                  </View>
-                </View>
-              </View>
-            );
-          })}
+          <OperatorAdvancedTable
+            questions={getOperatorQuestions()}
+            answers={workOrder?.answers?.[index]?.FormAnswerResponse ?? []}
+            mode="simple"
+            readOnly
+            columns={['Respuesta']}
+          />
           <Text style={styles.label}>
             Verificar Tipo De Etiqueta Vs Ot Y Pegar Utilizada:
           </Text>
@@ -390,46 +352,13 @@ const PersonalizacionComponent = ({ workOrder }: { workOrder: any }) => {
 
       {workOrder?.answers[index].tipo_personalizacion === 'packsmart' && (
         <>
-          {/* Encabezado estilo tabla */}
-          <View style={styles.tableHeader}>
-            <Text style={[styles.tableCell, { flex: 2 }]}>Pregunta</Text>
-            <Text style={styles.tableCell}>Respuesta</Text>
-          </View>
-
-          {/* Preguntas normales */}
-          {questions.slice(10, 16).map((q: any) => {
-            const responses = workOrder.answers[
-              index
-            ]?.FormAnswerResponse?.find(
-              (resp: any) => resp.question_id === q.id
-            );
-            console.log(responses);
-            // Encuentra la respuesta del operador por pregunta_id
-            const operatorResponse = responses?.response_operator;
-
-            return (
-              <View key={q.id} style={styles.tableRow}>
-                {/* Pregunta */}
-                <View style={[styles.tableCell, { flex: 2 }]}>
-                  <Text style={styles.questionText}>{q.title}</Text>
-                </View>
-
-                {/* Respuesta */}
-                <View
-                  style={[styles.tableCell, { flex: 1, alignItems: 'center' }]}
-                >
-                  <View
-                    style={[
-                      styles.radioCircle,
-                      operatorResponse && styles.radioDisabled,
-                    ]}
-                  >
-                    {operatorResponse && <View style={styles.radioDot} />}
-                  </View>
-                </View>
-              </View>
-            );
-          })}
+          <OperatorAdvancedTable
+            questions={getOperatorQuestions()}
+            answers={workOrder?.answers?.[index]?.FormAnswerResponse ?? []}
+            mode="simple"
+            readOnly
+            columns={['Respuesta']}
+          />
           {/* Muestras */}
           <Text style={styles.label}>Muestras entregadas:</Text>
           <TextInput
@@ -449,46 +378,13 @@ const PersonalizacionComponent = ({ workOrder }: { workOrder: any }) => {
 
       {workOrder?.answers[index].tipo_personalizacion === 'otto' && (
         <>
-          {/* Encabezado estilo tabla */}
-          <View style={styles.tableHeader}>
-            <Text style={[styles.tableCell, { flex: 2 }]}>Pregunta</Text>
-            <Text style={styles.tableCell}>Respuesta</Text>
-          </View>
-
-          {/* Preguntas normales */}
-          {questions.slice(16, 24).map((q: any) => {
-            const responses = workOrder.answers[
-              index
-            ]?.FormAnswerResponse?.find(
-              (resp: any) => resp.question_id === q.id
-            );
-            console.log(responses);
-            // Encuentra la respuesta del operador por pregunta_id
-            const operatorResponse = responses?.response_operator;
-
-            return (
-              <View key={q.id} style={styles.tableRow}>
-                {/* Pregunta */}
-                <View style={[styles.tableCell, { flex: 2 }]}>
-                  <Text style={styles.questionText}>{q.title}</Text>
-                </View>
-
-                {/* Respuesta */}
-                <View
-                  style={[styles.tableCell, { flex: 1, alignItems: 'center' }]}
-                >
-                  <View
-                    style={[
-                      styles.radioCircle,
-                      operatorResponse && styles.radioDisabled,
-                    ]}
-                  >
-                    {operatorResponse && <View style={styles.radioDot} />}
-                  </View>
-                </View>
-              </View>
-            );
-          })}
+          <OperatorAdvancedTable
+            questions={getOperatorQuestions()}
+            answers={workOrder?.answers?.[index]?.FormAnswerResponse ?? []}
+            mode="simple"
+            readOnly
+            columns={['Respuesta']}
+          />
 
           {/* Muestras */}
           <Text style={styles.label}>Muestras entregadas:</Text>
@@ -509,46 +405,13 @@ const PersonalizacionComponent = ({ workOrder }: { workOrder: any }) => {
 
       {workOrder?.answers[index].tipo_personalizacion === 'embolsadora' && (
         <>
-          {/* Encabezado estilo tabla */}
-          <View style={styles.tableHeader}>
-            <Text style={[styles.tableCell, { flex: 2 }]}>Pregunta</Text>
-            <Text style={styles.tableCell}>Respuesta</Text>
-          </View>
-
-          {/* Preguntas normales */}
-          {questions.slice(24, 26).map((q: any) => {
-            const responses = workOrder.answers[
-              index
-            ]?.FormAnswerResponse?.find(
-              (resp: any) => resp.question_id === q.id
-            );
-            console.log(responses);
-            // Encuentra la respuesta del operador por pregunta_id
-            const operatorResponse = responses?.response_operator;
-
-            return (
-              <View key={q.id} style={styles.tableRow}>
-                {/* Pregunta */}
-                <View style={[styles.tableCell, { flex: 2 }]}>
-                  <Text style={styles.questionText}>{q.title}</Text>
-                </View>
-
-                {/* Respuesta */}
-                <View
-                  style={[styles.tableCell, { flex: 1, alignItems: 'center' }]}
-                >
-                  <View
-                    style={[
-                      styles.radioCircle,
-                      operatorResponse && styles.radioDisabled,
-                    ]}
-                  >
-                    {operatorResponse && <View style={styles.radioDot} />}
-                  </View>
-                </View>
-              </View>
-            );
-          })}
+          <OperatorAdvancedTable
+            questions={getOperatorQuestions()}
+            answers={workOrder?.answers?.[index]?.FormAnswerResponse ?? []}
+            mode="simple"
+            readOnly
+            columns={['Respuesta']}
+          />
           {/* Muestras */}
           <Text style={styles.label}>Muestras entregadas:</Text>
           <TextInput
@@ -570,39 +433,20 @@ const PersonalizacionComponent = ({ workOrder }: { workOrder: any }) => {
 
       {workOrder?.answers[index].tipo_personalizacion === 'laser' && (
         <>
-          {/* Encabezado estilo tabla */}
-          <View style={styles.tableHeader}>
-            <Text style={[styles.tableCell, { flex: 2 }]}>Pregunta</Text>
-            <Text style={styles.tableCell}>Respuesta</Text>
-          </View>
-          {/* Preguntas normales */}
-          {workOrder.area.formQuestions
-            .slice(9, 13)
-            .filter((q: any) => q.role_id === 3)
-            .map((q: any) => (
-              <View key={q.id} style={styles.tableRow}>
-                {/* Pregunta */}
-                <View style={[styles.tableCell, { flex: 2 }]}>
-                  <Text style={styles.questionText}>{q.title}</Text>
-                </View>
-                {/* Respuestas */}
-                <View
-                  style={[styles.tableCell, { flex: 1, alignItems: 'center' }]}
-                >
-                  <TouchableOpacity
-                    onPress={() => handleCheckboxChange(q.id)}
-                    style={[
-                      styles.radioCircle,
-                      checkedQuestions.includes(q.id) && styles.checkedBox,
-                    ]}
-                  >
-                    {checkedQuestions.includes(q.id) && (
-                      <View style={styles.radioDot} />
-                    )}
-                  </TouchableOpacity>
-                </View>
-              </View>
-            ))}
+          {getCqmQuestions().length > 0 ? (
+            <SelectionQuestionTable
+              formQuestions={getCqmQuestions()}
+              roleId={3}
+              columns={['Respuesta']}
+              checkedQuestions={cqmChecked}
+              onToggle={handleToggleCqm}
+              readOnly={false}
+            />
+          ) : (
+            <Text style={styles.label}>
+              No hay preguntas por parte de calidad.
+            </Text>
+          )}
           <Text style={styles.label}>
             Verificar Script / Layout Vs Ot / Autorizacion:
           </Text>
@@ -644,39 +488,20 @@ const PersonalizacionComponent = ({ workOrder }: { workOrder: any }) => {
 
       {workOrder?.answers[index].tipo_personalizacion === 'persos' && (
         <>
-          {/* Encabezado estilo tabla */}
-          <View style={styles.tableHeader}>
-            <Text style={[styles.tableCell, { flex: 2 }]}>Pregunta</Text>
-            <Text style={styles.tableCell}>Respuesta</Text>
-          </View>
-          {/* Preguntas normales */}
-          {workOrder.area.formQuestions
-            .slice(13, 15)
-            .filter((q: any) => q.role_id === 3)
-            .map((q: any) => (
-              <View key={q.id} style={styles.tableRow}>
-                {/* Pregunta */}
-                <View style={[styles.tableCell, { flex: 2 }]}>
-                  <Text style={styles.questionText}>{q.title}</Text>
-                </View>
-                {/* Respuestas */}
-                <View
-                  style={[styles.tableCell, { flex: 1, alignItems: 'center' }]}
-                >
-                  <TouchableOpacity
-                    onPress={() => handleCheckboxChange(q.id)}
-                    style={[
-                      styles.radioCircle,
-                      checkedQuestions.includes(q.id) && styles.checkedBox,
-                    ]}
-                  >
-                    {checkedQuestions.includes(q.id) && (
-                      <View style={styles.radioDot} />
-                    )}
-                  </TouchableOpacity>
-                </View>
-              </View>
-            ))}
+          {getCqmQuestions().length > 0 ? (
+            <SelectionQuestionTable
+              formQuestions={getCqmQuestions()}
+              roleId={3}
+              columns={['Respuesta']}
+              checkedQuestions={cqmChecked}
+              onToggle={handleToggleCqm}
+              readOnly={false}
+            />
+          ) : (
+            <Text style={styles.label}>
+              No hay preguntas por parte de calidad.
+            </Text>
+          )}
           <Text style={styles.label}>
             Validar Carga De Aplicación (PersoMaster)
           </Text>
@@ -794,12 +619,6 @@ const styles = StyleSheet.create({
     color: 'black',
     padding: Platform.OS === 'ios' ? 10 : 0,
   },
-  subtitle: {
-    fontSize: 16,
-    fontWeight: 'bold',
-    marginTop: 20,
-    marginBottom: 12,
-  },
   label: { fontWeight: '600', marginTop: 12, fontSize: 16 },
   value: { marginBottom: 0 },
   input: {
@@ -831,50 +650,11 @@ const styles = StyleSheet.create({
     marginBottom: 24,
     elevation: 3,
   },
-  button: {
-    backgroundColor: '#0038A8',
-    padding: 12,
-    borderRadius: 16,
-    alignItems: 'center',
-    marginTop: 24,
-  },
-  radioCircle: {
-    width: 22,
-    height: 22,
-    borderRadius: 12,
-    borderWidth: 1,
-    borderColor: '#2563eb',
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: '#fff',
-    marginHorizontal: 'auto',
-  },
-  radioDot: {
-    width: 12,
-    height: 12,
-    borderRadius: 6,
-    backgroundColor: '#2563eb',
-  },
-  buttonSecondary: {
-    backgroundColor: '#9CA3AF',
-    padding: 12,
-    borderRadius: 16,
-    alignItems: 'center',
-    marginTop: 16,
-  },
-  buttonText: { color: '#fff', fontWeight: 'bold' },
   modalOverlay: {
     flex: 1,
     backgroundColor: 'rgba(0,0,0,0.4)',
     justifyContent: 'center',
     alignItems: 'center',
-  },
-  modalScrollContent: {
-    padding: 20,
-  },
-  questionText: {
-    fontSize: 15,
-    color: '#1f2937',
   },
   modalBox: {
     backgroundColor: '#fff',
@@ -910,15 +690,6 @@ const styles = StyleSheet.create({
     color: '#fff',
     fontWeight: '600',
   },
-  scrollArea: {
-    flex: 1,
-  },
-  modalContainer: {
-    flex: 1,
-    padding: 20,
-    marginTop: 60,
-    backgroundColor: '#fdfaf6',
-  },
   modalTitle: {
     fontSize: 22,
     fontWeight: 'bold',
@@ -926,106 +697,9 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     color: '#1f2937',
   },
-  questionGroup: {
-    marginBottom: 16,
-    backgroundColor: '#fff',
-    padding: 12,
-    borderRadius: 12,
-    borderColor: '#e5e7eb',
-    borderWidth: 1,
-  },
-  checkboxRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-around',
-    marginTop: 8,
-  },
-  checkbox: {
-    paddingVertical: 6,
-    paddingHorizontal: 12,
-    borderWidth: 1,
-    borderColor: '#ccc',
-    borderRadius: 10,
-    backgroundColor: '#f9fafb',
-  },
-  checkedBox: {
-    backgroundColor: '#dbeafe',
-    borderColor: '#2563eb',
-  },
-  checkboxText: {
-    fontSize: 14,
-    color: '#111827',
-  },
-  disabledButton: {
-    backgroundColor: '#9CA3AF', // gris como en web
-    opacity: 0.7,
-  },
-  tableHeader: {
-    flexDirection: 'row',
-    backgroundColor: '#f3f4f6',
-    paddingVertical: 10,
-    borderBottomWidth: 1,
-    borderColor: '#ccc',
-  },
-  tableRow: {
-    flexDirection: 'row',
-    borderBottomWidth: 1,
-    borderColor: '#e5e7eb',
-    paddingVertical: 10,
-    alignItems: 'center',
-  },
-  tableCell: {
-    flex: 1,
-    textAlign: 'center',
-    fontSize: 16,
-  },
-  checkboxBox: {
-    borderWidth: 1,
-    borderColor: '#ccc',
-    paddingVertical: 5,
-    paddingHorizontal: 12,
-    borderRadius: 8,
-    backgroundColor: '#fff',
-  },
-  toggleSection: {
-    marginTop: 24,
-    marginBottom: 8,
-  },
-  qualityRow: {
-    paddingVertical: 8,
-    borderBottomWidth: 1,
-    borderColor: '#eee',
-  },
-  qualityQuestion: {
-    fontSize: 14,
-    color: '#374151',
-  },
-  radioDisabled: {
-    padding: 8,
-    borderWidth: 1,
-    opacity: 0.4,
-    borderColor: '#ddd',
-    borderRadius: 10,
-    marginBottom: 8,
-    backgroundColor: '#f3f4f6',
-  },
   modalButtonRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     marginTop: 20,
-  },
-  radioGroup: {
-    marginTop: 12,
-    alignItems: 'flex-start',
-  },
-
-  radioLabel: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginBottom: 12,
-    gap: 10,
-  },
-  radioText: {
-    fontSize: 16,
-    color: '#1f2937',
   },
 });

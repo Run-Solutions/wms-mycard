@@ -10,21 +10,24 @@ import {
   Pressable,
 } from 'react-native';
 import { TextInput } from 'react-native-paper';
-import QuestionTable from './QuestionTable';
 import {
   deleteFormQuestion,
   updateFormQuestion,
 } from '../../api/configVistosBuenos';
+import { AdvancedQuestionTable } from './util/FormQuestionTable';
 
-interface Props {
-  formQuestion: any[];
+interface Area {
+  id: number;
+  name: string;
 }
-
 interface Question {
   id: number;
   title: string;
   role_id: number | null;
-  areas: { id: number }[];
+  areas: Area[];
+}
+interface Props {
+  formQuestion: Question[];
 }
 
 export default function MillingChipComponent({ formQuestion }: Props) {
@@ -69,16 +72,16 @@ export default function MillingChipComponent({ formQuestion }: Props) {
     <ScrollView contentContainerStyle={styles.container}>
       <Text style={styles.title}>Área a evaluar: Milling Chip</Text>
 
-      <QuestionTable
+      <AdvancedQuestionTable
         title="Respuestas del operador"
-        questions={formQuestions}
+        formQuestions={formQuestions}
         areaId={9}
-        roleFilter={null}
-        onEdit={(e) => {
-          setEditingId(e.id);
-          setNewTitle(e.title);
+        roleId={null}
+        onEdit={(id, title) => {
+          setEditingId(id);
+          setNewTitle(title ?? '');
         }}
-        onDelete={(e) => setDeletingId(e)}
+        onDelete={(id) => setDeletingId(id)}
       />
 
       <Text style={styles.label}>Revisar Tecnología De Chip Y Color Vs Ot</Text>
@@ -109,16 +112,16 @@ export default function MillingChipComponent({ formQuestion }: Props) {
         activeOutlineColor="#000"
         editable={false}
       />
-      <QuestionTable
+      <AdvancedQuestionTable
         title="Mis respuestas"
-        questions={formQuestions}
+        formQuestions={formQuestions}
         areaId={9}
-        roleFilter={3}
-        onEdit={(e) => {
-          setEditingId(e.id);
-          setNewTitle(e.title);
+        roleId={3}
+        onEdit={(id, title) => {
+          setEditingId(id);
+          setNewTitle(title ?? '');
         }}
-        onDelete={(e) => setDeletingId(e)}
+        onDelete={(id) => setDeletingId(id)}
       />
 
       <Text style={styles.label}>Localización de Contactos</Text>

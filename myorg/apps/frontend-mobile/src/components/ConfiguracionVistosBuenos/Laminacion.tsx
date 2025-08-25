@@ -10,21 +10,23 @@ import {
   Pressable,
 } from 'react-native';
 import { TextInput } from 'react-native-paper';
-import QuestionTable from './QuestionTable';
 import {
   deleteFormQuestion,
   updateFormQuestion,
 } from '../../api/configVistosBuenos';
+import { AdvancedQuestionTable } from './util/FormQuestionTable';
 
-interface Props {
-  formQuestion: any[];
-}
-
-interface Question {
+interface Area {
+  id: number;
+  name: string;
+}interface Question {
   id: number;
   title: string;
   role_id: number | null;
-  areas: { id: number }[];
+  areas: Area[];
+}
+interface Props {
+  formQuestion: Question[];
 }
 
 export default function Laminacion({ formQuestion }: Props) {
@@ -71,22 +73,24 @@ export default function Laminacion({ formQuestion }: Props) {
     <ScrollView style={styles.container}>
       <Text style={styles.title}>Área a evaluar: Laminación</Text>
 
-      <QuestionTable
+      <AdvancedQuestionTable
         title="Respuestas del operador"
-        questions={formQuestions}
+        formQuestions={formQuestions}
         areaId={5}
-        roleFilter={null}
-        onEdit={(e) => {
-          setEditingId(e.id);
-          setNewTitle(e.title);
+        roleId={null}
+        onEdit={(id, title) => {
+          setEditingId(id);
+          setNewTitle(title ?? '');
         }}
-        onDelete={(e) => setDeletingId(e)}
+        onDelete={(id) => setDeletingId(id)}
       />
 
       <Text style={styles.label}>Validar Acabado Vs Orden De Trabajo</Text>
       <View style={styles.radioGroup}>
-        <Text>◯ B/B</Text>
-        <Text>◯ M/M</Text>
+        <Text>◯ Brillo/Brillo</Text>
+        <Text>◯ Mate/Mate</Text>
+        <Text>◯ Brillo/Mate</Text>
+        <Text>◯ Mate/Brillo</Text>
         <Text>◯ Otro</Text>
       </View>
 
@@ -108,16 +112,16 @@ export default function Laminacion({ formQuestion }: Props) {
         editable={false}
       />
 
-      <QuestionTable
+      <AdvancedQuestionTable
         title="Mis respuestas"
-        questions={formQuestions}
+        formQuestions={formQuestions}
         areaId={5}
-        roleFilter={3}
-        onEdit={(e) => {
-          setEditingId(e.id);
-          setNewTitle(e.title);
+        roleId={3}
+        onEdit={(id, title) => {
+          setEditingId(id);
+          setNewTitle(title ?? '');
         }}
-        onDelete={(e) => setDeletingId(e)}
+        onDelete={(id) => setDeletingId(id)}
       />
 
       {/* Edit Modal */}

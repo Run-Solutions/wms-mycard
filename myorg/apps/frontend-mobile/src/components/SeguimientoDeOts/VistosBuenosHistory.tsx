@@ -9,8 +9,14 @@ import {
 } from 'react-native';
 import { ScrollView } from 'react-native-gesture-handler';
 import { TextInput } from 'react-native-paper';
-import { MachineSection } from './util/MachineSection';
-import { MachineSectionCqm } from './util/MachineSectionCqm';
+import {
+  OperatorAdvancedMachineTable,
+  CqmAdvancedMachineTable,
+} from './util/MachineSection';
+import {
+  CqmAdvancedTable,
+  OperatorAdvancedTable,
+} from './util/FormQuestionTable';
 interface Question {
   id: number;
   title: string;
@@ -177,10 +183,10 @@ export const VistosBuenosHistory: React.FC<Props> = ({
                                   >
                                     Tipo de Personalizacion
                                   </Text>
-                               
+
                                   <TextInput
-                                  style={styles.input}
-                                  theme={{ roundness: 30 }}
+                                    style={styles.input}
+                                    theme={{ roundness: 30 }}
                                     mode="outlined"
                                     activeOutlineColor="#000"
                                     value={
@@ -196,148 +202,19 @@ export const VistosBuenosHistory: React.FC<Props> = ({
                                 {entry.formAnswers[0].tipo_personalizacion ===
                                   null && (
                                   <>
-                                    <View style={styles.table}>
-                                      <View style={styles.tableHeader}>
-                                        <Text
-                                          style={[
-                                            styles.cellLabel,
-                                            { flex: 2, minWidth: 200 },
-                                          ]}
-                                        >
-                                          Pregunta
-                                        </Text>
-                                        {entry.mode === 'doble' &&
-                                        entry.formAnswers[0]
-                                          .tipo_personalizacion === null ? (
-                                          <>
-                                            <Text style={styles.cellLabel}>
-                                              Hoja Frente
-                                            </Text>
-                                            <Text style={styles.cellLabel}>
-                                              Hoja Vuelta
-                                            </Text>
-                                          </>
-                                        ) : (
-                                          <Text style={styles.cellLabel}>
-                                            Respuesta
-                                          </Text>
-                                        )}
-                                      </View>
-                                      {entry.formAnswers[0]
-                                        .tipo_personalizacion === null &&
-                                        entry.questions
-                                          .filter((q) => q.role_id === null)
-                                          .map((q) => {
-                                            const respuestas = (
-                                              formAnswer.FormAnswerResponse ||
-                                              []
-                                            ).filter(
-                                              (r: FormAnswerResponse) =>
-                                                r.question_id === q.id
-                                            );
-                                            const frontAnswer =
-                                              respuestas[0]?.response_operator;
-                                            const vueltaAnswer =
-                                              respuestas[1]?.response_operator;
-                                            const respuestaSimple =
-                                              respuestas[0]?.response_operator;
-                                            return (
-                                              <View
-                                                key={q.id}
-                                                style={styles.tableRow}
-                                              >
-                                                {/* Pregunta */}
-                                                <View
-                                                  style={[
-                                                    styles.tableCell,
-                                                    { flex: 2, maxWidth: 200 },
-                                                  ]}
-                                                >
-                                                  <Text
-                                                    style={styles.questionText}
-                                                  >
-                                                    {q.title}
-                                                  </Text>
-                                                </View>
-
-                                                {/* Respuestas */}
-                                                {entry.mode === 'doble' ? (
-                                                  <>
-                                                    <View
-                                                      style={[
-                                                        styles.tableCell,
-                                                        {
-                                                          flex: 1,
-                                                          alignItems: 'center',
-                                                          flexDirection: 'row',
-                                                          justifyContent:
-                                                            'center',
-                                                        },
-                                                      ]}
-                                                    >
-                                                      <View
-                                                        style={[
-                                                          styles.radioCircle,
-                                                          frontAnswer &&
-                                                            styles.radioDisabled,
-                                                        ]}
-                                                      >
-                                                        {frontAnswer && (
-                                                          <View
-                                                            style={
-                                                              styles.radioDot
-                                                            }
-                                                          />
-                                                        )}
-                                                      </View>
-                                                      <View
-                                                        style={[
-                                                          styles.radioCircle,
-                                                          vueltaAnswer &&
-                                                            styles.radioDisabled,
-                                                        ]}
-                                                      >
-                                                        {vueltaAnswer && (
-                                                          <View
-                                                            style={
-                                                              styles.radioDot
-                                                            }
-                                                          />
-                                                        )}
-                                                      </View>
-                                                    </View>
-                                                  </>
-                                                ) : (
-                                                  <View
-                                                    style={[
-                                                      styles.tableCell,
-                                                      {
-                                                        flex: 1,
-                                                        alignItems: 'center',
-                                                      },
-                                                    ]}
-                                                  >
-                                                    <View
-                                                      style={[
-                                                        styles.radioCircle,
-                                                        respuestaSimple &&
-                                                          styles.radioDisabled,
-                                                      ]}
-                                                    >
-                                                      {respuestaSimple && (
-                                                        <View
-                                                          style={
-                                                            styles.radioDot
-                                                          }
-                                                        />
-                                                      )}
-                                                    </View>
-                                                  </View>
-                                                )}
-                                              </View>
-                                            );
-                                          })}
-                                    </View>
+                                    <OperatorAdvancedTable
+                                      questions={entry.questions}
+                                      answers={
+                                        formAnswer.FormAnswerResponse ?? []
+                                      }
+                                      mode={entry.mode}
+                                      readOnly
+                                      columns={
+                                        entry.mode === 'doble'
+                                          ? ['Hoja Frente', 'Hoja Vuelta']
+                                          : ['Respuesta']
+                                      }
+                                    />
                                   </>
                                 )}
                               </ScrollView>
@@ -354,13 +231,11 @@ export const VistosBuenosHistory: React.FC<Props> = ({
                               {entry.formAnswers[0].tipo_personalizacion ===
                                 'persos' && (
                                 <>
-                                  <MachineSection
+                                  <OperatorAdvancedMachineTable
                                     visible
-                                    machine="personalizacion"
-                                    title=""
-                                    questions={entry.questions}
+                                    machine="Personalización"
                                     areaId={10}
-                                    roleId={null}
+                                    questions={entry.questions}
                                     questionSlice={[1, 10]}
                                     answers={
                                       formAnswer.FormAnswerResponse || []
@@ -404,13 +279,12 @@ export const VistosBuenosHistory: React.FC<Props> = ({
                               {entry.formAnswers[0].tipo_personalizacion ===
                                 'etiquetadora' && (
                                 <>
-                                  <MachineSection
+                                  <OperatorAdvancedMachineTable
                                     visible
                                     machine="etiquetadora"
                                     title=""
                                     questions={entry.questions}
                                     areaId={10}
-                                    roleId={null}
                                     questionSlice={[0, 1]}
                                     answers={
                                       formAnswer.FormAnswerResponse || []
@@ -440,13 +314,12 @@ export const VistosBuenosHistory: React.FC<Props> = ({
                               {entry.formAnswers[0].tipo_personalizacion ===
                                 'packsmart' && (
                                 <>
-                                  <MachineSection
+                                  <OperatorAdvancedMachineTable
                                     visible
                                     machine="packsmart"
                                     title=""
                                     questions={entry.questions}
                                     areaId={10}
-                                    roleId={null}
                                     questionSlice={[14, 20]}
                                     answers={
                                       formAnswer.FormAnswerResponse || []
@@ -458,13 +331,12 @@ export const VistosBuenosHistory: React.FC<Props> = ({
                               {entry.formAnswers[0].tipo_personalizacion ===
                                 'otto' && (
                                 <>
-                                  <MachineSection
+                                  <OperatorAdvancedMachineTable
                                     visible
                                     machine="otto"
                                     title=""
                                     questions={entry.questions}
                                     areaId={10}
-                                    roleId={null}
                                     questionSlice={[20, 28]}
                                     answers={
                                       formAnswer.FormAnswerResponse || []
@@ -476,13 +348,12 @@ export const VistosBuenosHistory: React.FC<Props> = ({
                               {entry.formAnswers[0].tipo_personalizacion ===
                                 'embolsadora' && (
                                 <>
-                                  <MachineSection
+                                  <OperatorAdvancedMachineTable
                                     visible
                                     machine="embolsadora"
                                     title=""
                                     questions={entry.questions}
                                     areaId={10}
-                                    roleId={null}
                                     questionSlice={[28, 30]}
                                     answers={
                                       formAnswer.FormAnswerResponse || []
@@ -494,20 +365,6 @@ export const VistosBuenosHistory: React.FC<Props> = ({
                               {entry.areaName === 'laminacion' && (
                                 <>
                                   <View style={{ width: '70%' }}>
-                                    <Text style={styles.label}>
-                                      Valor de Anclaje Obtenido:
-                                    </Text>
-                                    <TextInput
-                                      style={styles.input}
-                                      theme={{ roundness: 30 }}
-                                      mode="outlined"
-                                      activeOutlineColor="#000"
-                                      value={
-                                        formAnswer.valor_anclaje ??
-                                        'No se reconoce la muestra enviada'
-                                      }
-                                      readOnly
-                                    />
                                     <Text style={styles.label}>
                                       Validar Acabado Vs Orden De Trabajo:
                                     </Text>
@@ -694,155 +551,19 @@ export const VistosBuenosHistory: React.FC<Props> = ({
                                   null &&
                                   entry.areaName !== 'color edge' && (
                                     <>
-                                      <View style={styles.table}>
-                                        <View style={styles.tableHeader}>
-                                          <Text
-                                            style={[
-                                              styles.cellLabel,
-                                              { flex: 2, minWidth: 200 },
-                                            ]}
-                                          >
-                                            Pregunta
-                                          </Text>
-                                          {entry.mode === 'doble' &&
-                                          entry.formAnswers[0]
-                                            .tipo_personalizacion === null ? (
-                                            <>
-                                              <Text style={styles.cellLabel}>
-                                                Hoja Frente
-                                              </Text>
-                                              <Text style={styles.cellLabel}>
-                                                Hoja Vuelta
-                                              </Text>
-                                            </>
-                                          ) : (
-                                            <Text style={styles.cellLabel}>
-                                              Respuesta
-                                            </Text>
-                                          )}
-                                        </View>
-                                        {entry.formAnswers[0]
-                                          .tipo_personalizacion === null &&
-                                          entry.questions
-                                            .filter((q) => q.role_id === 3)
-                                            .map((q) => {
-                                              const respuestas = (
-                                                formAnswer.FormAnswerResponse ||
-                                                []
-                                              ).filter(
-                                                (r: FormAnswerResponse) =>
-                                                  r.question_id === q.id
-                                              );
-                                              const frontAnswer =
-                                                respuestas[0]?.response_cqm;
-                                              const vueltaAnswer =
-                                                respuestas[1]?.response_cqm;
-                                              const respuestaSimple =
-                                                respuestas[0]?.response_cqm;
-                                              return (
-                                                <View
-                                                  key={q.id}
-                                                  style={styles.tableRow}
-                                                >
-                                                  {/* Pregunta */}
-                                                  <View
-                                                    style={[
-                                                      styles.tableCell,
-                                                      {
-                                                        flex: 2,
-                                                        maxWidth: 200,
-                                                      },
-                                                    ]}
-                                                  >
-                                                    <Text
-                                                      style={
-                                                        styles.questionText
-                                                      }
-                                                    >
-                                                      {q.title}
-                                                    </Text>
-                                                  </View>
-
-                                                  {/* Respuestas */}
-                                                  {entry.mode === 'doble' ? (
-                                                    <>
-                                                      <View
-                                                        style={[
-                                                          styles.tableCell,
-                                                          {
-                                                            flex: 1,
-                                                            alignItems:
-                                                              'center',
-                                                            flexDirection:
-                                                              'row',
-                                                            justifyContent:
-                                                              'center',
-                                                          },
-                                                        ]}
-                                                      >
-                                                        <View
-                                                          style={[
-                                                            styles.radioCircle,
-                                                            frontAnswer &&
-                                                              styles.radioDisabled,
-                                                          ]}
-                                                        >
-                                                          {frontAnswer && (
-                                                            <View
-                                                              style={
-                                                                styles.radioDot
-                                                              }
-                                                            />
-                                                          )}
-                                                        </View>
-                                                        <View
-                                                          style={[
-                                                            styles.radioCircle,
-                                                            vueltaAnswer &&
-                                                              styles.radioDisabled,
-                                                          ]}
-                                                        >
-                                                          {vueltaAnswer && (
-                                                            <View
-                                                              style={
-                                                                styles.radioDot
-                                                              }
-                                                            />
-                                                          )}
-                                                        </View>
-                                                      </View>
-                                                    </>
-                                                  ) : (
-                                                    <View
-                                                      style={[
-                                                        styles.tableCell,
-                                                        {
-                                                          flex: 1,
-                                                          alignItems: 'center',
-                                                        },
-                                                      ]}
-                                                    >
-                                                      <View
-                                                        style={[
-                                                          styles.radioCircle,
-                                                          respuestaSimple &&
-                                                            styles.radioDisabled,
-                                                        ]}
-                                                      >
-                                                        {respuestaSimple && (
-                                                          <View
-                                                            style={
-                                                              styles.radioDot
-                                                            }
-                                                          />
-                                                        )}
-                                                      </View>
-                                                    </View>
-                                                  )}
-                                                </View>
-                                              );
-                                            })}
-                                      </View>
+                                      <CqmAdvancedTable
+                                        questions={entry.questions}
+                                        answers={
+                                          formAnswer.FormAnswerResponse ?? []
+                                        }
+                                        mode={entry.mode}
+                                        readOnly
+                                        columns={
+                                          entry.mode === 'doble'
+                                            ? ['Hoja Frente', 'Hoja Vuelta']
+                                            : ['Respuesta']
+                                        }
+                                      />
                                     </>
                                   )}
                               </ScrollView>
@@ -851,7 +572,7 @@ export const VistosBuenosHistory: React.FC<Props> = ({
                                 <>
                                   <View style={{ width: '70%' }}>
                                     <Text style={styles.label}>
-                                      Tipo de prueba:
+                                      Tonos y/o Densidades Contra:
                                     </Text>
                                     <View
                                       style={[
@@ -1033,6 +754,51 @@ export const VistosBuenosHistory: React.FC<Props> = ({
                                   </View>
                                 </>
                               )}
+                              {entry.areaName === 'laminacion' && (
+                                <>
+                                  <View style={{ width: '70%' }}>
+                                    <Text style={styles.label}>
+                                      Prueba Over:
+                                    </Text>
+                                    <TextInput
+                                      style={styles.input}
+                                      theme={{ roundness: 30 }}
+                                      mode="outlined"
+                                      activeOutlineColor="#000"
+                                      value={String(
+                                        formAnswer.prueba_over ?? 0
+                                      )}
+                                      readOnly
+                                    />
+                                    <Text style={styles.label}>
+                                      Prueba Cinta Magnética:
+                                    </Text>
+                                    <TextInput
+                                      style={styles.input}
+                                      theme={{ roundness: 30 }}
+                                      mode="outlined"
+                                      activeOutlineColor="#000"
+                                      value={String(
+                                        formAnswer.prueba_cinta_magnetica ?? 0
+                                      )}
+                                      readOnly
+                                    />
+                                    <Text style={styles.label}>
+                                      Prueba Centro (entre capas):
+                                    </Text>
+                                    <TextInput
+                                      style={styles.input}
+                                      theme={{ roundness: 30 }}
+                                      mode="outlined"
+                                      activeOutlineColor="#000"
+                                      value={String(
+                                        formAnswer.prueba_centro ?? 0
+                                      )}
+                                      readOnly
+                                    />
+                                  </View>
+                                </>
+                              )}
                               {entry.areaName === 'milling chip' && (
                                 <>
                                   <View style={{ width: '70%' }}>
@@ -1068,13 +834,12 @@ export const VistosBuenosHistory: React.FC<Props> = ({
                               {entry.formAnswers[0].tipo_personalizacion ===
                                 'laser' && (
                                 <>
-                                  <MachineSectionCqm
+                                  <CqmAdvancedMachineTable
                                     visible
                                     machine="laser"
                                     title=""
                                     questions={entry.questions}
                                     areaId={10}
-                                    roleId={3}
                                     questionSlice={[9, 3]}
                                     answers={
                                       formAnswer.FormAnswerResponse || []
@@ -1134,13 +899,12 @@ export const VistosBuenosHistory: React.FC<Props> = ({
                               {entry.formAnswers[0].tipo_personalizacion ===
                                 'persos' && (
                                 <>
-                                  <MachineSectionCqm
+                                  <CqmAdvancedMachineTable
                                     visible
                                     machine="personalizacion"
                                     title=""
                                     questions={entry.questions}
                                     areaId={10}
-                                    roleId={3}
                                     questionSlice={[13, 15]}
                                     answers={
                                       formAnswer.FormAnswerResponse || []

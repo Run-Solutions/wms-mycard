@@ -1,18 +1,35 @@
 // src/components/Header/DashboardHeader.tsx
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import styled from 'styled-components';
 import MenuIcon from '@mui/icons-material/Menu';
 import ChevronLeftIcon from '@mui/icons-material/ChevronLeft';
 import IconButton from '@mui/material/IconButton';
 import EditProfileModal from './EditProfileModal';
-import { useAuthContext } from '@/context/AuthContext'; 
+import { useAuthContext } from '@/context/AuthContext';
 import { Switch, SwitchProps } from '@mui/material';
 import { useThemeContext } from '@/components/ThemeContext';
 import { useRouter } from 'next/navigation';
 import { Theme } from '@mui/material/styles';
 import { BASE_URL } from '@/api/http';
+import {
+  getNotificationHistory,
+  markNotificationAsRead,
+} from '@/api/notifications';
+import CircularProgress from '@mui/material/CircularProgress';
+import List from '@mui/material/List';
+import ListItem from '@mui/material/ListItem';
+import ListItemText from '@mui/material/ListItemText';
+import ListItemIcon from '@mui/material/ListItemIcon';
+import Divider from '@mui/material/Divider';
+import Badge from '@mui/material/Badge';
+import Popover from '@mui/material/Popover';
+import Tooltip from '@mui/material/Tooltip';
+import CheckIcon from '@mui/icons-material/Check';
+import RefreshIcon from '@mui/icons-material/Refresh';
+import NotificationsActiveIcon from '@mui/icons-material/NotificationsActive';
+import NotificationsNoneIcon from '@mui/icons-material/NotificationsNone';
 
 interface DashboardHeaderProps {
   toggleDrawer: () => void;
@@ -25,6 +42,7 @@ interface DashboardHeaderProps {
 interface HeaderContainerProps {
   $sidebarWidth: number;
 }
+
 // Estilo personalizado para el Switch con luna y sol dentro
 const ThemedSwitch = styled((props: SwitchProps) => (
   <Switch focusVisibleClassName=".Mui-focusVisible" disableRipple {...props} />
@@ -33,7 +51,7 @@ const ThemedSwitch = styled((props: SwitchProps) => (
   height: 38,
   padding: 12,
   '& .MuiSwitch-switchBase': {
-    padding: 0, // mejor que 9, porque en tu ajuste en DevTools no tenías padding
+    padding: 0,
     right: 16,
     bottom: -4,
     width: 42,
@@ -80,62 +98,275 @@ const DashboardHeader: React.FC<DashboardHeaderProps> = ({
 }) => {
   // Hook para el usuario real
   const { user } = useAuthContext();
-  // Estado para el popover del tema
-  const [anchorEl, setAnchorEl] = useState<HTMLButtonElement | null>(null);
   // Estado para abrir el modal de editar perfil
   const [openProfile, setOpenProfile] = useState(false);
   const { isDarkMode, toggleTheme } = useThemeContext();
-  
-  const handleThemeButtonClick = (event: React.MouseEvent<HTMLButtonElement>) => {
-    setAnchorEl(event.currentTarget);
-  };  
-  // Al hacer click en el avatar se abre el modal de edición
-  const handleUserClick = () => {
-    setOpenProfile(true);
-  };
-  
-  const handleProfileClose = () => {
-    setOpenProfile(false);
-  };
   const router = useRouter();
-  // Selecciona el icono de la marca
-  const handleLogoClick = (name: string) => {
-    let redirect_page = name;
-    router.push(`/${redirect_page}`)
-  };
+
+  // Notificaciones
+  const [notifAnchorEl, setNotifAnchorEl] = useState<HTMLElement | null>(null);
+  const [notifications, setNotifications] = useState<
+    Array<{
+      id: string;
+      title: string;
+      body?: string;
+      date?: string;
+      isRead?: boolean;
+    }>
+  >([]);
+  const [loadingNotifs, setLoadingNotifs] = useState(false);
+  const [notifError, setNotifError] = useState<string | null>(null);
+
+  const fetchNotifications = async () => {
+    if (!user) return;
+    try {
+      setLoadingNotifs(true);
+      setNotifError(null);
+      const userId = (user as any).sub ?? user.id;
   
+      const raw = await getNotificationHistory(userId);
+      const normalized = (Array.isArray(raw) ? raw : []).map((n: any) => ({
+        id: String(n.id),
+        title: n.title ?? n.subject ?? 'Notificación',
+        body: n.body ?? n.message ?? '',
+        // intenta tomar la fecha del campo disponible en tu API
+        date: n.date ?? n.createdAt ?? n.timestamp ?? n.created_at ?? null,
+        isRead: Boolean(n.isRead ?? n.read ?? (n.status === 'READ')),
+      }));
+  
+      normalized.sort((a: any, b: any) => {
+        // 1) no leídas primero
+        if (!!a.isRead !== !!b.isRead) return a.isRead ? 1 : -1;
+        // 2) dentro del mismo grupo, más recientes primero
+        const ta = a.date ? new Date(a.date).getTime() : 0;
+        const tb = b.date ? new Date(b.date).getTime() : 0;
+        return tb - ta;
+      });
+  
+      setNotifications(normalized);
+    } catch (e: any) {
+      setNotifError(e?.message ?? 'Error al cargar notificaciones');
+    } finally {
+      setLoadingNotifs(false);
+    }
+  };
+
+  const handleMarkAsRead = async (notificationId: string) => {
+    try {
+      await markNotificationAsRead(notificationId);
+      setNotifications(prev => {
+        const next = prev.map(n => n.id === notificationId ? { ...n, isRead: true } : n);
+        next.sort((a, b) => {
+          if (!!a.isRead !== !!b.isRead) return a.isRead ? 1 : -1;
+          const ta = a.date ? new Date(a.date).getTime() : 0;
+          const tb = b.date ? new Date(b.date).getTime() : 0;
+          return tb - ta;
+        });
+        return next;
+      });
+    } catch {}
+  };
+
+  const unreadCount = notifications.filter((n) => !n.isRead).length;
+
+  useEffect(() => {
+    fetchNotifications();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // Toggle del popover
+  const handleNotifButton = (e: React.MouseEvent<HTMLElement>) => {
+    setNotifAnchorEl((prev) => (prev ? null : e.currentTarget));
+  };
+  const notifOpen = Boolean(notifAnchorEl);
+
+  // Eventos de UI
+  const handleUserClick = () => setOpenProfile(true);
+  const handleProfileClose = () => setOpenProfile(false);
+
   return (
     <>
       <HeaderContainer $sidebarWidth={sidebarWidth}>
         <div style={{ display: 'flex', alignItems: 'center' }}>
-          <IconButton color='inherit' onClick={toggleDrawer}>
+          <IconButton color="inherit" onClick={toggleDrawer}>
             {drawerOpen ? <ChevronLeftIcon /> : <MenuIcon />}
           </IconButton>
-          <LogoContainer onClick={() => handleLogoClick('dashboard')} style={{ cursor: 'pointer' }}>
-            <img src='/logos/mycard-logo.svg' alt='MyCard Logo' style={{ height: 40 }} />
+          <LogoContainer style={{ cursor: 'pointer' }}>
+            <img
+              src="/logos/mycard-logo.svg"
+              alt="MyCard Logo"
+              style={{ height: 40 }}
+            />
           </LogoContainer>
         </div>
+
         <div style={{ display: 'flex', alignItems: 'center' }}>
           <UserInfoContainer onClick={handleUserClick}>
             <UserAvatar
               src={
                 user?.profile_image
-                ? `${BASE_URL}/uploads/${user.profile_image}`
-                : '/logos/users.webp'
+                  ? `${BASE_URL}/uploads/${user.profile_image}`
+                  : '/logos/users.webp'
               }
               alt={user?.username}
-              />
+            />
             <UserName>{user?.username || 'Usuario'}</UserName>
           </UserInfoContainer>
-          <ThemedSwitch
-            checked={isDarkMode}
-            onChange={toggleTheme}
-          />
-          <SupportLogo src='/images/support.svg' alt='Soporte Técnico' />
+
+          <ThemedSwitch checked={isDarkMode} onChange={toggleTheme} />
+
+          {/* Botón de campana */}
+          <IconButton
+            color="inherit"
+            onClick={handleNotifButton}
+            aria-label="Notificaciones"
+          >
+            <Badge
+              badgeContent={unreadCount}
+              color="error"
+              overlap="circular"
+              max={99}
+            >
+              {unreadCount > 0 ? (
+                <NotificationsActiveIcon htmlColor="#fff" />
+              ) : (
+                <NotificationsNoneIcon htmlColor="#fff" />
+              )}
+            </Badge>
+          </IconButton>
+
+          {/* Popover hermano del botón */}
+          <Popover
+            open={notifOpen}
+            anchorEl={notifAnchorEl}
+            onClose={() => setNotifAnchorEl(null)}
+            anchorOrigin={{ vertical: 'bottom', horizontal: 'right' }}
+            transformOrigin={{ vertical: 'top', horizontal: 'right' }}
+            PaperProps={{
+              style: { borderRadius: 12, width: 380, maxHeight: 460 },
+            }}
+            // disablePortal // opcional: mejora click-away en ciertos layouts
+          >
+            <NotifContainer>
+              <NotifHeader>
+                <span>Notificaciones</span>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                  {unreadCount > 0 && (
+                    <UnreadPill>{unreadCount} nuevas</UnreadPill>
+                  )}
+                  <Tooltip title="Recargar">
+                    <IconButton size="small" onClick={fetchNotifications}>
+                      <RefreshIcon fontSize="small" />
+                    </IconButton>
+                  </Tooltip>
+                </div>
+              </NotifHeader>
+
+              {loadingNotifs ? (
+                <div
+                  style={{
+                    display: 'flex',
+                    justifyContent: 'center',
+                    padding: 20,
+                  }}
+                >
+                  <CircularProgress size={22} />
+                </div>
+              ) : notifError ? (
+                <EmptyState>{notifError}</EmptyState>
+              ) : notifications.length === 0 ? (
+                <EmptyState>Sin notificaciones por ahora</EmptyState>
+              ) : (
+                <NotifList as={List}>
+                  {notifications.map((n, idx) => (
+                    <React.Fragment key={n.id}>
+                      <ListItem
+                        alignItems="flex-start"
+                        secondaryAction={
+                          !n.isRead && (
+                            <Tooltip title="Marcar como leída">
+                              <IconButton
+                                edge="end"
+                                onClick={() => handleMarkAsRead(n.id)}
+                              >
+                                <CheckIcon />
+                              </IconButton>
+                            </Tooltip>
+                          )
+                        }
+                        style={{
+                          borderRadius: 10,
+                          background: n.isRead
+                            ? 'rgba(255,255,255,0.06)'
+                            : 'rgba(255,255,255,0.14)',
+                          margin: '4px 6px',
+                          cursor: 'pointer',
+                        }}
+                      >
+                        <ListItemIcon>
+                          {n.isRead ? (
+                            <NotificationsNoneIcon />
+                          ) : (
+                            <NotificationsActiveIcon />
+                          )}
+                        </ListItemIcon>
+
+                        <ListItemText
+                          primary={
+                            <span style={{ fontWeight: 600 }}>{n.title}</span>
+                          }
+                          secondary={
+                            <>
+                              {n.body && (
+                                <span
+                                  style={{ display: 'block', opacity: 0.9 }}
+                                >
+                                  {n.body}
+                                </span>
+                              )}
+                              {n.date && (
+                                <span
+                                  style={{
+                                    display: 'block',
+                                    fontSize: 12,
+                                    opacity: 0.7,
+                                    marginTop: 4,
+                                  }}
+                                >
+                                  {n.date}
+                                </span>
+                              )}
+                            </>
+                          }
+                          primaryTypographyProps={{
+                            component: 'span',
+                            style: { color: '#fff' },
+                          }}
+                          secondaryTypographyProps={{
+                            component: 'span',
+                            style: { color: '#fff' },
+                          }}
+                        />
+                      </ListItem>
+                      {idx < notifications.length - 1 && (
+                        <Divider variant="inset" component="li" />
+                      )}
+                    </React.Fragment>
+                  ))}
+                </NotifList>
+              )}
+            </NotifContainer>
+          </Popover>
+
+          {/*<SupportLogo src="/images/support.svg" alt="Soporte Técnico" />*/ }
         </div>
       </HeaderContainer>
+
       {openProfile && user && (
-        <EditProfileModal user={{...user, id: String(user.id)}} onClose={handleProfileClose} />
+        <EditProfileModal
+          user={{ ...user, id: String(user.id) }}
+          onClose={handleProfileClose}
+        />
       )}
     </>
   );
@@ -190,3 +421,56 @@ const UserName = styled.span`
   color: #fff;
 `;
 
+const NotifContainer = styled.div`
+  display: flex;
+  flex-direction: column;
+  padding: 12px;
+  gap: 8px;
+`;
+const NotifHeader = styled.div`
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  font-weight: 700;
+  font-size: 16px;
+  padding: 4px 6px 8px;
+`;
+const UnreadPill = styled.span`
+  background: #ff3b30;
+  color: #fff;
+  font-size: 12px;
+  padding: 2px 8px;
+  border-radius: 999px;
+`;
+const EmptyState = styled.div`
+  text-align: center;
+  padding: 24px 8px;
+  color: ${({ theme }) => theme.palette.text.secondary};
+`;
+const NotifList = styled.div`
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 4px;
+`;
+const NotifFooter = styled.div`
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+  margin-top: 6px;
+  padding: 6px 4px 2px;
+`;
+const FooterBtn = styled.button`
+  all: unset;
+  padding: 8px 10px;
+  border-radius: 8px;
+  cursor: pointer;
+  background: rgba(255, 255, 255, 0.12);
+  color: #fff;
+  font-size: 13px;
+  font-weight: 600;
+  text-align: center;
+  &:hover {
+    background: rgba(255, 255, 255, 0.18);
+  }
+`;

@@ -19,6 +19,7 @@ import {
 } from '../../api/liberarProducto';
 import { useAuth } from '../../contexts/AuthContext';
 import { calcularCantidadPorLiberar } from './util/calcularCantidadPorLiberar';
+import SelectionQuestionTable from './util/FormQuestionTable';
 
 interface PartialRelease {
   validated: boolean;
@@ -35,11 +36,13 @@ const ImpresionComponent = ({ workOrder }: { workOrder: any }) => {
   const [checkedFrente, setCheckedFrente] = useState<number[]>([]);
   const [checkedVuelta, setCheckedVuelta] = useState<number[]>([]);
   const [showQuality, setShowQuality] = useState<boolean>(false);
+  const [checkedFrenteOK, setCheckedFrenteOK] = useState<number[]>([]);
+  const [checkedFrenteNG, setCheckedFrenteNG] = useState<number[]>([]);
 
-  const questions =
-    workOrder.area.formQuestions?.filter((q: any) => q.role_id === null) || [];
-  const qualityQuestions =
-    workOrder.area.formQuestions?.filter((q: any) => q.role_id === 3) || [];
+  // ✅ Vuelta
+  const [checkedVueltaOK, setCheckedVueltaOK] = useState<number[]>([]);
+  const [checkedVueltaNG, setCheckedVueltaNG] = useState<number[]>([]);
+
   const isDisabled = workOrder.status === 'En proceso';
 
   const { user } = useAuth();
@@ -91,25 +94,63 @@ const ImpresionComponent = ({ workOrder }: { workOrder: any }) => {
     : 0;
 
   const enviarACQM = async () => {
+    const questions = workOrder.area.formQuestions.filter(
+      (q: any) => q.role_id === null
+    );
+    // --- NUEVA construcción de respuestas usando tus estados OK/NG ---
+    // OK => true, NG => false, sin marcar => false (para mantener arrays booleanos)
+    const visibleQuestions = (workOrder.area.formQuestions ?? []).filter(
+      (q: any) => q.role_id === null
+    );
+
+    const getAnswerFor = (
+      qid: number,
+      colIndex: number
+    ): boolean | undefined => {
+      if (colIndex === 0) {
+        if (checkedFrenteOK.includes(qid)) return true;
+        if (checkedFrenteNG.includes(qid)) return false;
+        return undefined;
+      } else {
+        if (checkedVueltaOK.includes(qid)) return true;
+        if (checkedVueltaNG.includes(qid)) return false;
+        return undefined;
+      }
+    };
+
+    const question_id: number[] = [];
+    const frente: boolean[] = [];
+    const vuelta: boolean[] = [];
+
+    for (const q of visibleQuestions) {
+      const a0 = getAnswerFor(q.id, 0); // Frente
+      const a1 = getAnswerFor(q.id, 1); // Vuelta
+
+      // Exigir todas respondidas (OK o NG en ambas columnas)
+      if (a0 === undefined || a1 === undefined) {
+        Alert.alert('Completa todas las preguntas y cantidad de muestra.');
+        return;
+      }
+
+      question_id.push(q.id);
+      frente.push(a0);
+      vuelta.push(a1);
+    }
+
+    // 4) Validar muestras
     const numValue = Number(sampleQuantity);
     if (isNaN(numValue) || !Number.isInteger(numValue) || numValue < 0) {
-      Alert.alert('Cantidad de muestra inválida');
-      return;
-    }
-    const isFrenteVueltaValid =
-      checkedFrente.length > 0 || checkedVuelta.length > 0;
-    if (!questions.length || !isFrenteVueltaValid) {
-      Alert.alert('Completa todas las preguntas y cantidad de muestra.');
+      Alert.alert('Por favor, ingresa una cantidad de muestra válida.');
       return;
     }
 
     const payload = {
-      question_id: questions.map((q: any) => q.id),
+      question_id,
       work_order_flow_id: currentFlow.id,
       work_order_id: currentFlow.workOrder.id,
       area_id: currentFlow.area.id,
-      frente: questions.map((q: any) => checkedFrente.includes(q.id)),
-      vuelta: questions.map((q: any) => checkedVuelta.includes(q.id)),
+      frente,
+      vuelta,
       reviewed: false,
       user_id: currentFlow.assigned_user,
       sample_quantity: Number(sampleQuantity),
@@ -148,6 +189,50 @@ const ImpresionComponent = ({ workOrder }: { workOrder: any }) => {
       navigation.navigate('liberarProducto');
     } catch (err) {
       Alert.alert('Error del servidor al liberar.');
+    }
+  };
+
+  const handleToggleFrenteVuelta = (
+    questionId: number,
+    columnIndex: number, // 0 = Frente, 1 = Vuelta
+    type: 'ok' | 'ng',
+    checked: boolean
+  ) => {
+    if (columnIndex === 0) {
+      // FRENTE
+      if (type === 'ok') {
+        setCheckedFrenteOK((prev) =>
+          checked
+            ? Array.from(new Set([...prev, questionId]))
+            : prev.filter((id) => id !== questionId)
+        );
+        // Quita la contraria en el mismo tick
+        setCheckedFrenteNG((prev) => prev.filter((id) => id !== questionId));
+      } else {
+        setCheckedFrenteNG((prev) =>
+          checked
+            ? Array.from(new Set([...prev, questionId]))
+            : prev.filter((id) => id !== questionId)
+        );
+        setCheckedFrenteOK((prev) => prev.filter((id) => id !== questionId));
+      }
+    } else {
+      // VUELTA
+      if (type === 'ok') {
+        setCheckedVueltaOK((prev) =>
+          checked
+            ? Array.from(new Set([...prev, questionId]))
+            : prev.filter((id) => id !== questionId)
+        );
+        setCheckedVueltaNG((prev) => prev.filter((id) => id !== questionId));
+      } else {
+        setCheckedVueltaNG((prev) =>
+          checked
+            ? Array.from(new Set([...prev, questionId]))
+            : prev.filter((id) => id !== questionId)
+        );
+        setCheckedVueltaOK((prev) => prev.filter((id) => id !== questionId));
+      }
     }
   };
 
@@ -306,7 +391,9 @@ const ImpresionComponent = ({ workOrder }: { workOrder: any }) => {
         )}
       </View>
 
-      <Text style={styles.label}>Cantidad a liberar (Hojas Frente / Hojas Vuelta):</Text>
+      <Text style={styles.label}>
+        Cantidad a liberar (Hojas Frente / Hojas Vuelta):
+      </Text>
       <TextInput
         style={styles.input}
         theme={{ roundness: 30 }}
@@ -373,56 +460,16 @@ const ImpresionComponent = ({ workOrder }: { workOrder: any }) => {
             <Text style={styles.modalTitle}>
               Preguntas del Área: {workOrder.area.name}
             </Text>
-
-            {/* Encabezado estilo tabla */}
-            <View style={styles.tableHeader}>
-              <Text style={[styles.tableCell, { flex: 2 }]}>Pregunta</Text>
-              <Text style={styles.tableCell}>Frente</Text>
-              <Text style={styles.tableCell}>Vuelta</Text>
-            </View>
-
-            {/* Preguntas normales */}
-            {questions.map((q: any) => (
-              <View key={q.id} style={styles.tableRow}>
-                {/* Pregunta */}
-                <View style={[styles.tableCell, { flex: 2 }]}>
-                  <Text style={styles.questionText}>{q.title}</Text>
-                </View>
-
-                {/* Frente */}
-                <View
-                  style={[styles.tableCell, { flex: 1, alignItems: 'center' }]}
-                >
-                  <TouchableOpacity
-                    onPress={() =>
-                      toggleCheckbox(q.id, checkedFrente, setCheckedFrente)
-                    }
-                    style={styles.radioCircle}
-                  >
-                    {checkedFrente.includes(q.id) && (
-                      <View style={styles.radioDot} />
-                    )}
-                  </TouchableOpacity>
-                </View>
-
-                {/* Vuelta */}
-                <View
-                  style={[styles.tableCell, { flex: 1, alignItems: 'center' }]}
-                >
-                  <TouchableOpacity
-                    onPress={() =>
-                      toggleCheckbox(q.id, checkedVuelta, setCheckedVuelta)
-                    }
-                    style={styles.radioCircle}
-                  >
-                    {checkedVuelta.includes(q.id) && (
-                      <View style={styles.radioDot} />
-                    )}
-                  </TouchableOpacity>
-                </View>
-              </View>
-            ))}
-
+            <SelectionQuestionTable
+              formQuestions={workOrder.area.formQuestions}
+              roleId={null}
+              columns={['Hoja Frente', 'Hoja Vuelta']}
+              checkedQuestions={[
+                { ok: checkedFrenteOK, ng: checkedFrenteNG },
+                { ok: checkedVueltaOK, ng: checkedVueltaNG },
+              ]}
+              onToggle={handleToggleFrenteVuelta}
+            />
             {/* Muestras */}
             <Text style={styles.label}>Muestras:</Text>
             <TextInput
@@ -448,13 +495,18 @@ const ImpresionComponent = ({ workOrder }: { workOrder: any }) => {
 
             {showQuality && (
               <>
-                {qualityQuestions.map((q: any) => (
-                  <View key={q.id} style={styles.qualityRow}>
-                    <Text style={styles.qualityQuestion}>{q.title}</Text>
-                  </View>
-                ))}
+                <SelectionQuestionTable
+                  formQuestions={workOrder.area.formQuestions}
+                  roleId={3}
+                  checkedQuestions={[
+                    { ok: checkedFrenteOK, ng: checkedFrenteNG },
+                  ]}
+                  onToggle={handleToggleFrenteVuelta}
+                  columns={['Hoja Frente', 'Hoja Vuelta']}
+                  readOnly={true}
+                />
 
-                <Text style={styles.subtitle}>Tipo de Prueba</Text>
+                <Text style={styles.subtitle}>Tonos y/o Densidades Contra</Text>
                 {['color', 'perfil', 'fisica'].map((type) => (
                   <View key={type} style={styles.radioDisabled}>
                     <Text>{`Prueba ${type}`}</Text>

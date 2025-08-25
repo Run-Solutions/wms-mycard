@@ -7,21 +7,27 @@ import {
   StyleSheet,
   Alert,
   Modal,
-  Pressable
+  Pressable,
 } from 'react-native';
 import { TextInput } from 'react-native-paper';
-import QuestionTable from './QuestionTable';
-import { deleteFormQuestion, updateFormQuestion } from '../../api/configVistosBuenos';
+import {
+  deleteFormQuestion,
+  updateFormQuestion,
+} from '../../api/configVistosBuenos';
+import { AdvancedQuestionTable } from './util/FormQuestionTable';
 
-interface Props {
-  formQuestion: any[];
+interface Area {
+  id: number;
+  name: string;
 }
-
 interface Question {
   id: number;
   title: string;
   role_id: number | null;
-  areas: { id: number }[];
+  areas: Area[];
+}
+interface Props {
+  formQuestion: Question[];
 }
 
 export default function ColorEdge({ formQuestion }: Props) {
@@ -31,14 +37,14 @@ export default function ColorEdge({ formQuestion }: Props) {
   const [formQuestions, setFormQuestions] = useState<Question[]>(formQuestion);
 
   const handleUpdateTitle = async (id: number, updatedTitle: string) => {
-    const currentTitle = formQuestions.find(q => q.id === id)?.title;
+    const currentTitle = formQuestions.find((q) => q.id === id)?.title;
     if (currentTitle === updatedTitle) {
       Alert.alert('Aviso', 'El título no ha cambiado.');
       return;
     }
 
     try {
-      const updatedQuestions = formQuestions.map(q =>
+      const updatedQuestions = formQuestions.map((q) =>
         q.id === id ? { ...q, title: updatedTitle } : q
       );
       setFormQuestions(updatedQuestions);
@@ -54,7 +60,7 @@ export default function ColorEdge({ formQuestion }: Props) {
     try {
       const res = await deleteFormQuestion(id);
       if (res) {
-        setFormQuestions(prev => prev.filter(q => q.id !== id));
+        setFormQuestions((prev) => prev.filter((q) => q.id !== id));
         setDeletingId(null);
       } else {
         Alert.alert('Error', 'No se pudo eliminar la pregunta.');
@@ -64,22 +70,30 @@ export default function ColorEdge({ formQuestion }: Props) {
     }
   };
 
-
   return (
     <ScrollView style={styles.container}>
       <Text style={styles.title}>Área a evaluar: Color Edge</Text>
 
-      <QuestionTable
-        title='Respuestas del operador'
-        questions={formQuestions}
+      <AdvancedQuestionTable
+        title="Respuestas del operador"
+        formQuestions={formQuestions}
         areaId={7}
-        roleFilter={null}
-        onEdit={(e) => {setEditingId(e.id); setNewTitle(e.title)}}
-        onDelete={(e) => setDeletingId(e)}
+        roleId={null}
+        onEdit={(id, title) => {
+          setEditingId(id);
+          setNewTitle(title ?? '');
+        }}
+        onDelete={(id) => setDeletingId(id)}
       />
 
       <Text style={styles.label}>Muestras entregadas:</Text>
-      <TextInput style={styles.input} theme={{ roundness: 30 }} mode="outlined" activeOutlineColor="#000" editable={false} />
+      <TextInput
+        style={styles.input}
+        theme={{ roundness: 30 }}
+        mode="outlined"
+        activeOutlineColor="#000"
+        editable={false}
+      />
 
       <Text style={styles.sectionTitle}>Mis respuestas</Text>
       <Text style={styles.label}>No hay preguntas por parte de calidad.</Text>
@@ -99,8 +113,18 @@ export default function ColorEdge({ formQuestion }: Props) {
               placeholder="Nuevo título"
             />
             <View style={styles.modalButtons}>
-              <Pressable onPress={() => setEditingId(null)} style={styles.cancelButton}><Text>Cancelar</Text></Pressable>
-              <Pressable onPress={() => handleUpdateTitle(editingId!, newTitle)} style={styles.saveButton}><Text>Guardar</Text></Pressable>
+              <Pressable
+                onPress={() => setEditingId(null)}
+                style={styles.cancelButton}
+              >
+                <Text>Cancelar</Text>
+              </Pressable>
+              <Pressable
+                onPress={() => handleUpdateTitle(editingId!, newTitle)}
+                style={styles.saveButton}
+              >
+                <Text>Guardar</Text>
+              </Pressable>
             </View>
           </View>
         </View>
@@ -113,8 +137,18 @@ export default function ColorEdge({ formQuestion }: Props) {
             <Text style={styles.modalTitle}>¿Eliminar esta pregunta?</Text>
             <Text>Esta acción no se puede deshacer.</Text>
             <View style={styles.modalButtons}>
-              <Pressable onPress={() => setDeletingId(null)} style={styles.cancelButton}><Text>Cancelar</Text></Pressable>
-              <Pressable onPress={() => handleDeleteQuestion(deletingId!)} style={styles.deleteButton}><Text>Eliminar</Text></Pressable>
+              <Pressable
+                onPress={() => setDeletingId(null)}
+                style={styles.cancelButton}
+              >
+                <Text>Cancelar</Text>
+              </Pressable>
+              <Pressable
+                onPress={() => handleDeleteQuestion(deletingId!)}
+                style={styles.deleteButton}
+              >
+                <Text>Eliminar</Text>
+              </Pressable>
             </View>
           </View>
         </View>

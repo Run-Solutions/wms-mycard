@@ -5,7 +5,7 @@ import { FaEdit, FaTrash } from 'react-icons/fa';
 import { useState } from "react";
 import styled from "styled-components";
 import { deleteFormQuestion, updateFormQuestion } from "@/api/configVistosBuenos";
-import { FormQuestionTable } from "./FormQuestionTable";
+import { FormQuestionTable } from "./util/FormQuestionTable";
 
 interface Props {
   formQuestion: any;

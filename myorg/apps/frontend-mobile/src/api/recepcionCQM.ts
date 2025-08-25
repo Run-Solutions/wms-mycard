@@ -98,6 +98,15 @@ export interface EmpalmePayload {
     validar_inlays: string;
   };
 }
+export interface LaminacionPayload {
+  form_answer_id: number;
+  checkboxes: { question_id: number }[];
+  extra_data: {
+    prueba_over: string;
+    prueba_cinta_magnetica: string;
+    prueba_centro: string;
+  };
+}
   
 export const submitExtraImpresion = async (payload: ImpresionPayload): Promise<boolean> => {
     try {
@@ -126,9 +135,9 @@ export const submitExtraEmpalme = async (payload: EmpalmePayload): Promise<boole
       throw new Error('Error al liberar el producto.');
     }
 };
-export const submitExtraLaminacion = async (payload: CQMPayload): Promise<boolean> => {
+export const submitExtraLaminacion = async (payload: LaminacionPayload): Promise<boolean> => {
     try {
-      const res = await API.post('/free-order-cqm/form-extra-seri', payload);
+      const res = await API.post('/free-order-cqm/form-extra-laminacion', payload);
       return res.status === 200;
     } catch (error: any) {
       console.error('Error en submitExtraLaminacion:', error?.response?.data || error.message);

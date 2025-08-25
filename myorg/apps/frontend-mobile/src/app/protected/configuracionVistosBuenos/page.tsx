@@ -11,7 +11,7 @@ import {
   TouchableWithoutFeedback,
 } from 'react-native';
 import { getConfigVistosBuenos } from '../../../api/configVistosBuenos';
-import ConfiguracionVistosBuenosOption from '../../../components/ConfiguracionVistosBuenos/ConfiguracionVistosBuenosOption';
+import ConfiguracionVistosBuenosOption from '../../../components/ConfiguracionVistosBuenos/util/ConfiguracionVistosBuenosOption';
 
 interface FormQuestion {
   id: number;

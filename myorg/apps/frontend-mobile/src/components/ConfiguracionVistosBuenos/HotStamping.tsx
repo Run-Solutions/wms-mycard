@@ -1,18 +1,24 @@
 import React, { useState } from 'react';
 import { View, Text, Alert, StyleSheet, Pressable, Modal } from 'react-native';
 import { TextInput } from 'react-native-paper';
-import QuestionTable from './QuestionTable';
-import { deleteFormQuestion, updateFormQuestion } from '../../api/configVistosBuenos';
+import {
+  deleteFormQuestion,
+  updateFormQuestion,
+} from '../../api/configVistosBuenos';
+import { AdvancedQuestionTable } from './util/FormQuestionTable';
 
-interface Props {
-  formQuestion: any;
+interface Area {
+  id: number;
+  name: string;
 }
-
 interface Question {
   id: number;
   title: string;
   role_id: number | null;
-  areas: { id: number }[];
+  areas: Area[];
+}
+interface Props {
+  formQuestion: Question[];
 }
 
 export default function HotStampingComponent({ formQuestion }: Props) {
@@ -24,10 +30,12 @@ export default function HotStampingComponent({ formQuestion }: Props) {
   const handleUpdateTitle = async (id: number, updatedTitle: string) => {
     const currentTitle = formQuestions.find((q) => q.id === id)?.title;
     if (currentTitle === updatedTitle) {
-      Alert.alert("El título no ha cambiado.");
+      Alert.alert('El título no ha cambiado.');
       return;
     }
-    const updated = formQuestions.map((q) => q.id === id ? { ...q, title: updatedTitle } : q);
+    const updated = formQuestions.map((q) =>
+      q.id === id ? { ...q, title: updatedTitle } : q
+    );
     setFormQuestions(updated);
     setEditingId(null);
 
@@ -37,7 +45,7 @@ export default function HotStampingComponent({ formQuestion }: Props) {
   const handleDeleteQuestion = async (id: number) => {
     const res = await deleteFormQuestion(id);
     if (res) {
-      const updated = formQuestions.filter(q => q.id !== id);
+      const updated = formQuestions.filter((q) => q.id !== id);
       setFormQuestions(updated);
       setDeletingId(null);
     }
@@ -46,18 +54,26 @@ export default function HotStampingComponent({ formQuestion }: Props) {
     <View style={styles.container}>
       <Text style={styles.title}>Área a evaluar: Hot Stamping</Text>
 
-
-      <QuestionTable
-        title='Respuestas del operador'
-        questions={formQuestions}
+      <AdvancedQuestionTable
+        title="Respuestas del operador"
+        formQuestions={formQuestions}
         areaId={8}
-        roleFilter={null}
-        onEdit={(e) => { setEditingId(e.id); setNewTitle(e.title) }}
-        onDelete={(e) => setDeletingId(e)}
+        roleId={null}
+        onEdit={(id, title) => {
+          setEditingId(id);
+          setNewTitle(title ?? '');
+        }}
+        onDelete={(id) => setDeletingId(id)}
       />
 
       <Text style={styles.label}>Color Foil:</Text>
-      <TextInput style={styles.input} theme={{ roundness: 30 }} mode="outlined" activeOutlineColor="#000" editable={false} />
+      <TextInput
+        style={styles.input}
+        theme={{ roundness: 30 }}
+        mode="outlined"
+        activeOutlineColor="#000"
+        editable={false}
+      />
 
       <Text style={styles.label}>Revisar Posicion Vs Ot</Text>
       <View style={styles.radioGroup}>
@@ -71,55 +87,81 @@ export default function HotStampingComponent({ formQuestion }: Props) {
       </View>
 
       <Text style={styles.label}>Muestras entregadas:</Text>
-      <TextInput style={styles.input} theme={{ roundness: 30 }} mode="outlined" activeOutlineColor="#000" editable={false} />
-
-
-      <QuestionTable
-        title='Mis respuestas'
-        questions={formQuestions}
-        areaId={8}
-        roleFilter={3}
-        onEdit={(e) => { setEditingId(e.id); setNewTitle(e.title) }}
-        onDelete={(e) => setDeletingId(e)}
+      <TextInput
+        style={styles.input}
+        theme={{ roundness: 30 }}
+        mode="outlined"
+        activeOutlineColor="#000"
+        editable={false}
       />
-      
 
+      <AdvancedQuestionTable
+        title="Mis respuestas"
+        formQuestions={formQuestions}
+        areaId={8}
+        roleId={3}
+        onEdit={(id, title) => {
+          setEditingId(id);
+          setNewTitle(title ?? '');
+        }}
+        onDelete={(id) => setDeletingId(id)}
+      />
 
-        {/* Edit Modal */}
-        <Modal visible={editingId !== null} transparent animationType="fade">
-          <View style={styles.modalOverlay}>
-            <View style={styles.modalBox}>
-              <Text style={styles.modalTitle}>Editar Pregunta</Text>
-              <TextInput
-                value={newTitle}
-                onChangeText={setNewTitle}
-                style={styles.input}
-                theme={{ roundness: 30 }}
-                mode="outlined"
-                activeOutlineColor="#000"
-                placeholder="Nuevo título"
-              />
-              <View style={styles.modalButtons}>
-                <Pressable onPress={() => setEditingId(null)} style={styles.cancelButton}><Text>Cancelar</Text></Pressable>
-                <Pressable onPress={() => handleUpdateTitle(editingId!, newTitle)} style={styles.saveButton}><Text>Guardar</Text></Pressable>
-              </View>
+      {/* Edit Modal */}
+      <Modal visible={editingId !== null} transparent animationType="fade">
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalBox}>
+            <Text style={styles.modalTitle}>Editar Pregunta</Text>
+            <TextInput
+              value={newTitle}
+              onChangeText={setNewTitle}
+              style={styles.input}
+              theme={{ roundness: 30 }}
+              mode="outlined"
+              activeOutlineColor="#000"
+              placeholder="Nuevo título"
+            />
+            <View style={styles.modalButtons}>
+              <Pressable
+                onPress={() => setEditingId(null)}
+                style={styles.cancelButton}
+              >
+                <Text>Cancelar</Text>
+              </Pressable>
+              <Pressable
+                onPress={() => handleUpdateTitle(editingId!, newTitle)}
+                style={styles.saveButton}
+              >
+                <Text>Guardar</Text>
+              </Pressable>
             </View>
           </View>
-        </Modal>
+        </View>
+      </Modal>
 
-        {/* Delete Modal */}
-        <Modal visible={deletingId !== null} transparent animationType="fade">
-          <View style={styles.modalOverlay}>
-            <View style={styles.modalBox}>
-              <Text style={styles.modalTitle}>¿Eliminar esta pregunta?</Text>
-              <Text>Esta acción no se puede deshacer.</Text>
-              <View style={styles.modalButtons}>
-                <Pressable onPress={() => setDeletingId(null)} style={styles.cancelButton}><Text>Cancelar</Text></Pressable>
-                <Pressable onPress={() => handleDeleteQuestion(deletingId!)} style={styles.deleteButton}><Text>Eliminar</Text></Pressable>
-              </View>
+      {/* Delete Modal */}
+      <Modal visible={deletingId !== null} transparent animationType="fade">
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalBox}>
+            <Text style={styles.modalTitle}>¿Eliminar esta pregunta?</Text>
+            <Text>Esta acción no se puede deshacer.</Text>
+            <View style={styles.modalButtons}>
+              <Pressable
+                onPress={() => setDeletingId(null)}
+                style={styles.cancelButton}
+              >
+                <Text>Cancelar</Text>
+              </Pressable>
+              <Pressable
+                onPress={() => handleDeleteQuestion(deletingId!)}
+                style={styles.deleteButton}
+              >
+                <Text>Eliminar</Text>
+              </Pressable>
             </View>
           </View>
-        </Modal>
+        </View>
+      </Modal>
     </View>
   );
 }
@@ -131,7 +173,12 @@ const styles = StyleSheet.create({
   },
   title: { fontSize: 20, fontWeight: 'bold', marginBottom: 16 },
   section: { fontSize: 16, fontWeight: '600', marginTop: 20 },
-  row: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginVertical: 8 },
+  row: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginVertical: 8,
+  },
   question: { flex: 1 },
   actions: { flexDirection: 'row', marginLeft: 8 },
   input: {
@@ -142,7 +189,11 @@ const styles = StyleSheet.create({
     backgroundColor: '#fff',
   },
   modal: { backgroundColor: 'white', padding: 20, margin: 20, borderRadius: 8 },
-  modalActions: { flexDirection: 'row', justifyContent: 'space-around', marginTop: 16 },
+  modalActions: {
+    flexDirection: 'row',
+    justifyContent: 'space-around',
+    marginTop: 16,
+  },
   modalButtons: {
     flexDirection: 'row',
     justifyContent: 'space-around',

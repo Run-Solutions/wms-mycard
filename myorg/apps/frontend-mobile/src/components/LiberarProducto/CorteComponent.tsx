@@ -22,6 +22,7 @@ import { useAuth } from '../../contexts/AuthContext';
 import { calcularCantidadPorLiberar } from './util/calcularCantidadPorLiberar';
 import BadQuantityModal from './util/BadQuantityModal';
 import { AreaData } from './PersonalizacionComponent';
+import SelectionQuestionTable from './util/FormQuestionTable';
 
 interface PartialRelease {
   validated: boolean;
@@ -38,7 +39,6 @@ const CorteComponent = ({ workOrder }: { workOrder: any }) => {
   const [comments, setComments] = useState('');
   const [showCqmModal, setShowCqmModal] = useState(false);
   const [showConfirm, setShowConfirm] = useState(false);
-  const [checkedQuestion, setCheckedQuestion] = useState<number[]>([]);
   const [showQuality, setShowQuality] = useState<boolean>(false);
   const [showBadQuantity, setShowBadQuantity] = useState(false);
   const [areaBadQuantities, setAreaBadQuantities] = useState<{
@@ -47,12 +47,32 @@ const CorteComponent = ({ workOrder }: { workOrder: any }) => {
   const [materialBadQuantity, setMaterialBadQuantity] = useState<string>('0');
   const [lastAreaBadQuantity, setLastBadQuantity] = useState<string>('0');
 
-  const questions =
-    workOrder.area.formQuestions?.filter((q: any) => q.role_id === null) || [];
-  const qualityQuestions =
-    workOrder.area.formQuestions?.filter((q: any) => q.role_id === 3) || [];
   const isDisabled = workOrder.status === 'En proceso';
+  // Una sola fuente de verdad: por pregunta guarda true (OK), false (NG) o undefined (sin respuesta)
+  const [answersByQuestion, setAnswersByQuestion] = useState<
+    Record<number, boolean | undefined>
+  >({});
 
+  // Preguntas visibles en la tabla (mismo filtro que pasas al child con roleId=null)
+  const visibleQuestions =
+    workOrder.area.formQuestions?.filter((q: any) => q.role_id === null) ?? [];
+
+  // Listas derivadas para el componente de tabla (no se guardan aparte)
+  const checkedRespuestaOK = useMemo(
+    () =>
+      visibleQuestions
+        .filter((q: any) => answersByQuestion[q.id] === true)
+        .map((q: any) => q.id),
+    [visibleQuestions, answersByQuestion]
+  );
+
+  const checkedRespuestaNG = useMemo(
+    () =>
+      visibleQuestions
+        .filter((q: any) => answersByQuestion[q.id] === false)
+        .map((q: any) => q.id),
+    [visibleQuestions, answersByQuestion]
+  );
   const { user } = useAuth();
   const currentUserId = user?.sub;
   const flowList = [...workOrder.workOrder.flow];
@@ -101,23 +121,28 @@ const CorteComponent = ({ workOrder }: { workOrder: any }) => {
       Alert.alert('Cantidad de muestra inválida');
       return;
     }
-    const isFrenteVueltaValid =
-      checkedQuestion.length > 0 || checkedQuestion.length > 0;
-    if (!questions.length || !isFrenteVueltaValid) {
+    // Construir arrays Alineados según el ORDEN de visibleQuestions
+    const question_id: number[] = [];
+    const response: boolean[] = [];
+    visibleQuestions.forEach((q: any) => {
+      const ans = answersByQuestion[q.id];
+      if (ans !== undefined) {
+        question_id.push(q.id);
+        response.push(!!ans);
+      }
+    });
+    // Exigir todas respondidas (o ajusta a tu regla)
+    if (question_id.length !== visibleQuestions.length) {
       Alert.alert('Completa todas las preguntas y cantidad de muestra.');
       return;
     }
 
-    const answeredQuestions = questions.filter((q: any) =>
-      checkedQuestion.includes(q.id)
-    );
-
     const payload = {
-      question_id: answeredQuestions.map((q: any) => q.id),
+      question_id,
       work_order_flow_id: currentFlow.id,
       work_order_id: currentFlow.workOrder.id,
       area_id: currentFlow.area.id,
-      response: answeredQuestions.map(() => true), // todas las marcadas son true
+      response,
       reviewed: false,
       user_id: currentFlow.assigned_user,
       sample_quantity: Number(sampleQuantity),
@@ -448,6 +473,30 @@ const CorteComponent = ({ workOrder }: { workOrder: any }) => {
       isNextInvalid
     );
   };
+
+  const handleToggleRespuesta = (
+    questionId: number,
+    _columnIndex: number,
+    type: 'ok' | 'ng',
+    checked: boolean
+  ) => {
+    setAnswersByQuestion((prev) => {
+      const next = { ...prev };
+      if (checked) {
+        // marcar OK => true, NG => false (exclusivo)
+        next[questionId] = type === 'ok';
+      } else {
+        // si desmarcan la opción activa, borramos la respuesta
+        if (
+          (type === 'ok' && next[questionId] === true) ||
+          (type === 'ng' && next[questionId] === false)
+        ) {
+          delete next[questionId];
+        }
+      }
+      return next;
+    });
+  };
   const shouldDisableCQM = () => {
     const estadosBloqueadosBase = [
       'Enviado a CQM',
@@ -488,16 +537,6 @@ const CorteComponent = ({ workOrder }: { workOrder: any }) => {
   const disableLiberarButton = shouldDisableLiberar();
   const disableLiberarCQM = shouldDisableCQM();
   const isListo = workOrder.status === 'Listo';
-
-  const toggleCheckbox = (
-    id: number,
-    target: number[],
-    setter: React.Dispatch<React.SetStateAction<number[]>>
-  ) => {
-    setter(
-      target.includes(id) ? target.filter((i) => i !== id) : [...target, id]
-    );
-  };
 
   return (
     <ScrollView style={styles.container}>
@@ -642,37 +681,15 @@ const CorteComponent = ({ workOrder }: { workOrder: any }) => {
               Preguntas del Área: {workOrder.area.name}
             </Text>
 
-            {/* Encabezado estilo tabla */}
-            <View style={styles.tableHeader}>
-              <Text style={[styles.tableCell, { flex: 2 }]}>Pregunta</Text>
-              <Text style={styles.tableCell}>Respuesta</Text>
-            </View>
-
-            {/* Preguntas normales */}
-            {questions.map((q: any) => (
-              <View key={q.id} style={styles.tableRow}>
-                {/* Pregunta */}
-                <View style={[styles.tableCell, { flex: 2 }]}>
-                  <Text style={styles.questionText}>{q.title}</Text>
-                </View>
-
-                {/* Respuesta */}
-                <View
-                  style={[styles.tableCell, { flex: 1, alignItems: 'center' }]}
-                >
-                  <TouchableOpacity
-                    onPress={() =>
-                      toggleCheckbox(q.id, checkedQuestion, setCheckedQuestion)
-                    }
-                    style={styles.radioCircle}
-                  >
-                    {checkedQuestion.includes(q.id) && (
-                      <View style={styles.radioDot} />
-                    )}
-                  </TouchableOpacity>
-                </View>
-              </View>
-            ))}
+            <SelectionQuestionTable
+              formQuestions={workOrder.area.formQuestions}
+              roleId={null}
+              columns={['Respuesta']}
+              checkedQuestions={[
+                { ok: checkedRespuestaOK, ng: checkedRespuestaNG },
+              ]}
+              onToggle={handleToggleRespuesta}
+            />
 
             {/* Muestras */}
             <Text style={styles.label}>Muestras:</Text>
@@ -699,11 +716,16 @@ const CorteComponent = ({ workOrder }: { workOrder: any }) => {
 
             {showQuality && (
               <>
-                {qualityQuestions.map((q: any) => (
-                  <View key={q.id} style={styles.qualityRow}>
-                    <Text style={styles.qualityQuestion}>{q.title}</Text>
-                  </View>
-                ))}
+                <SelectionQuestionTable
+                  formQuestions={workOrder.area.formQuestions}
+                  roleId={3}
+                  columns={['Respuesta']}
+                  checkedQuestions={[
+                    { ok: checkedRespuestaOK, ng: checkedRespuestaNG },
+                  ]}
+                  readOnly={true}
+                  onToggle={handleToggleRespuesta}
+                />
               </>
             )}
 

@@ -9,7 +9,7 @@ import {
 } from '@/api/liberarProducto';
 import { useAuthContext } from '@/context/AuthContext';
 import { calcularCantidadPorLiberar } from './util/calcularCantidadPorLiberar';
-
+import SelectionQuestionTable from './util/FormQuestionTable';
 interface Props {
   workOrder: any;
 }
@@ -24,6 +24,12 @@ export default function ImpresionComponent({ workOrder }: Props) {
   const isDisabled = workOrder.status === 'En proceso';
   // Para mostrar formulario de CQM y enviarlo
   const [showModal, setShowModal] = useState(false);
+  const [checkedFrenteOK, setCheckedFrenteOK] = useState<number[]>([]);
+  const [checkedFrenteNG, setCheckedFrenteNG] = useState<number[]>([]);
+
+  // ✅ Vuelta
+  const [checkedVueltaOK, setCheckedVueltaOK] = useState<number[]>([]);
+  const [checkedVueltaNG, setCheckedVueltaNG] = useState<number[]>([]);
   const openModal = () => {
     setShowModal(true);
   };
@@ -119,6 +125,49 @@ export default function ImpresionComponent({ workOrder }: Props) {
   ) => {
     handleCheckboxChange(questionId, isChecked, setCheckedQuestionsVuelta);
   };
+  const handleToggleFrenteVuelta = (
+    questionId: number,
+    columnIndex: number, // 0 = Frente, 1 = Vuelta
+    type: 'ok' | 'ng',
+    checked: boolean
+  ) => {
+    if (columnIndex === 0) {
+      // FRENTE
+      if (type === 'ok') {
+        setCheckedFrenteOK((prev) =>
+          checked
+            ? Array.from(new Set([...prev, questionId]))
+            : prev.filter((id) => id !== questionId)
+        );
+        // Quita la contraria en el mismo tick
+        setCheckedFrenteNG((prev) => prev.filter((id) => id !== questionId));
+      } else {
+        setCheckedFrenteNG((prev) =>
+          checked
+            ? Array.from(new Set([...prev, questionId]))
+            : prev.filter((id) => id !== questionId)
+        );
+        setCheckedFrenteOK((prev) => prev.filter((id) => id !== questionId));
+      }
+    } else {
+      // VUELTA
+      if (type === 'ok') {
+        setCheckedVueltaOK((prev) =>
+          checked
+            ? Array.from(new Set([...prev, questionId]))
+            : prev.filter((id) => id !== questionId)
+        );
+        setCheckedVueltaNG((prev) => prev.filter((id) => id !== questionId));
+      } else {
+        setCheckedVueltaNG((prev) =>
+          checked
+            ? Array.from(new Set([...prev, questionId]))
+            : prev.filter((id) => id !== questionId)
+        );
+        setCheckedVueltaOK((prev) => prev.filter((id) => id !== questionId));
+      }
+    }
+  };
 
   // Para ver las preguntas de calidad
   const [questionsOpen, setQuestionsOpen] = useState(false);
@@ -176,40 +225,64 @@ export default function ImpresionComponent({ workOrder }: Props) {
 
   // Para mandar la OT a evaluacion por CQM
   const handleSubmit = async () => {
-    const questions = workOrder.area.formQuestions.filter(
-      (q: any) => q.role_id === null
-    );
-    const flowId = currentFlow.id;
+    // 0) Validar muestras
     const numValue = Number(sampleQuantity);
     if (isNaN(numValue) || !Number.isInteger(numValue) || numValue < 0) {
       alert('Por favor, ingresa una cantidad de muestra válida.');
       return;
     }
-    if (checkedQuestionsFrente.length === 0) {
-      alert('Por favor, selecciona al menos una respuesta antes de enviar.');
-      return;
+
+    // 1) Preguntas VISIBLES (mismo criterio que tu tabla)
+    const visibleQuestions = (workOrder.area.formQuestions ?? [])
+      // .slice(ini, fin) // <-- si tu tabla usa slice, aplícalo aquí
+      .filter((q: any) => q.role_id === null);
+
+    // 2) Helper: estado por columna (0=Frente, 1=Vuelta)
+    const getAnswerFor = (
+      qid: number,
+      colIndex: number
+    ): boolean | undefined => {
+      if (colIndex === 0) {
+        if (checkedFrenteOK.includes(qid)) return true;
+        if (checkedFrenteNG.includes(qid)) return false;
+        return undefined;
+      } else {
+        if (checkedVueltaOK.includes(qid)) return true;
+        if (checkedVueltaNG.includes(qid)) return false;
+        return undefined;
+      }
+    };
+
+    // 3) Construcción estricta + validación de "todas respondidas"
+    const question_id: number[] = [];
+    const frente: boolean[] = [];
+    const vuelta: boolean[] = [];
+
+    for (const q of visibleQuestions) {
+      const a0 = getAnswerFor(q.id, 0);
+      const a1 = getAnswerFor(q.id, 1);
+      if (a0 === undefined || a1 === undefined) {
+        alert('Completa todas las preguntas y cantidad de muestra.');
+        return;
+      }
+      question_id.push(q.id);
+      frente.push(a0);
+      vuelta.push(a1);
     }
+
+    // 4) Payload sólo con visibles
     const payload = {
-      question_id: questions.map((q: any) => q.id),
-      work_order_flow_id: flowId,
+      question_id,
+      work_order_flow_id: currentFlow.id,
       work_order_id: currentFlow.workOrder.id,
       area_id: currentFlow.area.id,
-      frente: questions.map((q: any) => checkedQuestionsFrente.includes(q.id)),
-      vuelta: questions.map((q: any) => checkedQuestionsVuelta.includes(q.id)),
+      frente,
+      vuelta,
       reviewed: false,
       user_id: currentFlow.assigned_user,
       sample_quantity: Number(sampleQuantity),
     };
-    const isFrenteVueltaValid =
-      payload.frente.includes(true) || payload.vuelta.includes(true);
-    // Validamos que no haya campos vacíos
-    const isPayloadEmpty = !payload.question_id.length || !isFrenteVueltaValid;
-    if (isPayloadEmpty) {
-      alert(
-        'Por favor, asegúrate de completar todas las preguntas, seleccionar al menos una respuesta en "Frente" o "Vuelta" y establecer la cantidad de muestra antes de enviar.'
-      );
-      return; // Evitamos el envío si los datos no son válidos
-    }
+
     try {
       await submitToCQMImpression(payload);
       router.push('/liberarProducto');
@@ -444,59 +517,16 @@ export default function ImpresionComponent({ workOrder }: Props) {
         <ModalOverlay>
           <ModalContent>
             <ModalTitle>Preguntas del Área: {workOrder.area.name}</ModalTitle>
-            <Table>
-              <thead>
-                <tr>
-                  <th>Pregunta</th>
-                  <th>
-                    <div style={{ display: 'flex', alignItems: 'center' }}>
-                      Hoja Frente
-                    </div>
-                  </th>
-                  <th>
-                    <div style={{ display: 'flex', alignItems: 'center' }}>
-                      Hoja Vuelta
-                    </div>
-                  </th>
-                </tr>
-              </thead>
-              <tbody>
-                {workOrder.area.formQuestions
-                  .filter(
-                    (question: { role_id: number | null }) =>
-                      question.role_id === null
-                  )
-                  .map((question: { id: number; title: string }) => (
-                    <tr key={question.id}>
-                      <td>{question.title}</td>
-                      <td>
-                        <input
-                          type="checkbox"
-                          checked={checkedQuestionsFrente.includes(question.id)}
-                          onChange={(e) =>
-                            handleCheckboxChangeFrente(
-                              question.id,
-                              e.target.checked
-                            )
-                          }
-                        />
-                      </td>
-                      <td>
-                        <input
-                          type="checkbox"
-                          checked={checkedQuestionsVuelta.includes(question.id)}
-                          onChange={(e) =>
-                            handleCheckboxChangeVuelta(
-                              question.id,
-                              e.target.checked
-                            )
-                          }
-                        />
-                      </td>
-                    </tr>
-                  ))}
-              </tbody>
-            </Table>
+            <SelectionQuestionTable
+              formQuestions={workOrder.area.formQuestions}
+              roleId={null} // Calidad
+              columns={['Hoja Frente', 'Hoja Vuelta']}
+              checkedQuestions={[
+                { ok: checkedFrenteOK, ng: checkedFrenteNG },
+                { ok: checkedVueltaOK, ng: checkedVueltaNG },
+              ]}
+              onToggle={handleToggleFrenteVuelta}
+            />
             <InputGroup style={{ paddingTop: '30px' }}>
               <Label>Muestras:</Label>
               <Input
@@ -523,41 +553,18 @@ export default function ImpresionComponent({ workOrder }: Props) {
             </ModalTitle>
             {qualitySectionOpen && (
               <>
-                <Table>
-                  <thead>
-                    <tr>
-                      <th>Pregunta</th>
-                      <th>
-                        <button
-                          onClick={toggleQuestions}
-                          style={{
-                            marginLeft: '8px',
-                            cursor: 'pointer',
-                            border: 'none',
-                            background: 'transparent',
-                          }}
-                        >
-                          {questionsOpen ? '▼' : '▶'}
-                        </button>
-                      </th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {questionsOpen &&
-                      workOrder.area.formQuestions
-                        .filter(
-                          (question: { role_id: number | null }) =>
-                            question.role_id === 3
-                        )
-                        .map((question: { id: number; title: string }) => (
-                          <tr key={question.id}>
-                            <td>{question.title}</td>
-                            <td></td>
-                          </tr>
-                        ))}
-                  </tbody>
-                </Table>
-                <SectionTitle>Tipo de Prueba</SectionTitle>
+                <SelectionQuestionTable
+                  formQuestions={workOrder.area.formQuestions}
+                  roleId={3} // Calidad
+                  columns={[]}
+                  checkedQuestions={[
+                    { ok: checkedFrenteOK, ng: checkedFrenteNG },
+                    { ok: checkedVueltaOK, ng: checkedVueltaNG },
+                  ]}
+                  onToggle={() => {}} // no hace nada
+                  readOnly // <- nuevo prop para deshabilitar
+                />
+                <SectionTitle>Tonos y/o Densidades Contra</SectionTitle>
                 <RadioGroup>
                   <RadioLabel>
                     <Radio type="radio" name="prueba" value="color" disabled />
