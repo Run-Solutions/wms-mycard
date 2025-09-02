@@ -6,76 +6,40 @@ import styled from 'styled-components';
 import { submitExtraImpresion, sendInconformidadCQM } from '@/api/recepcionCQM';
 import { OperatorAdvancedTable } from './util/QuestionTable';
 import SelectionQuestionTable from './util/FormQuestionTable';
+import { WorkOrderHojasInfo } from './util/WorkOrderInfo';
+
 interface Props {
   workOrder: any;
 }
 type Answer = {
   reviewed: boolean;
   sample_quantity: number;
-  // lo que más tenga...
+  id?: number;
+  FormAnswerResponse?: any[];
 };
 
 export default function ImpresionComponent({ workOrder }: Props) {
   const router = useRouter();
+
   const [testTypes, SetTestTypes] = useState('');
   const [showInconformidad, setShowInconformidad] = useState(false);
   const [inconformidad, setInconformidad] = useState<string>('');
   const [checkedFrenteOK, setCheckedFrenteOK] = useState<number[]>([]);
   const [checkedFrenteNG, setCheckedFrenteNG] = useState<number[]>([]);
-
-  // ✅ Vuelta
   const [checkedVueltaOK, setCheckedVueltaOK] = useState<number[]>([]);
   const [checkedVueltaNG, setCheckedVueltaNG] = useState<number[]>([]);
+  const [showConfirmModal, setShowConfirmModal] = useState(false);
 
-  // Obtener todos los índices de respuestas no revisadas
+  // Último FormAnswer NO revisado
   const index = workOrder?.answers
     ?.map((a: Answer, i: number) => ({ ...a, index: i }))
     .reverse()
     .find((a: Answer) => a.reviewed === false)?.index;
-  console.log('el index', index);
 
-  const [showConfirmModal, setShowConfirmModal] = useState(false);
+  const currentAnswer: Answer | undefined =
+    typeof index === 'number' ? workOrder?.answers?.[index] : undefined;
+  const formQuestions = workOrder?.area?.formQuestions ?? [];
 
-  //Para guardar las respuestas
-  const [responses, setResponses] = useState<
-    { questionId: number; answer: boolean }[]
-  >(
-    workOrder.area.formQuestions
-      .filter((question: { role_id: number | null }) => question.role_id === 3)
-      .map((question: { id: number }) => ({
-        questionId: question.id,
-        answer: false,
-      }))
-  );
-
-  // Para controlar qué preguntas están marcadas
-  const [checkedQuestionsFrente, setCheckedQuestionsFrente] = useState<
-    number[]
-  >([]);
-  const [checkedQuestionsVuelta, setCheckedQuestionsVuelta] = useState<
-    number[]
-  >([]);
-  const [checkedQuestions, setCheckedQuestions] = useState<number[]>([]);
-
-  const handleCheckboxChange = (
-    questionId: number,
-    isChecked: boolean,
-    setCheckedQuestions: React.Dispatch<React.SetStateAction<number[]>>
-  ) => {
-    setResponses((prevResponses) => {
-      const updateResponses = prevResponses.filter(
-        (response) => response.questionId !== questionId
-      );
-      if (isChecked) {
-        updateResponses.push({ questionId, answer: isChecked });
-      }
-      return updateResponses;
-    });
-
-    setCheckedQuestions((prev) =>
-      isChecked ? [...prev, questionId] : prev.filter((id) => id !== questionId)
-    );
-  };
   const handleToggleFrenteVuelta = (
     questionId: number,
     columnIndex: number, // 0 = Frente, 1 = Vuelta
@@ -90,7 +54,6 @@ export default function ImpresionComponent({ workOrder }: Props) {
             ? Array.from(new Set([...prev, questionId]))
             : prev.filter((id) => id !== questionId)
         );
-        // Quita la contraria en el mismo tick
         setCheckedFrenteNG((prev) => prev.filter((id) => id !== questionId));
       } else {
         setCheckedFrenteNG((prev) =>
@@ -120,55 +83,62 @@ export default function ImpresionComponent({ workOrder }: Props) {
     }
   };
 
-  // Uso:
-  const handleCheckboxChangeFrente = (
-    questionId: number,
-    isChecked: boolean
-  ) => {
-    handleCheckboxChange(questionId, isChecked, setCheckedQuestionsFrente);
-  };
-
-  const handleCheckboxChangeVuelta = (
-    questionId: number,
-    isChecked: boolean
-  ) => {
-    handleCheckboxChange(questionId, isChecked, setCheckedQuestionsVuelta);
-  };
-
   const handleSubmit = async () => {
-    const formAnswerId = workOrder.answers[index]?.id;
+    const formAnswerId = currentAnswer?.id;
     if (!formAnswerId) {
       alert('No se encontró el ID del formulario.');
       return;
     }
-    // Preguntas con role_id 3
-    const questions = workOrder.area.formQuestions.filter(
+    // 1) Preguntas VISIBLES
+    const visibleQuestions = (workOrder.area.formQuestions ?? []).filter(
       (q: any) => q.role_id === 3
     );
-    // --- NUEVA construcción de respuestas usando tus estados OK/NG ---
-    // 1) Si hay algún NG marcado, no permitimos "Aprobado"
 
-    // 2) Construye payloads SOLO con OK (formato { question_id })
-    const frentePayload = checkedFrenteOK.map((id) => ({ question_id: id }));
-    const vueltaPayload = checkedVueltaOK.map((id) => ({ question_id: id }));
+    // 2) Helper: estado por columna (0 = Frente, 1 = Vuelta)
+    const getAnswerFor = (
+      qid: number,
+      colIndex: number
+    ): boolean | undefined => {
+      if (colIndex === 0) {
+        if (checkedFrenteOK.includes(qid)) return true;
+        if (checkedFrenteNG.includes(qid)) return false;
+        return undefined;
+      } else {
+        if (checkedVueltaOK.includes(qid)) return true;
+        if (checkedVueltaNG.includes(qid)) return false;
+        return undefined;
+      }
+    };
 
-    // 3) Valida que haya al menos un OK en cualquier lado
-    if (frentePayload.length === 0 && vueltaPayload.length === 0) {
-      alert('Selecciona al menos un OK en Frente o Vuelta para aprobar.');
-      return;
+    // 3) Validar que TODAS las visibles tengan selección en ambas columnas
+    for (const q of visibleQuestions) {
+      const a0 = getAnswerFor(q.id, 0);
+      const a1 = getAnswerFor(q.id, 1);
+      if (a0 === undefined || a1 === undefined) {
+        alert('Completa todas las preguntas y cantidad de muestra.');
+        return;
+      }
     }
-    // Payload final
+
+    // 4) Construir payload que el tipo espera:
+    //    frente/vuelta = SOLO ids con respuesta OK en cada columna
+    const frente = visibleQuestions
+      .filter((q: any) => getAnswerFor(q.id, 0) === true)
+      .map((q: any) => ({ question_id: q.id }));
+
+    const vuelta = visibleQuestions
+      .filter((q: any) => getAnswerFor(q.id, 1) === true)
+      .map((q: any) => ({ question_id: q.id }));
+
     const payload = {
       form_answer_id: formAnswerId,
-      frente: frentePayload,
-      vuelta: vueltaPayload,
-      radio: {
-        value: testTypes,
-      },
+      frente: frente,
+      vuelta: vuelta,
+      radio: { value: testTypes },
     };
-    console.log('Payload a enviar:', payload);
+
     try {
-      const res = await submitExtraImpresion(payload);
+      await submitExtraImpresion(payload);
       router.push('/liberacionDeVistosBuenos');
     } catch (error) {
       console.log('Error al guardar la respuesta: ', error);
@@ -181,7 +151,7 @@ export default function ImpresionComponent({ workOrder }: Props) {
       return;
     }
     try {
-      const res = await sendInconformidadCQM(workOrder.id, inconformidad);
+      await sendInconformidadCQM(workOrder?.id, inconformidad);
       router.push('/liberacionDeVistosBuenos');
     } catch (error) {
       console.error(error);
@@ -189,49 +159,35 @@ export default function ImpresionComponent({ workOrder }: Props) {
     }
   };
 
-  const cantidadHojasRaw = Number(workOrder?.workOrder.quantity) / 24;
-  const cantidadHojas = cantidadHojasRaw > 0 ? Math.ceil(cantidadHojasRaw) : 0;
+  // Si no hay respuesta pendiente
+  if (!currentAnswer) {
+    return (
+      <Container>
+        <Title>Área a evaluar: Impresion</Title>
+        <WorkOrderHojasInfo workOrder={workOrder} />
+        <NewData>
+          <SectionTitle>No hay respuestas pendientes por revisar</SectionTitle>
+          <p style={{ color: '#6b7280' }}>
+            Todas las respuestas parecen estar revisadas.
+          </p>
+        </NewData>
+      </Container>
+    );
+  }
 
   return (
     <Container>
       <Title>Área a evaluar: Impresion</Title>
 
-      <DataWrapper>
-        <InfoItem>
-          <Label>Número de Orden:</Label>
-          <Value>{workOrder.workOrder.ot_id}</Value>
-        </InfoItem>
-        <InfoItem>
-          <Label>ID del Presupuesto:</Label>
-          <Value>{workOrder.workOrder.mycard_id}</Value>
-        </InfoItem>
-        <InfoItem>
-          <Label>Cantidad (TARJETAS):</Label>
-          <Value>{workOrder.workOrder.quantity || 'No definida'}</Value>
-        </InfoItem>
-        <InfoItem style={{ backgroundColor: '#eaeaf5', borderRadius: '8px' }}>
-          <Label>Cantidad (Hojas Frente / Hojas Vuelta):</Label>
-          <Value>{cantidadHojas}</Value>
-        </InfoItem>
-      </DataWrapper>
-      <DataWrapper>
-        <InfoItem>
-          <Label>Operador:</Label>
-          <Value>{workOrder.user.username}</Value>
-        </InfoItem>
-        <InfoItem>
-          <Label>Comentarios:</Label>
-          <Value>{workOrder.workOrder.comments}</Value>
-        </InfoItem>
-      </DataWrapper>
+      <WorkOrderHojasInfo workOrder={workOrder} />
 
       <NewData>
         <SectionTitle>Respuestas del operador</SectionTitle>
         <NewDataWrapper>
           <OperatorAdvancedTable
-            questions={workOrder.area.formQuestions ?? []}
-            answers={workOrder.answers[index]?.FormAnswerResponse ?? []}
-            mode={'doble'}
+            questions={formQuestions}
+            answers={currentAnswer?.FormAnswerResponse ?? []}
+            mode="doble"
             readOnly
             columns={['Hoja Frente', 'Hoja Vuelta']}
           />
@@ -240,8 +196,8 @@ export default function ImpresionComponent({ workOrder }: Props) {
             <Input
               type="number"
               value={
-                workOrder?.answers[index].sample_quantity ??
-                'No se reconoce la muestra enviada'
+                currentAnswer?.sample_quantity ??
+                ('No se reconoce la muestra enviada' as any)
               }
               readOnly
             />
@@ -251,7 +207,7 @@ export default function ImpresionComponent({ workOrder }: Props) {
         <InputGroup>
           <SectionTitle>Mis respuestas</SectionTitle>
           <SelectionQuestionTable
-            formQuestions={workOrder.area.formQuestions}
+            formQuestions={formQuestions}
             roleId={3} // Calidad
             columns={['Hoja Frente', 'Hoja Vuelta']}
             checkedQuestions={[
@@ -260,6 +216,7 @@ export default function ImpresionComponent({ workOrder }: Props) {
             ]}
             onToggle={handleToggleFrenteVuelta}
           />
+
           <SectionTitle>Tonos y/o Densidades Contra</SectionTitle>
           <RadioGroup>
             <RadioLabel>
@@ -292,6 +249,7 @@ export default function ImpresionComponent({ workOrder }: Props) {
           </RadioGroup>
         </InputGroup>
       </NewData>
+
       <div style={{ display: 'flex', gap: '1rem' }}>
         <RechazarButton onClick={() => setShowInconformidad(true)}>
           Rechazar
@@ -300,6 +258,7 @@ export default function ImpresionComponent({ workOrder }: Props) {
           Aprobado
         </AceptarButton>
       </div>
+
       {showConfirmModal && (
         <ModalOverlay>
           <ModalContent>
@@ -323,6 +282,7 @@ export default function ImpresionComponent({ workOrder }: Props) {
           </ModalContent>
         </ModalOverlay>
       )}
+
       {showInconformidad && (
         <ModalOverlay>
           <ModalBox>
@@ -372,12 +332,11 @@ export default function ImpresionComponent({ workOrder }: Props) {
 // =================== Styled Components ===================
 
 const Container = styled.div`
-  background: white;
   padding: 2rem;
   margin-top: 1.5rem;
   border-radius: 1rem;
   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
-  max-width: 800px;
+  max-width: 1000px;
   margin-left: auto;
   margin-right: auto;
 `;
@@ -398,27 +357,10 @@ const SectionTitle = styled.h3`
   color: #374151;
 `;
 
-const DataWrapper = styled.div`
-  display: flex;
-  flex-wrap: wrap;
-`;
-
-const InfoItem = styled.div`
-  flex: 1;
-  padding: 5px;
-  min-width: 150px;
-`;
-
 const Label = styled.label`
   font-weight: 600;
   color: #6b7280;
   width: 50%;
-`;
-
-const Value = styled.div`
-  margin-top: 0.25rem;
-  font-weight: 500;
-  color: #111827;
 `;
 
 const NewDataWrapper = styled.div`
@@ -441,7 +383,6 @@ const Input = styled.input`
   outline: none;
   font-size: 1rem;
   transition: border 0.3s;
-
   &:focus {
     border-color: #0038a8;
   }
@@ -474,7 +415,6 @@ const Textarea = styled.textarea`
   margin-top: 0.5rem;
   font-size: 1rem;
   resize: vertical;
-
   &:focus {
     border-color: #0038a8;
     outline: none;
@@ -491,9 +431,7 @@ const AceptarButton = styled.button<{ disabled?: boolean }>`
   display: flex;
   border: none;
   cursor: pointer;
-
   transition: background-color 0.3s ease, color 0.3s ease;
-
   &:hover {
     background-color: #1d4ed8;
     outline: none;
@@ -510,29 +448,10 @@ const RechazarButton = styled.button<{ disabled?: boolean }>`
   display: block;
   border: none;
   cursor: pointer;
-
   transition: background-color 0.3s ease, color 0.3s ease;
-
   &:hover {
     background-color: #a0a0a0;
     outline: none;
-  }
-`;
-
-const Table = styled.table`
-  width: 100%;
-  border-collapse: collapse;
-  color: black;
-  th,
-  td {
-    padding: 0.75rem;
-    text-align: left;
-    border-bottom: 1px solid #e5e7eb;
-  }
-
-  th {
-    background-color: #f3f4f6;
-    color: #374151;
   }
 `;
 
@@ -575,7 +494,6 @@ const Button = styled.button`
   border: none;
   border-radius: 8px;
   cursor: pointer;
-
   &:hover {
     background-color: #005bb5;
   }
@@ -596,12 +514,9 @@ const ConfirmButton = styled.button`
   padding: 0.5rem 1.5rem;
   border-radius: 0.5rem;
   font-weight: 600;
-
   border: none;
   cursor: pointer;
-
   transition: background-color 0.3s ease, color 0.3s ease;
-
   &:hover,
   &:focus {
     background-color: #1e40af;
@@ -615,12 +530,9 @@ const CancelButton = styled.button`
   padding: 0.5rem 1.5rem;
   border-radius: 0.5rem;
   font-weight: 600;
-
   border: none;
   cursor: pointer;
-
   transition: background-color 0.3s ease, color 0.3s ease;
-
   &:hover,
   &:focus {
     background-color: #a0a0a0;

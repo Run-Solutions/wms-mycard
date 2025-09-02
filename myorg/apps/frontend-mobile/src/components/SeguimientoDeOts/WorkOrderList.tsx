@@ -1,5 +1,5 @@
 // src/components/SeguimientoDeOts/MobileWorkOrderList.tsx
-"use client";
+'use client';
 
 import React from 'react';
 import { TouchableOpacity } from 'react-native';
@@ -10,7 +10,10 @@ import * as FileSystem from 'expo-file-system';
 import { Buffer } from 'buffer';
 import FileViewer from 'react-native-file-viewer';
 
-type Navigation = NavigationProp<InternalStackParamList, 'WorkOrderDetailScreen'>;
+type Navigation = NavigationProp<
+  InternalStackParamList,
+  'WorkOrderDetailScreen'
+>;
 
 import {
   View,
@@ -23,7 +26,6 @@ import {
 import { getFileByName } from '../../api/finalizacion';
 import styled from 'styled-components/native';
 import { TextInput } from 'react-native-paper';
-
 
 interface File {
   id: number;
@@ -69,21 +71,29 @@ const Label = styled.Text`
   font-weight: bold;
 `;
 
-const WorkOrderList: React.FC<Props> = ({ orders, onSelectOrder, onlySearchOt,filter }) => {
+const WorkOrderList: React.FC<Props> = ({
+  orders,
+  onSelectOrder,
+  onlySearchOt,
+  filter,
+}) => {
   const navigation = useNavigation<any>();
   const [searchValue, setSearchValue] = React.useState('');
   const [statusFilter, setStatusFilter] = React.useState(filter);
-  const [activeArea, setActiveArea] = React.useState<string>("");
+  const [activeArea, setActiveArea] = React.useState<string>('');
 
   const validOrders = Array.isArray(orders) ? orders : [];
-  const filteredOrders = validOrders.filter(order =>
-    (order.status.toLowerCase().includes(statusFilter.toLowerCase()) ||
-      order.flow.some(flow => flow.status.toLowerCase().includes(statusFilter.toLowerCase())))
-    && order.ot_id.toLowerCase().includes(searchValue.toLowerCase())
-    && (
-      !activeArea || order.flow.some(flow => flow.area?.name?.toLowerCase().includes(activeArea.toLowerCase()))
-    )
-
+  const filteredOrders = validOrders.filter(
+    (order) =>
+      (order.status.toLowerCase().includes(statusFilter.toLowerCase()) ||
+        order.flow.some((flow) =>
+          flow.status.toLowerCase().includes(statusFilter.toLowerCase())
+        )) &&
+      order.ot_id.toLowerCase().includes(searchValue.toLowerCase()) &&
+      (!activeArea ||
+        order.flow.some((flow) =>
+          flow.area?.name?.toLowerCase().includes(activeArea.toLowerCase())
+        ))
   );
 
   const downloadFile = async (filename: string) => {
@@ -126,34 +136,34 @@ const WorkOrderList: React.FC<Props> = ({ orders, onSelectOrder, onlySearchOt,fi
               <Text>Creado por: {item.user?.username}</Text>
             </View>
 
-
             <View style={styles.filesBlock}>
-              {item.files.length > 0 ? (
-                item.files.map(file => {
-                  const label = file.file_path.toLowerCase().includes('ot')
-                    ? 'Ver OT'
-                    : file.file_path.toLowerCase().includes('sku')
+              {item.files && item.files.length > 0 ? (
+                item.files
+                  .filter((file) => ['OT', 'SKU', 'OP'].includes(file.type))
+                  .map((file) => {
+                    const label = file.file_path.toLowerCase().includes('ot')
+                      ? 'Ver OT'
+                      : file.file_path.toLowerCase().includes('sku')
                       ? 'Ver SKU'
                       : file.file_path.toLowerCase().includes('op')
-                        ? 'Ver OP'
-                        : 'Ver Archivo';
-                  return (
-                    <TouchableOpacity
-                      key={file.id}
-                      onPress={() => downloadFile(file.file_path)}
-                      style={styles.fileButton}
-                    >
-                      <Text style={styles.fileText}>{label}</Text>
-                    </TouchableOpacity>
-                  );
-                })
+                      ? 'Ver OP'
+                      : 'Ver Archivo';
+                    return (
+                      <TouchableOpacity
+                        key={file.id}
+                        onPress={() => downloadFile(file.file_path)}
+                        style={styles.fileButton}
+                      >
+                        <Text style={styles.fileText}>{label}</Text>
+                      </TouchableOpacity>
+                    );
+                  })
               ) : (
                 <Text style={styles.noFiles}>No hay archivos</Text>
               )}
             </View>
           </View>
         </TouchableOpacity>
-
 
         <Text style={styles.flowLine}>Áreas:</Text>
         <ScrollView
@@ -164,9 +174,13 @@ const WorkOrderList: React.FC<Props> = ({ orders, onSelectOrder, onlySearchOt,fi
         >
           {item.flow.map((step, index) => {
             const isActive = step.status.toLowerCase().includes('proceso');
-            const isCompleted = step.status.toLowerCase().includes('completado');
+            const isCompleted = step.status
+              .toLowerCase()
+              .includes('completado');
             const isParcial = step.status.toLowerCase() === 'parcial';
-            const isCalidad = ['calidad', 'cqm'].some(word => step.status.toLowerCase().includes(word));
+            const isCalidad = ['calidad', 'cqm'].some((word) =>
+              step.status.toLowerCase().includes(word)
+            );
             const isLast = index === item.flow.length - 1;
 
             const getColor = () => {
@@ -179,7 +193,12 @@ const WorkOrderList: React.FC<Props> = ({ orders, onSelectOrder, onlySearchOt,fi
 
             return (
               <View key={index} style={styles.stepItem}>
-                <View style={[styles.circle, { backgroundColor: getColor(), shadowColor: getColor() }]}>
+                <View
+                  style={[
+                    styles.circle,
+                    { backgroundColor: getColor(), shadowColor: getColor() },
+                  ]}
+                >
                   <Text style={styles.circleText}>{index + 1}</Text>
                 </View>
                 <Text
@@ -189,12 +208,12 @@ const WorkOrderList: React.FC<Props> = ({ orders, onSelectOrder, onlySearchOt,fi
                       color: isCompleted
                         ? '#22c55e'
                         : isCalidad
-                          ? '#facc15'
-                          : isActive
-                            ? '#4a90e2'
-                            : isParcial
-                              ? '#f5945c'
-                              : '#6b7280',
+                        ? '#facc15'
+                        : isActive
+                        ? '#4a90e2'
+                        : isParcial
+                        ? '#f5945c'
+                        : '#6b7280',
                       fontWeight: isActive ? 'bold' : 'normal',
                     },
                   ]}
@@ -225,18 +244,20 @@ const WorkOrderList: React.FC<Props> = ({ orders, onSelectOrder, onlySearchOt,fi
         />
       </Container>
 
-      {!onlySearchOt && <Container>
-        <Label>Filtrar por Área</Label>
-        <TextInput
-          label="Filtrar por Área"
-          value={activeArea}
-          onChangeText={setActiveArea}
-          mode="outlined"
-          activeOutlineColor="#000"
-          style={styles.input}
-          theme={{ roundness: 30 }}
-        />
-      </Container>}
+      {!onlySearchOt && (
+        <Container>
+          <Label>Filtrar por Área</Label>
+          <TextInput
+            label="Filtrar por Área"
+            value={activeArea}
+            onChangeText={setActiveArea}
+            mode="outlined"
+            activeOutlineColor="#000"
+            style={styles.input}
+            theme={{ roundness: 30 }}
+          />
+        </Container>
+      )}
       <FlatList
         data={filteredOrders}
         keyExtractor={(item) => item.id.toString()}
@@ -273,10 +294,10 @@ const styles = StyleSheet.create({
     marginBottom: 4,
   },
   input: {
-    backgroundColor: "#fff",
+    backgroundColor: '#fff',
     borderRadius: 30,
     fontSize: 14,
-    width: '90%'
+    width: '90%',
   },
   flowLine: {
     flexDirection: 'row',

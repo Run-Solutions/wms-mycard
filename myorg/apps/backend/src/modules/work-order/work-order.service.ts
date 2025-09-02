@@ -16,6 +16,7 @@ export class WorkOrderService {
       ot: Express.Multer.File | null;
       sku: Express.Multer.File | null;
       op: Express.Multer.File | null;
+      attachments?: Express.Multer.File[];
     },
     userId: number,
   ) {
@@ -29,6 +30,17 @@ export class WorkOrderService {
       priority = false;
     } else if (typeof dto.priority === 'boolean') {
       priority = dto.priority;
+    }
+
+    const extras = files.attachments || [];
+    const MAX_FILES = 8;
+    const total =
+      (files.ot ? 1 : 0) +
+      (files.sku ? 1 : 0) +
+      (files.op ? 1 : 0) +
+      extras.length;
+    if (total > MAX_FILES) {
+      throw new BadRequestException(`Máximo ${MAX_FILES} archivos por orden.`);
     }
     // Para guardar la OT en la BD
     const workOrder = await this.prisma.workOrder.create({
@@ -54,15 +66,25 @@ export class WorkOrderService {
     try {
       for (const { file, type } of fileMappings) {
         if (file) {
-          console.log(`Guardando archivo (${type}): ${file.filename}`);
           await this.prisma.workOrderFiles.create({
             data: {
               work_order_id: workOrder.id,
-              type,
+              type, // 'OT' | 'SKU' | 'OP'
               file_path: file.filename,
             },
           });
         }
+      }
+
+      // Guardar adjuntos adicionales
+      for (const f of extras) {
+        await this.prisma.workOrderFiles.create({
+          data: {
+            work_order_id: workOrder.id,
+            type: 'ATTACHMENT', // etiqueta homogénea para adjuntos
+            file_path: f.filename,
+          },
+        });
       }
     } catch (error) {
       console.error('Error al guardar los archivos:', error);
@@ -144,6 +166,7 @@ export class WorkOrderService {
       },
       include: {
         user: true,
+        files: true,
         flow: {
           include: {
             user: true,
@@ -401,11 +424,13 @@ export class WorkOrderService {
       where: { ot_id: workOrderOtId },
       select: { id: true },
     });
-    
+
     if (!workOrder) {
-      throw new BadRequestException(`No se encontró la orden de trabajo con ot_id: ${workOrderOtId}`);
+      throw new BadRequestException(
+        `No se encontró la orden de trabajo con ot_id: ${workOrderOtId}`,
+      );
     }
-    
+
     const workOrderId = workOrder.id;
     for (const area of areas) {
       const { block, blockId, data, sample_data, formId, cqmId } = area;
@@ -420,7 +445,6 @@ export class WorkOrderService {
       let prevBlock: Record<string, any> | null = null;
       let prevAnswer: import('@prisma/client').FormAnswer | null = null;
       let prevAuditory: import('@prisma/client').FormAuditory | null = null;
-
 
       switch (block) {
         case 'prepress':
@@ -633,7 +657,11 @@ function stringifyValue(value: unknown): string | null {
   if (typeof value === 'string') {
     return value;
   }
-  if (typeof value === 'number' || typeof value === 'boolean' || typeof value === 'bigint') {
+  if (
+    typeof value === 'number' ||
+    typeof value === 'boolean' ||
+    typeof value === 'bigint'
+  ) {
     return value.toString();
   }
   // Si llegara a ser otro tipo (símbolo o función), conviértelo de forma explícita

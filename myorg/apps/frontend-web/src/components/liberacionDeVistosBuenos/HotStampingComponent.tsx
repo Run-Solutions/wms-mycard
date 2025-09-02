@@ -9,6 +9,7 @@ import {
 } from '@/api/recepcionCQM';
 import { OperatorAdvancedTable } from './util/QuestionTable';
 import SelectionQuestionTable from './util/FormQuestionTable';
+import WorkOrderInfo from './util/WorkOrderInfo';
 
 interface Props {
   workOrder: any;
@@ -16,38 +17,38 @@ interface Props {
 type Answer = {
   reviewed: boolean;
   sample_quantity: number;
+  id?: number;
+  FormAnswerResponse?: any[];
+  color_foil?: string;
+  imagen_holograma?: string;
+  revisar_posicion?: string;
 };
 
 export default function HotStampingComponent({ workOrder }: Props) {
   const router = useRouter();
   const [showInconformidad, setShowInconformidad] = useState(false);
   const [inconformidad, setInconformidad] = useState<string>('');
+  const [showConfirmModal, setShowConfirmModal] = useState(false);
 
-  // Para obtener el ultimo FormAnswer
+  // Último FormAnswer NO revisado
   const index = workOrder?.answers
     ?.map((a: Answer, i: number) => ({ ...a, index: i }))
     .reverse()
     .find((a: Answer) => a.reviewed === false)?.index;
-  console.log('el index', index);
-  const revisarPosicionValue =
-    workOrder?.answers[index]?.revisar_posicion ?? '';
-  const imagenHologramaValue =
-    workOrder?.answers[index]?.imagen_holograma ?? '';
 
-  // Para mostrar formulario de CQM y enviarlo
-  const [showConfirmModal, setShowConfirmModal] = useState(false);
+  const currentAnswer: Answer | undefined =
+    typeof index === 'number' ? workOrder?.answers?.[index] : undefined;
+  const formQuestions = workOrder?.area?.formQuestions ?? [];
 
-  // Para controlar qué preguntas están marcadas
-  //Para guardar las respuestas
+  const revisarPosicionValue = currentAnswer?.revisar_posicion ?? '';
+  const imagenHologramaValue = currentAnswer?.imagen_holograma ?? '';
+
+  // Para guardar las respuestas
   const [answersByQuestion, setAnswersByQuestion] = useState<
     Record<number, boolean | undefined>
   >({});
 
-  // Preguntas visibles en la tabla (mismo filtro que pasas al child con roleId=null)
-  const visibleQuestions =
-    workOrder.area.formQuestions?.filter((q: any) => q.role_id === null) ?? [];
-
-  // Listas derivadas para el componente de tabla (no se guardan aparte)
+  // Listas derivadas para la tabla
   const checkedRespuestaOK = useMemo(
     () =>
       Object.entries(answersByQuestion)
@@ -73,10 +74,8 @@ export default function HotStampingComponent({ workOrder }: Props) {
     setAnswersByQuestion((prev) => {
       const next = { ...prev };
       if (checked) {
-        // marcar OK => true, NG => false (exclusivo)
-        next[questionId] = type === 'ok';
+        next[questionId] = type === 'ok'; // OK => true, NG => false
       } else {
-        // si desmarcan la opción activa, borramos la respuesta
         if (
           (type === 'ok' && next[questionId] === true) ||
           (type === 'ng' && next[questionId] === false)
@@ -88,24 +87,43 @@ export default function HotStampingComponent({ workOrder }: Props) {
     });
   };
 
+  const qualityQuestionIds = useMemo(
+    () =>
+      (workOrder?.area?.formQuestions ?? [])
+        .filter((q: any) => q.role_id === 3)
+        .map((q: any) => q.id as number),
+    [workOrder?.area?.formQuestions]
+  );
   const handleSubmit = async () => {
-    const formAnswerId = workOrder.answers[index]?.id; // id de FormAnswer
+    const formAnswerId = currentAnswer?.id;
     if (!formAnswerId) {
       alert('No se encontró el ID del formulario.');
       return;
     }
-    const checkboxPayload = Object.entries(answersByQuestion).map(
-      ([questionId, answer]) => ({
-        question_id: Number(questionId),
-        answer: answer === true ? true : answer === false ? false : null, // <-- boolean | null
-      })
+    // 1) Validar que TODAS las preguntas de Calidad tengan respuesta booleana
+    //    (evita null/undefined)
+    const unansweredIds = qualityQuestionIds.filter(
+      (qid: any) =>
+        !(answersByQuestion[qid] === true || answersByQuestion[qid] === false)
     );
+
+    if (unansweredIds.length > 0) {
+      alert('Completa todas las preguntas.');
+      return;
+    }
+
+    // 2) Construir el payload SOLO en el orden de las preguntas de Calidad
+    //    (opcional: si quieres incluir también otras preguntas, mézclalas aquí)
+    const checkboxPayload = qualityQuestionIds.map((qid: any) => ({
+      question_id: qid,
+      answer: answersByQuestion[qid] === true ? true : false, // ya está validado que es boolean
+    }));
     const payload = {
       form_answer_id: formAnswerId,
       checkboxes: checkboxPayload,
     };
     try {
-      const res = await submitExtraHotStamping(payload);
+      await submitExtraHotStamping(payload);
       router.push('/liberacionDeVistosBuenos');
     } catch (error) {
       console.log('Error al guardar la respuesta: ', error);
@@ -118,7 +136,7 @@ export default function HotStampingComponent({ workOrder }: Props) {
       return;
     }
     try {
-      const res = await sendInconformidadCQM(workOrder.id, inconformidad);
+      await sendInconformidadCQM(workOrder?.id, inconformidad);
       router.push('/liberacionDeVistosBuenos');
     } catch (error) {
       console.error(error);
@@ -126,40 +144,34 @@ export default function HotStampingComponent({ workOrder }: Props) {
     }
   };
 
+  if (!currentAnswer) {
+    return (
+      <Container>
+        <Title>Área a evaluar: Hot Stamping</Title>
+        <WorkOrderInfo workOrder={workOrder} />
+        <NewData>
+          <SectionTitle>No hay respuestas pendientes por revisar</SectionTitle>
+          <p style={{ color: '#6b7280' }}>
+            Todas las respuestas parecen estar revisadas.
+          </p>
+        </NewData>
+      </Container>
+    );
+  }
+
   return (
     <Container>
       <Title>Área a evaluar: Hot Stamping</Title>
 
-      <DataWrapper>
-        <InfoItem>
-          <Label>Número de Orden:</Label>
-          <Value>{workOrder.workOrder.ot_id}</Value>
-        </InfoItem>
-        <InfoItem>
-          <Label>ID del Presupuesto:</Label>
-          <Value>{workOrder.workOrder.mycard_id}</Value>
-        </InfoItem>
-        <InfoItem>
-          <Label>Cantidad:</Label>
-          <Value>{workOrder.workOrder.quantity}</Value>
-        </InfoItem>
-        <InfoItem>
-          <Label>Operador:</Label>
-          <Value>{workOrder.user.username}</Value>
-        </InfoItem>
-        <InfoItem>
-          <Label>Comentarios:</Label>
-          <Value>{workOrder.workOrder.comments}</Value>
-        </InfoItem>
-      </DataWrapper>
+      <WorkOrderInfo workOrder={workOrder} />
 
       <NewData>
         <SectionTitle>Respuestas del operador</SectionTitle>
         <NewDataWrapper>
           <OperatorAdvancedTable
-            questions={workOrder.area.formQuestions ?? []}
-            answers={workOrder.answers[index]?.FormAnswerResponse ?? []}
-            mode={'doble'}
+            questions={formQuestions}
+            answers={currentAnswer?.FormAnswerResponse ?? []}
+            mode="doble"
             readOnly
             columns={['Respuesta']}
           />
@@ -168,8 +180,7 @@ export default function HotStampingComponent({ workOrder }: Props) {
             <Input
               type="text"
               value={
-                workOrder?.answers[index].color_foil ??
-                'No se reconoce la muestra enviada'
+                currentAnswer?.color_foil ?? 'No se reconoce la muestra enviada'
               }
               readOnly
             />
@@ -231,18 +242,19 @@ export default function HotStampingComponent({ workOrder }: Props) {
             <Input
               type="number"
               value={
-                workOrder?.answers[index].sample_quantity ??
-                'No se reconoce la muestra enviada'
+                currentAnswer?.sample_quantity ??
+                ('No se reconoce la muestra enviada' as any)
               }
               readOnly
             />
           </InputGroup>
         </NewDataWrapper>
+
         <SectionTitle>Mis respuestas</SectionTitle>
         <NewDataWrapper>
           <SelectionQuestionTable
-            formQuestions={workOrder.area.formQuestions}
-            roleId={3} // Calidad
+            formQuestions={formQuestions}
+            roleId={3}
             columns={['Respuesta']}
             checkedQuestions={[
               { ok: checkedRespuestaOK, ng: checkedRespuestaNG },
@@ -251,6 +263,7 @@ export default function HotStampingComponent({ workOrder }: Props) {
           />
         </NewDataWrapper>
       </NewData>
+
       <div style={{ display: 'flex', gap: '1rem' }}>
         <RechazarButton onClick={() => setShowInconformidad(true)}>
           Rechazar
@@ -259,6 +272,7 @@ export default function HotStampingComponent({ workOrder }: Props) {
           Aprobado
         </AceptarButton>
       </div>
+
       {showConfirmModal && (
         <ModalOverlay>
           <ModalContent>
@@ -282,6 +296,7 @@ export default function HotStampingComponent({ workOrder }: Props) {
           </ModalContent>
         </ModalOverlay>
       )}
+
       {showInconformidad && (
         <ModalOverlay>
           <ModalBox>
@@ -331,12 +346,11 @@ export default function HotStampingComponent({ workOrder }: Props) {
 // =================== Styled Components ===================
 
 const Container = styled.div`
-  background: white;
   padding: 2rem;
   margin-top: 1.5rem;
   border-radius: 1rem;
   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
-  max-width: 800px;
+  max-width: 1000px;
   margin-left: auto;
   margin-right: auto;
 `;
@@ -357,29 +371,11 @@ const SectionTitle = styled.h3`
   color: #374151;
 `;
 
-const DataWrapper = styled.div`
-  display: flex;
-  flex-wrap: wrap;
-  gap: 2rem;
-  flex-direction: row;
-`;
-
-const InfoItem = styled.div`
-  flex: 1;
-  min-width: 200px;
-`;
-
 const Label = styled.label`
   font-weight: 600;
   color: #6b7280;
   width: 50%;
   margin-bottom: 0.5rem;
-`;
-
-const Value = styled.div`
-  margin-top: 0.25rem;
-  font-weight: 500;
-  color: #111827;
 `;
 
 const NewDataWrapper = styled.div`
@@ -402,7 +398,6 @@ const Input = styled.input`
   outline: none;
   font-size: 1rem;
   transition: border 0.3s;
-
   &:focus {
     border-color: #0038a8;
   }
@@ -423,10 +418,6 @@ const RadioLabel = styled.label`
   color: #374151;
 `;
 
-const Radio = styled.input`
-  accent-color: #0038a8;
-`;
-
 const Textarea = styled.textarea`
   width: 100%;
   height: 120px;
@@ -436,7 +427,6 @@ const Textarea = styled.textarea`
   margin-top: 0.5rem;
   font-size: 1rem;
   resize: vertical;
-
   &:focus {
     border-color: #0038a8;
     outline: none;
@@ -453,9 +443,7 @@ const AceptarButton = styled.button<{ disabled?: boolean }>`
   display: flex;
   border: none;
   cursor: pointer;
-
   transition: background-color 0.3s ease, color 0.3s ease;
-
   &:hover {
     background-color: #1d4ed8;
     outline: none;
@@ -472,29 +460,10 @@ const RechazarButton = styled.button<{ disabled?: boolean }>`
   display: block;
   border: none;
   cursor: pointer;
-
   transition: background-color 0.3s ease, color 0.3s ease;
-
   &:hover {
     background-color: #a0a0a0;
     outline: none;
-  }
-`;
-
-const Table = styled.table`
-  width: 100%;
-  border-collapse: collapse;
-  color: black;
-  th,
-  td {
-    padding: 0.75rem;
-    text-align: left;
-    border-bottom: 1px solid #e5e7eb;
-  }
-
-  th {
-    background-color: #f3f4f6;
-    color: #374151;
   }
 `;
 
@@ -537,7 +506,6 @@ const Button = styled.button`
   border: none;
   border-radius: 8px;
   cursor: pointer;
-
   &:hover {
     background-color: #005bb5;
   }
@@ -558,12 +526,9 @@ const CancelButton = styled.button`
   padding: 0.5rem 1.5rem;
   border-radius: 0.5rem;
   font-weight: 600;
-
   border: none;
   cursor: pointer;
-
   transition: background-color 0.3s ease, color 0.3s ease;
-
   &:hover,
   &:focus {
     background-color: #a0a0a0;
@@ -577,12 +542,9 @@ const ConfirmButton = styled.button`
   padding: 0.5rem 1.5rem;
   border-radius: 0.5rem;
   font-weight: 600;
-
   border: none;
   cursor: pointer;
-
   transition: background-color 0.3s ease, color 0.3s ease;
-
   &:hover,
   &:focus {
     background-color: #1e40af;

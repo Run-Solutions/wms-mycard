@@ -13,7 +13,15 @@ import {
 } from 'react-native';
 import { useRoute, RouteProp, useNavigation } from '@react-navigation/native';
 import { InternalStackParamList } from '../../../../navigation/types';
-import { liberarWorkOrderAuditory, fetchWorkOrderById } from '../../../../api/cerrarOrdenDeTrabajo';
+import {
+  liberarWorkOrderAuditory,
+  fetchWorkOrderById,
+} from '../../../../api/cerrarOrdenDeTrabajo';
+import { getFileByName } from '../../../../api/finalizacion';
+import * as FileSystem from 'expo-file-system';
+import { Buffer } from 'buffer';
+import FileViewer from 'react-native-file-viewer';
+import InfoCard from '../../../../components/SeguimientoDeOts/InfoCard';
 
 type WorkOrderDetailRouteProp = RouteProp<
   InternalStackParamList,
@@ -156,7 +164,10 @@ const CerrarOrdenDeTrabajoAuxScreen: React.FC = () => {
   const cantidadHojasRaw = Number(workOrder?.quantity) / 24;
   const cantidadHojas = cantidadHojasRaw > 0 ? Math.ceil(cantidadHojasRaw) : 0;
   const ultimaArea = areas[areas.length - 1];
-  const totalMalas = areas.reduce((acc: any, area: any) => acc + (area.malas || 0), 0);
+  const totalMalas = areas.reduce(
+    (acc: any, area: any) => acc + (area.malas || 0),
+    0
+  );
   const totalCqm = areas
     .filter((area: any) => area.id >= 6)
     .reduce((acc: any, area: any) => acc + (area.cqm || 0), 0);
@@ -189,26 +200,100 @@ const CerrarOrdenDeTrabajoAuxScreen: React.FC = () => {
       Alert.alert('Error', 'No se pudo cerrar la orden.');
     }
   };
+  function getLabelByType(type: string) {
+    switch (type) {
+      case 'OT':
+        return 'Ver OT';
+      case 'SKU':
+        return 'Ver SKU';
+      case 'OP':
+        return 'Ver OP';
+      default:
+        return 'Adjunto';
+    }
+  }
+
+  const downloadFile = async (filename: string) => {
+    try {
+      const res = await getFileByName(filename);
+      if (!res) {
+        console.error('❌ Error desde el backend');
+        return;
+      }
+      const base64Data = Buffer.from(res, 'binary').toString('base64');
+      const fileUri = FileSystem.documentDirectory + filename;
+      await FileSystem.writeAsStringAsync(fileUri, base64Data, {
+        encoding: FileSystem.EncodingType.Base64,
+      });
+      await FileViewer.open(fileUri, {
+        showOpenWithDialog: true,
+        displayName: filename,
+      });
+    } catch (error) {
+      console.error('Error al abrir el archivo:', error);
+    }
+  };
 
   return (
     <ScrollView contentContainerStyle={styles.container}>
       <Text style={styles.title}>Información de la Orden #{id}</Text>
 
       <View style={styles.card}>
-        <Text style={styles.label}>OT:</Text>
-        <Text style={styles.value}>{workOrder?.ot_id}</Text>
-
-        <Text style={styles.label}>Presupuesto:</Text>
-        <Text style={styles.value}>{workOrder?.mycard_id}</Text>
-
-        <Text style={styles.label}>Cantidad (TARJETAS): </Text>
-        <Text style={styles.value}>{workOrder?.quantity}</Text>
-
-        <Text style={styles.label}>Cantidad (Hojas Frente / Hojas Vuelta): </Text>
-        <Text style={styles.value}>{cantidadHojas}</Text>
-
-        <Text style={styles.label}>Comentarios:</Text>
-        <Text style={styles.value}>{workOrder?.comments}</Text>
+        <InfoCard
+          label="Número de Orden"
+          value={String(workOrder?.ot_id ?? '')}
+        />
+        <InfoCard
+          label="Id del Presupuesto"
+          value={String(workOrder?.mycard_id ?? '')}
+        />
+        <InfoCard
+          label="Cantidad (TARJETAS)"
+          value={String(workOrder?.quantity ?? '')}
+        />
+        <InfoCard
+          style={{ backgroundColor: '#93C5FD' }}
+          label="Cantidad (Hojas Frente / Hojas Vuelta)"
+          value={String(cantidadHojas ?? '')}
+        />
+        <InfoCard
+          label="Fecha de Creación"
+          value={
+            workOrder?.createdAt
+              ? new Date(workOrder.createdAt).toLocaleDateString()
+              : '—'
+          }
+        />
+        <InfoCard
+          label="Comentarios"
+          value={String(workOrder?.comments ?? '')}
+        />
+        <InfoCard label="Archivos de la Orden de Trabajo">
+          {Array.isArray(workOrder?.files) && workOrder.files.length > 0 ? (
+            <ScrollView
+              horizontal
+              showsHorizontalScrollIndicator={false}
+              contentContainerStyle={fileStyles.row}
+            >
+              {workOrder.files.map((file: any) => (
+                <TouchableOpacity
+                  key={file.id}
+                  onPress={() => downloadFile(file.file_path)} // ver función abajo
+                  style={fileStyles.button}
+                  activeOpacity={0.8}
+                >
+                  <Text style={fileStyles.buttonText}>
+                    {getLabelByType(file.type)}
+                  </Text>
+                </TouchableOpacity>
+              ))}
+            </ScrollView>
+          ) : (
+            <Text style={fileStyles.empty}>
+              No se ha adjuntado ningún archivo
+            </Text>
+          )}
+        </InfoCard>
       </View>
 
       <Text style={styles.subtitle}>Datos de Producción por Área</Text>
@@ -450,4 +535,23 @@ const styles = StyleSheet.create({
     color: '#fff',
     fontWeight: '600',
   },
+});
+const fileStyles = StyleSheet.create({
+  row: { gap: 8, paddingVertical: 4 },
+  button: {
+    paddingVertical: 10,
+    paddingHorizontal: 14,
+    backgroundColor: '#FFFFFF',
+    borderWidth: 1,
+    borderColor: '#E5E7EB',
+    borderRadius: 12,
+    shadowColor: '#000',
+    shadowOpacity: 0.05,
+    shadowOffset: { width: 0, height: 1 },
+    shadowRadius: 2,
+    elevation: 1,
+    marginRight: 8,
+  },
+  buttonText: { color: '#374151', fontSize: 14, fontWeight: '600' },
+  empty: { fontSize: 16, fontWeight: '600', color: '#111827' },
 });

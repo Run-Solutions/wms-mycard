@@ -16,6 +16,7 @@ import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { RootStackParamList } from '../../navigation/types';
 import { submitExtraColor, sendInconformidadCQM } from '../../api/recepcionCQM';
 import { OperatorAdvancedTable } from './util/FormQuestionTable';
+import WorkOrderInfo from './util/WorkOrderInfo';
 
 // Tipos y constantes globales
 type Answer = {
@@ -76,22 +77,7 @@ const ColorEdgeComponent = ({ workOrder }: { workOrder: any }) => {
   return (
     <ScrollView style={styles.container}>
       <Text style={styles.title}>Área a evaluar: Color Edge</Text>
-      <View style={styles.card}>
-        <Text style={styles.label}>OT:</Text>
-        <Text style={styles.value}>{workOrder.workOrder.ot_id}</Text>
-
-        <Text style={styles.label}>Id del Presupuesto:</Text>
-        <Text style={styles.value}>{workOrder.workOrder.mycard_id}</Text>
-
-        <Text style={styles.label}>Cantidad:</Text>
-        <Text style={styles.value}>{workOrder.workOrder.quantity}</Text>
-
-        <Text style={styles.label}>Operador:</Text>
-        <Text style={styles.value}>{workOrder.user.username}</Text>
-
-        <Text style={styles.label}>Comentarios:</Text>
-        <Text style={styles.value}>{workOrder.workOrder.comments}</Text>
-      </View>
+      <WorkOrderInfo workOrder={workOrder} />
 
       <Text style={styles.modalTitle}>Respuestas del operador</Text>
       <OperatorAdvancedTable
@@ -292,6 +278,7 @@ const styles = StyleSheet.create({
   modalTitle: {
     fontSize: 22,
     fontWeight: 'bold',
+    marginTop: 8,
     marginBottom: 16,
     textAlign: 'center',
     color: '#1f2937',

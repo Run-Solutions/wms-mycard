@@ -396,7 +396,7 @@ const WorkOrderTable: React.FC<Props> = ({ orders, title, statusFilter }) => {
                 <TableRow key={orderFlow.id}>
                   <TableCell
                     onClick={() =>
-                      router.push(`/liberacionDeVistosBuenos/${orderFlow.ot_id}`)
+                      (window.location.href = `/liberacionDeVistosBuenos/${orderFlow.ot_id}`)
                     }
                     sx={{
                       color: 'black',
@@ -452,52 +452,38 @@ const WorkOrderTable: React.FC<Props> = ({ orders, title, statusFilter }) => {
                   </TableCell>
                   <TableCell sx={{ color: 'black' }}>
                     {orderFlow.files.length > 0 ? (
-                      <div
-                        style={{
-                          display: 'flex',
-                          flexDirection: 'column',
-                          flexWrap: 'wrap',
-                          gap: '0.5rem',
-                        }}
-                      >
-                        {orderFlow.files.map((file) => {
-                          const fileName = file.file_path.toLowerCase();
-                          const label = fileName.includes('ot')
-                            ? 'Ver OT'
-                            : fileName.includes('sku')
-                            ? 'Ver SKU'
-                            : fileName.includes('op')
-                            ? 'Ver OP'
-                            : 'Ver Archivo';
-                          return (
-                            <button
-                              key={file.file_path}
-                              onClick={() => downloadFile(file.file_path)}
-                              style={{
-                                border: '1px solid #c2c2c2',
-                                borderRadius: '20px',
-                                padding: '4px 12px',
-                                backgroundColor: '#f7f7f7',
-                                cursor: 'pointer',
-                                fontSize: '0.75rem',
-                                transition: 'all 0.2s ease-in-out',
-                              }}
-                              onMouseOver={(e) => {
-                                (
-                                  e.target as HTMLButtonElement
-                                ).style.backgroundColor = '#e0e0e0';
-                              }}
-                              onMouseOut={(e) => {
-                                (
-                                  e.target as HTMLButtonElement
-                                ).style.backgroundColor = '#f7f7f7';
-                              }}
-                            >
-                              {label}
-                            </button>
-                          );
-                        })}
-                      </div>
+                      <Box display="flex" flexDirection="column" gap={1}>
+                        {orderFlow.files
+                          .filter((file) =>
+                            ['OT', 'SKU', 'OP'].includes(file.type)
+                          )
+                          .map((file: any) => {
+                            const label =
+                              file.type === 'OT'
+                                ? 'Ver OT'
+                                : file.type === 'SKU'
+                                ? 'Ver SKU'
+                                : 'Ver OP';
+                            return (
+                              <Box
+                                component="button"
+                                key={file.id}
+                                onClick={() => downloadFile(file.file_path)}
+                                sx={{
+                                  border: '1px solid #c2c2c2',
+                                  borderRadius: '20px',
+                                  p: '4px 12px',
+                                  backgroundColor: '#f7f7f7',
+                                  cursor: 'pointer',
+                                  fontSize: '0.75rem',
+                                  '&:hover': { backgroundColor: '#e0e0e0' },
+                                }}
+                              >
+                                {label}
+                              </Box>
+                            );
+                          })}
+                      </Box>
                     ) : (
                       'No hay archivos'
                     )}

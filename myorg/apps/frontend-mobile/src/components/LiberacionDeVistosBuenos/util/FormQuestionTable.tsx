@@ -4,12 +4,12 @@ import {
   Text,
   TouchableOpacity,
   StyleSheet,
+  ViewStyle,
   ScrollView,
+  useWindowDimensions,
 } from 'react-native';
 
 // ===== Config de columnas (ajusta a tu UI) =====
-const CELL_PREGUNTA_WIDTH = 280; // ancho fijo para la columna "Pregunta"
-const CELL_COL_WIDTH = 60;       // ancho fijo para cada subcolumna (OK/NG)
 const OK_COLOR = '#0038A8';
 const NG_COLOR = '#DC2626';
 const BORDER = '#9A9DA1';
@@ -30,19 +30,20 @@ type Role = 'operator' | 'cqm';
 
 interface AdvancedQuestionTableProps {
   questions: Question[];
-  answers: FormAnswerResponse[];
-  mode: 'doble' | 'simple';
   role: Role; // operador o cqm (elige el campo)
-  filterRoleId: number | null; // null para operador, 3 para CQM
-  // Opcional: personalizar cabeceras de columnas
   columns?: string[]; // p.ej. ['Hoja Frente','Hoja Vuelta'] o ['Respuesta']
-  // Interactividad (por defecto readOnly)
-  readOnly?: boolean;
+  answers: FormAnswerResponse[];
   onToggle?: (
     questionId: number,
     colIndex: number,
     value: true | false | null
   ) => void;
+  readOnly?: boolean;
+  mode: 'doble' | 'simple';
+  filterRoleId: number | null; // null para operador, 3 para CQM
+  style?: ViewStyle;
+  /** Nuevo: si true, la tabla se expande para llenar el ancho disponible en pantallas grandes */
+  autoFit?: boolean;
 }
 
 /**
@@ -60,13 +61,46 @@ export const AdvancedQuestionTable: React.FC<AdvancedQuestionTableProps> = memo(
     columns,
     readOnly = true,
     onToggle,
+    style,
+    autoFit = true,
   }) => {
+    const { width: screenW } = useWindowDimensions();
     const cols =
       columns ??
       (mode === 'doble' ? ['Hoja Frente', 'Hoja Vuelta'] : ['Respuesta']);
 
     const filtered = questions.filter((q) => q.role_id === filterRoleId);
     console.log('filtered', filtered);
+
+    // 2) Cálculo de anchos responsivos -------------------------------
+    // Valores base (los que ya usabas)
+    const basePreguntaW = 280;
+    const baseColW = 60;
+    const numSubCols = (columns?.length ?? 1) * 2;
+    const minTableW = basePreguntaW + numSubCols * baseColW;
+
+    // Margen de tarjeta y bordes: reserva ~24px para que no “toque”
+    const availableW = Math.max(0, screenW - 24);
+
+    // Si autoFit y hay espacio extra, lo repartimos:
+    // 40% para "Pregunta" (porque suele necesitar más texto) y 60% para subcolumnas
+    let cellPreguntaW = basePreguntaW;
+    let cellColW = baseColW;
+    if (autoFit && availableW > minTableW) {
+      const extra = availableW - minTableW;
+      const extraPregunta = extra * 0.4;
+      const extraColsTotal = extra * 0.6;
+
+      cellPreguntaW = Math.round(basePreguntaW + extraPregunta);
+      const perSubColExtra = extraColsTotal / numSubCols;
+      cellColW = Math.round(baseColW + perSubColExtra);
+    }
+
+    // 3) Escalado de tipografías para no verse “chiquito” en tablet
+    const scale = Math.min(1.25, Math.max(1, screenW / 768)); // hasta +25% aprox.
+    const headerFont = 13.5 * scale;
+    const questionFont = 15 * scale;
+    const subHeaderFont = 12.5 * scale;
 
     // Devuelve [valorCol0, valorCol1] según role
     const getValues = (qid: number): (boolean | null | undefined)[] => {
@@ -100,43 +134,36 @@ export const AdvancedQuestionTable: React.FC<AdvancedQuestionTableProps> = memo(
       onToggle(qid, colIndex, newVal);
     };
 
+    // Ancho total final de la tabla (para que el ScrollView estire su contenido)
+    const tableW = cellPreguntaW + numSubCols * cellColW;
+
     return (
-      <View style={[styles.card]}>
+      <View style={[styles.card, style]}>
         {/* Header */}
-        <ScrollView horizontal showsHorizontalScrollIndicator={false}>
-          <View>
+        <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ width: Math.max(tableW, availableW) }}>
+          <View style={{ width: tableW }}>
             {/* Top header row */}
             <View style={[styles.row, styles.headerRowTop]}>
-              <View
-                style={[
-                  styles.cell,
-                  styles.headerCell,
-                  styles.cellPregunta,
-                  { minWidth: 200 },
-                ]}
-              >
-                <Text style={styles.headerText}>Pregunta</Text>
+              <View style={[styles.cell, styles.headerCell, { width: cellPreguntaW }]}>
+                <Text style={[styles.headerText, { fontSize: headerFont }]}>Pregunta</Text>
               </View>
               {columns?.map((label, i) => (
-                <View
-                  key={i}
-                  style={[styles.cell, styles.headerCell, styles.cellColSpan2]}
-                >
-                  <Text style={styles.headerText}>{label}</Text>
+                <View key={i} style={[styles.cell, styles.headerCell, { width: cellColW * 2, alignItems: 'center', justifyContent: 'center' }]}>
+                  <Text style={[styles.headerText, { fontSize: headerFont }]}>{label}</Text>
                 </View>
               ))}
             </View>
 
             {/* Sub-header row: OK | NG per column */}
             <View style={[styles.row, styles.headerRowBottom]}>
-              <View style={[styles.cell, styles.subHeaderSpacer]} />
+              <View style={[styles.cell, { width: cellPreguntaW, borderRightWidth: 1, borderColor: BORDER }]} />
               {columns?.map((_, i) => (
-                <View key={i} style={styles.subHeaderPair}>
-                  <View style={[styles.cell, styles.subHeaderCell]}>
-                    <Text style={styles.subHeaderText}>OK</Text>
+                <View key={i} style={{ flexDirection: 'row', width: cellColW * 2 }}>
+                  <View style={[styles.cell, styles.subHeaderCell, { width: cellColW }]}>
+                    <Text style={[styles.subHeaderText, { fontSize: subHeaderFont }]}>OK</Text>
                   </View>
-                  <View style={[styles.cell, styles.subHeaderCell]}>
-                    <Text style={styles.subHeaderText}>NG</Text>
+                  <View style={[styles.cell, styles.subHeaderCell, { width: cellColW }]}>
+                    <Text style={[styles.subHeaderText, { fontSize: subHeaderFont }]}>NG</Text>
                   </View>
                 </View>
               ))}
@@ -147,15 +174,8 @@ export const AdvancedQuestionTable: React.FC<AdvancedQuestionTableProps> = memo(
               const values = getValues(q.id); // [v0, v1]
               return (
                 <View key={q.id} style={[styles.row, styles.bodyRow]}>
-                  <View
-                    style={[
-                      styles.cell,
-                      styles.headerCell,
-                      styles.cellPregunta,
-                      { flex: 2 },
-                    ]}
-                  >
-                    <Text style={styles.questionText}>{q.title}</Text>
+                  <View style={[styles.cell, { width: cellPreguntaW, paddingVertical: 12, paddingHorizontal: 12, borderBottomWidth: 1, borderRightWidth: 1, borderColor: BORDER, justifyContent: 'center' }]}>
+                    <Text style={[styles.questionText, { fontSize: questionFont }]}>{q.title}</Text>
                   </View>
                   {columns?.map((_, colIndex) => {
                     // Para modo simple usamos sólo colIndex 0
@@ -165,7 +185,7 @@ export const AdvancedQuestionTable: React.FC<AdvancedQuestionTableProps> = memo(
                     const okChecked = v === true;
                     const ngChecked = v === false;
                     return (
-                      <View key={`${q.id}-${colIndex}`} style={styles.pair}>
+                      <View key={`${q.id}-${colIndex}`} style={{ flexDirection: 'row', width: cellColW * 2 }}>
                         <CheckboxCell
                           type="ok"
                           checked={okChecked}
@@ -173,6 +193,7 @@ export const AdvancedQuestionTable: React.FC<AdvancedQuestionTableProps> = memo(
                             handleChange(q.id, colIndex, 'ok', !okChecked)
                           }
                           disabled={readOnly}
+                          cellW={cellColW}
                         />
                         <CheckboxCell
                           type="ng"
@@ -181,6 +202,7 @@ export const AdvancedQuestionTable: React.FC<AdvancedQuestionTableProps> = memo(
                             handleChange(q.id, colIndex, 'ng', !ngChecked)
                           }
                           disabled={readOnly}
+                          cellW={cellColW}
                         />
                       </View>
                     );
@@ -207,7 +229,8 @@ const CheckboxCell: React.FC<{
   checked: boolean;
   disabled?: boolean;
   onPress: () => void;
-}> = ({ type, checked, disabled, onPress }) => {
+  cellW: number;
+}> = ({ type, checked, disabled, onPress, cellW }) => {
   return (
     <TouchableOpacity
       accessibilityRole="checkbox"
@@ -215,13 +238,16 @@ const CheckboxCell: React.FC<{
       accessibilityState={{ checked, disabled }}
       onPress={disabled ? undefined : onPress}
       activeOpacity={0.8}
-      style={[styles.cell, styles.cellCheckbox]}
+      style={[styles.cell, styles.cellCheckbox, { width: cellW }]}
     >
       <View
         style={[
           styles.checkbox,
           type === 'ok' ? styles.checkboxOk : styles.checkboxNg,
-          checked && (type === 'ok' ? styles.checkboxOkChecked : styles.checkboxNgChecked),
+          checked &&
+            (type === 'ok'
+              ? styles.checkboxOkChecked
+              : styles.checkboxNgChecked),
           disabled && styles.checkboxDisabled,
         ]}
       >
@@ -244,6 +270,7 @@ const styles = StyleSheet.create({
     shadowOffset: { width: 0, height: 1 },
     elevation: 1,
     overflow: 'hidden',
+    // Un poco de padding para que availableW sea realista
   },
   row: {
     flexDirection: 'row',
@@ -264,42 +291,10 @@ const styles = StyleSheet.create({
   headerText: {
     color: '#374151',
     fontWeight: '600',
-    fontSize: 13.5,
     textTransform: 'uppercase',
     letterSpacing: 0.3,
   },
-  // --- columnas pregunta ---
-  cellPregunta: {
-    width: CELL_PREGUNTA_WIDTH,
-    justifyContent: 'center',
-  },
-  cellPreguntaBody: {
-    width: CELL_PREGUNTA_WIDTH,
-    paddingVertical: 12,
-    paddingHorizontal: 12,
-    borderBottomWidth: 1,
-    borderRightWidth: 1,
-    borderColor: BORDER,
-    justifyContent: 'center',
-  },
-  // --- header que abarca 2 subcolumnas ---
-  cellColSpan2: {
-    width: CELL_COL_WIDTH * 2,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  // --- subheader (OK / NG) ---
-  subHeaderSpacer: {
-    width: CELL_PREGUNTA_WIDTH,
-    borderRightWidth: 1,
-    borderColor: BORDER,
-  },
-  subHeaderPair: {
-    flexDirection: 'row',
-    width: CELL_COL_WIDTH * 2,
-  },
   subHeaderCell: {
-    width: CELL_COL_WIDTH,
     paddingVertical: 8,
     paddingHorizontal: 12,
     borderRightWidth: 1,
@@ -308,64 +303,20 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
   },
-  subHeaderText: {
-    color: '#374151',
-    fontWeight: '600',
-  },
+  subHeaderText: { color: '#374151', fontWeight: '600' },
   // --- celdas comunes ---
-  cell: {
-    borderBottomWidth: 1,
-    borderRightWidth: 1,
-    borderColor: BORDER,
-    justifyContent: 'center',
-  },
-  bodyRow: {
-    backgroundColor: '#FFFFFF',
-  },
-  questionText: {
-    color: '#111827',
-    fontSize: 15,
-  },
-  // --- par OK/NG en body ---
-  pair: {
-    flexDirection: 'row',
-    width: CELL_COL_WIDTH * 2,
-  },
-  cellCheckbox: {
-    width: CELL_COL_WIDTH,
-    paddingVertical: 10,
-    paddingHorizontal: 12,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
+  cell: { borderBottomWidth: 1, borderRightWidth: 1, borderColor: BORDER, justifyContent: 'center' },
+  bodyRow: { backgroundColor: '#FFFFFF' },
+  questionText: { color: '#111827' },
+  cellCheckbox: { paddingVertical: 10, paddingHorizontal: 12, alignItems: 'center', justifyContent: 'center' },
   checkbox: {
-    width: 22,
-    height: 22,
-    borderRadius: 6,
-    borderWidth: 2,
-    backgroundColor: '#FFFFFF',
-    alignItems: 'center',
-    justifyContent: 'center',
+    width: 22, height: 22, borderRadius: 6, borderWidth: 2,
+    backgroundColor: '#FFFFFF', alignItems: 'center', justifyContent: 'center',
   },
-  checkboxOk: {
-    borderColor: OK_COLOR,
-  },
-  checkboxNg: {
-    borderColor: NG_COLOR,
-  },
-  checkboxOkChecked: {
-    backgroundColor: OK_COLOR,
-  },
-  checkboxNgChecked: {
-    backgroundColor: NG_COLOR,
-  },
-  checkboxMark: {
-    color: '#FFFFFF',
-    fontWeight: 'bold',
-    fontSize: 14,
-    lineHeight: 14,
-  },
-  checkboxDisabled: {
-    opacity: 0.6,
-  },
+  checkboxOk: { borderColor: OK_COLOR },
+  checkboxNg: { borderColor: NG_COLOR },
+  checkboxOkChecked: { backgroundColor: OK_COLOR },
+  checkboxNgChecked: { backgroundColor: NG_COLOR },
+  checkboxMark: { color: '#FFFFFF', fontWeight: 'bold', fontSize: 14, lineHeight: 14 },
+  checkboxDisabled: { opacity: 0.6 },
 });

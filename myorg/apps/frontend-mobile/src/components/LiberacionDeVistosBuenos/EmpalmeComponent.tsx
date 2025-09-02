@@ -20,6 +20,7 @@ import {
 } from '../../api/recepcionCQM';
 import { OperatorAdvancedTable } from './util/FormQuestionTable';
 import SelectionQuestionTable from './util/SelectionQuestionTable';
+import { WorkOrderHojasInfo } from './util/WorkOrderInfo';
 
 // Tipos y constantes globales
 type Answer = {
@@ -103,18 +104,37 @@ const EmpalmeComponent = ({ workOrder }: { workOrder: any }) => {
     { label: '3 Tracks', value: 'tres_tracks' },
   ];
 
+  const qualityQuestionIds = useMemo(
+    () =>
+      (workOrder?.area?.formQuestions ?? [])
+        .filter((q: any) => q.role_id === 3)
+        .map((q: any) => q.id as number),
+    [workOrder?.area?.formQuestions]
+  );
   const handleSubmit = async () => {
     const formAnswerId = workOrder.answers[index]?.id;
     if (!formAnswerId) {
       Alert.alert('No se encontró el Id del formulario');
       return;
     }
-    const checkboxPayload = Object.entries(answersByQuestion).map(
-      ([questionId, answer]) => ({
-        question_id: Number(questionId),
-        answer: answer === true ? true : answer === false ? false : null, // <-- boolean | null
-      })
+    // 1) Validar que TODAS las preguntas de Calidad tengan respuesta booleana
+    //    (evita null/undefined)
+    const unansweredIds = qualityQuestionIds.filter(
+      (qid: any) =>
+        !(answersByQuestion[qid] === true || answersByQuestion[qid] === false)
     );
+
+    if (unansweredIds.length > 0) {
+      Alert.alert('Completa todas las preguntas.');
+      return;
+    }
+
+    // 2) Construir el payload SOLO en el orden de las preguntas de Calidad
+    //    (opcional: si quieres incluir también otras preguntas, mézclalas aquí)
+    const checkboxPayload = qualityQuestionIds.map((qid: any) => ({
+      question_id: qid,
+      answer: answersByQuestion[qid] === true ? true : false, // ya está validado que es boolean
+    }));
     const payload = {
       form_answer_id: formAnswerId,
       checkboxes: checkboxPayload,
@@ -161,27 +181,7 @@ const EmpalmeComponent = ({ workOrder }: { workOrder: any }) => {
   return (
     <ScrollView style={styles.container}>
       <Text style={styles.title}>Área a evaluar: Empalme</Text>
-      <View style={styles.card}>
-        <Text style={styles.label}>OT:</Text>
-        <Text style={styles.value}>{workOrder.workOrder.ot_id}</Text>
-
-        <Text style={styles.label}>Id del Presupuesto:</Text>
-        <Text style={styles.value}>{workOrder.workOrder.mycard_id}</Text>
-
-        <Text style={styles.label}>Cantidad (TARJETAS):</Text>
-        <Text style={styles.value}>{workOrder.workOrder.quantity}</Text>
-
-        <Text style={styles.label}>
-          Cantidad (Hojas Frente / Hojas Vuelta):
-        </Text>
-        <Text style={styles.value}>{cantidadHojas}</Text>
-
-        <Text style={styles.label}>Operador:</Text>
-        <Text style={styles.value}>{workOrder.user.username}</Text>
-
-        <Text style={styles.label}>Comentarios:</Text>
-        <Text style={styles.value}>{workOrder.workOrder.comments}</Text>
-      </View>
+      <WorkOrderHojasInfo workOrder={workOrder} />
 
       <Text style={styles.modalTitle}>Respuestas del operador</Text>
       <OperatorAdvancedTable
@@ -457,6 +457,7 @@ const styles = StyleSheet.create({
   modalTitle: {
     fontSize: 22,
     fontWeight: 'bold',
+    marginTop: 8,
     marginBottom: 16,
     textAlign: 'center',
     color: '#1f2937',

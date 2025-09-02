@@ -184,12 +184,33 @@ const VistosBuenosPage: React.FC = () => {
       alert('Error al conectar con el servidor');
     }
   };
+  const guessMimeFromName = (filename: string): string => {
+    const ext = filename.split('.').pop()?.toLowerCase();
+    switch (ext) {
+      case 'pdf':
+        return 'application/pdf';
+      case 'png':
+        return 'image/png';
+      case 'jpg':
+      case 'jpeg':
+        return 'image/jpeg';
+      case 'webp':
+        return 'image/webp';
+      default:
+        return 'application/octet-stream';
+    }
+  };
   const downloadFile = async (filename: string) => {
     try {
-      const arrayBuffer = await getFileByName(filename);
-      const blob = new Blob([arrayBuffer], { type: 'application/pdf' });
+      const arrayBuffer = await getFileByName(filename); // <- ya la tienes
+      const mime = guessMimeFromName(filename);
+      const blob = new Blob([arrayBuffer], { type: mime });
       const url = window.URL.createObjectURL(blob);
+
+      // abre en nueva pestaña (sirve para PDF e imágenes)
       window.open(url, '_blank');
+
+      // liberar URL luego
       setTimeout(() => window.URL.revokeObjectURL(url), 5000);
     } catch (error) {
       console.error('Error al abrir el archivo:', error);
@@ -263,20 +284,28 @@ const VistosBuenosPage: React.FC = () => {
                 <p>
                   <strong>Archivos:</strong>
                 </p>
-                <div style={{ display: 'flex', flexDirection: 'row' }}>
-                  {selectedOrder.workOrder.files.map((file) => (
-                    <div key={file.file_path}>
-                      <button onClick={() => downloadFile(file.file_path)}>
-                        {file.file_path.toLowerCase().includes('ot')
-                          ? 'Ver OT'
-                          : file.file_path.toLowerCase().includes('sku')
-                          ? 'Ver SKU'
-                          : file.file_path.toLowerCase().includes('op')
-                          ? 'Ver OP'
-                          : 'Ver Archivo'}
+                <div className="grid grid-cols-4 gap-1">
+                  {selectedOrder.workOrder.files.map((file) => {
+                    const name = file.file_path.toLowerCase();
+                    const label = name.includes('ot')
+                      ? 'Ver OT'
+                      : name.includes('sku')
+                      ? 'Ver SKU'
+                      : name.includes('op')
+                      ? 'Ver OP'
+                      : 'Adjunto';
+                    return (
+                      <button
+                        key={file.file_path}
+                        onClick={() => downloadFile(file.file_path)}
+                        className="flex items-center justify-center w-full px-3 py-2
+                                 rounded-lg shadow-sm bg-white hover:bg-gray-100 
+                                 border text-sm font-medium transition-all duration-200"
+                      >
+                        <span>{label}</span>
                       </button>
-                    </div>
-                  ))}
+                    );
+                  })}
                 </div>
               </ModalInfo>
               <ModalFlow>
@@ -294,10 +323,20 @@ const VistosBuenosPage: React.FC = () => {
                 </Timeline>
               </ModalFlow>
             </ModalBody>
-            <button style={{ marginTop: '20px' }} onClick={closeModal}>
+            <button
+              style={{ marginTop: '20px', backgroundColor: '#bbbbbb' }}
+              onClick={closeModal}
+            >
               Cerrar
             </button>
-            <button style={{ marginTop: '20px' }} onClick={aceptarOT}>
+            <button
+              style={{
+                marginTop: '20px',
+                backgroundColor: '#0038A8',
+                color: 'white',
+              }}
+              onClick={aceptarOT}
+            >
               Aceptar OT
             </button>
           </ModalContent>
@@ -416,38 +455,6 @@ const CardTitle = styled.div`
     transform: rotateY(180deg);
   }
 `;
-
-const UserCard = styled.div`
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-`;
-
-const FlipCard = styled.div`
-  background-color: transparent;
-  width: 245px;
-  height: 270px;
-  perspective: 1000px;
-  font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-  cursor: pointer;
-
-  &:hover .flip-card-inner {
-    transform: rotateY(180deg);
-  }
-`;
-
-const FlipCardInner = styled.div`
-  position: relative;
-  width: 100%;
-  height: 100%;
-  text-align: center;
-  transition: transform 0.6s;
-  transform-style: preserve-3d;
-`;
-
-interface FlipCardSideProps {
-  theme: any;
-}
 
 const InfoItem = styled.div`
   display: flex;

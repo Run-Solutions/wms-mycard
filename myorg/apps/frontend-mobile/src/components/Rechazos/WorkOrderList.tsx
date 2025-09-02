@@ -1,5 +1,5 @@
 // myorg/apps/frontend-mobile/src/components/Rechazos/WorkOrderList.tsx
-"use client";
+'use client';
 
 import React from 'react';
 import { TouchableOpacity } from 'react-native';
@@ -20,7 +20,6 @@ import {
   ScrollView,
 } from 'react-native';
 import { getFileByName } from '../../api/finalizacion';
-
 
 interface File {
   id: number;
@@ -63,14 +62,14 @@ const WorkOrderList: React.FC<Props> = ({ orders, onSelectOrder }) => {
         console.error('❌ Error desde el backend');
         return;
       }
-  
+
       const base64Data = Buffer.from(res, 'binary').toString('base64');
       const fileUri = FileSystem.documentDirectory + filename;
-  
+
       await FileSystem.writeAsStringAsync(fileUri, base64Data, {
         encoding: FileSystem.EncodingType.Base64,
       });
-  
+
       await FileViewer.open(fileUri, {
         showOpenWithDialog: true,
         displayName: filename,
@@ -98,17 +97,19 @@ const WorkOrderList: React.FC<Props> = ({ orders, onSelectOrder }) => {
               <Text>Estado: {item.status}</Text>
               <Text>Creado por: {item.user?.username}</Text>
             </View>
-          
+
             <View style={styles.filesBlock}>
-              {item.files.length > 0 ? (
-                item.files.map(file => {
+            {item.files && item.files.length > 0 ? (
+                item.files
+                  .filter((file) => ['OT', 'SKU', 'OP'].includes(file.type))
+                  .map((file) => {
                   const label = file.file_path.toLowerCase().includes('ot')
                     ? 'Ver OT'
                     : file.file_path.toLowerCase().includes('sku')
-                      ? 'Ver SKU'
-                      : file.file_path.toLowerCase().includes('op')
-                        ? 'Ver OP'
-                        : 'Ver Archivo';
+                    ? 'Ver SKU'
+                    : file.file_path.toLowerCase().includes('op')
+                    ? 'Ver OP'
+                    : 'Ver Archivo';
                   return (
                     <TouchableOpacity
                       key={file.id}
@@ -135,9 +136,13 @@ const WorkOrderList: React.FC<Props> = ({ orders, onSelectOrder }) => {
           {item.flow.map((step, index) => {
             const status = step.status?.toLowerCase() ?? '';
             const isActive = status.includes('inconformidad');
-            const isCompleted = step.status.toLowerCase().includes('completado');
+            const isCompleted = step.status
+              .toLowerCase()
+              .includes('completado');
             const isParcial = step.status.toLowerCase() === 'parcial';
-            const isCalidad = ['calidad', 'cqm'].some(word => step.status.toLowerCase().includes(word));
+            const isCalidad = ['calidad', 'cqm'].some((word) =>
+              step.status.toLowerCase().includes(word)
+            );
             const isLast = index === item.flow.length - 1;
 
             const getColor = () => {
@@ -150,7 +155,12 @@ const WorkOrderList: React.FC<Props> = ({ orders, onSelectOrder }) => {
 
             return (
               <View key={index} style={styles.stepItem}>
-                <View style={[styles.circle, { backgroundColor: getColor(), shadowColor: getColor() }]}>
+                <View
+                  style={[
+                    styles.circle,
+                    { backgroundColor: getColor(), shadowColor: getColor() },
+                  ]}
+                >
                   <Text style={styles.circleText}>{index + 1}</Text>
                 </View>
                 <Text

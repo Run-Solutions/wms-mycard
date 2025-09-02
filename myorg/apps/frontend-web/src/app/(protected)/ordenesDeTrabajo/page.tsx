@@ -33,6 +33,24 @@ const WorkOrdersPage: React.FC = () => {
     sku: File | null;
     op: File | null;
   }>({ ot: null, sku: null, op: null });
+  const [extraFiles, setExtraFiles] = useState<File[]>([]);
+  const MAX_TOTAL_FILES = 8;
+  const MAX_ATTACHMENTS = 5;
+  const ALLOWED_MIME_TYPES = [
+    'application/pdf',
+    'image/png',
+    'image/jpeg',
+    'image/webp',
+  ];
+  const validateFile = (file: File) => {
+    if (!ALLOWED_MIME_TYPES.includes(file.type)) {
+      alert(
+        `Formato no permitido: ${file.name} (${file.type}). Solo PDF/PNG/JPEG/WEBP.`
+      );
+      return false;
+    }
+    return true;
+  };
 
   // Para obtener las areas de operacion
   useEffect(() => {
@@ -53,30 +71,33 @@ const WorkOrdersPage: React.FC = () => {
     '9': 'Milling Chip',
     '10': 'Personalización',
   };
-  
+
   const allowedNextAreas: Record<string, string[]> = {
-    '1': ['2', '3'],          // después de Preprensa → Impresión o Serigrafía
-    '2': ['2', '3', '4'],     // después de Impresión → Serigrafía, Empalme o Impresión
-    '3': ['2', '4', '6'],     // después de Serigrafía → Impresión, Empalme o Corte
-    '4': ['5'],               // después de Empalme → Laminación
-    '5': ['3', '6'],          // después de Laminación → Corte o Serigrafía
+    '1': ['2', '3'], // después de Preprensa → Impresión o Serigrafía
+    '2': ['2', '3', '4'], // después de Impresión → Serigrafía, Empalme o Impresión
+    '3': ['2', '4', '6'], // después de Serigrafía → Impresión, Empalme o Corte
+    '4': ['5'], // después de Empalme → Laminación
+    '5': ['3', '6'], // después de Laminación → Corte o Serigrafía
     '6': ['8', '9', '10', '7'], // después de Corte → Hot Stamping, Milling Chip, Personalización o Color Edge
-    '7': ['8', '9', '10'],    // después de Color Edge → Hot Stamping, Milling Chip o Personalización
-    '8': ['9', '10', '7'],    // después de Hot Stamping → Milling Chip, Personalización o Color Edge
-    '9': ['7', '9', '10'],    // después de Milling Chip → Color Edge, Hot Stamping o Personalización
-    '10': ['7', '10'],        // después de Personalización → Color Edge o Personalización
+    '7': ['8', '9', '10'], // después de Color Edge → Hot Stamping, Milling Chip o Personalización
+    '8': ['9', '10', '7'], // después de Hot Stamping → Milling Chip, Personalización o Color Edge
+    '9': ['7', '9', '10'], // después de Milling Chip → Color Edge, Hot Stamping o Personalización
+    '10': ['7', '10'], // después de Personalización → Color Edge o Personalización
   };
-  
+
   const handleChange = (
-    e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>,
+    e: React.ChangeEvent<
+      HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement
+    >,
     areaIndex?: number
   ) => {
     const target = e.target;
     const name = target.name;
-    const value = target.type === 'checkbox'
-      ? (target as HTMLInputElement).checked
-      : target.value;
-  
+    const value =
+      target.type === 'checkbox'
+        ? (target as HTMLInputElement).checked
+        : target.value;
+
     if (areaIndex !== undefined) {
       // 1) El primer área SIEMPRE debe ser '1' (Preprensa)
       if (areaIndex === 0 && value !== '1' && value !== '') {
@@ -84,16 +105,16 @@ const WorkOrdersPage: React.FC = () => {
           'La primera área debe ser Preprensa (ID: 1). ¿Deseas limpiar todas las áreas seleccionadas?'
         );
         if (shouldReset) {
-          setFormData(prev => ({ ...prev, areasOperatorIds: [] }));
+          setFormData((prev) => ({ ...prev, areasOperatorIds: [] }));
           setDropdownCount(4);
         }
         e.preventDefault();
         return;
       }
-  
+
       // Permitir limpiar (value === '') sin más validación
       if (value === '') {
-        setFormData(prev => {
+        setFormData((prev) => {
           const updated = [...(prev.areasOperatorIds || [])];
           updated[areaIndex] = '';
           // Limpieza en cascada para evitar inconsistencias
@@ -102,41 +123,46 @@ const WorkOrdersPage: React.FC = () => {
         });
         return;
       }
-  
+
       // 2) Para índices > 0, validar contra el VALOR PREVIO (no el índice)
       if (areaIndex > 0) {
         // OJO: usamos el estado actual para leer el valor previo
         const previousValue =
-          (formData?.areasOperatorIds && formData.areasOperatorIds[areaIndex - 1]) || '';
-  
+          (formData?.areasOperatorIds &&
+            formData.areasOperatorIds[areaIndex - 1]) ||
+          '';
+
         if (!previousValue) {
           alert('Selecciona primero el área anterior antes de continuar.');
           e.preventDefault();
           return;
         }
-  
+
         const allowed = allowedNextAreas[previousValue] || [];
         if (!allowed.includes(value as string)) {
-          const allowedNames = allowed.map(v => AREA_NAMES[v] ?? v).join(', ');
+          const allowedNames = allowed
+            .map((v) => AREA_NAMES[v] ?? v)
+            .join(', ');
           alert(
-            `Después de ${AREA_NAMES[previousValue] ?? previousValue} solo puede ir: ${allowedNames}`
+            `Después de ${
+              AREA_NAMES[previousValue] ?? previousValue
+            } solo puede ir: ${allowedNames}`
           );
           e.preventDefault();
           return;
         }
       }
-  
+
       // Actualiza y limpia en cascada lo que viene después para mantener la secuencia válida
-      setFormData(prev => {
+      setFormData((prev) => {
         const updated = [...(prev.areasOperatorIds || [])];
         updated[areaIndex] = value as string;
         for (let i = areaIndex + 1; i < updated.length; i++) updated[i] = '';
         return { ...prev, areasOperatorIds: updated };
       });
-  
     } else {
       // Campos que no son de áreas
-      setFormData(prev => ({ ...prev, [name]: value }));
+      setFormData((prev) => ({ ...prev, [name]: value }));
     }
   };
 
@@ -163,12 +189,59 @@ const WorkOrdersPage: React.FC = () => {
     e: React.ChangeEvent<HTMLInputElement>,
     type: 'ot' | 'sku' | 'op'
   ) => {
-    const file = e.target.files?.[0]; // Obtener solo el primer file
-    if (!file) return; // Si no hay archivos, salimos de la función
-    setFiles((prevFiles) => ({
-      ...prevFiles,
-      [type]: file, // Asignar el archivo al tipo correspondiente
-    }));
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    if (!validateFile(file)) {
+      e.target.value = '';
+      return;
+    }
+
+    // Si reemplazamos uno existente, no debe contar doble
+    const baseCount =
+      (files.ot ? 1 : 0) + (files.sku ? 1 : 0) + (files.op ? 1 : 0);
+    const replacing = files[type] ? 1 : 0;
+    const newTotal = baseCount - replacing + 1 + extraFiles.length;
+
+    if (newTotal > MAX_TOTAL_FILES) {
+      alert(`Con este archivo superas el máximo de ${MAX_TOTAL_FILES} por orden.`);
+      e.target.value = '';
+      return;
+    }
+
+    setFiles((prev) => ({ ...prev, [type]: file }));
+  };
+  const handleExtraFilesChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const picked = Array.from(e.target.files || []);
+    if (picked.length === 0) return;
+
+    const validNew = picked.filter(validateFile);
+
+    const baseCount =
+      (files.ot ? 1 : 0) + (files.sku ? 1 : 0) + (files.op ? 1 : 0);
+    const currentExtra = extraFiles.length;
+    const availableSlots = MAX_TOTAL_FILES - (baseCount + currentExtra);
+
+    if (availableSlots <= 0) {
+      alert(`Ya alcanzaste el máximo de ${MAX_TOTAL_FILES} archivos por orden.`);
+      e.target.value = '';
+      return;
+    }
+
+    const toAdd = validNew.slice(0, availableSlots);
+    if (toAdd.length < validNew.length) {
+      alert(
+        `Se agregaron ${toAdd.length} archivo(s). Límite total ${MAX_TOTAL_FILES}.`
+      );
+    }
+
+    setExtraFiles((prev) => [...prev, ...toAdd]);
+
+    // Limpia el input para poder volver a elegir los mismos archivos, si se quiere
+    e.target.value = '';
+  };
+  const removeExtraFileAt = (index: number) => {
+    setExtraFiles((prev) => prev.filter((_, i) => i !== index));
   };
 
   // Para eliminar un archivo adjunto
@@ -182,10 +255,14 @@ const WorkOrdersPage: React.FC = () => {
   // Para el envío de la informacion
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+
+    // Archivos obligatorios
     if (!files.ot || !files.sku || !files.op) {
       alert('Todos los archivos (OT, SKU, OP) son obligatorios.');
       return;
     }
+
+    // Campos obligatorios
     if (
       !formData.ot_id.trim() ||
       !formData.mycard_id.trim() ||
@@ -196,34 +273,54 @@ const WorkOrdersPage: React.FC = () => {
       return;
     }
 
+    // Flujo mínimo y primera área
     if (formData.areasOperatorIds.length < 3) {
       alert('Debes seleccionar al menos 3 áreas.');
       return;
     }
-
     if (formData.areasOperatorIds[0] !== '1') {
       alert('La primera área debe ser la de Preprensa (ID: 1).');
       return;
     }
 
-    if (!files.ot || !files.sku || !files.op) {
-      alert('Debes subir OT, SKU y OP.');
+    // Límite total de archivos: OT + SKU + OP + extraFiles
+    const totalFiles =
+      (files.ot ? 1 : 0) +
+      (files.sku ? 1 : 0) +
+      (files.op ? 1 : 0) +
+      extraFiles.length;
+      if (extraFiles.length > MAX_ATTACHMENTS) {
+        alert(`Máximo ${MAX_ATTACHMENTS} adjuntos permitidos.`);
+        return;
+      }
+    if (totalFiles > MAX_TOTAL_FILES) {
+      alert(
+        `Máximo ${MAX_TOTAL_FILES} archivos por orden. Actualmente: ${totalFiles}.`
+      );
       return;
     }
+
+    // Normalizar áreas
     const cleanedAreasOperatorIds = formData.areasOperatorIds.filter(
       (id) => id !== '' && id !== undefined && id !== null
     );
+
     const payload = {
       ...formData,
       areasOperatorIds: cleanedAreasOperatorIds,
+      files: extraFiles, // opcional si lo usas en el body JSON además de FormData
     };
+
     try {
       const result = await createWorkOrder(payload, {
         ot: files.ot!,
         sku: files.sku!,
         op: files.op!,
+        attachments: extraFiles, // << enviar adjuntos adicionales
       });
+
       setMessage(result.message || 'Orden de trabajo creada correctamente');
+
       // Reseteamos
       setFormData({
         ot_id: '',
@@ -235,6 +332,7 @@ const WorkOrdersPage: React.FC = () => {
         files: [],
       });
       setFiles({ ot: null, sku: null, op: null });
+      setExtraFiles([]); // << limpiar adjuntos adicionales
       setDropdownCount(4);
     } catch (error: any) {
       console.error(error);
@@ -389,9 +487,98 @@ const WorkOrdersPage: React.FC = () => {
               required
               placeholder="Escribe tus comentarios aquí..."
             />
+            {/* === Adjuntos adicionales (único bloque) === */}
+            <Label>Adjuntos adicionales (PDF / Imágenes):</Label>
+            <label
+              htmlFor="upload-extra"
+              style={{
+                borderRadius: '10rem',
+                border: '2px solid #aeadab',
+                width: '100%',
+                minHeight: '44px',
+                display: 'flex',
+                flexDirection: 'row',
+                alignItems: 'center',
+              }}
+            >
+              <HiddenInput
+                id="upload-extra"
+                type="file"
+                accept={ALLOWED_MIME_TYPES.join(',')}
+                multiple
+                onChange={handleExtraFilesChange}
+                disabled={
+                  (files.ot ? 1 : 0) +
+                    (files.sku ? 1 : 0) +
+                    (files.op ? 1 : 0) +
+                    extraFiles.length >=
+                    MAX_TOTAL_FILES
+                }
+              />
+              <IconButton color="primary" component="span">
+                <UploadFileIcon />
+              </IconButton>
+              <Typography variant="body2" style={{ color: 'black' }}>
+                {extraFiles.length === 0
+                  ? 'Selecciona uno o varios archivos'
+                  : `${extraFiles.length} archivo(s) añadidos`}
+              </Typography>
+            </label>
+
+            {/* Lista (solo una vez) */}
+            {extraFiles.length > 0 && (
+              <div
+                style={{
+                  marginTop: '8px',
+                  display: 'flex',
+                  flexDirection: 'column',
+                  gap: '6px',
+                }}
+              >
+                {extraFiles.map((f, idx) => (
+                  <div
+                    key={`${f.name}-${idx}`}
+                    style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '0.5rem',
+                    }}
+                  >
+                    <Typography
+                      variant="body2"
+                      style={{
+                        color: 'black',
+                        flex: 1,
+                        overflow: 'hidden',
+                        textOverflow: 'ellipsis',
+                        whiteSpace: 'nowrap',
+                      }}
+                      title={f.name}
+                    >
+                      {f.name}
+                    </Typography>
+                    <IconButton
+                      onClick={() => removeExtraFileAt(idx)}
+                      color="error"
+                    >
+                      <DeleteIcon />
+                    </IconButton>
+                  </div>
+                ))}
+              </div>
+            )}
+
+            {/* Ayuda de límite (solo una vez) */}
+            <Typography
+              variant="caption"
+              style={{ marginTop: '6px', color: '#555' }}
+            >
+              Límite total por orden: {MAX_TOTAL_FILES} archivos (incluye OT, SKU,
+              OP).
+            </Typography>
           </Auxiliar>
 
-          <Auxiliar style={{ width:'30%'}}>
+          <Auxiliar style={{ width: '30%' }}>
             <Label>Subir OT (PDF):</Label>
             <label
               htmlFor="upload-ot"
@@ -518,6 +705,7 @@ const WorkOrdersPage: React.FC = () => {
               />
             </CheckboxWrapper>
           </Auxiliar>
+          <Auxiliar></Auxiliar>
         </OperationWrapper>
         <Button type="submit">Crear Orden</Button>
       </FormWrapper>
@@ -625,7 +813,7 @@ const Arrow = styled.div`
 const Auxiliar = styled.div`
   display: flex;
   flex-direction: column; // Pone el Label arriba del Input
-   // Permite que todos los campos ocupen el mismo espacio
+  // Permite que todos los campos ocupen el mismo espacio
 `;
 
 const Label = styled.label`

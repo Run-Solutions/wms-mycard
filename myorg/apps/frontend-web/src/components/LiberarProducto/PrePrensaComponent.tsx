@@ -1,10 +1,10 @@
 'use client';
 
-import axios from 'axios';
 import { useRouter } from 'next/navigation';
 import { useState } from 'react';
 import styled from 'styled-components';
 import { submitPrepressForm } from '@/api/liberarProducto';
+import { WorkOrderPrePressInfo } from './util/WorkOrderInfo';
 
 interface Props {
   workOrder: any;
@@ -78,27 +78,7 @@ export default function PrePrensaComponent({ workOrder }: Props) {
     <Container>
       <Title>Área: Preprensa</Title>
 
-      <DataWrapper>
-        <InfoItem>
-          <Label>Número de Orden:</Label>
-          <Value>{workOrder.workOrder.ot_id}</Value>
-        </InfoItem>
-        <InfoItem>
-          <Label>ID del Presupuesto:</Label>
-          <Value>{workOrder.workOrder.mycard_id}</Value>
-        </InfoItem>
-        <InfoItem>
-          <Label>Cantidad:</Label>
-          <Value>{workOrder.workOrder.quantity}</Value>
-        </InfoItem>
-      </DataWrapper>
-
-      <DataWrapper>
-        <InfoItem style={{ marginTop: '20px' }}>
-          <Label>Comentarios:</Label>
-          <Value>{workOrder.workOrder.comments}</Value>
-        </InfoItem>
-      </DataWrapper>
+      <WorkOrderPrePressInfo workOrder={workOrder} />
 
       <form onSubmit={handleSubmit}>
         <SectionTitle>Datos de Producción</SectionTitle>
@@ -195,12 +175,11 @@ export default function PrePrensaComponent({ workOrder }: Props) {
 // =================== Styled Components ===================
 
 const Container = styled.div`
-  background: white;
   padding: 2rem;
   margin-top: 1.5rem;
   border-radius: 1rem;
   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
-  max-width: 800px;
+  max-width: 1000px;
   margin-left: auto;
   margin-right: auto;
 `;
@@ -219,27 +198,9 @@ const SectionTitle = styled.h3`
   color: #374151;
 `;
 
-const DataWrapper = styled.div`
-  display: flex;
-  flex-direction: row;
-  flex-wrap: wrap;
-  gap: 1rem;
-`;
-
-const InfoItem = styled.div`
-  flex: 1;
-  min-width: 200px;
-`;
-
 const Label = styled.label`
   font-weight: 600;
   color: #6b7280;
-`;
-
-const Value = styled.div`
-  margin-top: 0.25rem;
-  font-weight: 500;
-  color: #111827;
 `;
 
 const NewDataWrapper = styled.div`

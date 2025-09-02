@@ -18,6 +18,7 @@ import { useNavigation } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { RootStackParamList } from '../../navigation/types';
 import { submitPrepressForm } from '../../api/liberarProducto';
+import { WorkOrderPrePressInfo } from './util/WorkOrderInfo';
 
 const PrePrensaComponent: React.FC<{ workOrder: any }> = ({ workOrder }) => {
   const navigation =
@@ -80,10 +81,6 @@ const PrePrensaComponent: React.FC<{ workOrder: any }> = ({ workOrder }) => {
       setShowConfirm(false);
     }
   };
-
-  const cantidadHojasRaw = Number(workOrder?.workOrder.quantity) / 24;
-  const cantidadHojas = cantidadHojasRaw > 0 ? Math.ceil(cantidadHojasRaw) : 0;
-
   return (
     <KeyboardAvoidingView
       style={{ flex: 1 }}
@@ -93,7 +90,7 @@ const PrePrensaComponent: React.FC<{ workOrder: any }> = ({ workOrder }) => {
       <TouchableWithoutFeedback onPress={Keyboard.dismiss}>
         <View style={styles.container}>
           <Text style={styles.title}>Área: Preprensa</Text>
-
+          <WorkOrderPrePressInfo workOrder={workOrder} />
           <ScrollView style={styles.scrollArea}>
             <Text style={styles.subtitle}>Datos de Producción</Text>
 

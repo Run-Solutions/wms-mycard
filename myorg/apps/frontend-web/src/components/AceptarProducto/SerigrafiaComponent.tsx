@@ -7,6 +7,7 @@ import {
   acceptWorkOrderFlow,
   registrarInconformidad,
 } from '@/api/aceptarProducto';
+import { WorkOrderHojasInfo } from './util/WorkOrderInfo';
 
 // Define un tipo para los valores del formulario
 type SerigrafiaData = {
@@ -21,7 +22,6 @@ interface PartialRelease {
   quantity: string;
   observations: string;
   validated: boolean;
-  // otros campos si aplica
 }
 
 export default function SerigrafiaComponentAccept({ workOrder }: Props) {
@@ -134,46 +134,11 @@ export default function SerigrafiaComponentAccept({ workOrder }: Props) {
     }
   };
 
-  const cantidadHojasRaw = Number(workOrder?.workOrder.quantity) / 24;
-  const cantidadHojas = cantidadHojasRaw > 0 ? Math.ceil(cantidadHojasRaw) : 0;
-
   return (
     <Container>
       <Title>Área: {workOrder?.area.name || 'No definida'}</Title>
-      <DataWrapper>
-        <InfoItem>
-          <Label>Número de Orden:</Label>
-          <Value>{workOrder.workOrder.ot_id}</Value>
-        </InfoItem>
-        <InfoItem>
-          <Label>ID del Presupuesto:</Label>
-          <Value>{workOrder.workOrder.mycard_id}</Value>
-        </InfoItem>
-        <InfoItem>
-          <Label>Cantidad (TARJETAS):</Label>
-          <Value>{workOrder.workOrder.quantity || 'No definida'}</Value>
-        </InfoItem>
-        <InfoItem style={{ backgroundColor: '#eaeaf5', borderRadius: '8px' }}>
-          <Label>Cantidad (Hojas Frente / Hojas Vuelta):</Label>
-          <Value>{cantidadHojas}</Value>
-        </InfoItem>
-      </DataWrapper>
-      <DataWrapper style={{ marginTop: '20px' }}>
-        <InfoItem>
-          <Label>Área que lo envía:</Label>
-          <Value>{lastCompletedOrPartial?.area.name || 'No definida'}</Value>
-        </InfoItem>
-        <InfoItem>
-          <Label>Usuario que lo envía:</Label>
-          <Value>
-            {lastCompletedOrPartial?.user?.username || 'No definida'}
-          </Value>
-        </InfoItem>
-      </DataWrapper>
-      <InfoItem>
-        <Label>Comentarios:</Label>
-        <Value>{workOrder.workOrder.comments}</Value>
-      </InfoItem>
+      <WorkOrderHojasInfo workOrder={workOrder} lastCompletedOrPartial={lastCompletedOrPartial} />
+
       <NewData>
         <SectionTitle>Datos de Producción</SectionTitle>
         <NewDataWrapper>
@@ -182,7 +147,7 @@ export default function SerigrafiaComponentAccept({ workOrder }: Props) {
             <Input
               type="number"
               name="release_quantity"
-              value={Math.ceil((defaultValues.release_quantity)/24)}
+              value={Math.ceil(defaultValues.release_quantity / 24)}
               disabled
             />
             <Label>Cantidad entregada (TARJETAS):</Label>
@@ -281,12 +246,11 @@ export default function SerigrafiaComponentAccept({ workOrder }: Props) {
 // =================== Styled Components ===================
 
 const Container = styled.div`
-  background: white;
   padding: 2rem;
   margin-top: 1.5rem;
   border-radius: 1rem;
   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
-  max-width: 800px;
+  max-width: 1000px;
   margin-left: auto;
   margin-right: auto;
 `;
@@ -307,26 +271,9 @@ const SectionTitle = styled.h3`
   color: #374151;
 `;
 
-const DataWrapper = styled.div`
-  display: flex;
-  flex-wrap: wrap;
-`;
-
-const InfoItem = styled.div`
-  flex: 1;
-  padding: 5px;
-  min-width: 150px;
-`;
-
 const Label = styled.label`
   font-weight: 600;
   color: #6b7280;
-`;
-
-const Value = styled.div`
-  margin-top: 0.25rem;
-  font-weight: 500;
-  color: #111827;
 `;
 
 const NewDataWrapper = styled.div`
