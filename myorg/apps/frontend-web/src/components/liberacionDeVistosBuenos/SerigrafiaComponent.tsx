@@ -9,6 +9,7 @@ import {
 } from '@/api/recepcionCQM';
 import { OperatorAdvancedTable } from './util/QuestionTable';
 import SelectionQuestionTable from './util/FormQuestionTable';
+import { WorkOrderHojasInfo } from './util/WorkOrderInfo';
 
 interface Props {
   workOrder: any;
@@ -16,34 +17,32 @@ interface Props {
 type Answer = {
   reviewed: boolean;
   sample_quantity: number;
+  id?: number;
+  FormAnswerResponse?: any[];
 };
 
 export default function SerigrafiaComponent({ workOrder }: Props) {
   const router = useRouter();
-  const [testTypes, SetTestTypes] = useState('');
   const [showInconformidad, setShowInconformidad] = useState(false);
   const [inconformidad, setInconformidad] = useState<string>('');
+  const [showConfirmModal, setShowConfirmModal] = useState(false);
 
-  // Para obtener el ultimo FormAnswer
+  // Último FormAnswer NO revisado
   const index = workOrder?.answers
     ?.map((a: Answer, i: number) => ({ ...a, index: i }))
     .reverse()
     .find((a: Answer) => a.reviewed === false)?.index;
-  console.log('el index', index);
 
-  // Para mostrar formulario de CQM y enviarlo
-  const [showConfirmModal, setShowConfirmModal] = useState(false);
+  // Derivados seguros
+  const currentAnswer: Answer | undefined =
+    typeof index === 'number' ? workOrder?.answers?.[index] : undefined;
+  const formQuestions = workOrder?.area?.formQuestions ?? [];
 
-  //Para guardar las respuestas
+  // Respuestas OK/NG por pregunta (para la tabla)
   const [answersByQuestion, setAnswersByQuestion] = useState<
     Record<number, boolean | undefined>
   >({});
 
-  // Preguntas visibles en la tabla (mismo filtro que pasas al child con roleId=null)
-  const visibleQuestions =
-    workOrder.area.formQuestions?.filter((q: any) => q.role_id === null) ?? [];
-
-  // Listas derivadas para el componente de tabla (no se guardan aparte)
   const checkedRespuestaOK = useMemo(
     () =>
       Object.entries(answersByQuestion)
@@ -51,7 +50,7 @@ export default function SerigrafiaComponent({ workOrder }: Props) {
         .map(([k]) => Number(k)),
     [answersByQuestion]
   );
-  
+
   const checkedRespuestaNG = useMemo(
     () =>
       Object.entries(answersByQuestion)
@@ -59,7 +58,6 @@ export default function SerigrafiaComponent({ workOrder }: Props) {
         .map(([k]) => Number(k)),
     [answersByQuestion]
   );
-
 
   const handleToggleRespuesta = (
     questionId: number,
@@ -70,10 +68,8 @@ export default function SerigrafiaComponent({ workOrder }: Props) {
     setAnswersByQuestion((prev) => {
       const next = { ...prev };
       if (checked) {
-        // marcar OK => true, NG => false (exclusivo)
-        next[questionId] = type === 'ok';
+        next[questionId] = type === 'ok'; // OK => true, NG => false
       } else {
-        // si desmarcan la opción activa, borramos la respuesta
         if (
           (type === 'ok' && next[questionId] === true) ||
           (type === 'ng' && next[questionId] === false)
@@ -85,27 +81,45 @@ export default function SerigrafiaComponent({ workOrder }: Props) {
     });
   };
 
+  const qualityQuestionIds = useMemo(
+    () =>
+      (workOrder?.area?.formQuestions ?? [])
+        .filter((q: any) => q.role_id === 3)
+        .map((q: any) => q.id as number),
+    [workOrder?.area?.formQuestions]
+  );
+
   const handleSubmit = async () => {
-    const formAnswerId = workOrder.answers[index]?.id; // id de FormAnswer
+    const formAnswerId = currentAnswer?.id; // id de FormAnswer
     if (!formAnswerId) {
       alert('No se encontró el ID del formulario.');
       return;
     }
-    const checkboxPayload = Object.entries(answersByQuestion).map(
-      ([questionId, answer]) => ({
-        question_id: Number(questionId),
-        answer: answer === true ? true : answer === false ? false : null, // <-- boolean | null
-      })
+    // 1) Validar que TODAS las preguntas de Calidad tengan respuesta booleana
+    //    (evita null/undefined)
+    const unansweredIds = qualityQuestionIds.filter(
+      (qid: any) =>
+        !(answersByQuestion[qid] === true || answersByQuestion[qid] === false)
     );
+
+    if (unansweredIds.length > 0) {
+      alert('Completa todas las preguntas.');
+      return;
+    }
+
+    // 2) Construir el payload SOLO en el orden de las preguntas de Calidad
+    //    (opcional: si quieres incluir también otras preguntas, mézclalas aquí)
+    const checkboxPayload = qualityQuestionIds.map((qid: any) => ({
+      question_id: qid,
+      answer: answersByQuestion[qid] === true ? true : false, // ya está validado que es boolean
+    }));
+
     const payload = {
       form_answer_id: formAnswerId,
       checkboxes: checkboxPayload,
-      radio: {
-        value: testTypes,
-      },
     };
     try {
-      const res = await submitExtraSerigrafia(payload);
+      await submitExtraSerigrafia(payload);
       router.push('/liberacionDeVistosBuenos');
     } catch (error) {
       console.log('Error al guardar la respuesta: ', error);
@@ -118,7 +132,7 @@ export default function SerigrafiaComponent({ workOrder }: Props) {
       return;
     }
     try {
-      const res = await sendInconformidadCQM(workOrder.id, inconformidad);
+      await sendInconformidadCQM(workOrder?.id, inconformidad);
       router.push('/liberacionDeVistosBuenos');
     } catch (error) {
       console.error(error);
@@ -126,49 +140,35 @@ export default function SerigrafiaComponent({ workOrder }: Props) {
     }
   };
 
-  const cantidadHojasRaw = Number(workOrder?.workOrder.quantity) / 24;
-  const cantidadHojas = cantidadHojasRaw > 0 ? Math.ceil(cantidadHojasRaw) : 0;
+  // Si no hay respuesta pendiente
+  if (!currentAnswer) {
+    return (
+      <Container>
+        <Title>Área a evaluar: Serigrafia</Title>
+        <WorkOrderHojasInfo workOrder={workOrder} />
+        <NewData>
+          <SectionTitle>No hay respuestas pendientes por revisar</SectionTitle>
+          <p style={{ color: '#6b7280' }}>
+            Todas las respuestas parecen estar revisadas.
+          </p>
+        </NewData>
+      </Container>
+    );
+  }
 
   return (
     <Container>
       <Title>Área a evaluar: Serigrafia</Title>
 
-      <DataWrapper>
-        <InfoItem>
-          <Label>Número de Orden:</Label>
-          <Value>{workOrder.workOrder.ot_id}</Value>
-        </InfoItem>
-        <InfoItem>
-          <Label>ID del Presupuesto:</Label>
-          <Value>{workOrder.workOrder.mycard_id}</Value>
-        </InfoItem>
-        <InfoItem>
-          <Label>Cantidad (TARJETAS):</Label>
-          <Value>{workOrder.workOrder.quantity || 'No definida'}</Value>
-        </InfoItem>
-        <InfoItem style={{ backgroundColor: '#eaeaf5', borderRadius: '8px' }}>
-          <Label>Cantidad (Hojas Frente / Hojas Vuelta):</Label>
-          <Value>{cantidadHojas}</Value>
-        </InfoItem>
-      </DataWrapper>
-      <DataWrapper>
-        <InfoItem>
-          <Label>Operador:</Label>
-          <Value>{workOrder.user.username}</Value>
-        </InfoItem>
-        <InfoItem>
-          <Label>Comentarios:</Label>
-          <Value>{workOrder.workOrder.comments}</Value>
-        </InfoItem>
-      </DataWrapper>
+      <WorkOrderHojasInfo workOrder={workOrder} />
 
       <NewData>
         <SectionTitle>Respuestas del operador</SectionTitle>
         <NewDataWrapper>
           <OperatorAdvancedTable
-            questions={workOrder.area.formQuestions ?? []}
-            answers={workOrder.answers[index]?.FormAnswerResponse ?? []}
-            mode={'doble'}
+            questions={formQuestions}
+            answers={currentAnswer?.FormAnswerResponse ?? []}
+            mode="doble"
             readOnly
             columns={['Respuesta']}
           />
@@ -177,8 +177,8 @@ export default function SerigrafiaComponent({ workOrder }: Props) {
             <Input
               type="number"
               value={
-                workOrder?.answers[index].sample_quantity ??
-                'No se reconoce la muestra enviada'
+                currentAnswer?.sample_quantity ??
+                ('No se reconoce la muestra enviada' as any)
               }
               readOnly
             />
@@ -188,7 +188,7 @@ export default function SerigrafiaComponent({ workOrder }: Props) {
         <InputGroup>
           <SectionTitle>Mis respuestas</SectionTitle>
           <SelectionQuestionTable
-            formQuestions={workOrder.area.formQuestions}
+            formQuestions={formQuestions}
             roleId={3} // Calidad
             columns={['Respuesta']}
             checkedQuestions={[
@@ -198,6 +198,7 @@ export default function SerigrafiaComponent({ workOrder }: Props) {
           />
         </InputGroup>
       </NewData>
+
       <div style={{ display: 'flex', gap: '1rem' }}>
         <RechazarButton onClick={() => setShowInconformidad(true)}>
           Rechazar
@@ -206,6 +207,7 @@ export default function SerigrafiaComponent({ workOrder }: Props) {
           Aprobado
         </AceptarButton>
       </div>
+
       {showConfirmModal && (
         <ModalOverlay>
           <ModalContent>
@@ -229,6 +231,7 @@ export default function SerigrafiaComponent({ workOrder }: Props) {
           </ModalContent>
         </ModalOverlay>
       )}
+
       {showInconformidad && (
         <ModalOverlay>
           <ModalBox>
@@ -278,12 +281,11 @@ export default function SerigrafiaComponent({ workOrder }: Props) {
 // =================== Styled Components ===================
 
 const Container = styled.div`
-  background: white;
   padding: 2rem;
   margin-top: 1.5rem;
   border-radius: 1rem;
   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
-  max-width: 800px;
+  max-width: 1000px;
   margin-left: auto;
   margin-right: auto;
 `;
@@ -304,27 +306,10 @@ const SectionTitle = styled.h3`
   color: #374151;
 `;
 
-const DataWrapper = styled.div`
-  display: flex;
-  flex-wrap: wrap;
-`;
-
-const InfoItem = styled.div`
-  flex: 1;
-  padding: 5px;
-  min-width: 150px;
-`;
-
 const Label = styled.label`
   font-weight: 600;
   color: #6b7280;
   width: 50%;
-`;
-
-const Value = styled.div`
-  margin-top: 0.25rem;
-  font-weight: 500;
-  color: #111827;
 `;
 
 const NewDataWrapper = styled.div`
@@ -347,28 +332,8 @@ const Input = styled.input`
   outline: none;
   font-size: 1rem;
   transition: border 0.3s;
-
   &:focus {
     border-color: #0038a8;
-  }
-`;
-
-const ConfirmButton = styled.button`
-  background-color: #0038a8;
-  color: white;
-  padding: 0.5rem 1.5rem;
-  border-radius: 0.5rem;
-  font-weight: 600;
-
-  border: none;
-  cursor: pointer;
-
-  transition: background-color 0.3s ease, color 0.3s ease;
-
-  &:hover,
-  &:focus {
-    background-color: #1e40af;
-    outline: none;
   }
 `;
 
@@ -381,7 +346,6 @@ const Textarea = styled.textarea`
   margin-top: 0.5rem;
   font-size: 1rem;
   resize: vertical;
-
   &:focus {
     border-color: #0038a8;
     outline: none;
@@ -398,9 +362,7 @@ const AceptarButton = styled.button<{ disabled?: boolean }>`
   display: flex;
   border: none;
   cursor: pointer;
-
   transition: background-color 0.3s ease, color 0.3s ease;
-
   &:hover {
     background-color: #1d4ed8;
     outline: none;
@@ -417,58 +379,11 @@ const RechazarButton = styled.button<{ disabled?: boolean }>`
   display: block;
   border: none;
   cursor: pointer;
-
   transition: background-color 0.3s ease, color 0.3s ease;
-
   &:hover {
     background-color: #a0a0a0;
     outline: none;
   }
-`;
-
-const CancelButton = styled.button`
-  background-color: #bbbbbb;
-  color: white;
-  padding: 0.5rem 1.5rem;
-  border-radius: 0.5rem;
-  font-weight: 600;
-
-  border: none;
-  cursor: pointer;
-
-  transition: background-color 0.3s ease, color 0.3s ease;
-
-  &:hover,
-  &:focus {
-    background-color: #a0a0a0;
-    outline: none;
-  }
-`;
-
-const Table = styled.table`
-  width: 100%;
-  border-collapse: collapse;
-  color: black;
-  th,
-  td {
-    padding: 0.75rem;
-    text-align: left;
-    border-bottom: 1px solid #e5e7eb;
-  }
-
-  th {
-    background-color: #f3f4f6;
-    color: #374151;
-  }
-`;
-
-const ModalBox = styled.div`
-  background: white;
-  padding: 2rem;
-  border-radius: 1rem;
-  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.2);
-  max-width: 400px;
-  width: 90%;
 `;
 
 const ModalOverlay = styled.div`
@@ -510,8 +425,48 @@ const Button = styled.button`
   border: none;
   border-radius: 8px;
   cursor: pointer;
-
   &:hover {
     background-color: #005bb5;
+  }
+`;
+
+const ModalBox = styled.div`
+  background: white;
+  padding: 2rem;
+  border-radius: 1rem;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.2);
+  max-width: 400px;
+  width: 90%;
+`;
+
+const CancelButton = styled.button`
+  background-color: #bbbbbb;
+  color: white;
+  padding: 0.5rem 1.5rem;
+  border-radius: 0.5rem;
+  font-weight: 600;
+  border: none;
+  cursor: pointer;
+  transition: background-color 0.3s ease, color 0.3s ease;
+  &:hover,
+  &:focus {
+    background-color: #a0a0a0;
+    outline: none;
+  }
+`;
+
+const ConfirmButton = styled.button`
+  background-color: #0038a8;
+  color: white;
+  padding: 0.5rem 1.5rem;
+  border-radius: 0.5rem;
+  font-weight: 600;
+  border: none;
+  cursor: pointer;
+  transition: background-color 0.3s ease, color 0.3s ease;
+  &:hover,
+  &:focus {
+    background-color: #1e40af;
+    outline: none;
   }
 `;

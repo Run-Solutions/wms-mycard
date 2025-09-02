@@ -24,6 +24,10 @@ import { InconformityData } from '../../../../components/SeguimientoDeOts/Inconf
 import ProgressBarAreas from '../../../../components/SeguimientoDeOts/ProgressBarAreas';
 import BadQuantityModal from '../../../../components/SeguimientoDeOts/BadQuantityModal';
 import { VistosBuenosHistory } from '../../../../components/SeguimientoDeOts/VistosBuenosHistory';
+import * as FileSystem from 'expo-file-system';
+import { Buffer } from 'buffer';
+import FileViewer from 'react-native-file-viewer';
+import { getFileByName } from '../../../../api/finalizacion';
 
 type WorkOrderDetailRouteProp = RouteProp<
   InternalStackParamList,
@@ -91,6 +95,39 @@ const WorkOrderDetailScreen: React.FC = () => {
   }>({});
   const [vistosBuenosHistory, setVistosBuenosHistory] = useState([]);
 
+  function getLabelByType(type: string) {
+    switch (type) {
+      case 'OT':
+        return 'Ver OT';
+      case 'SKU':
+        return 'Ver SKU';
+      case 'OP':
+        return 'Ver OP';
+      default:
+        return 'Adjunto';
+    }
+  }
+
+  const downloadFile = async (filename: string) => {
+    try {
+      const res = await getFileByName(filename);
+      if (!res) {
+        console.error('❌ Error desde el backend');
+        return;
+      }
+      const base64Data = Buffer.from(res, 'binary').toString('base64');
+      const fileUri = FileSystem.documentDirectory + filename;
+      await FileSystem.writeAsStringAsync(fileUri, base64Data, {
+        encoding: FileSystem.EncodingType.Base64,
+      });
+      await FileViewer.open(fileUri, {
+        showOpenWithDialog: true,
+        displayName: filename,
+      });
+    } catch (error) {
+      console.error('Error al abrir el archivo:', error);
+    }
+  };
   const loadData = async () => {
     const data = await fetchWorkOrderById(id);
     setWorkOrder(data);
@@ -163,7 +200,7 @@ const WorkOrderDetailScreen: React.FC = () => {
       })) || [];
     setAreas(areaData);
 
-     // Procesamiento de inconformidades
+    // Procesamiento de inconformidades
     const allInconformities =
       data?.flow?.flatMap((flowItem: any) => {
         const areaName = flowItem.area?.name || 'Area desconocida';
@@ -189,7 +226,7 @@ const WorkOrderDetailScreen: React.FC = () => {
               })) || []
           ) || [];
 
-          const audits: InconformityData[] = [];
+        const audits: InconformityData[] = [];
 
         if (flowItem.areaResponse) {
           Object.values(flowItem.areaResponse).forEach((block: any) => {
@@ -607,26 +644,62 @@ const WorkOrderDetailScreen: React.FC = () => {
       <Text style={styles.title}>Información de la Orden #{id}</Text>
 
       <View style={styles.card}>
-        <InfoCard label="Número de Orden" value={String(workOrder?.ot_id)} />
+        <InfoCard
+          label="Número de Orden"
+          value={String(workOrder?.ot_id ?? '')}
+        />
         <InfoCard
           label="Id del Presupuesto"
-          value={String(workOrder?.mycard_id)}
+          value={String(workOrder?.mycard_id ?? '')}
         />
         <InfoCard
           label="Cantidad (TARJETAS)"
-          value={String(workOrder?.quantity)}
+          value={String(workOrder?.quantity ?? '')}
         />
         <InfoCard
+          style={{ backgroundColor: '#93C5FD' }}
           label="Cantidad (Hojas Frente / Hojas Vuelta)"
-          value={String(cantidadHojas)}
+          value={String(cantidadHojas ?? '')}
         />
         <InfoCard
           label="Fecha de Creación"
-          value={new Date(workOrder?.createdAt).toLocaleDateString()}
+          value={
+            workOrder?.createdAt
+              ? new Date(workOrder.createdAt).toLocaleDateString()
+              : '—'
+          }
         />
-        <InfoCard label="Comentarios" value={String(workOrder?.comments)} />
+        <InfoCard
+          label="Comentarios"
+          value={String(workOrder?.comments ?? '')}
+        />
+        <InfoCard label="Archivos de la Orden de Trabajo">
+          {Array.isArray(workOrder?.files) && workOrder.files.length > 0 ? (
+            <ScrollView
+              horizontal
+              showsHorizontalScrollIndicator={false}
+              contentContainerStyle={fileStyles.row}
+            >
+              {workOrder.files.map((file: any) => (
+                <TouchableOpacity
+                  key={file.id}
+                  onPress={() => downloadFile(file.file_path)} // ver función abajo
+                  style={fileStyles.button}
+                  activeOpacity={0.8}
+                >
+                  <Text style={fileStyles.buttonText}>
+                    {getLabelByType(file.type)}
+                  </Text>
+                </TouchableOpacity>
+              ))}
+            </ScrollView>
+          ) : (
+            <Text style={fileStyles.empty}>
+              No se ha adjuntado ningún archivo
+            </Text>
+          )}
+        </InfoCard>
       </View>
-
       {areas.length > 0 && <ProgressBarAreas areas={areas} />}
 
       <Text style={styles.subtitle}>Datos de Producción por Área</Text>
@@ -840,14 +913,14 @@ const WorkOrderDetailScreen: React.FC = () => {
         </>
       )}
       <VistosBuenosHistory
-            history={vistosBuenosHistory}
-            qualitySectionOpen={qualitySectionOpen}
-            toggleQualitySection={toggleQualitySection}
+        history={vistosBuenosHistory}
+        qualitySectionOpen={qualitySectionOpen}
+        toggleQualitySection={toggleQualitySection}
       />
       <InconformitiesHistory
-            inconformities={inconformities}
-            qualitySectionOpen={inconformitySectionOpen}
-            toggleQualitySection={toggleInconformitySection}
+        inconformities={inconformities}
+        qualitySectionOpen={inconformitySectionOpen}
+        toggleQualitySection={toggleInconformitySection}
       />
 
       {workOrder?.status !== 'Cerrado' && (
@@ -1069,4 +1142,23 @@ const styles = StyleSheet.create({
     backgroundColor: '#4ADE80', // verde tailwind: bg-green-400
     borderRadius: 8,
   },
+});
+const fileStyles = StyleSheet.create({
+  row: { gap: 8, paddingVertical: 4 },
+  button: {
+    paddingVertical: 10,
+    paddingHorizontal: 14,
+    backgroundColor: '#FFFFFF',
+    borderWidth: 1,
+    borderColor: '#E5E7EB',
+    borderRadius: 12,
+    shadowColor: '#000',
+    shadowOpacity: 0.05,
+    shadowOffset: { width: 0, height: 1 },
+    shadowRadius: 2,
+    elevation: 1,
+    marginRight: 8,
+  },
+  buttonText: { color: '#374151', fontSize: 14, fontWeight: '600' },
+  empty: { fontSize: 16, fontWeight: '600', color: '#111827' },
 });

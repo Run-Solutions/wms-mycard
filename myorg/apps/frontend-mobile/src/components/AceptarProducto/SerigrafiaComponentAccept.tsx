@@ -16,6 +16,7 @@ import { acceptWorkOrderFlow } from '../../api/aceptarProducto';
 import { registrarInconformidad } from '../../api/aceptarProducto';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { RootStackParamList } from '../../navigation/types';
+import { WorkOrderHojasInfo } from './util/WorkOrderInfo';
 
 type SerigrafiaData = {
   release_quantity: number;
@@ -65,46 +66,46 @@ const SerigrafiaComponentAccept: React.FC<{ workOrder: any }> = ({
     lastCompletedOrPartial.status === 'Enviado a CQM' ||
     lastCompletedOrPartial.status === 'En Inconformidad CQM' ||
     lastCompletedOrPartial.status === 'En Calidad';
-    useEffect(() => {
-      if (!lastCompletedOrPartial) return;
-  
-      const serigrafia = lastCompletedOrPartial.areaResponse?.serigrafia;
-      const partials = lastCompletedOrPartial.partialReleases;
-  
-      const allValidated =
-        partials.length > 0 && partials.every((p: any) => p.validated);
-  
-      if (serigrafia && partials.length === 0) {
-        // Caso original: hay serigrafia pero no hay parciales
-        const vals: SerigrafiaData = {
-          release_quantity: serigrafia.release_quantity || '',
-          comments: serigrafia.comments || '',
-        };
-        setDefaultValues(vals);
-      } else if (serigrafia && allValidated) {
-        // Nuevo caso: todos los parciales están validados y hay serigrafia
-        const totalParciales = partials.reduce(
-          (acc: any, curr: any) => acc + (curr.quantity || 0),
-          0
-        );
-        const restante = (serigrafia.release_quantity || 0) - totalParciales;
-  
-        const vals: SerigrafiaData = {
-          release_quantity: restante > 0 ? restante : 0,
-          comments: serigrafia.comments || '',
-        };
-        setDefaultValues(vals);
-      } else {
-        // Caso original: se busca el primer parcial sin validar
-        const firstUnvalidatedPartial = partials.find((p: any) => !p.validated);
-  
-        const vals: SerigrafiaData = {
-          release_quantity: firstUnvalidatedPartial?.quantity || '',
-          comments: firstUnvalidatedPartial?.observation || '',
-        };
-        setDefaultValues(vals);
-      }
-    }, [workOrder]);
+  useEffect(() => {
+    if (!lastCompletedOrPartial) return;
+
+    const serigrafia = lastCompletedOrPartial.areaResponse?.serigrafia;
+    const partials = lastCompletedOrPartial.partialReleases;
+
+    const allValidated =
+      partials.length > 0 && partials.every((p: any) => p.validated);
+
+    if (serigrafia && partials.length === 0) {
+      // Caso original: hay serigrafia pero no hay parciales
+      const vals: SerigrafiaData = {
+        release_quantity: serigrafia.release_quantity || '',
+        comments: serigrafia.comments || '',
+      };
+      setDefaultValues(vals);
+    } else if (serigrafia && allValidated) {
+      // Nuevo caso: todos los parciales están validados y hay serigrafia
+      const totalParciales = partials.reduce(
+        (acc: any, curr: any) => acc + (curr.quantity || 0),
+        0
+      );
+      const restante = (serigrafia.release_quantity || 0) - totalParciales;
+
+      const vals: SerigrafiaData = {
+        release_quantity: restante > 0 ? restante : 0,
+        comments: serigrafia.comments || '',
+      };
+      setDefaultValues(vals);
+    } else {
+      // Caso original: se busca el primer parcial sin validar
+      const firstUnvalidatedPartial = partials.find((p: any) => !p.validated);
+
+      const vals: SerigrafiaData = {
+        release_quantity: firstUnvalidatedPartial?.quantity || '',
+        comments: firstUnvalidatedPartial?.observation || '',
+      };
+      setDefaultValues(vals);
+    }
+  }, [workOrder]);
 
   const handleAceptar = async () => {
     try {
@@ -133,43 +134,23 @@ const SerigrafiaComponentAccept: React.FC<{ workOrder: any }> = ({
     }
   };
 
-  const cantidadHojasRaw = Number(workOrder?.workOrder.quantity) / 24;
-  const cantidadHojas = cantidadHojasRaw > 0 ? Math.ceil(cantidadHojasRaw) : 0;
   const isAcceptButtonDisabled = isAcceptDisabled();
   return (
     <ScrollView contentContainerStyle={styles.container}>
       <Text style={styles.title}>Área: {workOrder.area.name}</Text>
 
-      <View style={styles.card}>
-        <Text style={styles.label}>Número de Orden:</Text>
-        <Text style={styles.value}>{workOrder.workOrder.ot_id}</Text>
+      <WorkOrderHojasInfo
+        workOrder={workOrder}
+        lastCompletedOrPartial={lastCompletedOrPartial}
+      />
 
-        <Text style={styles.label}>ID del Presupuesto:</Text>
-        <Text style={styles.value}>{workOrder.workOrder.mycard_id}</Text>
+      <Text style={styles.subtitle}>
+        Cantidad entregada (Hojas Frente / Hojas Vuelta)
+      </Text>
+      <Text style={styles.input}>
+        {Math.ceil(defaultValues.release_quantity / 24)}
+      </Text>
 
-        <Text style={styles.label}>Cantidad (TARJETAS):</Text>
-        <Text style={styles.value}>{workOrder.workOrder.quantity}</Text>
-
-        <Text style={styles.label}>Cantidad (Hojas Frente / Hojas Vuelta):</Text>
-        <Text style={styles.value}>{cantidadHojas}</Text>
-
-        <Text style={styles.label}>Área que lo envía:</Text>
-        <Text style={styles.value}>
-          {lastCompletedOrPartial?.area?.name || 'No definida'}
-        </Text>
-
-        <Text style={styles.label}>Usuario que lo envía:</Text>
-        <Text style={styles.value}>
-          {lastCompletedOrPartial?.user?.username || 'No definido'}
-        </Text>
-
-        <Text style={styles.label}>Comentarios:</Text>
-        <Text style={styles.value}>{workOrder.workOrder.comments}</Text>
-      </View>
-
-      <Text style={styles.subtitle}>Cantidad entregada (Hojas Frente / Hojas Vuelta)</Text>
-      <Text style={styles.input}>{Math.ceil((defaultValues.release_quantity)/24)}</Text>
-      
       <Text style={styles.subtitle}>Cantidad entregada (TARJETAS)</Text>
       <Text style={styles.input}>{defaultValues.release_quantity}</Text>
 

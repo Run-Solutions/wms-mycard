@@ -10,6 +10,9 @@ import {
 import { useAuthContext } from '@/context/AuthContext';
 import { calcularCantidadPorLiberar } from './util/calcularCantidadPorLiberar';
 import SelectionQuestionTable from './util/FormQuestionTable';
+import { WorkOrderHojasInfo } from './util/WorkOrderInfo';
+import { usePartialReleaseControls } from './util/disablePartialTime';
+
 interface Props {
   workOrder: any;
 }
@@ -36,7 +39,107 @@ export default function ImpresionComponent({ workOrder }: Props) {
   const closeModal = () => {
     setShowModal(false);
   };
+  console.log('El mismo workOrder (workOrder)', workOrder);
+  const { user } = useAuthContext();
+  const currentUserId = user?.id;
+
+  const flowList = [...workOrder.workOrder.flow];
+  const currentFlow = workOrder.workOrder.flow.find(
+    (f: any) =>
+      f.area_id === workOrder.area.id &&
+      [
+        'Pendiente',
+        'En proceso',
+        'Parcial',
+        'Pendiente parcial',
+        'Listo',
+        'Enviado a CQM',
+        'En Calidad',
+      ].includes(f.status) &&
+      f.user?.id === currentUserId
+  );
+  if (!currentFlow) {
+    alert('No tienes una orden activa para esta área.');
+    return;
+  }
+  const allParcialsValidated = currentFlow.partialReleases?.every(
+    (r: PartialRelease) => r.validated
+  );
+  const currentIndex = flowList.findIndex((item) => item.id === currentFlow.id);
+  console.log('el currentIndex', currentIndex);
+  // Anterior (si hay)
+  const lastCompletedOrPartial =
+    currentIndex > 0 ? flowList[currentIndex - 1] : null;
+  // Siguiente (si hay)
+  const nextFlow =
+    currentIndex !== -1 && currentIndex < flowList.length - 1
+      ? flowList[currentIndex + 1]
+      : null;
+  console.log('El flujo actual (currentFlow)', currentFlow);
+  console.log('El siguiente flujo (nextFlow)', nextFlow);
+  console.log('Ultimo parcial o completado', lastCompletedOrPartial);
+  const cantidadporliberar = calcularCantidadPorLiberar(
+    currentFlow,
+    lastCompletedOrPartial
+  );
+  console.log('Cantidad final por liberar:', cantidadporliberar);
+  const statusesToCheck = [
+    currentFlow?.status,
+    nextFlow?.status,
+    lastCompletedOrPartial?.status,
+  ];
+
+  const { disableCQM, disablePartial, cooldown } = usePartialReleaseControls({
+    flow: currentFlow,
+    cantidadPorLiberar: cantidadporliberar,
+    withCountdown: true,
+
+    // 🔎 acá decides contra qué comparar:
+    statusesToCheck, // revisa current + next + last
+    blockedForCQM: [
+      'Enviado a CQM',
+      'En Calidad',
+      'Listo',
+      'Pendiente parcial',
+    ],
+    blockedForCQM_AfterCorte: [
+      'Enviado a CQM',
+      'En Calidad',
+      'Listo',
+      'Pendiente',
+      'Pendiente parcial',
+      'Enviado a auditoria parcial',
+      'En inconformidad CQM',
+      'Enviado a Auditoria',
+    ],
+  });
+
+  const shouldDisableCQM = () => disableCQM;
   const shouldDisableLiberar = () => {
+    // 1) Detectar si CQM está bloqueado SOLO por cooldown (<24h y sin otras razones)
+    const estadosBloqueadosCQM = ['Enviado a CQM', 'En Calidad', 'Listo'];
+    const estadosBloqueadosNext = ['Pendiente parcial'];
+
+    const byStatusCQM = estadosBloqueadosCQM.includes(
+      currentFlow.status?.trim?.() ?? ''
+    );
+    const byNextCQM = estadosBloqueadosNext.includes(
+      nextFlow?.status?.trim?.() ?? ''
+    );
+    const byCantidad = Number(cantidadporliberar) === 0;
+
+    // cooldown aplica solo si NO hay areaResponse
+    const byCooldown = !currentFlow.areaResponse && !!cooldown?.isLocked;
+
+    const cqmBloqueadoSoloPorTiempo =
+      byCooldown && !byStatusCQM && !byNextCQM && !byCantidad;
+
+    // 👉 Regla pedida: si CQM está bloqueado SOLO por tiempo, habilitamos "Liberación parcial"
+    if (cqmBloqueadoSoloPorTiempo) {
+      return false; // NO deshabilitar el botón de liberar parcial
+    }
+
+    // 2) Si no es el caso anterior, aplicamos tus reglas + base del hook para parciales
     const currentInvalidStatuses = [
       'Enviado a CQM',
       'En Calidad',
@@ -49,32 +152,29 @@ export default function ImpresionComponent({ workOrder }: Props) {
       'En Calidad',
       'Pendiente parcial',
       'Enviado a auditoria parcial',
-      'Enviado a auditoria',
       'En inconformidad CQM',
     ];
 
     const isCurrentInvalid = currentInvalidStatuses.includes(
-      currentFlow.status?.trim()
+      currentFlow.status?.trim?.() ?? ''
     );
     const isNextInvalid = nextInvalidStatuses.includes(
-      nextFlow?.status?.trim()
+      nextFlow?.status?.trim?.() ?? ''
     );
     const isNextInvalidAndNotValidated =
-      nextInvalidStatuses.includes(nextFlow?.status?.trim()) &&
+      nextInvalidStatuses.includes(nextFlow?.status?.trim?.() ?? '') &&
       !allParcialsValidated;
 
+    // disablePartial (del hook) bloquea por cantidad=0 o estados finales
     return (
+      disablePartial ||
       isDisabled ||
       isCurrentInvalid ||
       isNextInvalidAndNotValidated ||
       isNextInvalid
     );
   };
-  const shouldDisableCQM = () => {
-    const estadosBloqueados = ['Enviado a CQM', 'En Calidad', 'Listo'];
-    const isDisabled = estadosBloqueados.includes(currentFlow.status);
-    return isDisabled || Number(cantidadporliberar) === 0;
-  };
+
   //Para guardar las respuestas
   const [responses, setResponses] = useState<
     { questionId: number; answer: boolean }[]
@@ -179,48 +279,6 @@ export default function ImpresionComponent({ workOrder }: Props) {
     setQualitySectionOpen(!qualitySectionOpen);
   };
 
-  console.log('El mismo workOrder (workOrder)', workOrder);
-  const flowList = [...workOrder.workOrder.flow];
-
-  const { user } = useAuthContext();
-  const currentUserId = user?.id;
-
-  const currentFlow = workOrder.workOrder.flow.find(
-    (f: any) =>
-      f.area_id === workOrder.area.id &&
-      [
-        'Pendiente',
-        'En proceso',
-        'Parcial',
-        'Pendiente parcial',
-        'Listo',
-        'Enviado a CQM',
-        'En Calidad',
-      ].includes(f.status) &&
-      f.user?.id === currentUserId
-  );
-  if (!currentFlow) {
-    alert('No tienes una orden activa para esta área.');
-    return;
-  }
-  const currentIndex = flowList.findIndex((item) => item.id === currentFlow.id);
-  console.log('el currentIndex', currentIndex);
-  // Anterior (si hay)
-  const lastCompletedOrPartial =
-    currentIndex > 0 ? flowList[currentIndex - 1] : null;
-  // Siguiente (si hay)
-  const nextFlow =
-    currentIndex !== -1 && currentIndex < flowList.length - 1
-      ? flowList[currentIndex + 1]
-      : null;
-  console.log('El flujo actual (currentFlow)', currentFlow);
-  console.log('El siguiente flujo (nextFlow)', nextFlow);
-  console.log('Ultimo parcial o completado', lastCompletedOrPartial);
-
-  const allParcialsValidated = currentFlow.partialReleases?.every(
-    (r: PartialRelease) => r.validated
-  );
-
   const tarjetasporliberar = sampleQuantity * 24;
 
   // Para mandar la OT a evaluacion por CQM
@@ -232,7 +290,7 @@ export default function ImpresionComponent({ workOrder }: Props) {
       return;
     }
 
-    // 1) Preguntas VISIBLES (mismo criterio que tu tabla)
+    // 1) Preguntas VISIBLES 
     const visibleQuestions = (workOrder.area.formQuestions ?? [])
       // .slice(ini, fin) // <-- si tu tabla usa slice, aplícalo aquí
       .filter((q: any) => q.role_id === null);
@@ -335,112 +393,18 @@ export default function ImpresionComponent({ workOrder }: Props) {
     }
   };
 
-  const cantidadporliberar = calcularCantidadPorLiberar(
-    currentFlow,
-    lastCompletedOrPartial
-  );
-  console.log('Cantidad final por liberar:', cantidadporliberar);
 
-  const cantidadHojasRaw = Number(workOrder?.workOrder.quantity) / 24;
-  const cantidadHojas = cantidadHojasRaw > 0 ? Math.ceil(cantidadHojasRaw) : 0;
 
   return (
     <>
       <Container>
         <Title>Área: Impresion</Title>
+        <WorkOrderHojasInfo
+          workOrder={workOrder}
+          lastCompletedOrPartial={lastCompletedOrPartial}
+          cantidadporliberar={cantidadporliberar}
+        />
 
-        <DataWrapper style={{ gap: '2px' }}>
-          <InfoItem>
-            <Label>Número de Orden:</Label>
-            <Value>{workOrder.workOrder.ot_id}</Value>
-          </InfoItem>
-          <InfoItem>
-            <Label>ID del Presupuesto:</Label>
-            <Value>{workOrder.workOrder.mycard_id}</Value>
-          </InfoItem>
-          <InfoItem>
-            <Label>Cantidad (TARJETAS):</Label>
-            <Value>{workOrder.workOrder.quantity || 'No definida'}</Value>
-          </InfoItem>
-          <InfoItem style={{ backgroundColor: '#eaeaf5', borderRadius: '8px' }}>
-            <Label>Cantidad (Hojas Frente / Hojas Vuelta):</Label>
-            <Value>{cantidadHojas}</Value>
-          </InfoItem>
-        </DataWrapper>
-        <DataWrapper style={{ marginTop: '20px' }}>
-          <InfoItem>
-            <Label>Área que lo envía:</Label>
-            <Value>{lastCompletedOrPartial.area.name}</Value>
-          </InfoItem>
-          <InfoItem>
-            <Label>Usuario del area previa:</Label>
-            <Value>{lastCompletedOrPartial.user.username}</Value>
-          </InfoItem>
-          <InfoItem>
-            <Label>
-              {(lastCompletedOrPartial.areaResponse &&
-                lastCompletedOrPartial.partialReleases.length === 0) ||
-              lastCompletedOrPartial.areaResponse
-                ? 'Cantidad entregada:'
-                : lastCompletedOrPartial.partialReleases?.some(
-                    (r: PartialRelease) => r.validated
-                  )
-                ? 'Cantidad entregada validada:'
-                : 'Cantidad faltante por liberar:'}
-            </Label>
-            <Value>
-              {(lastCompletedOrPartial.areaResponse &&
-                lastCompletedOrPartial.partialReleases.length === 0) ||
-              lastCompletedOrPartial.areaResponse
-                ? // Mostrar cantidad según sub-área disponible
-                  lastCompletedOrPartial.areaResponse.prepress?.plates ??
-                  lastCompletedOrPartial.areaResponse.impression
-                    ?.release_quantity ??
-                  lastCompletedOrPartial.areaResponse.serigrafia
-                    ?.release_quantity ??
-                  lastCompletedOrPartial.areaResponse.empalme
-                    ?.release_quantity ??
-                  lastCompletedOrPartial.areaResponse.laminacion
-                    ?.release_quantity ??
-                  lastCompletedOrPartial.areaResponse.corte?.good_quantity ??
-                  lastCompletedOrPartial.areaResponse.colorEdge
-                    ?.good_quantity ??
-                  lastCompletedOrPartial.areaResponse.hotStamping
-                    ?.good_quantity ??
-                  lastCompletedOrPartial.areaResponse.millingChip
-                    ?.good_quantity ??
-                  lastCompletedOrPartial.areaResponse.personalizacion
-                    ?.good_quantity ??
-                  'Sin cantidad'
-                : lastCompletedOrPartial.partialReleases?.some(
-                    (r: PartialRelease) => r.validated
-                  )
-                ? lastCompletedOrPartial.partialReleases
-                    .filter((release: PartialRelease) => release.validated)
-                    .reduce(
-                      (sum: number, release: PartialRelease) =>
-                        sum + release.quantity,
-                      0
-                    )
-                : (lastCompletedOrPartial.workOrder?.quantity ?? 0) -
-                  (lastCompletedOrPartial.partialReleases?.reduce(
-                    (sum: number, release: PartialRelease) =>
-                      sum + release.quantity,
-                    0
-                  ) ?? 0)}
-            </Value>
-          </InfoItem>
-          {workOrder?.partialReleases?.length > 0 && (
-            <InfoItem>
-              <Label>Cantidad por Liberar:</Label>
-              <Value>{cantidadporliberar}</Value>
-            </InfoItem>
-          )}
-        </DataWrapper>
-        <InfoItem style={{ marginTop: '20px' }}>
-          <Label>Comentarios:</Label>
-          <Value>{workOrder.workOrder.comments}</Value>
-        </InfoItem>
         <NewData>
           <SectionTitle>Datos de Producción</SectionTitle>
           <NewDataWrapper>
@@ -597,12 +561,11 @@ export default function ImpresionComponent({ workOrder }: Props) {
 // =================== Styled Components ===================
 
 const Container = styled.div`
-  background: white;
   padding: 2rem;
   margin-top: 1.5rem;
   border-radius: 1rem;
   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
-  max-width: 800px;
+  max-width: 1000px;
   margin-left: auto;
   margin-right: auto;
 `;
@@ -623,27 +586,10 @@ const SectionTitle = styled.h3`
   color: #374151;
 `;
 
-const DataWrapper = styled.div`
-  display: flex;
-  flex-wrap: wrap;
-`;
-
-const InfoItem = styled.div`
-  flex: 1;
-  padding: 5px;
-  min-width: 150px;
-`;
-
 const Label = styled.label`
   font-weight: 600;
   color: #6b7280;
   width: 50%;
-`;
-
-const Value = styled.div`
-  margin-top: 0.25rem;
-  font-weight: 500;
-  color: #111827;
 `;
 
 const NewDataWrapper = styled.div`
@@ -790,23 +736,6 @@ const ModalTitle = styled.h2`
   margin-bottom: 1.5rem;
   color: #1f2937;
   text-align: center;
-`;
-
-const Table = styled.table`
-  width: 100%;
-  border-collapse: collapse;
-
-  th,
-  td {
-    padding: 0.75rem;
-    text-align: left;
-    border-bottom: 1px solid #e5e7eb;
-  }
-
-  th {
-    background-color: #f3f4f6;
-    color: #374151;
-  }
 `;
 
 const CloseButton = styled.button`

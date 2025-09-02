@@ -337,7 +337,7 @@ const WorkOrderTable: React.FC<Props> = ({ orders, title, statusFilter }) => {
               {paginatedOrders.map((orderFlow) => (
                 <TableRow key={orderFlow.id}>
                   <TableCell
-                    onClick={() => router.push(`/rechazos/${orderFlow.ot_id}`)}
+                    onClick={() => (window.location.href = `/rechazos/${orderFlow.ot_id}`)}
                     sx={{
                       color: 'black',
                       cursor: 'pointer',
@@ -351,9 +351,7 @@ const WorkOrderTable: React.FC<Props> = ({ orders, title, statusFilter }) => {
                   <CustomTableCell sx={{ maxWidth: 900, overflowX: 'hidden' }}>
                     <Timeline>
                       {orderFlow.flow?.map((flowStep, index) => {
-                        const isActive = [
-                          'inconformidad',
-                        ].some((word) =>
+                        const isActive = ['inconformidad'].some((word) =>
                           flowStep.status?.toLowerCase().includes(word)
                         );
                         const isCompleted = flowStep.status
@@ -381,53 +379,40 @@ const WorkOrderTable: React.FC<Props> = ({ orders, title, statusFilter }) => {
                     {new Date(orderFlow.createdAt).toLocaleDateString()}
                   </CustomTableCell>
                   <CustomTableCell>
-                    {orderFlow.files.length > 0 ? (
-                      <div
-                        style={{
-                          display: 'flex',
-                          flexDirection: 'column',
-                          flexWrap: 'wrap',
-                          gap: '0.5rem',
-                        }}
-                      >
-                        {orderFlow.files.map((file) => {
-                          const fileName = file.file_path.toLowerCase();
-                          const label = fileName.includes('ot')
-                            ? 'Ver OT'
-                            : fileName.includes('sku')
-                            ? 'Ver SKU'
-                            : fileName.includes('op')
-                            ? 'Ver OP'
-                            : 'Ver Archivo';
-                          return (
-                            <button
-                              key={file.file_path}
-                              onClick={() => downloadFile(file.file_path)}
-                              style={{
-                                border: '1px solid #c2c2c2',
-                                borderRadius: '20px',
-                                padding: '4px 12px',
-                                backgroundColor: '#f7f7f7',
-                                cursor: 'pointer',
-                                fontSize: '0.75rem',
-                                transition: 'all 0.2s ease-in-out',
-                              }}
-                              onMouseOver={(e) => {
-                                (
-                                  e.target as HTMLButtonElement
-                                ).style.backgroundColor = '#e0e0e0';
-                              }}
-                              onMouseOut={(e) => {
-                                (
-                                  e.target as HTMLButtonElement
-                                ).style.backgroundColor = '#f7f7f7';
-                              }}
-                            >
-                              {label}
-                            </button>
-                          );
-                        })}
-                      </div>
+                    {orderFlow.files && orderFlow.files.length > 0 ? (
+                      <Box display="flex" flexDirection="column" gap={0.5}>
+                        {orderFlow.files
+                          .filter((file) =>
+                            ['OT', 'SKU', 'OP'].includes(file.type)
+                          ) // ← Filtramos solo esos 3
+                          .map((file) => {
+                            const label =
+                              file.type === 'OT'
+                                ? 'Ver OT'
+                                : file.type === 'SKU'
+                                ? 'Ver SKU'
+                                : 'Ver OP';
+
+                            return (
+                              <Box
+                                component="button"
+                                key={file.id}
+                                onClick={() => downloadFile(file.file_path)}
+                                sx={{
+                                  border: '1px solid #c2c2c2',
+                                  borderRadius: '20px',
+                                  p: '4px 12px',
+                                  backgroundColor: '#f7f7f7',
+                                  cursor: 'pointer',
+                                  fontSize: '0.75rem',
+                                  '&:hover': { backgroundColor: '#e0e0e0' },
+                                }}
+                              >
+                                {label}
+                              </Box>
+                            );
+                          })}
+                      </Box>
                     ) : (
                       'No hay archivos'
                     )}

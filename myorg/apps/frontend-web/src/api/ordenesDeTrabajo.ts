@@ -15,7 +15,7 @@ export const getAreasOperator = async () => {
   // Crear orden de trabajo
 export const createWorkOrder = async (
   formData: any,
-  files: { ot: File; sku: File; op: File }
+  files: { ot: File; sku: File; op: File; attachments?: File[] }
 ) => {
   const token = localStorage.getItem('token');
   if (!token) throw new Error('Token no disponible');
@@ -24,6 +24,10 @@ export const createWorkOrder = async (
   formDataToSend.append('ot', files.ot);
   formDataToSend.append('sku', files.sku);
   formDataToSend.append('op', files.op);
+
+  (files.attachments || []).forEach((f) => {
+    formDataToSend.append('attachments', f);
+  });
   
   formData.areasOperatorIds.forEach((area: string) =>
     formDataToSend.append('areasOperatorIds', area)

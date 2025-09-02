@@ -81,9 +81,6 @@ const LiberarProductoAuxScreen: React.FC = () => {
     }
   };
 
-  const cantidadHojasRaw = Number(workOrder?.workOrder.quantity) / 24;
-  const cantidadHojas = cantidadHojasRaw > 0 ? Math.ceil(cantidadHojasRaw) : 0;
-
   return (
     <ScrollView contentContainerStyle={styles.container}>
       {loading ? (
@@ -91,27 +88,6 @@ const LiberarProductoAuxScreen: React.FC = () => {
       ) : (
         <>
           <Text style={styles.header}>Información de la OT</Text>
-          <View style={styles.card}>
-            <Text style={styles.label}>
-              Número de Orden:{' '}
-              <Text style={styles.value}>{workOrder.workOrder.ot_id}</Text>
-            </Text>
-            <Text style={styles.label}>
-              ID del Presupuesto:{' '}
-              <Text style={styles.value}>{workOrder.workOrder.mycard_id}</Text>
-            </Text>
-            <Text style={styles.label}>
-              Cantidad (TARJETAS):{' '}
-              <Text style={styles.value}>{workOrder.workOrder.quantity}</Text>
-            </Text>
-            <Text style={styles.label}>
-              Cantidad (Hojas Frente / Hojas Vuelta): <Text style={styles.value}>{cantidadHojas}</Text>
-            </Text>
-            <Text style={styles.label}>
-              Comentarios:{' '}
-              <Text style={styles.value}>{workOrder.workOrder.comments}</Text>
-            </Text>
-          </View>
           {renderComponentByArea()}
         </>
       )}

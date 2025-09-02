@@ -8,6 +8,8 @@ import {
   fetchWorkOrderById,
   liberarWorkOrderAuditory,
 } from '@/api/cerrarOrdenDeTrabajo';
+import { Card, CardContent } from '@/components/ui/card';
+import { getFileByName } from '@/api/seguimientoDeOts';
 
 interface Props {
   params: Promise<{ id: string }>;
@@ -170,34 +172,155 @@ export default function CloseWorkOrderAuxPage({ params }: Props) {
     totalMalas +
     totalCqm +
     totalMuestras;
+
+  const guessMimeFromName = (filename: string): string => {
+    const ext = filename.split('.').pop()?.toLowerCase();
+    switch (ext) {
+      case 'pdf':
+        return 'application/pdf';
+      case 'png':
+        return 'image/png';
+      case 'jpg':
+      case 'jpeg':
+        return 'image/jpeg';
+      case 'webp':
+        return 'image/webp';
+      default:
+        return 'application/octet-stream';
+    }
+  };
+
+  const downloadFile = async (filename: string) => {
+    try {
+      const arrayBuffer = await getFileByName(filename); // <- ya la tienes
+      const mime = guessMimeFromName(filename);
+      const blob = new Blob([arrayBuffer], { type: mime });
+      const url = window.URL.createObjectURL(blob);
+
+      // abre en nueva pestaña (sirve para PDF e imágenes)
+      window.open(url, '_blank');
+
+      // liberar URL luego
+      setTimeout(() => window.URL.revokeObjectURL(url), 5000);
+    } catch (error) {
+      console.error('Error al abrir el archivo:', error);
+    }
+  };
+
   return (
     <>
       <Container>
         <Title>Información Complementaria Orden de Trabajo</Title>
 
-        <DataWrapper>
-          <InfoItem>
-            <Label>Número de Orden:</Label>
-            <Value>{workOrder?.workOrder.ot_id}</Value>
-          </InfoItem>
-          <InfoItem>
-            <Label>ID del Presupuesto:</Label>
-            <Value>{workOrder?.workOrder.mycard_id}</Value>
-          </InfoItem>
-          <InfoItem>
-            <Label>Cantidad (TARJETAS): </Label>
-            <Value>{workOrder?.workOrder.quantity}</Value>
-          </InfoItem>
-          <InfoItem>
-            <Label>Cantidad (Hojas Frente / Hojas Vuelta): </Label>
-            <Value>{cantidadHojas}</Value>
-          </InfoItem>
-        </DataWrapper>
+        <div className="grid grid-cols-1 md:grid-cols-5 gap-4 mb-6">
+          <Card>
+            <CardContent>
+              <p className="text-sm text-muted-foreground text-black">
+                Número de Orden
+              </p>
+              <p className="text-xl font-semibold text-black">
+                {workOrder?.ot_id}
+              </p>
+            </CardContent>
+          </Card>
 
-        <InfoItem>
-          <Label>Comentarios:</Label>
-          <Value>{workOrder?.workOrder.comments}</Value>
-        </InfoItem>
+          <Card>
+            <CardContent>
+              <p className="text-sm text-muted-foreground text-black">
+                Presupuesto
+              </p>
+              <p className="text-xl font-semibold text-black">
+                {workOrder?.mycard_id}
+              </p>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardContent>
+              <p className="text-sm text-muted-foreground text-black">
+                Cantidad (Tarjetas)
+              </p>
+              <p className="text-xl font-semibold text-black">
+                {workOrder?.quantity}
+              </p>
+            </CardContent>
+          </Card>
+
+          <Card className="bg-blue-400">
+            <CardContent>
+              <p className="text-sm text-muted-foreground text-black">
+                Cantidad (Hojas Frente / Hojas Vuelta)
+              </p>
+              <p className="text-xl font-semibold text-black">
+                {cantidadHojas}
+              </p>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardContent>
+              <p className="text-sm text-muted-foreground text-black">
+                Fecha de Creación
+              </p>
+              <p className="text-xl font-semibold text-black">
+                {new Date(workOrder?.createdAt).toLocaleDateString()}
+              </p>
+            </CardContent>
+          </Card>
+        </div>
+
+        <div className="grid grid-cols-1 md:grid-cols-1 gap-4 mb-6">
+          <Card>
+            <CardContent>
+              <p className="text-sm text-muted-foreground text-black">
+                Comentarios
+              </p>
+              <p className="text-xl font-semibold text-black">
+                {workOrder?.comments}
+              </p>
+            </CardContent>
+          </Card>
+          <Card>
+            <CardContent>
+              <p className="text-sm text-muted-foreground text-black">
+                Archivos de la Orden de Trabajo
+              </p>
+              {workOrder?.files && workOrder.files.length > 0 ? (
+                <div className=" flex gap-3 m-2">
+                  {workOrder.files.map((file: any) => {
+                    const label =
+                      file.type === 'OT'
+                        ? 'Ver OT'
+                        : file.type === 'SKU'
+                        ? 'Ver SKU'
+                        : file.type === 'OP'
+                        ? 'Ver OP'
+                        : 'Adjunto';
+                    return (
+                      <button
+                        key={file.id}
+                        onClick={() => downloadFile(file.file_path)}
+                        className="flex-row items-center
+                                         rounded-xl border border-gray-200
+                                         bg-white px-4 py-2 text-sm font-medium text-gray-700
+                                         shadow-sm transition
+                                         hover:bg-gray-50 hover:shadow-md
+                                         focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-1
+                                         active:scale-[0.98]"
+                      >
+                        {label}
+                      </button>
+                    );
+                  })}
+                </div>
+              ) : (
+                <p className="text-xl font-semibold text-black">
+                  No se ha adjuntado ningun archivo
+                </p>
+              )}
+            </CardContent>
+          </Card>
+        </div>
 
         <Section>
           <SectionTitle>Datos de Producción</SectionTitle>

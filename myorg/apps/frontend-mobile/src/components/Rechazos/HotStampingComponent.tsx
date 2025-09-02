@@ -264,10 +264,8 @@ const HotStampingComponent: React.FC<Props> = ({ workOrder, currentFlow }) => {
   }, 0);
 
   return (
-    <View>
-      <ScrollView
-        contentContainerStyle={[styles.container, { paddingBottom: 230 }]}
-      >
+    <View style={{ paddingBottom: 16 }}>
+      <View style={styles.container /* sin marginBottom gigante */}>
         <Text style={styles.title}>Área: Hot Stamping</Text>
 
         <View style={styles.card}>
@@ -291,12 +289,8 @@ const HotStampingComponent: React.FC<Props> = ({ workOrder, currentFlow }) => {
               mode="outlined"
               activeOutlineColor="#000"
               keyboardType="numeric"
-              value={sumaBadQuantity}
-              placeholder={
-                sumaBadQuantity > 0 ? sumaBadQuantity.toString() : '0'
-              }
-              editable={false} // deshabilita edición
-              pointerEvents="none" // evita que se abra el teclado
+              value={String(sumaBadQuantity)} // ✅ siempre string
+              editable={false}
             />
           </TouchableOpacity>
           <Text style={styles.subtitle}>Excedente:</Text>
@@ -358,8 +352,6 @@ const HotStampingComponent: React.FC<Props> = ({ workOrder, currentFlow }) => {
         <TouchableOpacity style={styles.button} onPress={openModal}>
           <Text style={styles.buttonText}>Aceptar Inconformidad</Text>
         </TouchableOpacity>
-
-        <View style={{ height: 100 }} />
 
         {/* Modal para marcar malas por areas previas al liberar */}
         <Modal visible={showBadQuantity} transparent animationType="fade">
@@ -462,7 +454,7 @@ const HotStampingComponent: React.FC<Props> = ({ workOrder, currentFlow }) => {
             </View>
           </View>
         </Modal>
-      </ScrollView>
+      </View>
     </View>
   );
 };
@@ -515,7 +507,6 @@ const styles = StyleSheet.create({
     backgroundColor: '#fff',
     padding: 16,
     borderRadius: 18,
-    marginBottom: 24,
     elevation: 3,
   },
   button: {
@@ -523,7 +514,6 @@ const styles = StyleSheet.create({
     padding: 14,
     borderRadius: 18,
     alignItems: 'center',
-    marginBottom: 30,
   },
   buttonText: {
     color: '#fff',

@@ -1,0 +1,163 @@
+'use client';
+
+import { Card, CardContent } from '@/components/ui/card';
+import { getFileByName } from '@/api/seguimientoDeOts';
+
+interface Props {
+  workOrder: any;
+}
+interface PartialRelease {
+  validated: boolean;
+  quantity: number;
+}
+
+export default function WorkOrderInfo({
+  workOrder,
+}: Props) {
+
+  const guessMimeFromName = (filename: string): string => {
+    const ext = filename.split('.').pop()?.toLowerCase();
+    switch (ext) {
+      case 'pdf':
+        return 'application/pdf';
+      case 'png':
+        return 'image/png';
+      case 'jpg':
+      case 'jpeg':
+        return 'image/jpeg';
+      case 'webp':
+        return 'image/webp';
+      default:
+        return 'application/octet-stream';
+    }
+  };
+
+  const downloadFile = async (filename: string) => {
+    try {
+      const arrayBuffer = await getFileByName(filename);
+      const mime = guessMimeFromName(filename);
+      const blob = new Blob([arrayBuffer], { type: mime });
+      const url = window.URL.createObjectURL(blob);
+      window.open(url, '_blank');
+      setTimeout(() => window.URL.revokeObjectURL(url), 5000);
+    } catch (error) {
+      console.error('Error al abrir el archivo:', error);
+    }
+  };
+
+  return (
+    <>
+      {/* Datos principales */}
+      <div className="grid grid-cols-3 md:grid-cols-3 gap-4 mb-3">
+        <Card>
+          <CardContent>
+            <p className="text-sm text-muted-foreground text-black">
+              Número de Orden
+            </p>
+            <p className="text-xl font-semibold text-black">
+              {workOrder.workOrder.ot_id}
+            </p>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardContent>
+            <p className="text-sm text-muted-foreground text-black">
+              Presupuesto
+            </p>
+            <p className="text-xl font-semibold text-black">
+              {workOrder.workOrder.mycard_id}
+            </p>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardContent>
+            <p className="text-sm text-muted-foreground text-black">
+              Cantidad (Tarjetas)
+            </p>
+            <p className="text-xl font-semibold text-black">
+              {workOrder.workOrder.quantity}
+            </p>
+          </CardContent>
+        </Card>
+      </div>
+      <div className="grid grid-cols-2 md:grid-cols-2 gap-4 mb-3">
+        <Card>
+          <CardContent>
+            <p className="text-sm text-muted-foreground text-black">
+              Área que lo envía:
+            </p>
+            <p className="text-xl font-semibold text-black">
+              {workOrder?.area.name || 'No definida'}
+            </p>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardContent>
+            <p className="text-sm text-muted-foreground text-black">
+              Usuario que lo envía:
+            </p>
+            <p className="text-xl font-semibold text-black">
+              {workOrder?.user.username || 'No definida'}
+            </p>
+          </CardContent>
+        </Card>
+      </div>
+
+      {/* Comentarios y Archivos */}
+      <div className="grid grid-cols-1 md:grid-cols-1 gap-4 mb-6">
+        <Card>
+          <CardContent>
+            <p className="text-sm text-muted-foreground text-black">
+              Comentarios
+            </p>
+            <p className="text-xl font-semibold text-black">
+              {workOrder.workOrder.comments}
+            </p>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardContent>
+            <p className="text-sm text-muted-foreground text-black">
+              Archivos de la Orden de Trabajo
+            </p>
+            {workOrder?.workOrder.files &&
+            workOrder.workOrder.files.length > 0 ? (
+              <div className="flex gap-3 m-2">
+                {workOrder.workOrder.files.map((file: any) => {
+                  const label =
+                    file.type === 'OT'
+                      ? 'OT'
+                      : file.type === 'SKU'
+                      ? 'SKU'
+                      : file.type === 'OP'
+                      ? 'OP'
+                      : 'Adjunto';
+                  return (
+                    <button
+                      key={file.id}
+                      onClick={() => downloadFile(file.file_path)}
+                      className="flex-row items-center
+                                 rounded-xl border border-gray-200
+                                 bg-white px-4 py-2 text-sm font-medium text-gray-700
+                                 shadow-sm transition
+                                 hover:bg-gray-50 hover:shadow-md
+                                 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-1
+                                 active:scale-[0.98]"
+                    >
+                      {label}
+                    </button>
+                  );
+                })}
+              </div>
+            ) : (
+              <p className="text-xl font-semibold text-black">
+                No se ha adjuntado ningún archivo
+              </p>
+            )}
+          </CardContent>
+        </Card>
+      </div>
+    </>
+  );
+}
+

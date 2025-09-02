@@ -116,7 +116,7 @@ const CerrarOrdenDeTrabajoScreen: React.FC = () => {
         </View>
       ) : (
         <>
-          <StatusLegend />
+        <StatusLegend />
           <WorkOrderList
             orders={filteredOrders}
           />

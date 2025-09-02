@@ -13,6 +13,9 @@ import { calcularCantidadPorLiberar } from './util/calcularCantidadPorLiberar';
 import BadQuantityModal from './util/BadQuantityModal';
 import { AreaData } from './PersonalizacionComponent';
 import SelectionQuestionTable from './util/FormQuestionTable';
+import WorkOrderInfo from './util/WorkOrderInfo';
+import { usePartialReleaseControls } from './util/disablePartialTime';
+
 interface Props {
   workOrder: any;
 }
@@ -25,8 +28,6 @@ export default function MillingChipComponent({ workOrder }: Props) {
   const router = useRouter();
   const isDisabled = workOrder.status === 'En proceso';
   const [showModal, setShowModal] = useState(false);
-  const [checkedRespuestaOK, setCheckedRespuestaOK] = useState<number[]>([]);
-  const [checkedRespuestaNG, setCheckedRespuestaNG] = useState<number[]>([]);
   const openModal = () => {
     setShowModal(true);
   };
@@ -39,150 +40,6 @@ export default function MillingChipComponent({ workOrder }: Props) {
   const closeModal = () => {
     setShowModal(false);
   };
-  const shouldDisableLiberar = () => {
-    const currentInvalidStatuses = [
-      'Enviado a CQM',
-      'En Calidad',
-      'Parcial',
-      'Enviado a auditoria parcial',
-      'Pendiente',
-      'Pendiente parcial',
-      'En proceso',
-    ];
-    const nextInvalidStatuses = [
-      'Enviado a CQM',
-      'Listo',
-      'En Calidad',
-      'Enviado a auditoria parcial',
-      'Pendiente',
-      'Parcial',
-      'Pendiente parcial',
-      'En inconformidad CQM',
-    ];
-    const nextCorteStatuses = ['Enviado a auditoria parcial'];
-
-    const isCurrentInvalid = currentInvalidStatuses.includes(
-      currentFlow.status?.trim()
-    );
-    const isNextInvalid = nextInvalidStatuses.includes(
-      nextFlow?.status?.trim()
-    );
-    const afterCorte =
-      nextCorteStatuses.includes(currentFlow?.status?.trim()) &&
-      nextFlow?.area?.id >= 6;
-    const isNextInvalidAndNotValidated =
-      nextInvalidStatuses.includes(nextFlow?.status?.trim()) &&
-      !allParcialsValidated;
-
-    return (
-      isDisabled ||
-      isCurrentInvalid ||
-      afterCorte ||
-      isNextInvalidAndNotValidated ||
-      isNextInvalid
-    );
-  };
-  const shouldDisableCQM = () => {
-    const estadosBloqueados = [
-      'Enviado a CQM',
-      'En Calidad',
-      'Listo',
-      'Pendiente',
-      'Pendiente parcial',
-      'Enviado a auditoria parcial',
-      'En inconformidad CQM',
-      'Enviado a Auditoria',
-    ];
-    const statusesToCheck = [
-      currentFlow.status,
-      nextFlow?.status,
-      lastCompletedOrPartial.status,
-    ];
-    const tieneStatusBloqueado = statusesToCheck.some((status) =>
-      estadosBloqueados.includes(status)
-    );
-    return tieneStatusBloqueado || Number(cantidadporliberar) === 0;
-  };
-  //Para guardar las respuestas
-  const [responses, setResponses] = useState<
-    { questionId: number; answer: boolean }[]
-  >([]);
-  const [sampleQuantity, setSampleQuantity] = useState<number | string>('');
-  const [revisarTecnologia, setRevisarTecnologia] = useState('');
-  const [validarKVC, setValidarKVC] = useState('');
-  const [goodQuantity, setGoodQuantity] = useState<number | string>('');
-  const [badQuantity, setBadQuantity] = useState<number | string>('');
-  const [excessQuantity, setExcessQuantity] = useState<number | string>('');
-  // Para controlar qué preguntas están marcadas
-  const [checkedQuestions, setCheckedQuestions] = useState<number[]>([]);
-  // Función para manejar el cambio en el campo de muestras y color edge
-  const handleSampleQuantityChange = (
-    e: React.ChangeEvent<HTMLInputElement>
-  ) => {
-    setSampleQuantity(e.target.value);
-  };
-  const handleCheckboxChange = (questionId: number, isChecked: boolean) => {
-    setResponses((prevResponses) => {
-      const updateResponses = prevResponses.filter(
-        (response) => response.questionId !== questionId
-      );
-      if (isChecked) {
-        updateResponses.push({ questionId, answer: isChecked });
-      }
-      return updateResponses;
-    });
-
-    // Actualizar visualmente el checkbox
-    setCheckedQuestions((prev) =>
-      isChecked ? [...prev, questionId] : prev.filter((id) => id !== questionId)
-    );
-  };
-  const handleToggleRespuesta = (
-    questionId: number,
-    _columnIndex: number, // por ahora 0, si solo tienes 'Respuesta'
-    type: 'ok' | 'ng',
-    checked: boolean
-  ) => {
-    if (type === 'ok') {
-      // Marcar OK ⇒ true
-      setCheckedRespuestaOK((prev) =>
-        checked ? [...prev, questionId] : prev.filter((id) => id !== questionId)
-      );
-      // Desmarcar NG si se marcó OK
-      if (checked)
-        setCheckedRespuestaNG((prev) => prev.filter((id) => id !== questionId));
-
-      setResponses((prev) => {
-        // Si se marcó OK, answer=true; si se desmarcó y NG no está marcado, eliminar
-        const without = prev.filter((r) => r.questionId !== questionId);
-        if (checked) return [...without, { questionId, answer: true }];
-        // si no está marcado OK, pero NG está marcado, mantener NG=false en responses
-        if (checkedRespuestaNG.includes(questionId)) {
-          return [...without, { questionId, answer: false }];
-        }
-        return without; // ninguno marcado => sin respuesta
-      });
-    } else {
-      // Marcar NG ⇒ false
-      setCheckedRespuestaNG((prev) =>
-        checked ? [...prev, questionId] : prev.filter((id) => id !== questionId)
-      );
-      // Desmarcar OK si se marcó NG
-      if (checked)
-        setCheckedRespuestaOK((prev) => prev.filter((id) => id !== questionId));
-
-      setResponses((prev) => {
-        const without = prev.filter((r) => r.questionId !== questionId);
-        if (checked) return [...without, { questionId, answer: false }];
-        // si no está marcado NG, pero OK sí lo está, mantener OK=true en responses
-        if (checkedRespuestaOK.includes(questionId)) {
-          return [...without, { questionId, answer: true }];
-        }
-        return without; // ninguno marcado => sin respuesta
-      });
-    }
-  };
-
   console.log('El mismo workOrder (workOrder)', workOrder);
   const flowList = [...workOrder.workOrder.flow];
 
@@ -209,6 +66,9 @@ export default function MillingChipComponent({ workOrder }: Props) {
     alert('No tienes una orden activa para esta área.');
     return;
   }
+  const allParcialsValidated = currentFlow.partialReleases?.every(
+    (r: PartialRelease) => r.validated
+  );
   const currentIndex = flowList.findIndex(
     (item) => item.id === currentFlow?.id
   );
@@ -225,8 +85,193 @@ export default function MillingChipComponent({ workOrder }: Props) {
   console.log('El siguiente flujo (nextFlow)', nextFlow);
   console.log('Ultimo parcial o completado', lastCompletedOrPartial);
 
-  const allParcialsValidated = currentFlow.partialReleases?.every(
-    (r: PartialRelease) => r.validated
+  const cantidadporliberar = calcularCantidadPorLiberar(
+    currentFlow,
+    lastCompletedOrPartial
+  );
+  console.log('Cantidad final por liberar:', cantidadporliberar);
+  const statusesToCheck = [
+    currentFlow?.status,
+    nextFlow?.status,
+    lastCompletedOrPartial?.status,
+  ];
+  const { disableAfterCorteCQM, disablePartial, cooldown } =
+    usePartialReleaseControls({
+      flow: currentFlow,
+      cantidadPorLiberar: cantidadporliberar,
+      withCountdown: true,
+
+      // 🔎 acá decides contra qué comparar:
+      statusesToCheck, // revisa current + next + last
+      blockedForCQM: [
+        'Enviado a CQM',
+        'En Calidad',
+        'Listo',
+        'Pendiente parcial',
+      ],
+      blockedForCQM_AfterCorte: [
+        'Enviado a CQM',
+        'En Calidad',
+        'Listo',
+        'Pendiente',
+        'Pendiente parcial',
+        'Enviado a auditoria parcial',
+        'En inconformidad CQM',
+        'Enviado a Auditoria',
+      ],
+    });
+  const shouldDisableCQM = () => disableAfterCorteCQM;
+  const shouldDisableLiberar = () => {
+    // 0) Helpers locales con las MISMAS listas que pasaste al hook
+    const blockedAfterCorte = [
+      'Enviado a CQM',
+      'En Calidad',
+      'Listo',
+      'Pendiente',
+      'Pendiente parcial',
+      'Enviado a auditoria parcial',
+      'En inconformidad CQM',
+      'Enviado a Auditoria',
+    ];
+
+    const cleaned = [
+      currentFlow?.status,
+      nextFlow?.status,
+      lastCompletedOrPartial?.status,
+    ]
+      .map((s) => s?.trim?.() ?? '')
+      .filter(Boolean);
+
+    const hasBlockedStatus = cleaned.some((s) => blockedAfterCorte.includes(s));
+    const byCantidad = Number(cantidadporliberar) === 0;
+    const byCooldown = !currentFlow.areaResponse && !!cooldown?.isLocked;
+
+    // 1) Si CQM está bloqueado SOLO por cooldown (no por estados ni cantidad) => habilitar parcial
+    const cqmBloqueadoSoloPorTiempo =
+      byCooldown && !hasBlockedStatus && !byCantidad;
+    if (cqmBloqueadoSoloPorTiempo) {
+      return false; // NO deshabilitar botón de Liberación Parcial
+    }
+
+    // 2) Si no es el caso anterior, aplicar base del hook para parciales + tus reglas extra
+    const currentInvalidStatuses = [
+      'Enviado a CQM',
+      'En Calidad',
+      'Parcial',
+      'Enviado a auditoria parcial',
+      'Pendiente',
+      'Pendiente parcial',
+      'En proceso',
+    ];
+    const nextInvalidStatuses = [
+      'Enviado a CQM',
+      'Listo',
+      'En Calidad',
+      'Enviado a auditoria parcial',
+      'Pendiente',
+      'Parcial',
+      'Pendiente parcial',
+      'En inconformidad CQM',
+    ];
+    const nextCorteStatuses = ['Enviado a auditoria parcial'];
+
+    const isCurrentInvalid = currentInvalidStatuses.includes(
+      currentFlow.status?.trim?.() ?? ''
+    );
+    const isNextInvalid = nextInvalidStatuses.includes(
+      nextFlow?.status?.trim?.() ?? ''
+    );
+    const afterCorte =
+      nextCorteStatuses.includes(currentFlow?.status?.trim?.() ?? '') &&
+      (nextFlow?.area?.id ?? 0) >= 6;
+    const isNextInvalidAndNotValidated =
+      nextInvalidStatuses.includes(nextFlow?.status?.trim?.() ?? '') &&
+      !allParcialsValidated;
+
+    return (
+      disablePartial || // base del hook para parciales (cantidad=0, estados finales)
+      isDisabled || // tu flag global
+      isCurrentInvalid ||
+      afterCorte ||
+      isNextInvalidAndNotValidated ||
+      isNextInvalid
+    );
+  };
+  //Para guardar las respuestas
+  const [responses, setResponses] = useState<
+    { questionId: number; answer: boolean }[]
+  >([]);
+  const [sampleQuantity, setSampleQuantity] = useState<number | string>('');
+  const [revisarTecnologia, setRevisarTecnologia] = useState('');
+  const [validarKVC, setValidarKVC] = useState('');
+  const [goodQuantity, setGoodQuantity] = useState<number | string>('');
+  const [badQuantity, setBadQuantity] = useState<number | string>('');
+  const [excessQuantity, setExcessQuantity] = useState<number | string>('');
+  // Para controlar qué preguntas están marcadas
+  const [checkedQuestions, setCheckedQuestions] = useState<number[]>([]);
+  // Función para manejar el cambio en el campo de muestras y color edge
+  const handleSampleQuantityChange = (
+    e: React.ChangeEvent<HTMLInputElement>
+  ) => {
+    setSampleQuantity(e.target.value);
+  };
+  const handleToggleRespuesta = (
+    questionId: number,
+    _columnIndex: number, // por ahora 0
+    type: 'ok' | 'ng',
+    checked: boolean
+  ) => {
+    setResponses((prev) => {
+      const without = prev.filter((r) => r.questionId !== questionId);
+      // estado actual (antes del cambio)
+      const current = answersByQuestion[questionId];
+
+      if (type === 'ok') {
+        if (checked) {
+          // marcar OK => true
+          return [...without, { questionId, answer: true }];
+        } else {
+          // desmarcar OK: si antes estaba en true y NG no se marcó, queda sin respuesta
+          // si NG está marcado (no aplica aquí porque cambiamos OK), lo manejará el siguiente toggle
+          return without;
+        }
+      } else {
+        // type === 'ng'
+        if (checked) {
+          // marcar NG => false
+          return [...without, { questionId, answer: false }];
+        } else {
+          // desmarcar NG
+          return without;
+        }
+      }
+    });
+  };
+
+  // Preguntas visibles en la tabla (mismo filtro que pasas al child con roleId=null)
+  const visibleQuestions =
+    workOrder.area.formQuestions?.filter((q: any) => q.role_id === null) ?? [];
+  // Crea answersByQuestion en base a responses
+  const answersByQuestion = useMemo(() => {
+    const map: Record<number, boolean | undefined> = {};
+    for (const r of responses) map[r.questionId] = r.answer;
+    return map;
+  }, [responses]);
+  // Listas derivadas para el componente de tabla (no se guardan aparte)
+  const checkedRespuestaOK = useMemo(
+    () =>
+      visibleQuestions
+        .filter((q: any) => answersByQuestion[q.id] === true)
+        .map((q: any) => q.id),
+    [visibleQuestions, answersByQuestion]
+  );
+
+  const checkedRespuestaNG = useMemo(
+    () =>
+      visibleQuestions
+        .filter((q: any) => answersByQuestion[q.id] === false)
+        .map((q: any) => q.id),
+    [visibleQuestions, answersByQuestion]
   );
 
   // Para mandar la OT a evaluacion por CQM
@@ -237,16 +282,27 @@ export default function MillingChipComponent({ workOrder }: Props) {
       alert('Por favor, ingresa una cantidad de muestra válida.');
       return;
     }
-    if (responses.length === 0) {
-      alert('Por favor, selecciona al menos una respuesta antes de enviar.');
+    // Construir arrays Alineados según el ORDEN de visibleQuestions
+    const question_id: number[] = [];
+    const response: boolean[] = [];
+    visibleQuestions.forEach((q: any) => {
+      const ans = answersByQuestion[q.id];
+      if (ans !== undefined) {
+        question_id.push(q.id);
+        response.push(!!ans);
+      }
+    });
+    // Exigir todas respondidas (o ajusta a tu regla)
+    if (question_id.length !== visibleQuestions.length) {
+      alert('Completa todas las preguntas y cantidad de muestra.');
       return;
     }
     const payload = {
-      question_id: responses.map((response) => response.questionId),
+      question_id,
       work_order_flow_id: flowId,
       work_order_id: currentFlow.workOrder.id,
       area_id: currentFlow.area.id,
-      response: responses.map((response) => response.answer),
+      response,
       reviewed: false,
       user_id: currentFlow.assigned_user,
       sample_quantity: Number(sampleQuantity),
@@ -309,12 +365,6 @@ export default function MillingChipComponent({ workOrder }: Props) {
       console.log('Error al enviar datos:', error);
     }
   };
-
-  const cantidadporliberar = calcularCantidadPorLiberar(
-    currentFlow,
-    lastCompletedOrPartial
-  );
-  console.log('Cantidad final por liberar:', cantidadporliberar);
 
   const previousFlows = flowList
     .slice(0, currentIndex + 1)
@@ -514,90 +564,10 @@ export default function MillingChipComponent({ workOrder }: Props) {
       <Container>
         <Title>Área: Milling Chip</Title>
 
-        <DataWrapper>
-          <InfoItem>
-            <Label>Número de Orden:</Label>
-            <Value>{workOrder.workOrder.ot_id}</Value>
-          </InfoItem>
-          <InfoItem>
-            <Label>ID del Presupuesto:</Label>
-            <Value>{workOrder.workOrder.mycard_id}</Value>
-          </InfoItem>
-          <InfoItem style={{ backgroundColor: '#eaeaf5', borderRadius: '8px' }}>
-            <Label>Cantidad:</Label>
-            <Value>{workOrder.workOrder.quantity}</Value>
-          </InfoItem>
-        </DataWrapper>
-        <DataWrapper style={{ marginTop: '20px' }}>
-          <InfoItem>
-            <Label>Usuario del area previa:</Label>
-            <Value>{lastCompletedOrPartial.user.username}</Value>
-          </InfoItem>
-          <InfoItem>
-            <Label>
-              {(lastCompletedOrPartial.areaResponse &&
-                lastCompletedOrPartial.partialReleases.length === 0) ||
-              lastCompletedOrPartial.areaResponse
-                ? 'Cantidad entregada:'
-                : lastCompletedOrPartial.partialReleases?.some(
-                    (r: PartialRelease) => r.validated
-                  )
-                ? 'Cantidad entregada validada:'
-                : 'Cantidad faltante por liberar:'}
-            </Label>
-            <Value>
-              {(lastCompletedOrPartial.areaResponse &&
-                lastCompletedOrPartial.partialReleases.length === 0) ||
-              lastCompletedOrPartial.areaResponse
-                ? // Mostrar cantidad según sub-área disponible
-                  lastCompletedOrPartial.areaResponse.prepress?.plates ??
-                  lastCompletedOrPartial.areaResponse.impression
-                    ?.release_quantity ??
-                  lastCompletedOrPartial.areaResponse.serigrafia
-                    ?.release_quantity ??
-                  lastCompletedOrPartial.areaResponse.empalme
-                    ?.release_quantity ??
-                  lastCompletedOrPartial.areaResponse.laminacion
-                    ?.release_quantity ??
-                  lastCompletedOrPartial.areaResponse.corte?.good_quantity ??
-                  lastCompletedOrPartial.areaResponse.colorEdge
-                    ?.good_quantity ??
-                  lastCompletedOrPartial.areaResponse.hotStamping
-                    ?.good_quantity ??
-                  lastCompletedOrPartial.areaResponse.millingChip
-                    ?.good_quantity ??
-                  lastCompletedOrPartial.areaResponse.personalizacion
-                    ?.good_quantity ??
-                  'Sin cantidad'
-                : lastCompletedOrPartial.partialReleases?.some(
-                    (r: PartialRelease) => r.validated
-                  )
-                ? lastCompletedOrPartial.partialReleases
-                    .filter((release: PartialRelease) => release.validated)
-                    .reduce(
-                      (sum: number, release: PartialRelease) =>
-                        sum + release.quantity,
-                      0
-                    )
-                : (lastCompletedOrPartial.workOrder?.quantity ?? 0) -
-                  (lastCompletedOrPartial.partialReleases?.reduce(
-                    (sum: number, release: PartialRelease) =>
-                      sum + release.quantity,
-                    0
-                  ) ?? 0)}
-            </Value>
-          </InfoItem>
-          {workOrder?.partialReleases?.length > 0 && (
-            <InfoItem>
-              <Label>Cantidad por Liberar:</Label>
-              <Value>{cantidadporliberar}</Value>
-            </InfoItem>
-          )}
-        </DataWrapper>
-        <InfoItem style={{ marginTop: '20px' }}>
-          <Label>Comentarios:</Label>
-          <Value>{workOrder.workOrder.comments}</Value>
-        </InfoItem>
+        <WorkOrderInfo
+          workOrder={workOrder}
+          lastCompletedOrPartial={lastCompletedOrPartial}
+        />
         <NewData>
           <SectionTitle>Datos de Producción</SectionTitle>
           <NewDataWrapper>
@@ -766,12 +736,11 @@ export default function MillingChipComponent({ workOrder }: Props) {
 // =================== Styled Components ===================
 
 const Container = styled.div`
-  background: white;
   padding: 2rem;
   margin-top: 1.5rem;
   border-radius: 1rem;
   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
-  max-width: 800px;
+  max-width: 1000px;
   margin-left: auto;
   margin-right: auto;
 `;
@@ -792,26 +761,9 @@ const SectionTitle = styled.h3`
   color: #374151;
 `;
 
-const DataWrapper = styled.div`
-  display: flex;
-  flex-wrap: wrap;
-`;
-
-const InfoItem = styled.div`
-  flex: 1;
-  padding: 5px;
-  min-width: 150px;
-`;
-
 const Label = styled.label`
   font-weight: 600;
   color: #6b7280;
-`;
-
-const Value = styled.div`
-  margin-top: 0.25rem;
-  font-weight: 500;
-  color: #111827;
 `;
 
 const NewDataWrapper = styled.div`
@@ -825,22 +777,6 @@ const InputGroup = styled.div`
 `;
 
 const Input = styled.input`
-  width: 100%;
-  color: black;
-  padding: 0.75rem 1rem;
-  border: 2px solid #d1d5db;
-  border-radius: 0.5rem;
-  margin-top: 0.25rem;
-  outline: none;
-  font-size: 1rem;
-  transition: border 0.3s;
-
-  &:focus {
-    border-color: #0038a8;
-  }
-`;
-
-const InputBad = styled.input`
   width: 100%;
   color: black;
   padding: 0.75rem 1rem;
@@ -975,23 +911,6 @@ const ModalTitle = styled.h2`
   margin-bottom: 1.5rem;
   color: #1f2937;
   text-align: center;
-`;
-
-const Table = styled.table`
-  width: 100%;
-  border-collapse: collapse;
-
-  th,
-  td {
-    padding: 0.75rem;
-    text-align: left;
-    border-bottom: 1px solid #e5e7eb;
-  }
-
-  th {
-    background-color: #f3f4f6;
-    color: #374151;
-  }
 `;
 
 const CloseButton = styled.button`

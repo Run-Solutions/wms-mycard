@@ -1,6 +1,6 @@
 // myorg/apps/frontend-mobile/src/components/LiberacionDeVistosBuenos/PersonalizacionComponent.tsx
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import {
   View,
   Text,
@@ -21,6 +21,7 @@ import {
 } from '../../api/recepcionCQM';
 import { OperatorAdvancedTable } from './util/FormQuestionTable';
 import SelectionQuestionTable from './util/SelectionQuestionTable';
+import WorkOrderInfo from './util/WorkOrderInfo';
 
 // Tipos y constantes globales
 type Answer = {
@@ -81,6 +82,13 @@ const PersonalizacionComponent = ({ workOrder }: { workOrder: any }) => {
     }
   };
 
+  // Set de preguntas respondidas por CQM (OK o NG)
+  const answeredIdsSet = useMemo(() => {
+    const ok = new Set<number>(cqmChecked?.[0]?.ok ?? []);
+    const ng = new Set<number>(cqmChecked?.[0]?.ng ?? []);
+    return new Set<number>([...ok, ...ng]);
+  }, [cqmChecked]);
+
   // Derivaciones
   // --- Derivaciones (mueve esto arriba, justo después de useState) ---
   const index =
@@ -138,6 +146,20 @@ const PersonalizacionComponent = ({ workOrder }: { workOrder: any }) => {
     });
   };
 
+  // IDs de preguntas CQM visibles (role_id === 3) según el tipo
+  const cqmQuestionIds = useMemo(
+    () =>
+      (getCqmQuestions() ?? [])
+        .filter((q: any) => q?.role_id === 3)
+        .map((q: any) => q.id as number),
+    [
+      // dependencias seguras para recalcular cuando cambie el tipo o el set de preguntas
+      hasIndex,
+      workOrder?.area?.formQuestions,
+      workOrder?.answers?.[index!]?.tipo_personalizacion,
+    ]
+  );
+
   const handleSubmit = async () => {
     if (!hasIndex) {
       Alert.alert('No se encontró una respuesta pendiente para esta OT.');
@@ -147,6 +169,15 @@ const PersonalizacionComponent = ({ workOrder }: { workOrder: any }) => {
     if (!formAnswerId) {
       Alert.alert('No se encontró el Id del formulario');
       return;
+    }
+    if (cqmQuestionIds.length > 0) {
+      const unanswered = cqmQuestionIds.filter(
+        (id: any) => !answeredIdsSet.has(id)
+      );
+      if (unanswered.length > 0) {
+        Alert.alert('No se encontró el ID del formulario.');
+        return;
+      }
     }
 
     const okIds = new Set(cqmChecked?.[0]?.ok ?? []);
@@ -211,22 +242,7 @@ const PersonalizacionComponent = ({ workOrder }: { workOrder: any }) => {
   return (
     <ScrollView style={styles.container}>
       <Text style={styles.title}>Área a evaluar: Personalización</Text>
-      <View style={styles.card}>
-        <Text style={styles.label}>OT:</Text>
-        <Text style={styles.value}>{workOrder.workOrder.ot_id}</Text>
-
-        <Text style={styles.label}>Id del Presupuesto:</Text>
-        <Text style={styles.value}>{workOrder.workOrder.mycard_id}</Text>
-
-        <Text style={styles.label}>Cantidad:</Text>
-        <Text style={styles.value}>{workOrder.workOrder.quantity}</Text>
-
-        <Text style={styles.label}>Operador:</Text>
-        <Text style={styles.value}>{workOrder.user.username}</Text>
-
-        <Text style={styles.label}>Comentarios:</Text>
-        <Text style={styles.value}>{workOrder.workOrder.comments}</Text>
-      </View>
+      <WorkOrderInfo workOrder={workOrder} />
 
       <Text style={styles.modalTitle}>Respuestas del operador</Text>
       <Text style={styles.label}>Tipo de Personalizacion:</Text>
@@ -693,6 +709,7 @@ const styles = StyleSheet.create({
   modalTitle: {
     fontSize: 22,
     fontWeight: 'bold',
+    marginTop: 8,
     marginBottom: 16,
     textAlign: 'center',
     color: '#1f2937',

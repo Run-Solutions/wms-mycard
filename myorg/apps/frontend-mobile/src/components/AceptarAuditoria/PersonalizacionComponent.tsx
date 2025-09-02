@@ -300,30 +300,7 @@ const PersonalizacionComponentAcceptAuditory: React.FC<{ workOrder: any }> = ({
 
   return (
     <ScrollView contentContainerStyle={styles.container}>
-      <Text style={styles.title}>Área: {workOrder.area.name}</Text>
-      <View style={styles.card}>
-        <Text style={styles.label}>OT:</Text>
-        <Text style={styles.value}>{workOrder.workOrder.ot_id}</Text>
 
-        <Text style={styles.label}>Presupuesto:</Text>
-        <Text style={styles.value}>{workOrder.workOrder.mycard_id}</Text>
-
-        <Text style={styles.label}>Cantidad:</Text>
-        <Text style={styles.value}>{workOrder.workOrder.quantity}</Text>
-
-        <Text style={styles.label}>Área que lo envía:</Text>
-        <Text style={styles.value}>
-          {workOrder?.area?.name || 'No definida'}
-        </Text>
-
-        <Text style={styles.label}>Usuario:</Text>
-        <Text style={styles.value}>
-          {workOrder?.user?.username || 'No definido'}
-        </Text>
-
-        <Text style={styles.label}>Comentarios:</Text>
-        <Text style={styles.value}>{workOrder.workOrder.comments}</Text>
-      </View>
       <Text style={styles.subtitle}>Buenas:</Text>
       <TextInput
         style={styles.input}
@@ -370,7 +347,7 @@ const PersonalizacionComponentAcceptAuditory: React.FC<{ workOrder: any }> = ({
       />
       <Text style={styles.subtitle}>Muestras:</Text>
       <TextInput
-        style={styles.input}
+        style={styles.inputActive}
         theme={{ roundness: 30 }}
         mode="outlined"
         activeOutlineColor="#000"
@@ -381,7 +358,7 @@ const PersonalizacionComponentAcceptAuditory: React.FC<{ workOrder: any }> = ({
       />
       <Text style={styles.subtitle}>Comentarios</Text>
       <TextInput
-        style={styles.inputActive}
+        style={styles.input}
         editable={false}
         value={String(defaultValues.comments)}
         mode="outlined"
@@ -575,7 +552,6 @@ const styles = StyleSheet.create({
   input: {
     padding: 10,
     marginBottom: 12,
-    backgroundColor: '#fff',
     height: 30,
     fontSize: 16,
   },

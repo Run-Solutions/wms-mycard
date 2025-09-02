@@ -65,7 +65,7 @@ const InconformidadesPage: React.FC = () => {
   return (
     <PageContainer>
       <TitleWrapper>
-        <Title>Inconformidades</Title>
+        <Title>Rechazos</Title>
       </TitleWrapper>
       <WorkOrderTable
         orders={WorkOrders}

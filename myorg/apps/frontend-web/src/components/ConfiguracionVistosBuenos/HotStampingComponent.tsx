@@ -290,23 +290,6 @@ const Radio = styled.input`
   accent-color: #2563eb;
 `;
 
-const Table = styled.table`
-  width: 100%;
-  border-collapse: collapse;
-  color: black;
-  th,
-  td {
-    padding: 0.75rem;
-    text-align: left;
-    border-bottom: 1px solid #e5e7eb;
-  }
-
-  th {
-    background-color: #f3f4f6;
-    color: #374151;
-  }
-`;
-
 const ModalOverlay = styled.div`
   position: fixed;
   top: 0;

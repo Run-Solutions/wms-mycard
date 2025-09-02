@@ -444,36 +444,39 @@ const WorkOrderTable: React.FC<Props> = ({ orders, title, statusFilter }) => {
                     {new Date(order.createdAt).toLocaleDateString()}
                   </CustomTableCell>
                   <CustomTableCell>
-                    {order.files.length > 0 ? (
+                    {order.files && order.files.length > 0 ? (
                       <Box display="flex" flexDirection="column" gap={0.5}>
-                        {order.files.map((file) => {
-                          const nameLower = file.file_path.toLowerCase();
-                          const label = nameLower.includes('ot')
-                            ? 'Ver OT'
-                            : nameLower.includes('sku')
-                            ? 'Ver SKU'
-                            : nameLower.includes('op')
-                            ? 'Ver OP'
-                            : 'Ver Archivo';
-                          return (
-                            <Box
-                              component="button"
-                              key={file.id}
-                              onClick={() => downloadFile(file.file_path)}
-                              sx={{
-                                border: '1px solid #c2c2c2',
-                                borderRadius: '20px',
-                                p: '4px 12px',
-                                backgroundColor: '#f7f7f7',
-                                cursor: 'pointer',
-                                fontSize: '0.75rem',
-                                '&:hover': { backgroundColor: '#e0e0e0' },
-                              }}
-                            >
-                              {label}
-                            </Box>
-                          );
-                        })}
+                        {order.files
+                          .filter((file) =>
+                            ['OT', 'SKU', 'OP'].includes(file.type)
+                          ) // ← Filtramos solo esos 3
+                          .map((file) => {
+                            const label =
+                              file.type === 'OT'
+                                ? 'Ver OT'
+                                : file.type === 'SKU'
+                                ? 'Ver SKU'
+                                : 'Ver OP';
+
+                            return (
+                              <Box
+                                component="button"
+                                key={file.id}
+                                onClick={() => downloadFile(file.file_path)}
+                                sx={{
+                                  border: '1px solid #c2c2c2',
+                                  borderRadius: '20px',
+                                  p: '4px 12px',
+                                  backgroundColor: '#f7f7f7',
+                                  cursor: 'pointer',
+                                  fontSize: '0.75rem',
+                                  '&:hover': { backgroundColor: '#e0e0e0' },
+                                }}
+                              >
+                                {label}
+                              </Box>
+                            );
+                          })}
                       </Box>
                     ) : (
                       'No hay archivos'
@@ -595,19 +598,6 @@ const Circle = styled.div.withConfig({
       ? ' 0 0 5px #f5945c'
       : 'none'};
   transition: background-color 0.3s, box-shadow 0.3s;
-`;
-
-const TimelineDivider = styled.div.withConfig({
-  shouldForwardProp: (prop) => prop !== '$isLast',
-})<{ $isLast: boolean }>`
-  position: absolute;
-  top: 14px;
-  left: 50%;
-  height: 2px;
-  width: 80px;
-  background-color: #d1d5db;
-  z-index: 0;
-  display: ${({ $isLast }) => ($isLast ? 'none' : 'block')};
 `;
 
 const AreaName = styled.span.withConfig({

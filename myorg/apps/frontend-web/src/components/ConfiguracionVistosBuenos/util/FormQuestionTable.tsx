@@ -34,7 +34,7 @@ export const FormQuestionTable = ({
 }: Props) => {
   // Si roleId es null => no filtramos por role_id
   const filtered = formQuestions.filter(
-    (q) => (roleId == null || q.role_id === roleId) && q.areas?.some((a) => a.id === areaId)
+    (q) => (q.role_id === roleId) && q.areas?.some((a) => a.id === areaId)
   );
 
   return (

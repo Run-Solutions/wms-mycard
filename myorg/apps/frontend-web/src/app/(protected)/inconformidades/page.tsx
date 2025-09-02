@@ -85,7 +85,7 @@ export default InconformidadesPage;
 // =================== Styled Components ===================
 
 const PageContainer = styled.div`
-  padding: 1rem 2rem;
+  padding: 20px 20px 20px 50px;
   margin-top: -70px;
 `;
 

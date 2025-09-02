@@ -12,9 +12,13 @@ import {
 } from 'react-native';
 import { TextInput } from 'react-native-paper';
 import { useNavigation } from '@react-navigation/native';
-import { acceptWorkOrderFlowAfterCorte, registrarInconformidadAuditory } from '../../api/aceptarProducto';
+import {
+  acceptWorkOrderFlowAfterCorte,
+  registrarInconformidadAuditory,
+} from '../../api/aceptarProducto';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { RootStackParamList } from '../../navigation/types';
+import WorkOrderInfo from './util/WorkOrderInfo';
 
 type PersonalizacionData = {
   good_quantity: number | string;
@@ -80,7 +84,8 @@ const PersonalizacionComponentAccept: React.FC<{ workOrder: any }> = ({
   useEffect(() => {
     if (!lastCompletedOrPartial) return;
 
-    const personalizacion = lastCompletedOrPartial.areaResponse?.personalizacion;
+    const personalizacion =
+      lastCompletedOrPartial.areaResponse?.personalizacion;
     const partials = lastCompletedOrPartial.partialReleases;
 
     const allValidated =
@@ -112,9 +117,10 @@ const PersonalizacionComponentAccept: React.FC<{ workOrder: any }> = ({
         0
       );
       const restante = (personalizacion.good_quantity || 0) - totalParciales;
-      const restantebad = (personalizacion.bad_quantity || 0) - totalParcialesbad;
-      const restanteexc = (personalizacion.excess_quantity || 0) - totalParcialesexec;
-
+      const restantebad =
+        (personalizacion.bad_quantity || 0) - totalParcialesbad;
+      const restanteexc =
+        (personalizacion.excess_quantity || 0) - totalParcialesexec;
 
       const vals: PersonalizacionData = {
         good_quantity: restante > 0 ? restante : 0,
@@ -134,7 +140,8 @@ const PersonalizacionComponentAccept: React.FC<{ workOrder: any }> = ({
         bad_quantity: firstUnvalidatedPartial.bad_quantity || '',
         excess_quantity: firstUnvalidatedPartial.excess_quantity || '',
         comments: firstUnvalidatedPartial.observation || '',
-        sample_quantity: firstUnvalidatedPartial.formAuditory.sample_auditory || '',
+        sample_quantity:
+          firstUnvalidatedPartial.formAuditory.sample_auditory || '',
         auditor: firstUnvalidatedPartial.formAuditory.user.username || '',
       };
       setDefaultValues(vals);
@@ -158,7 +165,10 @@ const PersonalizacionComponentAccept: React.FC<{ workOrder: any }> = ({
       return;
     }
     try {
-      await registrarInconformidadAuditory(lastCompletedOrPartial?.id, inconformidad);
+      await registrarInconformidadAuditory(
+        lastCompletedOrPartial?.id,
+        inconformidad
+      );
       Alert.alert('Inconformidad registrada');
       setShowInconformidad(false);
       navigation.goBack();
@@ -167,48 +177,20 @@ const PersonalizacionComponentAccept: React.FC<{ workOrder: any }> = ({
       Alert.alert('Error al enviar inconformidad');
     }
   };
-  const cantidadHojasRaw = Number(workOrder?.workOrder.quantity) / 24;
-  const cantidadHojas = cantidadHojasRaw > 0 ? Math.ceil(cantidadHojasRaw) : 0;
+
   const isAcceptButtonDisabled = isAcceptDisabled();
   return (
     <ScrollView contentContainerStyle={styles.container}>
       <Text style={styles.title}>Área: {workOrder.area.name}</Text>
 
-      <View style={styles.card}>
-        <Text style={styles.label}>Número de Orden:</Text>
-        <Text style={styles.value}>{workOrder.workOrder.ot_id}</Text>
-
-        <Text style={styles.label}>ID del Presupuesto:</Text>
-        <Text style={styles.value}>{workOrder.workOrder.mycard_id}</Text>
-
-        <Text style={styles.label}>Cantidad (TARJETAS):</Text>
-        <Text style={styles.value}>{workOrder.workOrder.quantity}</Text>
-
-        <Text style={styles.label}>Cantidad (Hojas Frente / Hojas Vuelta):</Text>
-        <Text style={styles.value}>{cantidadHojas}</Text>
-
-        <Text style={styles.label}>Área que lo envía:</Text>
-        <Text style={styles.value}>
-          {lastCompletedOrPartial?.area?.name || 'No definida'}
-        </Text>
-
-        <Text style={styles.label}>Usuario que lo envía:</Text>
-        <Text style={styles.value}>
-          {lastCompletedOrPartial?.user?.username || 'No definido'}
-        </Text>
-        <Text style={styles.label}>Auditor que lo envía:</Text>
-        <Text style={styles.value}>
-          {defaultValues.auditor || 'No definido'}
-        </Text>
-
-        <Text style={styles.label}>Comentarios:</Text>
-        <Text style={styles.value}>{workOrder.workOrder.comments}</Text>
-      </View>
+      <WorkOrderInfo
+        workOrder={workOrder}
+        lastCompletedOrPartial={lastCompletedOrPartial}
+        defaultValues={defaultValues}
+      />
 
       <Text style={styles.subtitle}>Buenas:</Text>
-      <Text style={styles.input}>
-        {defaultValues.good_quantity}
-      </Text>
+      <Text style={styles.input}>{defaultValues.good_quantity}</Text>
 
       <Text style={styles.subtitle}>Excedente:</Text>
       <Text style={styles.input}>{defaultValues.excess_quantity}</Text>

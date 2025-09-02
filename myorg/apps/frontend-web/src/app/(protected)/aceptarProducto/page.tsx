@@ -3,9 +3,9 @@
 
 import React, { useEffect, useState } from 'react';
 import styled, { useTheme } from 'styled-components';
-import { useRouter } from "next/navigation";
+import { useRouter } from 'next/navigation';
 import { acceptWorkOrderFlow, getPendingOrders } from '@/api/aceptarProducto';
-import { getFileByName } from "@/api/seguimientoDeOts";
+import { getFileByName } from '@/api/seguimientoDeOts';
 import { useAuthContext } from '@/context/AuthContext';
 
 // Se define el tipo de datos
@@ -17,14 +17,14 @@ interface WorkOrder {
   assigned_at: string;
   created_at: string;
   updated_at: string;
-  workOrder: {   
+  workOrder: {
     id: number;
     ot_id: string;
     priority: boolean;
     mycard_id: string;
     quantity: number;
     comments: string;
-    created_by: number;  
+    created_by: number;
     validated: boolean;
     createdAt: string;
     updatedAt: string;
@@ -44,7 +44,7 @@ interface WorkOrder {
       area: {
         id: number;
         name: string;
-      }
+      };
     }[];
   };
   areaResponse: {
@@ -55,7 +55,7 @@ interface WorkOrder {
       positives: number;
       testType: string;
       comments: string;
-    }
+    };
   };
 }
 
@@ -79,21 +79,21 @@ function puedeAceptarNuevaEtapa(
   currentUserId: number
 ): boolean {
   const flujosAnterioresMismaAreaYUsuario = allFlows.filter(
-    f =>
+    (f) =>
       f.area_id === currentFlow.area_id &&
       f.id < currentFlow.id &&
       f.assigned_user === currentUserId
-  )
+  );
   if (flujosAnterioresMismaAreaYUsuario.length === 0) {
     // ✅ Nunca participó antes: puede aceptar
     return true;
   }
   for (const flujo of flujosAnterioresMismaAreaYUsuario) {
     const pendiente =
-      ["Parcial", "Listo"].includes(flujo.status) ||
+      ['Parcial', 'Listo'].includes(flujo.status) ||
       (flujo.partialReleases || []).some((r) => !r.validated);
     if (pendiente) {
-      console.log("⛔ Usuario ya participó y aún tiene pendientes:", flujo);
+      console.log('⛔ Usuario ya participó y aún tiene pendientes:', flujo);
       return false;
     }
   }
@@ -114,7 +114,7 @@ const AcceptProductPage: React.FC = () => {
   const [isModalOpen, setIsModalOpen] = useState(false);
 
   const handleCardClick = (order: WorkOrder) => {
-    console.log("Clic en OT:", order.workOrder.ot_id);
+    console.log('Clic en OT:', order.workOrder.ot_id);
     setSelectedOrder(order);
     setIsModalOpen(true);
   };
@@ -122,18 +122,18 @@ const AcceptProductPage: React.FC = () => {
   const closeModal = () => {
     setIsModalOpen(false);
     setSelectedOrder(null);
-  }
+  };
 
   const aceptarOT = async () => {
-    console.log("Se hizo clic en Aceptar OT");
+    console.log('Se hizo clic en Aceptar OT');
     if (!selectedOrder) return;
-    const flowItem = [...selectedOrder?.workOrder.flow || []]
-    .reverse()
-    .find(
-      (f) =>
-        f.area.id === selectedOrder.area_id &&
-        f.status === selectedOrder.status
-    );
+    const flowItem = [...(selectedOrder?.workOrder.flow || [])]
+      .reverse()
+      .find(
+        (f) =>
+          f.area.id === selectedOrder.area_id &&
+          f.status === selectedOrder.status
+      );
     if (!flowItem) {
       alert('No se encontró el flujo activo para esta área');
       return;
@@ -155,20 +155,22 @@ const AcceptProductPage: React.FC = () => {
         ...flowItem,
         area_id: selectedOrder.area_id,
         assigned_user: currentUserId ?? null,
-        work_order_id: selectedOrder.work_order_id
+        work_order_id: selectedOrder.work_order_id,
       },
       mappedFlows,
       currentUserId
     );
-    console.log("puedeAceptar:", puedeAceptar);
+    console.log('puedeAceptar:', puedeAceptar);
     console.log('User', currentUserId);
     if (!puedeAceptar) {
-      alert("Debes liberar completamente tu participación anterior antes de aceptar esta etapa.");
+      alert(
+        'Debes liberar completamente tu participación anterior antes de aceptar esta etapa.'
+      );
       return;
     }
     // Si el área no es 1, redirigir inmediatamente
     if (selectedOrder?.area_id >= 2) {
-      router.push(`/aceptarProducto/${flowId}`); 
+      (window.location.href = `/aceptarProducto/${flowId}`);
       return;
     }
     try {
@@ -178,13 +180,34 @@ const AcceptProductPage: React.FC = () => {
       console.error(error);
       alert('Error al conectar con el servidor');
     }
-  }
+  };
+  const guessMimeFromName = (filename: string): string => {
+    const ext = filename.split('.').pop()?.toLowerCase();
+    switch (ext) {
+      case 'pdf':
+        return 'application/pdf';
+      case 'png':
+        return 'image/png';
+      case 'jpg':
+      case 'jpeg':
+        return 'image/jpeg';
+      case 'webp':
+        return 'image/webp';
+      default:
+        return 'application/octet-stream';
+    }
+  };
   const downloadFile = async (filename: string) => {
     try {
-      const arrayBuffer = await getFileByName(filename);
-      const blob = new Blob([arrayBuffer], { type: 'application/pdf' });
+      const arrayBuffer = await getFileByName(filename); // <- ya la tienes
+      const mime = guessMimeFromName(filename);
+      const blob = new Blob([arrayBuffer], { type: mime });
       const url = window.URL.createObjectURL(blob);
+
+      // abre en nueva pestaña (sirve para PDF e imágenes)
       window.open(url, '_blank');
+
+      // liberar URL luego
       setTimeout(() => window.URL.revokeObjectURL(url), 5000);
     } catch (error) {
       console.error('Error al abrir el archivo:', error);
@@ -199,7 +222,10 @@ const AcceptProductPage: React.FC = () => {
           const sorted = data.sort((a, b) => {
             if (a.workOrder.priority && !b.workOrder.priority) return -1;
             if (!a.workOrder.priority && b.workOrder.priority) return 1;
-            return new Date(a.workOrder.createdAt).getTime() - new Date(b.workOrder.createdAt).getTime();
+            return (
+              new Date(a.workOrder.createdAt).getTime() -
+              new Date(b.workOrder.createdAt).getTime()
+            );
           });
           setWorkOrders(sorted);
         } else {
@@ -212,83 +238,137 @@ const AcceptProductPage: React.FC = () => {
     }
     fetchWorkOrders();
   }, []);
-  
+
   return (
     <>
-    {isModalOpen && selectedOrder && (
-      <ModalOverlay onClick={closeModal}>
-        <ModalContent onClick={(e) => e.stopPropagation()}>
-          <h2>Orden: {selectedOrder.workOrder.ot_id}</h2>
-          <ModalBody>
-            <ModalInfo>
-              <p><strong>Id del Presupuesto:</strong> {selectedOrder.workOrder.mycard_id}</p>
-              <p><strong>Cantidad:</strong> {selectedOrder.workOrder.quantity}</p>
-              <p><strong>Creado por:</strong> {selectedOrder.workOrder.user?.username}</p>
-              <p><strong>Prioritario:</strong> {selectedOrder.workOrder.priority ? 'Sí' : 'No'}</p>
-              <p><strong>Comentarios:</strong> {selectedOrder.workOrder.comments}</p>
-              <p><strong>Archivos:</strong></p>
-              <div style={{ display: 'flex', flexDirection: 'row',}}>
-                {selectedOrder.workOrder.files.map((file) => (
-                  <div key={file.file_path}>
-                    <button onClick={() => downloadFile(file.file_path)}>
-                      {file.file_path.toLowerCase().includes('ot') ? 'Ver OT' : 
-                      file.file_path.toLowerCase().includes('sku') ? 'Ver SKU' : 
-                      file.file_path.toLowerCase().includes('op') ? 'Ver OP' : 
-                      'Ver Archivo'}
-                    </button>
-                  </div>
-                ))}
-              </div>
-            </ModalInfo>
-            <ModalFlow>
+      {isModalOpen && selectedOrder && (
+        <ModalOverlay onClick={closeModal}>
+          <ModalContent onClick={(e) => e.stopPropagation()}>
+            <h2>Orden: {selectedOrder.workOrder.ot_id}</h2>
+            <ModalBody>
+              <ModalInfo>
+                <p>
+                  <strong>Id del Presupuesto:</strong>{' '}
+                  {selectedOrder.workOrder.mycard_id}
+                </p>
+                <p>
+                  <strong>Cantidad:</strong> {selectedOrder.workOrder.quantity}
+                </p>
+                <p>
+                  <strong>Creado por:</strong>{' '}
+                  {selectedOrder.workOrder.user?.username}
+                </p>
+                <p>
+                  <strong>Prioritario:</strong>{' '}
+                  {selectedOrder.workOrder.priority ? 'Sí' : 'No'}
+                </p>
+                <p>
+                  <strong>Comentarios:</strong>{' '}
+                  {selectedOrder.workOrder.comments}
+                </p>
+                <p>
+                  <strong>Archivos:</strong>
+                </p>
+                <div className="grid grid-cols-4 gap-1">
+                  {selectedOrder.workOrder.files.map((file) => {
+                    const name = file.file_path.toLowerCase();
+                    const label = name.includes('ot')
+                      ? 'Ver OT'
+                      : name.includes('sku')
+                      ? 'Ver SKU'
+                      : name.includes('op')
+                      ? 'Ver OP'
+                      : 'Adjunto';
+                    return (
+                      <button
+                        key={file.file_path}
+                        onClick={() => downloadFile(file.file_path)}
+                        className="flex items-center justify-center w-full px-3 py-2
+                                 rounded-lg shadow-sm bg-white hover:bg-gray-100 
+                                 border text-sm font-medium transition-all duration-200"
+                      >
+                        <span>{label}</span>
+                      </button>
+                    );
+                  })}
+                </div>
+              </ModalInfo>
+              <ModalFlow>
                 <strong>Flujos:</strong>
                 <Timeline>
                   {selectedOrder.workOrder.flow.map((f, index) => (
                     <TimelineItem key={index}>
                       <Circle>{index + 1}</Circle>
                       <AreaName>{f.area.name ?? 'Area Desconocida'}</AreaName>
-                      {index < selectedOrder.workOrder.flow.length -1 && <Line/>}
+                      {index < selectedOrder.workOrder.flow.length - 1 && (
+                        <Line />
+                      )}
                     </TimelineItem>
                   ))}
                 </Timeline>
-            </ModalFlow>
-          </ModalBody>
-          <button style={{ marginTop: '20px'}} onClick={closeModal}>Cerrar</button>
-          <button style={{ marginTop: '20px'}} onClick={aceptarOT}>Aceptar OT</button>
-        </ModalContent>
-      </ModalOverlay>
-    )}
+              </ModalFlow>
+            </ModalBody>
+            <button
+              style={{ marginTop: '20px', backgroundColor: '#bbbbbb' }}
+              onClick={closeModal}
+            >
+              Cerrar
+            </button>
+            <button
+              style={{
+                marginTop: '20px',
+                backgroundColor: '#0038A8',
+                color: 'white',
+              }}
+              onClick={aceptarOT}
+            >
+              Aceptar OT
+            </button>
+          </ModalContent>
+        </ModalOverlay>
+      )}
 
-    <PageContainer>
-      <TitleWrapper>
-        <Title theme={theme}>Órdenes de Trabajo Pendientes</Title>
-      </TitleWrapper>
-      <CardsContainer>
-        {Array.isArray(WorkOrders) && WorkOrders.length > 0 ? (
-          WorkOrders.map((order, index) => {
-            console.log(`Orden ${index + 1}:`, order);
-            const workOrder = order.workOrder;
-            if(!workOrder) return null;
-            return (
-              <WorkOrderCard key={order.id} onClick={() => {
-                console.log('Ha clickeado');
-                handleCardClick(order);
-                }}>
-                <CardTitle>{workOrder.priority && <PriorityBadge />}{workOrder.ot_id}</CardTitle>
-                <InfoItem>
-                  <p>{workOrder.mycard_id}</p>
-                  <p>Cantidad: {workOrder.quantity}</p>
-                </InfoItem>
-                <Info style={{ paddingTop: '10px' }}>Creado por: {workOrder.user.username}</Info>
-                <Info>Fecha de creación: {new Date(workOrder.createdAt).toLocaleDateString()}</Info>
-              </WorkOrderCard>
-            );
-          })
-        ) : (
-          <Message>No hay ordenes pendientes por asignar.</Message>
-        )}
-      </CardsContainer>
-    </PageContainer>
+      <PageContainer>
+        <TitleWrapper>
+          <Title theme={theme}>Órdenes de Trabajo Pendientes</Title>
+        </TitleWrapper>
+        <CardsContainer>
+          {Array.isArray(WorkOrders) && WorkOrders.length > 0 ? (
+            WorkOrders.map((order, index) => {
+              console.log(`Orden ${index + 1}:`, order);
+              const workOrder = order.workOrder;
+              if (!workOrder) return null;
+              return (
+                <WorkOrderCard
+                  key={order.id}
+                  onClick={() => {
+                    console.log('Ha clickeado');
+                    handleCardClick(order);
+                  }}
+                >
+                  <CardTitle>
+                    {workOrder.priority && <PriorityBadge />}
+                    {workOrder.ot_id}
+                  </CardTitle>
+                  <InfoItem>
+                    <p>{workOrder.mycard_id}</p>
+                    <p>Cantidad: {workOrder.quantity}</p>
+                  </InfoItem>
+                  <Info style={{ paddingTop: '10px' }}>
+                    Creado por: {workOrder.user.username}
+                  </Info>
+                  <Info>
+                    Fecha de creación:{' '}
+                    {new Date(workOrder.createdAt).toLocaleDateString()}
+                  </Info>
+                </WorkOrderCard>
+              );
+            })
+          ) : (
+            <Message>No hay ordenes pendientes por asignar.</Message>
+          )}
+        </CardsContainer>
+      </PageContainer>
     </>
   );
 };
@@ -333,9 +413,9 @@ const WorkOrderCard = styled.div`
   background-color: ${(props) => props.theme.palette.primary.main};
   cursor: pointer;
   box-shadow: 0px 4px 10px rgba(0, 0, 0, 0.1);
-  transition: border-color 0.3s cubic-bezier(0.25, 0.01, 0.25, 1), 
-              color 0.3s cubic-bezier(0.25, 0.01, 0.25, 1), 
-              background 0.2s cubic-bezier(0.25, 0.01, 0.25, 1);
+  transition: border-color 0.3s cubic-bezier(0.25, 0.01, 0.25, 1),
+    color 0.3s cubic-bezier(0.25, 0.01, 0.25, 1),
+    background 0.2s cubic-bezier(0.25, 0.01, 0.25, 1);
   &::placeholder {
     color: #aaa;
     font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen,
@@ -399,31 +479,31 @@ const ModalContent = styled.div`
   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.25);
 
   h2 {
-      font-size: 1.8rem;
-      margin-bottom: 1rem;
+    font-size: 1.8rem;
+    margin-bottom: 1rem;
   }
   button {
     padding: 0.5rem 1rem;
     border: none;
     border-radius: 0.5rem;
-    background-color: #F9FAFB;
+    background-color: #f9fafb;
     color: black;
     cursor: pointer;
     margin: 5px;
-    transition: border-color 0.3s cubic-bezier(0.25, 0.01, 0.25, 1), 
-              color 0.3s cubic-bezier(0.25, 0.01, 0.25, 1), 
-              background 0.2s cubic-bezier(0.25, 0.01, 0.25, 1);
+    transition: border-color 0.3s cubic-bezier(0.25, 0.01, 0.25, 1),
+      color 0.3s cubic-bezier(0.25, 0.01, 0.25, 1),
+      background 0.2s cubic-bezier(0.25, 0.01, 0.25, 1);
 
-  &::placeholder {
-    color: #aaa;
-    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen,
-      Ubuntu, Cantarell, 'Open Sans', 'Helvetica Neue', sans-serif;
-  }
+    &::placeholder {
+      color: #aaa;
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen,
+        Ubuntu, Cantarell, 'Open Sans', 'Helvetica Neue', sans-serif;
+    }
 
-  &:hover,
-  &:focus {
-    border-color: #05060f;
-  }
+    &:hover,
+    &:focus {
+      border-color: #05060f;
+    }
   }
 `;
 
@@ -493,14 +573,14 @@ const PriorityBadge = styled.span`
   display: inline-block;
   width: 14px;
   height: 14px;
-  background-color: #FFD700;
+  background-color: #ffd700;
   border-radius: 50%;
   margin-left: 8px;
   box-shadow: 0 0 4px rgba(255, 215, 0, 0.7);
   position: relative;
   top: -4px;
   margin-right: 5px;
-  
+
   /* Efecto de brillo opcional */
   &:after {
     content: '';

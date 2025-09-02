@@ -23,6 +23,8 @@ import { calcularCantidadPorLiberar } from './util/calcularCantidadPorLiberar';
 import BadQuantityModal from './util/BadQuantityModal';
 import { AreaData } from './PersonalizacionComponent';
 import SelectionQuestionTable from './util/FormQuestionTable';
+import WorkOrderInfo from './util/WorkOrderInfo';
+import { usePartialReleaseControls } from './util/disablePartialTime';
 
 interface PartialRelease {
   validated: boolean;
@@ -96,6 +98,9 @@ const ColorEdgeComponent = ({ workOrder }: { workOrder: any }) => {
     alert('No tienes una orden activa para esta área.');
     return;
   }
+  const allParcialsValidated = currentFlow.partialReleases?.every(
+    (r: PartialRelease) => r.validated
+  );
   const currentIndex = flowList.findIndex(
     (item) => item.id === currentFlow?.id
   );
@@ -111,11 +116,119 @@ const ColorEdgeComponent = ({ workOrder }: { workOrder: any }) => {
   console.log('El flujo actual (currentFlow)', currentFlow);
   console.log('El siguiente flujo (nextFlow)', nextFlow);
   console.log('Ultimo parcial o completado', lastCompletedOrPartial);
-
-  const allParcialsValidated = currentFlow.partialReleases?.every(
-    (r: PartialRelease) => r.validated
+  const cantidadporliberar = calcularCantidadPorLiberar(
+    currentFlow,
+    lastCompletedOrPartial
   );
+  console.log('Cantidad final por liberar:', cantidadporliberar);
+  const statusesToCheck = [
+    currentFlow?.status,
+    nextFlow?.status,
+    lastCompletedOrPartial?.status,
+  ];
 
+  const { disableAfterCorteCQM, disablePartial, cooldown } =
+    usePartialReleaseControls({
+      flow: currentFlow,
+      cantidadPorLiberar: cantidadporliberar,
+      withCountdown: true,
+
+      // 🔎 acá decides contra qué comparar:
+      statusesToCheck, // revisa current + next + last
+      blockedForCQM: [
+        'Enviado a CQM',
+        'En Calidad',
+        'Listo',
+        'Pendiente parcial',
+      ],
+      blockedForCQM_AfterCorte: [
+        'Enviado a CQM',
+        'En Calidad',
+        'Listo',
+        'Pendiente',
+        'Pendiente parcial',
+        'Enviado a auditoria parcial',
+        'En inconformidad CQM',
+        'Enviado a Auditoria',
+      ],
+    });
+  const shouldDisableCQM = () => disableAfterCorteCQM;
+  const shouldDisableLiberar = () => {
+    // 0) Helpers locales con las MISMAS listas que pasaste al hook
+    const blockedAfterCorte = [
+      'Enviado a CQM',
+      'En Calidad',
+      'Listo',
+      'Pendiente',
+      'Pendiente parcial',
+      'Enviado a auditoria parcial',
+      'En inconformidad CQM',
+      'Enviado a Auditoria',
+    ];
+
+    const cleaned = [
+      currentFlow?.status,
+      nextFlow?.status,
+      lastCompletedOrPartial?.status,
+    ]
+      .map((s) => s?.trim?.() ?? '')
+      .filter(Boolean);
+
+    const hasBlockedStatus = cleaned.some((s) => blockedAfterCorte.includes(s));
+    const byCantidad = Number(cantidadporliberar) === 0;
+    const byCooldown = !currentFlow.areaResponse && !!cooldown?.isLocked;
+
+    // 1) Si CQM está bloqueado SOLO por cooldown (no por estados ni cantidad) => habilitar parcial
+    const cqmBloqueadoSoloPorTiempo =
+      byCooldown && !hasBlockedStatus && !byCantidad;
+    if (cqmBloqueadoSoloPorTiempo) {
+      return false; // NO deshabilitar botón de Liberación Parcial
+    }
+
+    // 2) Si no es el caso anterior, aplicar base del hook para parciales + tus reglas extra
+    const currentInvalidStatuses = [
+      'Enviado a CQM',
+      'En Calidad',
+      'Parcial',
+      'Enviado a auditoria parcial',
+      'Pendiente',
+      'Pendiente parcial',
+      'En proceso',
+    ];
+    const nextInvalidStatuses = [
+      'Enviado a CQM',
+      'Listo',
+      'En Calidad',
+      'Enviado a auditoria parcial',
+      'Pendiente',
+      'Parcial',
+      'Pendiente parcial',
+      'En inconformidad CQM',
+    ];
+    const nextCorteStatuses = ['Enviado a auditoria parcial'];
+
+    const isCurrentInvalid = currentInvalidStatuses.includes(
+      currentFlow.status?.trim?.() ?? ''
+    );
+    const isNextInvalid = nextInvalidStatuses.includes(
+      nextFlow?.status?.trim?.() ?? ''
+    );
+    const afterCorte =
+      nextCorteStatuses.includes(currentFlow?.status?.trim?.() ?? '') &&
+      (nextFlow?.area?.id ?? 0) >= 6;
+    const isNextInvalidAndNotValidated =
+      nextInvalidStatuses.includes(nextFlow?.status?.trim?.() ?? '') &&
+      !allParcialsValidated;
+
+    return (
+      disablePartial || // base del hook para parciales (cantidad=0, estados finales)
+      isDisabled || // tu flag global
+      isCurrentInvalid ||
+      afterCorte ||
+      isNextInvalidAndNotValidated ||
+      isNextInvalid
+    );
+  };
   const enviarACQM = async () => {
     const numValue = Number(sampleQuantity);
     if (isNaN(numValue) || !Number.isInteger(numValue) || numValue < 0) {
@@ -193,53 +306,6 @@ const ColorEdgeComponent = ({ workOrder }: { workOrder: any }) => {
       Alert.alert('Error del servidor al liberar.');
     }
   };
-
-  const cantidadEntregadaLabel =
-    lastCompletedOrPartial.areaResponse &&
-    lastCompletedOrPartial.partialReleases.length === 0
-      ? 'Cantidad entregada:'
-      : lastCompletedOrPartial.partialReleases?.some(
-          (r: PartialRelease) => r.validated
-        )
-      ? 'Cantidad entregada validada:'
-      : 'Cantidad faltante por liberar:';
-
-  const cantidadEntregadaValue =
-    lastCompletedOrPartial.areaResponse &&
-    lastCompletedOrPartial.partialReleases.length === 0
-      ? // Mostrar cantidad según sub-área disponible
-        lastCompletedOrPartial.areaResponse.prepress?.plates ??
-        lastCompletedOrPartial.areaResponse.impression?.release_quantity ??
-        lastCompletedOrPartial.areaResponse.serigrafia?.release_quantity ??
-        lastCompletedOrPartial.areaResponse.empalme?.release_quantity ??
-        lastCompletedOrPartial.areaResponse.laminacion?.release_quantity ??
-        lastCompletedOrPartial.areaResponse.corte?.good_quantity ??
-        lastCompletedOrPartial.areaResponse.colorEdge?.good_quantity ??
-        lastCompletedOrPartial.areaResponse.hotStamping?.good_quantity ??
-        lastCompletedOrPartial.areaResponse.millingChip?.good_quantity ??
-        lastCompletedOrPartial.areaResponse.personalizacion?.good_quantity ??
-        'Sin cantidad'
-      : lastCompletedOrPartial.partialReleases?.some(
-          (r: PartialRelease) => r.validated
-        )
-      ? lastCompletedOrPartial.partialReleases
-          .filter((release: PartialRelease) => release.validated)
-          .reduce(
-            (sum: number, release: PartialRelease) => sum + release.quantity,
-            0
-          )
-      : (lastCompletedOrPartial.workOrder?.quantity ?? 0) -
-        (lastCompletedOrPartial.partialReleases?.reduce(
-          (sum: number, release: PartialRelease) => sum + release.quantity,
-          0
-        ) ?? 0);
-
-  const cantidadporliberar = calcularCantidadPorLiberar(
-    currentFlow,
-    lastCompletedOrPartial
-  );
-  console.log('Cantidad final por liberar:', cantidadporliberar);
-
   const previousFlows = flowList
     .slice(0, currentIndex + 1)
     .filter((flow) => flow.area_id !== 1);
@@ -437,50 +503,6 @@ const ColorEdgeComponent = ({ workOrder }: { workOrder: any }) => {
       return sum;
     }, 0);
   }, [areaBadQuantities, previousFlows]);
-  const shouldDisableLiberar = () => {
-    const currentInvalidStatuses = [
-      'Enviado a CQM',
-      'En Calidad',
-      'Parcial',
-      'Enviado a auditoria parcial',
-      'Pendiente',
-      'Pendiente parcial',
-      'En proceso',
-    ];
-    const nextInvalidStatuses = [
-      'Enviado a CQM',
-      'Listo',
-      'En Calidad',
-      'Enviado a auditoria parcial',
-      'Pendiente',
-      'Parcial',
-      'Pendiente parcial',
-      'En inconformidad CQM',
-    ];
-    const nextCorteStatuses = ['Enviado a auditoria parcial'];
-
-    const isCurrentInvalid = currentInvalidStatuses.includes(
-      currentFlow.status?.trim()
-    );
-    const isNextInvalid = nextInvalidStatuses.includes(
-      nextFlow?.status?.trim()
-    );
-    const afterCorte =
-      nextCorteStatuses.includes(currentFlow?.status?.trim()) &&
-      nextFlow?.area?.id >= 6;
-    const isNextInvalidAndNotValidated =
-      nextInvalidStatuses.includes(nextFlow?.status?.trim()) &&
-      !allParcialsValidated;
-
-    return (
-      isDisabled ||
-      isCurrentInvalid ||
-      afterCorte ||
-      isNextInvalidAndNotValidated ||
-      isNextInvalid
-    );
-  };
-
   const handleToggleRespuesta = (
     questionId: number,
     _columnIndex: number,
@@ -504,43 +526,6 @@ const ColorEdgeComponent = ({ workOrder }: { workOrder: any }) => {
       return next;
     });
   };
-  const shouldDisableCQM = () => {
-    const estadosBloqueadosBase = [
-      'Enviado a CQM',
-      'En Calidad',
-      'Listo',
-      'Pendiente',
-      'Pendiente parcial',
-      'Enviado a auditoria parcial',
-      'En inconformidad CQM',
-      'Enviado a Auditoria',
-    ];
-    const estadosBloqueadosExtra = [
-      'Listo',
-      'Enviado a auditoria parcial',
-      'Enviado a Auditoria',
-    ];
-    const statusesToCheck = [
-      currentFlow.status,
-      nextFlow?.status,
-      lastCompletedOrPartial.status,
-    ];
-    const matchBloqueadosBase = statusesToCheck.some((status) =>
-      estadosBloqueadosBase.includes(status)
-    );
-    const matchBloqueadosExtra = statusesToCheck.some((status) =>
-      estadosBloqueadosExtra.includes(status)
-    );
-    const algunoBloqueado = workOrder.workOrder.flow.some((flow: any) =>
-      estadosBloqueadosBase.includes(flow.status)
-    );
-    return (
-      matchBloqueadosBase ||
-      matchBloqueadosExtra ||
-      algunoBloqueado ||
-      Number(cantidadporliberar) === 0
-    );
-  };
   const disableLiberarButton = shouldDisableLiberar();
   const disableLiberarCQM = shouldDisableCQM();
   const isListo = workOrder.status === 'Listo';
@@ -559,32 +544,8 @@ const ColorEdgeComponent = ({ workOrder }: { workOrder: any }) => {
     <ScrollView style={styles.container}>
       <Text style={styles.title}>Área: Color Edge</Text>
 
-      <View style={styles.cardDetail}>
-        <Text style={styles.labelDetail}>
-          Área que lo envía:
-          <Text style={styles.valueDetail}>
-            {' '}
-            {lastCompletedOrPartial.area.name}
-          </Text>
-        </Text>
-        <Text style={styles.labelDetail}>
-          Usuario del área previa:{' '}
-          <Text style={styles.valueDetail}>
-            {lastCompletedOrPartial.user.username}
-          </Text>
-        </Text>
-        <Text style={styles.labelDetail}>
-          {cantidadEntregadaLabel}
-          <Text style={styles.valueDetail}> {cantidadEntregadaValue}</Text>
-        </Text>
+      <WorkOrderInfo workOrder={workOrder} lastCompletedOrPartial={lastCompletedOrPartial} cantidadporliberar={cantidadporliberar} />
 
-        {workOrder?.partialReleases?.length > 0 && (
-          <Text style={styles.labelDetail}>
-            Cantidad por Liberar:
-            <Text style={styles.valueDetail}> {cantidadporliberar}</Text>
-          </Text>
-        )}
-      </View>
 
       <Text style={styles.label}>Cantidad a liberar</Text>
       <Text style={styles.label}>Buenas:</Text>

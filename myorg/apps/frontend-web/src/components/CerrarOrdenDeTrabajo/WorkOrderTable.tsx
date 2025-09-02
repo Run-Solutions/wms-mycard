@@ -392,7 +392,7 @@ const WorkOrderTable: React.FC<Props> = ({ orders, title, statusFilter }) => {
                 <TableRow key={orderFlow.id}>
                   <TableCell
                     onClick={() =>
-                      router.push(`/cerrarOrdenDeTrabajo/${orderFlow.ot_id}`)
+                      (window.location.href = `/cerrarOrdenDeTrabajo/${orderFlow.ot_id}`)
                     }
                     sx={{
                       color: 'black',

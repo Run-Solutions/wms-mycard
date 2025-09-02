@@ -21,6 +21,7 @@ import {
 } from '../../api/recepcionCQM';
 import { OperatorAdvancedTable } from './util/FormQuestionTable';
 import SelectionQuestionTable from './util/SelectionQuestionTable';
+import { WorkOrderHojasInfo } from './util/WorkOrderInfo';
 
 // Tipos y constantes globales
 
@@ -62,66 +63,70 @@ const ImpresionComponent = ({ workOrder }: { workOrder: any }) => {
   const qualityQuestions =
     workOrder.area.formQuestions?.filter((q: any) => q.role_id === 3) || [];
 
-    const handleSubmit = async () => {
-      const formAnswerId = workOrder.answers[index]?.id;
-      if (!formAnswerId) {
-        Alert.alert('No se encontró el Id del formulario');
-        return;
-      }
-    
-      // 1) Preguntas visibles (CQM: role_id === 3). Aplica slice si lo usas en la UI.
-      const visibleQuestions =
-        (workOrder.area.formQuestions ?? []).filter((q: any) => q.role_id === 3);
-    
-      // 2) Helper: estado por columna (0 = Frente, 1 = Vuelta)
-      const getAnswerFor = (qid: number, colIndex: number): boolean | undefined => {
-        if (colIndex === 0) {
-          if (checkedFrenteOK.includes(qid)) return true;
-          if (checkedFrenteNG.includes(qid)) return false;
-          return undefined;
-        } else {
-          if (checkedVueltaOK.includes(qid)) return true;
-          if (checkedVueltaNG.includes(qid)) return false;
-          return undefined;
-        }
-      };
-    
-      // 3) Validar que TODAS las visibles tengan selección en ambas columnas
-      for (const q of visibleQuestions) {
-        const a0 = getAnswerFor(q.id, 0);
-        const a1 = getAnswerFor(q.id, 1);
-        if (a0 === undefined || a1 === undefined) {
-          Alert.alert('Completa todas las preguntas y cantidad de muestra.');
-          return;
-        }
-      }
-    
-      // 4) Construir payload que el tipo espera:
-      //    frente/vuelta = SOLO ids con respuesta OK en cada columna
-      const frente = visibleQuestions
-        .filter((q: any) => getAnswerFor(q.id, 0) === true)
-        .map((q: any) => ({ question_id: q.id }));
-    
-      const vuelta = visibleQuestions
-        .filter((q: any) => getAnswerFor(q.id, 1) === true)
-        .map((q: any) => ({ question_id: q.id }));
-    
-      const payload = {
-        form_answer_id: formAnswerId,
-        frente, // {question_id}[]
-        vuelta, // {question_id}[]
-        radio: { value: testTypes },
-      };
-    
-      try {
-        const success = await submitExtraImpresion(payload);
-        setShowConfirmModal(false);
-        Alert.alert('Producto evaluado correctamente');
-        navigation.goBack();
-      } catch (err) {
-        Alert.alert('Error al liberar el producto.');
+  const handleSubmit = async () => {
+    const formAnswerId = workOrder.answers[index]?.id;
+    if (!formAnswerId) {
+      Alert.alert('No se encontró el Id del formulario');
+      return;
+    }
+
+    // 1) Preguntas visibles (CQM: role_id === 3). Aplica slice si lo usas en la UI.
+    const visibleQuestions = (workOrder.area.formQuestions ?? []).filter(
+      (q: any) => q.role_id === 3
+    );
+
+    // 2) Helper: estado por columna (0 = Frente, 1 = Vuelta)
+    const getAnswerFor = (
+      qid: number,
+      colIndex: number
+    ): boolean | undefined => {
+      if (colIndex === 0) {
+        if (checkedFrenteOK.includes(qid)) return true;
+        if (checkedFrenteNG.includes(qid)) return false;
+        return undefined;
+      } else {
+        if (checkedVueltaOK.includes(qid)) return true;
+        if (checkedVueltaNG.includes(qid)) return false;
+        return undefined;
       }
     };
+
+    // 3) Validar que TODAS las visibles tengan selección en ambas columnas
+    for (const q of visibleQuestions) {
+      const a0 = getAnswerFor(q.id, 0);
+      const a1 = getAnswerFor(q.id, 1);
+      if (a0 === undefined || a1 === undefined) {
+        Alert.alert('Completa todas las preguntas y cantidad de muestra.');
+        return;
+      }
+    }
+
+    // 4) Construir payload que el tipo espera:
+    //    frente/vuelta = SOLO ids con respuesta OK en cada columna
+    const frente = visibleQuestions
+      .filter((q: any) => getAnswerFor(q.id, 0) === true)
+      .map((q: any) => ({ question_id: q.id }));
+
+    const vuelta = visibleQuestions
+      .filter((q: any) => getAnswerFor(q.id, 1) === true)
+      .map((q: any) => ({ question_id: q.id }));
+
+    const payload = {
+      form_answer_id: formAnswerId,
+      frente, // {question_id}[]
+      vuelta, // {question_id}[]
+      radio: { value: testTypes },
+    };
+
+    try {
+      const success = await submitExtraImpresion(payload);
+      setShowConfirmModal(false);
+      Alert.alert('Producto evaluado correctamente');
+      navigation.goBack();
+    } catch (err) {
+      Alert.alert('Error al liberar el producto.');
+    }
+  };
 
   const handleInconformidad = async () => {
     if (!inconformidad.trim()) {
@@ -189,27 +194,7 @@ const ImpresionComponent = ({ workOrder }: { workOrder: any }) => {
   return (
     <ScrollView style={styles.container}>
       <Text style={styles.title}>Área a evaluar: Impresión</Text>
-      <View style={styles.card}>
-        <Text style={styles.label}>OT:</Text>
-        <Text style={styles.value}>{workOrder.workOrder.ot_id}</Text>
-
-        <Text style={styles.label}>Id del Presupuesto:</Text>
-        <Text style={styles.value}>{workOrder.workOrder.mycard_id}</Text>
-
-        <Text style={styles.label}>Cantidad (TARJETAS):</Text>
-        <Text style={styles.value}>{workOrder.workOrder.quantity}</Text>
-
-        <Text style={styles.label}>
-          Cantidad (Hojas Frente / Hojas Vuelta):
-        </Text>
-        <Text style={styles.value}>{cantidadHojas}</Text>
-
-        <Text style={styles.label}>Operador:</Text>
-        <Text style={styles.value}>{workOrder.user.username}</Text>
-
-        <Text style={styles.label}>Comentarios:</Text>
-        <Text style={styles.value}>{workOrder.workOrder.comments}</Text>
-      </View>
+      <WorkOrderHojasInfo workOrder={workOrder} />
 
       <Text style={styles.modalTitle}>Respuestas del operador</Text>
 
@@ -456,6 +441,7 @@ const styles = StyleSheet.create({
   modalTitle: {
     fontSize: 22,
     fontWeight: 'bold',
+    marginTop: 8,
     marginBottom: 16,
     textAlign: 'center',
     color: '#1f2937',

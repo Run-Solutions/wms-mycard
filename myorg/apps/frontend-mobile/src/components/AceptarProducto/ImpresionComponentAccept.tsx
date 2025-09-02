@@ -16,6 +16,7 @@ import { acceptWorkOrderFlow } from '../../api/aceptarProducto';
 import { registrarInconformidad } from '../../api/aceptarProducto';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { RootStackParamList } from '../../navigation/types';
+import { WorkOrderHojasInfo } from './util/WorkOrderInfo';
 
 type ImpressionData = {
   release_quantity: number;
@@ -141,34 +142,14 @@ const ImpresionComponentAccept: React.FC<{ workOrder: any }> = ({
     <ScrollView contentContainerStyle={styles.container}>
       <Text style={styles.title}>Área: {workOrder.area.name}</Text>
 
-      <View style={styles.card}>
-        <Text style={styles.label}>Número de Orden:</Text>
-        <Text style={styles.value}>{workOrder.workOrder.ot_id}</Text>
+      <WorkOrderHojasInfo
+        workOrder={workOrder}
+        lastCompletedOrPartial={lastCompletedOrPartial}
+      />
 
-        <Text style={styles.label}>ID del Presupuesto:</Text>
-        <Text style={styles.value}>{workOrder.workOrder.mycard_id}</Text>
-
-        <Text style={styles.label}>Cantidad (TARJETAS):</Text>
-        <Text style={styles.value}>{workOrder.workOrder.quantity}</Text>
-
-        <Text style={styles.label}>Cantidad (Hojas Frente / Hojas Vuelta):</Text>
-        <Text style={styles.value}>{cantidadHojas}</Text>
-
-        <Text style={styles.label}>Área que lo envía:</Text>
-        <Text style={styles.value}>
-          {lastCompletedOrPartial?.area?.name || 'No definida'}
-        </Text>
-
-        <Text style={styles.label}>Usuario que lo envía:</Text>
-        <Text style={styles.value}>
-          {lastCompletedOrPartial?.user?.username || 'No definido'}
-        </Text>
-
-        <Text style={styles.label}>Comentarios:</Text>
-        <Text style={styles.value}>{workOrder.workOrder.comments}</Text>
-      </View>
-
-      <Text style={styles.subtitle}>Cantidad entregada (Hojas Frente / Hojas Vuelta)</Text>
+      <Text style={styles.subtitle}>
+        Cantidad entregada (Hojas Frente / Hojas Vuelta)
+      </Text>
       <Text style={styles.input}>
         {Math.ceil(defaultValues.release_quantity / 24)}
       </Text>

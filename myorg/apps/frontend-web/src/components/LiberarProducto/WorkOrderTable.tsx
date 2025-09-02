@@ -187,7 +187,7 @@ const WorkOrderTable: React.FC<Props> = ({
                   <TableCell
                     sx={{ ...clickableCell }}
                     onClick={() =>
-                      router.push(`/liberarProducto/${order.workOrder.ot_id}`)
+                       (window.location.href = `/liberarProducto/${order.workOrder.ot_id}`)
                     }
                   >
                     {order.workOrder.ot_id}
@@ -245,25 +245,26 @@ const WorkOrderTable: React.FC<Props> = ({
                   <CustomTableCell>
                     {order.workOrder.files.length > 0 ? (
                       <Box display="flex" flexDirection="column" gap={1}>
-                        {order.workOrder.files.map(
-                          (file: WorkOrder['workOrder']['files'][number]) => (
-                            <button
-                              key={file.file_path}
+                        {order.workOrder.files.filter((file) => ['OT', 'SKU', 'OP'].includes(file.type)).map(
+                          (file: WorkOrder['workOrder']['files'][number]) => {
+                            const label = file.type === 'OT' ? 'Ver OT' : file.type === 'SKU' ? 'Ver SKU' : 'Ver OP';
+                            return (
+                              <Box        component="button"
+                              key={file.id}
                               onClick={() => downloadFile(file.file_path)}
-                              style={fileButtonStyle}
-                              onMouseOver={(e) =>
-                                (e.currentTarget.style.backgroundColor =
-                                  '#e0e0e0')
-                              }
-                              onMouseOut={(e) =>
-                                (e.currentTarget.style.backgroundColor =
-                                  '#f7f7f7')
-                              }
-                            >
-                              {getFileLabel(file.file_path)}
-                            </button>
-                          )
-                        )}
+                              sx={{
+                                border: '1px solid #c2c2c2',
+                                borderRadius: '20px',
+                                p: '4px 12px',
+                                backgroundColor: '#f7f7f7',
+                                cursor: 'pointer',
+                                fontSize: '0.75rem',
+                                '&:hover': { backgroundColor: '#e0e0e0' },
+                              }}>
+                                {label}
+                              </Box>
+                            );
+                          })}
                       </Box>
                     ) : (
                       'No hay archivos'

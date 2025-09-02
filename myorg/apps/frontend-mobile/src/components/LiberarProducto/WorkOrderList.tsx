@@ -28,7 +28,10 @@ import {
   getFlowStateStyles,
 } from './util/helpers';
 
-type Navigation = NavigationProp<InternalStackParamList, 'LiberarProductoAuxScreen'>;
+type Navigation = NavigationProp<
+  InternalStackParamList,
+  'LiberarProductoAuxScreen'
+>;
 
 interface Props {
   orders: WorkOrder[];
@@ -104,14 +107,16 @@ const WorkOrderList: React.FC<Props> = ({ orders = [] }) => {
             </View>
 
             <View style={styles.filesBlock}>
-              {item.files.length > 0 ? (
-                item.files.map((file) => (
+              {item.files && item.files.length > 0 ? (
+                item.files.filter((file) => ['OT', 'SKU', 'OP'].includes(file.type)).map((file) => (
                   <TouchableOpacity
                     key={file.id}
                     onPress={() => downloadFile(file.file_path)}
                     style={styles.fileButton}
                   >
-                    <Text style={styles.fileText}>{getFileLabel(file.file_path)}</Text>
+                    <Text style={styles.fileText}>
+                      {getFileLabel(file.file_path)}
+                    </Text>
                   </TouchableOpacity>
                 ))
               ) : (

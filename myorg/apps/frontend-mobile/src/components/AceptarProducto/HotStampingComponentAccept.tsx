@@ -15,7 +15,7 @@ import { useNavigation } from '@react-navigation/native';
 import { acceptWorkOrderFlowAfterCorte, registrarInconformidadAuditory } from '../../api/aceptarProducto';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { RootStackParamList } from '../../navigation/types';
-
+import WorkOrderInfo from './util/WorkOrderInfo';
 type HotStampingData = {
   good_quantity: number | string;
   bad_quantity: number | string;
@@ -167,43 +167,12 @@ const HotStampingComponentAccept: React.FC<{ workOrder: any }> = ({
       Alert.alert('Error al enviar inconformidad');
     }
   };
-  const cantidadHojasRaw = Number(workOrder?.workOrder.quantity) / 24;
-  const cantidadHojas = cantidadHojasRaw > 0 ? Math.ceil(cantidadHojasRaw) : 0;
+
   const isAcceptButtonDisabled = isAcceptDisabled();
   return (
     <ScrollView contentContainerStyle={styles.container}>
       <Text style={styles.title}>Área: {workOrder.area.name}</Text>
-
-      <View style={styles.card}>
-        <Text style={styles.label}>Número de Orden:</Text>
-        <Text style={styles.value}>{workOrder.workOrder.ot_id}</Text>
-
-        <Text style={styles.label}>ID del Presupuesto:</Text>
-        <Text style={styles.value}>{workOrder.workOrder.mycard_id}</Text>
-
-        <Text style={styles.label}>Cantidad (TARJETAS):</Text>
-        <Text style={styles.value}>{workOrder.workOrder.quantity}</Text>
-
-        <Text style={styles.label}>Cantidad (Hojas Frente / Hojas Vuelta):</Text>
-        <Text style={styles.value}>{cantidadHojas}</Text>
-
-        <Text style={styles.label}>Área que lo envía:</Text>
-        <Text style={styles.value}>
-          {lastCompletedOrPartial?.area?.name || 'No definida'}
-        </Text>
-
-        <Text style={styles.label}>Usuario que lo envía:</Text>
-        <Text style={styles.value}>
-          {lastCompletedOrPartial?.user?.username || 'No definido'}
-        </Text>
-        <Text style={styles.label}>Auditor que lo envía:</Text>
-        <Text style={styles.value}>
-          {defaultValues.auditor || 'No definido'}
-        </Text>
-
-        <Text style={styles.label}>Comentarios:</Text>
-        <Text style={styles.value}>{workOrder.workOrder.comments}</Text>
-      </View>
+      <WorkOrderInfo workOrder={workOrder} lastCompletedOrPartial={lastCompletedOrPartial} defaultValues={defaultValues} />
 
       <Text style={styles.subtitle}>Buenas:</Text>
       <Text style={styles.input}>
