@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useMemo } from 'react';
 import {
   View,
   Text,
@@ -15,6 +15,8 @@ import { InternalStackParamList } from '../../../../navigation/types';
 import {
   fetchWorkOrderById,
   closeWorkOrder,
+  fetchAllUsers,
+  updateFlowAssignedUser,
   updateWorkOrderAreas,
 } from '../../../../api/seguimientoDeOts';
 import { TextInput } from 'react-native-paper';
@@ -46,22 +48,8 @@ export type AreaData = {
   id: number;
   name: string;
   status: string;
-  response: {
-    prepress: { id: number };
-    impression: { id: number };
-    serigrafia: { id: number };
-    empalme: { id: number };
-    laminacion: { id: number };
-    corte: { id: number };
-    colorEdge: { id: number };
-    millingChip: { id: number };
-    hotStamping: { id: number };
-    personalizacion: { id: number };
-    user: {
-      username: string;
-    };
-  };
-  answers: any;
+  response: any;
+  answers: any[]; // arreglo como en web
   usuario: string;
   auditor: string;
   buenas: number;
@@ -70,41 +58,315 @@ export type AreaData = {
   excedente: number;
   defectuoso: number;
   muestras: number;
+
+  // alineado con web:
+  flowId?: number;
+  assigned_user_id?: number | null;
+
+  parciales: number;
+  parcialesValidados: number;
+  partials: Array<{
+    id: number;
+    quantity: number;
+    bad_quantity: number;
+    excess_quantity: number;
+    user_id: number | null;
+    validated: boolean;
+    user?: { username: string } | null;
+    created_at: string;
+  }>;
 };
+
+// ---------- helpers / constantes (compartidos con web) ----------
+type NumericField =
+  | 'buenas'
+  | 'malas'
+  | 'excedente'
+  | 'defectuoso'
+  | 'cqm'
+  | 'muestras';
+
+const AREA_KEY_BY_ID: Record<number, string> = {
+  1: 'prepress',
+  2: 'impression',
+  3: 'serigrafia',
+  4: 'empalme',
+  5: 'laminacion',
+  6: 'corte',
+  7: 'colorEdge',
+  8: 'hotStamping',
+  9: 'millingChip',
+  10: 'personalizacion',
+};
+const getAreaKey = (area: AreaData) => AREA_KEY_BY_ID[area.id] ?? null;
+
+const getAreaReleaseTotal = (area: AreaData) => {
+  const key = getAreaKey(area);
+  const block: any = key ? (area.response as any)?.[key] : null;
+  if (!block) return 0;
+  return block.release_quantity ?? block.good_quantity ?? block.plates ?? 0;
+};
+const getSumParciales = (area: AreaData) =>
+  (area.partials ?? []).reduce((acc, p) => acc + (p?.quantity ?? 0), 0);
+const getRemainder = (area: AreaData) =>
+  Math.max(getAreaReleaseTotal(area) - getSumParciales(area), 0);
+
+const getLastPartial = (area: AreaData) => {
+  const list = area.partials ?? [];
+  if (!list.length) return null;
+  return [...list].sort(
+    (a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime()
+  )[list.length - 1];
+};
+
+function getPerPartialValues(
+  area: AreaData,
+  field: 'cqm' | 'muestras' | 'defectuoso'
+) {
+  const parc = area.parciales || 0;
+  const hasRem = getRemainder(area) > 0;
+  const cols = parc + (hasRem ? 1 : 0);
+
+  const answersSorted = [...(area.answers ?? [])].sort(
+    (a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime()
+  );
+
+  const defaultVal = 0;
+  const values: Array<number | string> = Array(cols).fill(defaultVal);
+
+  for (let i = 0; i < parc; i++) {
+    const ans = answersSorted[i];
+    if (!ans) continue;
+    if (field === 'cqm') values[i] = ans.sample_quantity ?? 0;
+    else if (field === 'muestras') values[i] = (ans as any)?.sample_auditory ?? 0;
+    else if (field === 'defectuoso') values[i] = 0;
+  }
+
+  if (hasRem) {
+    const block = (area.response as any)?.[getAreaKey(area)];
+    const remIndex = cols - 1;
+    const remAns =
+      answersSorted[parc] ?? answersSorted[answersSorted.length - 1];
+
+    if (field === 'cqm') values[remIndex] = remAns?.sample_quantity ?? 0;
+    else if (field === 'muestras')
+      values[remIndex] = (remAns as any)?.sample_auditory ?? '—';
+    else if (field === 'defectuoso')
+      values[remIndex] = block?.material_quantity ?? block?.bad_quantity ?? 0;
+  }
+  return values;
+}
+
+// -------- getAreaData (AHORA ES FUNCIÓN DECLARADA Y ARRIBA DE loadData) -----
+function getAreaData(
+  areaId: number,
+  areaResponse: any,
+  partialReleases: any[] = [],
+  flowUser: any = null,
+  index: number = -1
+) {
+  const parciales = Array.isArray(partialReleases) ? partialReleases.length : 0;
+  const parcialesValidados = (Array.isArray(partialReleases)
+    ? partialReleases
+    : []
+  ).filter((p) => p?.validated).length;
+
+  const safePartials = Array.isArray(partialReleases) ? partialReleases : [];
+
+  const sumFromPartials = () => {
+    return safePartials.reduce(
+      (acc: any, curr: any) => {
+        acc.buenas += curr?.quantity || 0;
+        acc.malas += curr?.bad_quantity || 0;
+        acc.excedente += curr?.excess_quantity || 0;
+        return acc;
+      },
+      { buenas: 0, malas: 0, excedente: 0 }
+    );
+  };
+
+  const getCommonData = (areaKey: string) => {
+    const hasResponse = !!areaResponse?.[areaKey];
+    const usuario = areaResponse?.user?.username || flowUser?.username || '';
+    const auditor = areaResponse?.[areaKey]?.formAuditory?.user?.username || '';
+
+    if (!hasResponse && parciales > 0) {
+      const resumen = sumFromPartials();
+      return {
+        ...resumen,
+        defectuoso: 0,
+        cqm: 0,
+        muestras: 0,
+        usuario,
+        auditor,
+        parciales,
+        parcialesValidados,
+        partials: safePartials,
+      };
+    }
+
+    return {
+      buenas:
+        areaResponse?.[areaKey]?.good_quantity ||
+        areaResponse?.[areaKey]?.release_quantity ||
+        areaResponse?.[areaKey]?.plates ||
+        0,
+      malas: areaResponse?.[areaKey]?.bad_quantity || 0,
+      excedente: areaResponse?.[areaKey]?.excess_quantity || 0,
+      defectuoso: areaResponse?.[areaKey]?.material_quantity || 0,
+      cqm: areaResponse?.[areaKey]?.form_answer?.sample_quantity ?? 0,
+      muestras: areaResponse?.[areaKey]?.formAuditory?.sample_auditory ?? 0,
+      usuario,
+      auditor,
+      parciales,
+      parcialesValidados,
+      partials: safePartials,
+    };
+  };
+
+  switch (areaId) {
+    case 1:
+      return getCommonData('prepress');
+    case 2:
+      return getCommonData('impression');
+    case 3:
+      return getCommonData('serigrafia');
+    case 4:
+      return getCommonData('empalme');
+    case 5:
+      return getCommonData('laminacion');
+    case 6:
+      return getCommonData('corte');
+    case 7:
+      return getCommonData('colorEdge');
+    case 8:
+      return getCommonData('hotStamping');
+    case 9:
+      return getCommonData('millingChip');
+    case 10:
+      return getCommonData('personalizacion');
+    default:
+      return {
+        buenas: 0,
+        malas: 0,
+        excedente: 0,
+        defectuoso: 0,
+        cqm: 0,
+        muestras: 0,
+        usuario: '',
+        auditor: '',
+        parciales: 0,
+        parcialesValidados: 0,
+        partials: [],
+      };
+  }
+}
 
 const WorkOrderDetailScreen: React.FC = () => {
   const route = useRoute<WorkOrderDetailRouteProp>();
   const { id } = route.params;
   const navigation = useNavigation();
+
   const [workOrder, setWorkOrder] = useState<any>(null);
   const [showConfirm, setShowConfirm] = useState(false);
   const [areas, setAreas] = useState<AreaData[]>([]);
   const [inconformities, setInconformities] = useState<InconformityData[]>([]);
   const [progressWidth, setProgressWidth] = useState(0);
-  const toggleQualitySection = () => {
-    setQualitySectionOpen(!qualitySectionOpen);
-  };
-  const toggleInconformitySection = () => {
-    setInconformitySectionOpen(!inconformitySectionOpen);
-  };
   const [qualitySectionOpen, setQualitySectionOpen] = useState(false);
   const [inconformitySectionOpen, setInconformitySectionOpen] = useState(false);
   const [showBadQuantity, setShowBadQuantity] = useState(false);
-  const [areaBadQuantities, setAreaBadQuantities] = useState<{
-    [key: string]: string;
-  }>({});
-  const [vistosBuenosHistory, setVistosBuenosHistory] = useState([]);
+  const [areaBadQuantities, setAreaBadQuantities] = useState<{ [key: string]: string; }>({});
+  const [vistosBuenosHistory, setVistosBuenosHistory] = useState<any[]>([]);
+
+  const toggleQualitySection = () => setQualitySectionOpen(!qualitySectionOpen);
+  const toggleInconformitySection = () => setInconformitySectionOpen(!inconformitySectionOpen);
+
+  type OperatorUser = {
+    id: number;
+    username: string;
+    areasOperator?: { id: number; name: string };
+  };
+
+  // --- operadores (nuevo) ---
+  const [operatorUsers, setOperatorUsers] = useState<OperatorUser[]>([]);
+  const operatorOptionsByAreaId = useMemo(() => {
+    const map = new Map<number, Array<{ id: number; username: string }>>();
+    operatorUsers.forEach((u) => {
+      const aId = u.areasOperator?.id;
+      if (!aId) return;
+      if (!map.has(aId)) map.set(aId, []);
+      map.get(aId)!.push({ id: u.id, username: u.username });
+    });
+    for (const [k, arr] of map.entries()) {
+      arr.sort((a, b) => a.username.localeCompare(b.username));
+      map.set(k, arr);
+    }
+    return map;
+  }, [operatorUsers]);
+  const operatorById = useMemo(() => {
+    const m = new Map<number, string>();
+    operatorUsers.forEach((u) => m.set(u.id, u.username));
+    return m;
+  }, [operatorUsers]);
+  const getUserOptionsForArea = (areaId: number) =>
+    operatorOptionsByAreaId.get(areaId) ?? [];
+
+  type PartialType = AreaData['partials'][number] | null;
+  const [opModal, setOpModal] = useState<{
+    open: boolean;
+    area: AreaData | null;
+    partial: PartialType;
+    areaId: number | null;
+    selectedUserId: number | null;
+    search: string;
+  }>({
+    open: false,
+    area: null,
+    partial: null,
+    areaId: null,
+    selectedUserId: null,
+    search: '',
+  });
+
+  const openOperatorModal = (area: AreaData, partial: PartialType) => {
+    const currentId = partial?.user_id ?? area.assigned_user_id ?? null;
+    setOpModal({
+      open: true,
+      area,
+      partial,
+      areaId: area.id ?? null,
+      selectedUserId: currentId,
+      search: '',
+    });
+  };
+  const closeOperatorModal = () => setOpModal((s) => ({ ...s, open: false }));
+
+  const modalOptions = useMemo(() => {
+    if (!opModal.areaId) return [];
+    const base = getUserOptionsForArea(opModal.areaId);
+    const q = opModal.search.trim().toLowerCase();
+    return q ? base.filter((u) => u.username.toLowerCase().includes(q)) : base;
+  }, [opModal.areaId, opModal.search, operatorOptionsByAreaId]);
+
+  const canEditUser = (area: AreaData, partial?: PartialType | null) => {
+    if (workOrder?.status === 'Cerrado') return false;
+    if (partial) return !partial.validated && ['En proceso', 'Parcial'].includes(area.status);
+    return ['En proceso', 'Parcial'].includes(area.status);
+  };
+
+  const confirmOperatorModal = async () => {
+    if (!opModal.area || opModal.selectedUserId == null) return;
+    if (!canEditUser(opModal.area, opModal.partial)) return;
+    await handleChangeUser(opModal.area, opModal.partial, opModal.selectedUserId);
+    closeOperatorModal();
+  };
 
   function getLabelByType(type: string) {
     switch (type) {
-      case 'OT':
-        return 'Ver OT';
-      case 'SKU':
-        return 'Ver SKU';
-      case 'OP':
-        return 'Ver OP';
-      default:
-        return 'Adjunto';
+      case 'OT': return 'Ver OT';
+      case 'SKU': return 'Ver SKU';
+      case 'OP': return 'Ver OP';
+      default: return 'Adjunto';
     }
   }
 
@@ -117,152 +379,164 @@ const WorkOrderDetailScreen: React.FC = () => {
       }
       const base64Data = Buffer.from(res, 'binary').toString('base64');
       const fileUri = FileSystem.documentDirectory + filename;
-      await FileSystem.writeAsStringAsync(fileUri, base64Data, {
-        encoding: FileSystem.EncodingType.Base64,
-      });
-      await FileViewer.open(fileUri, {
-        showOpenWithDialog: true,
-        displayName: filename,
-      });
+      await FileSystem.writeAsStringAsync(fileUri, base64Data, { encoding: FileSystem.EncodingType.Base64 });
+      await FileViewer.open(fileUri, { showOpenWithDialog: true, displayName: filename });
     } catch (error) {
       console.error('Error al abrir el archivo:', error);
     }
   };
+
+  // ----------------------- loadData con defensas y logs -----------------------
   const loadData = async () => {
-    const data = await fetchWorkOrderById(id);
-    setWorkOrder(data);
-    const historyData = data.flow
-      .filter((item: any) => item.answers?.length > 0)
-      .map((item: any) => {
-        const areaName = item.area?.name?.toLowerCase() || '';
-        const mode = ['impresion'].includes(areaName) ? 'doble' : 'simple';
+    try {
+      const data = await fetchWorkOrderById(id);
+      const users = await fetchAllUsers();
 
-        return {
-          areaName: item.area?.name || 'Sin nombre',
-          username: item.user?.username || '',
-          questions: item.area?.formQuestions || [],
-          formAnswers: item.answers.map((a: any) => ({
-            accepted: a.accepted,
-            altura_chip: a.altura_chip,
-            apariencia_quemado: a.apariencia_quemado,
-            carga_aplicacion: a.carga_aplicacion,
-            codigo_barras: a.codigo_barras,
-            color: a.color,
-            color_edge: a.color_edge,
-            color_foil: a.color_foil,
-            color_personalizacion: a.color_personalizacion,
-            finish_validation: a.finish_validation,
-            holographic_type: a.holographic_type,
-            imagen_holograma: a.imagen_holograma,
-            localizacion_contactos: a.localizacion_contactos,
-            magnetic_band: a.magnetic_band,
-            revisar_posicion: a.revisar_posicion,
-            revisar_tecnologia: a.revisar_tecnologia,
-            prueba_over: a.prueba_over,
-            prueba_cinta_magnetica: a.prueba_cinta_magnetica,
-            prueba_centro: a.prueba_centro,
-            sample_quantity: a.sample_quantity,
-            testtype_cqm: a.testtype_cqm,
-            tipo_personalizacion: a.tipo_personalizacion,
-            track_type: a.track_type,
-            validar_inlays: a.validar_inlays,
-            validar_kvc: a.validar_kvc,
-            validar_kvc_perso: a.validar_kvc_perso,
-            valor_anclaje: a.valor_anclaje,
-            verificar_etiqueta: a.verificar_etiqueta,
-            verificar_script: a.verificar_script,
-            created_at: a.created_at,
+      setOperatorUsers(users || []);
+      setWorkOrder(data);
 
-            reviewer: a.reviewer || [],
-            FormAnswerResponse: a.FormAnswerResponse || [],
-          })),
-          mode,
-        };
-      });
-
-    setVistosBuenosHistory(historyData);
-
-    // Procesamiento de áreas
-    const areaData =
-      data?.flow?.map((item: any, index: number) => ({
-        id: item.area_id,
-        name: item.area?.name || 'Sin nombre',
-        status: item.status || 'Desconocido',
-        response: item.areaResponse || {},
-        answers: item.answers?.[0] || {},
-        ...getAreaData(
-          item.area_id,
-          item.areaResponse,
-          item.partialReleases,
-          item.user,
-          index
-        ),
-      })) || [];
-    setAreas(areaData);
-
-    // Procesamiento de inconformidades
-    const allInconformities =
-      data?.flow?.flatMap((flowItem: any) => {
-        const areaName = flowItem.area?.name || 'Area desconocida';
-
-        const direct =
-          flowItem?.areaResponse?.inconformities?.map((inc: any) => ({
-            id: inc.id,
-            comments: inc.comments,
-            createdAt: inc.created_at,
-            createdBy: inc.user?.username || 'Desconocido',
-            area: flowItem.area?.name || 'Área desconocida',
-          })) || [];
-
-        const partials =
-          flowItem?.partialReleases?.flatMap(
-            (release: any) =>
-              release.inconformities?.map((inconformity: any) => ({
-                id: inconformity.id,
-                comments: inconformity.comments,
-                createdAt: inconformity.createdAt,
-                createdBy: inconformity.createdBy,
-                area: areaName,
-              })) || []
-          ) || [];
-
-        const audits: InconformityData[] = [];
-
-        if (flowItem.areaResponse) {
-          Object.values(flowItem.areaResponse).forEach((block: any) => {
-            if (block?.formAuditory?.inconformities) {
-              block.formAuditory.inconformities.forEach((inc: any) => {
-                audits.push({
-                  id: inc.id,
-                  comments: inc.comments,
-                  createdAt: inc.created_at,
-                  createdBy: inc.user?.username || 'Desconocido',
-                  area: areaName,
-                });
-              });
-            }
+      // Historial de vistos buenos
+      const historyData =
+        (data?.flow ?? [])
+          .filter((item: any) => item?.answers?.length > 0)
+          .map((item: any) => {
+            const areaName = item?.area?.name?.toLowerCase() || '';
+            const mode = ['impresion'].includes(areaName) ? 'doble' : 'simple';
+            return {
+              areaName: item?.area?.name || 'Sin nombre',
+              username: item?.user?.username || '',
+              questions: item?.area?.formQuestions || [],
+              formAnswers: (item?.answers || []).map((a: any) => ({
+                accepted: a.accepted,
+                altura_chip: a.altura_chip,
+                apariencia_quemado: a.apariencia_quemado,
+                carga_aplicacion: a.carga_aplicacion,
+                codigo_barras: a.codigo_barras,
+                color: a.color,
+                color_edge: a.color_edge,
+                color_foil: a.color_foil,
+                color_personalizacion: a.color_personalizacion,
+                finish_validation: a.finish_validation,
+                holographic_type: a.holographic_type,
+                imagen_holograma: a.imagen_holograma,
+                localizacion_contactos: a.localizacion_contactos,
+                magnetic_band: a.magnetic_band,
+                revisar_posicion: a.revisar_posicion,
+                revisar_tecnologia: a.revisar_tecnologia,
+                prueba_over: a.prueba_over,
+                prueba_cinta_magnetica: a.prueba_cinta_magnetica,
+                prueba_centro: a.prueba_centro,
+                sample_quantity: a.sample_quantity,
+                testtype_cqm: a.testtype_cqm,
+                tipo_personalizacion: a.tipo_personalizacion,
+                track_type: a.track_type,
+                validar_inlays: a.validar_inlays,
+                validar_kvc: a.validar_kvc,
+                validar_kvc_perso: a.validar_kvc_perso,
+                valor_anclaje: a.valor_anclaje,
+                verificar_etiqueta: a.verificar_etiqueta,
+                verificar_script: a.verificar_script,
+                created_at: a.created_at,
+                reviewer: a.reviewer || [],
+                FormAnswerResponse: a.FormAnswerResponse || [],
+              })),
+              mode,
+            };
           });
-        }
 
-        return [...direct, ...partials, ...audits];
-      }) || [];
+      setVistosBuenosHistory(historyData ?? []);
 
-    setInconformities(allInconformities);
+      // Áreas (incluye parciales/remanente y answers como array)
+      const areaData: AreaData[] =
+        (data?.flow ?? []).map((item: any, index: number) => {
+          const partials = Array.isArray(item?.partialReleases)
+            ? item.partialReleases
+            : [];
 
-    // Cálculo del progreso de áreas completadas
-    const completedCount = areaData.filter(
-      (a: any) => a.status === 'Completado'
-    ).length;
-    const percentage = (completedCount / areaData.length) * 100;
+          const base = getAreaData(
+            item?.area_id,
+            item?.areaResponse,
+            partials,
+            item?.user,
+            index
+          );
 
-    // Retrasamos el set para que se note la animación
-    setTimeout(() => {
-      setProgressWidth(percentage);
-    }, 100); // puedes ajustar el delay si querés
+          return {
+            id: item?.area_id,
+            name: item?.area?.name || 'Sin nombre',
+            status: item?.status || 'Desconocido',
+            response: item?.areaResponse || {},
+            answers: item?.answers || [],         // ✅ array
+            flowId: item?.id,                     // ✅ para reasignación
+            assigned_user_id: item?.assigned_user ?? null,
+            ...base,
+          } as AreaData;
+        }) ?? [];
+
+      console.log('areaData length:', areaData.length);
+      setAreas(areaData);
+
+      // Inconformidades
+      const allInconformities: InconformityData[] =
+        (data?.flow ?? []).flatMap((flowItem: any) => {
+          const areaName = flowItem?.area?.name || 'Area desconocida';
+
+          const direct =
+            flowItem?.areaResponse?.inconformities?.map((inc: any) => ({
+              id: inc.id,
+              comments: inc.comments,
+              createdAt: inc.created_at,
+              createdBy: inc?.user?.username || 'Desconocido',
+              area: areaName,
+            })) || [];
+
+          const partialsInc =
+            (flowItem?.partialReleases ?? []).flatMap(
+              (release: any) =>
+                release?.inconformities?.map((inconformity: any) => ({
+                  id: inconformity.id,
+                  comments: inconformity.comments,
+                  createdAt: inconformity.createdAt,
+                  createdBy: inconformity.createdBy,
+                  area: areaName,
+                })) || []
+            ) || [];
+
+          const audits: InconformityData[] = [];
+          if (flowItem?.areaResponse) {
+            Object.values(flowItem.areaResponse).forEach((block: any) => {
+              if (block?.formAuditory?.inconformities) {
+                block.formAuditory.inconformities.forEach((inc: any) => {
+                  audits.push({
+                    id: inc.id,
+                    comments: inc.comments,
+                    createdAt: inc.created_at,
+                    createdBy: inc?.user?.username || 'Desconocido',
+                    area: areaName,
+                  });
+                });
+              }
+            });
+          }
+
+          return [...direct, ...partialsInc, ...audits];
+        }) || [];
+
+      setInconformities(allInconformities);
+
+      // Progreso
+      const completedCount = areaData.filter((a) => a.status === 'Completado').length;
+      const percentage = areaData.length ? (completedCount / areaData.length) * 100 : 0;
+      setTimeout(() => setProgressWidth(percentage), 100);
+    } catch (err) {
+      console.error('loadData error:', err);
+      Alert.alert('Error', 'No se pudo cargar la orden de trabajo.');
+    }
   };
 
   useEffect(() => {
     loadData();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [id]);
 
   const getSumaMalasHasta = (areaId: number): number => {
@@ -273,231 +547,22 @@ const WorkOrderDetailScreen: React.FC = () => {
 
   const handleOpenBadQuantityModal = () => {
     const initialValues: { [key: string]: string } = {};
-
     areas.forEach((area) => {
       const areaKey = area.name.toLowerCase().replace(/\s/g, '');
-
       initialValues[`${areaKey}_bad`] = area.malas?.toString() || '0';
-      if (area.id >= 6) {
-        initialValues[`${areaKey}_material`] =
-          area.defectuoso?.toString() || '0';
-      }
+      if (area.id >= 6) initialValues[`${areaKey}_material`] = area.defectuoso?.toString() || '0';
     });
-
     setAreaBadQuantities(initialValues);
     setShowBadQuantity(true);
-  };
-
-  const renderCell = (area: AreaData, field: keyof AreaData) => {
-    // 1. Si la orden está cerrada, todo es lectura
-    if (workOrder?.status === 'Cerrado') {
-      return <Text style={styles.cellUser}>{area[field]}</Text>;
-    }
-
-    // 2. Si el área no está Completado, todo es lectura
-    if (area.status !== 'Completado') {
-      return <Text style={styles.cellUser}>{area[field]}</Text>;
-    }
-
-    // 3. Preprensa: solo 'buenas' editable
-    if (area.id === 1) {
-      if (field === 'buenas') {
-        return (
-          <TextInput
-            mode="outlined"
-            activeOutlineColor="#000"
-            value={String(area[field])}
-            keyboardType="numeric"
-            onChangeText={(text) => handleValueChange(area.id, field, text)}
-            style={[styles.input, { height: 40 }]}
-          />
-        );
-      } else {
-        return <Text style={styles.cellUser}>{area[field]}</Text>;
-      }
-    }
-
-    // 4. CQM solo editable desde Impresión (id >=2)
-    if (field === 'cqm') {
-      if (area.id >= 2) {
-        return (
-          <TextInput
-            mode="outlined"
-            activeOutlineColor="#000"
-            keyboardType="numeric"
-            value={String(area[field])}
-            onChangeText={(text) => handleValueChange(area.id, field, text)}
-            style={[styles.input, { height: 40 }]}
-          />
-        );
-      } else {
-        return <Text style={styles.cellUser}>{area[field]}</Text>;
-      }
-    }
-
-    // 5. Muestras solo editable desde Corte (id >=6)
-    if (field === 'muestras' || field === 'defectuoso') {
-      if (area.id >= 6) {
-        return (
-          <TextInput
-            mode="outlined"
-            activeOutlineColor="#000"
-            keyboardType="numeric"
-            value={String(area[field])}
-            onChangeText={(text) => handleValueChange(area.id, field, text)}
-            style={[styles.input, { height: 40 }]}
-          />
-        );
-      } else {
-        return <Text style={styles.cellUser}>{area[field]}</Text>;
-      }
-    }
-    if (field === 'malas') {
-      if (area.id >= 6) {
-        return (
-          <TouchableOpacity onPress={handleOpenBadQuantityModal}>
-            <View
-              style={[
-                styles.input,
-                {
-                  height: 40,
-                  backgroundColor: '#eaeaf5',
-                  borderRadius: 9,
-                  justifyContent: 'center',
-                },
-              ]}
-            >
-              <Text style={{ textAlign: 'center' }}>
-                {getSumaMalasHasta(area.id)}
-              </Text>
-            </View>
-          </TouchableOpacity>
-        );
-      } else {
-        return (
-          <TextInput
-            mode="outlined"
-            activeOutlineColor="#000"
-            keyboardType="numeric"
-            value={String(area[field])}
-            onChangeText={(text) => handleValueChange(area.id, field, text)}
-            style={[styles.input, { height: 40 }]}
-          />
-        );
-      }
-    }
-
-    // 6. Resto de campos (buenas, malas, excedente) editables si área Completado
-    return (
-      <TextInput
-        mode="outlined"
-        activeOutlineColor="#000"
-        keyboardType="numeric"
-        value={String(area[field])}
-        onChangeText={(text) => handleValueChange(area.id, field, text)}
-        style={[styles.input, { height: 40 }]}
-      />
-    );
-  };
-
-  // Función para obtener los datos específicos de cada área
-  const getAreaData = (
-    areaId: number,
-    areaResponse: any,
-    partialReleases: any[] = [],
-    flowUser: any = null,
-    index: number = -1
-  ) => {
-    const sumFromPartials = () => {
-      return partialReleases.reduce(
-        (acc: any, curr: any) => {
-          acc.buenas += curr.quantity || 0;
-          acc.malas += curr.bad_quantity || 0;
-          acc.excedente += curr.excess_quantity || 0;
-          return acc;
-        },
-        { buenas: 0, malas: 0, excedente: 0 }
-      );
-    };
-
-    const getCommonData = (areaKey: string) => {
-      const hasResponse = !!areaResponse?.[areaKey];
-      const usuario = areaResponse?.user?.username || flowUser?.username || '';
-      const auditor =
-        areaResponse?.[areaKey]?.formAuditory?.user?.username || '';
-
-      if (!hasResponse && partialReleases.length > 0) {
-        const resumen = sumFromPartials();
-        console.log('[PARCIAL DETECTADO]', areaKey, resumen);
-        return { ...resumen, cqm: 0, muestras: 0, usuario, auditor: '' };
-      }
-
-      return {
-        buenas:
-          areaResponse?.[areaKey]?.good_quantity ||
-          areaResponse?.[areaKey]?.release_quantity ||
-          areaResponse?.[areaKey]?.plates ||
-          0,
-        malas: areaResponse?.[areaKey]?.bad_quantity || 0,
-        excedente: areaResponse?.[areaKey]?.excess_quantity || 0,
-        defectuoso: areaResponse?.[areaKey]?.material_quantity || 0,
-        cqm: areaResponse?.[areaKey]?.form_answer?.sample_quantity ?? 0,
-        muestras: areaResponse?.[areaKey]?.formAuditory?.sample_auditory ?? 0,
-        usuario,
-        auditor,
-      };
-    };
-
-    switch (areaId) {
-      case 1:
-        return getCommonData('prepress');
-      case 2:
-        return getCommonData('impression');
-      case 3:
-        return getCommonData('serigrafia');
-      case 4:
-        return getCommonData('empalme');
-      case 5:
-        return getCommonData('laminacion');
-      case 6:
-        return getCommonData('corte');
-      case 7:
-        return getCommonData('colorEdge');
-      case 8:
-        return getCommonData('hotStamping');
-      case 9:
-        return getCommonData('millingChip');
-      case 10:
-        return getCommonData('personalizacion');
-      default:
-        return {
-          buenas: 0,
-          malas: 0,
-          excedente: 0,
-          defectuoso: 0,
-          cqm: 0,
-          muestras: 0,
-          usuario: '',
-          auditor: '',
-        };
-    }
   };
 
   const cantidadHojasRaw = Number(workOrder?.quantity) / 24;
   const cantidadHojas = cantidadHojasRaw > 0 ? Math.ceil(cantidadHojasRaw) : 0;
   const ultimaArea = areas[areas.length - 1];
   const totalMalas = areas.reduce((acc, area) => acc + (area.malas || 0), 0);
-  const totalDefectuoso = areas.reduce(
-    (acc, area) => acc + (area.defectuoso || 0),
-    0
-  );
-  const totalCqm = areas
-    .filter((area) => area.id >= 6)
-    .reduce((acc, area) => acc + (area.cqm || 0), 0);
-  const totalMuestras = areas.reduce(
-    (acc, area) => acc + (area.muestras || 0),
-    0
-  );
+  const totalDefectuoso = areas.reduce((acc, area) => acc + (area.defectuoso || 0), 0);
+  const totalCqm = areas.filter((area) => area.id >= 6).reduce((acc, area) => acc + (area.cqm || 0), 0);
+  const totalMuestras = areas.reduce((acc, area) => acc + (area.muestras || 0), 0);
   const totalUltimaBuenas = ultimaArea?.buenas || 0;
   const totalUltimaExcedente = ultimaArea?.excedente || 0;
 
@@ -509,6 +574,36 @@ const WorkOrderDetailScreen: React.FC = () => {
     totalCqm +
     totalMuestras;
 
+  const handleChangeUser = async (
+    area: AreaData,
+    _partial: AreaData['partials'][number] | null,
+    newUserId: number
+  ) => {
+    const prevAreas = areas;
+    setAreas((prev) =>
+      prev.map((a) =>
+        a.id === area.id
+          ? {
+              ...a,
+              assigned_user_id: newUserId,
+              usuario: operatorById.get(newUserId) ?? a.usuario,
+            }
+          : a
+      )
+    );
+    try {
+      if (!area.flowId) throw new Error('Falta flowId del área');
+      await updateFlowAssignedUser(area.flowId, newUserId);
+    } catch (e) {
+      console.error(e);
+      setAreas(prevAreas);
+      Alert.alert(
+        'Error',
+        'No se pudo actualizar el encargado. Se revirtieron los cambios.'
+      );
+    }
+  };
+
   const handleCloseOrder = async () => {
     try {
       await closeWorkOrder(workOrder?.ot_id);
@@ -519,6 +614,20 @@ const WorkOrderDetailScreen: React.FC = () => {
       Alert.alert('Error', 'No se pudo cerrar la orden.');
     }
   };
+
+  const areaColSpan = (area: AreaData) => {
+    const base = Math.max(1, area.parciales || 0);
+    const rem = area.parciales > 0 && getRemainder(area) > 0 ? 1 : 0;
+    return area.parciales > 0 ? base + rem : 1;
+  };
+  const totalCols = areas.reduce(
+    (sum, area) =>
+      sum +
+      (area.parciales > 0
+        ? area.parciales + (getRemainder(area) > 0 ? 1 : 0)
+        : 1),
+    0
+  );
 
   const handleValueChange = (
     areaId: number,
@@ -535,11 +644,9 @@ const WorkOrderDetailScreen: React.FC = () => {
   const handleSaveChanges = async (updatedAreas: AreaData[]) => {
     const effectiveAreas = updatedAreas ?? areas;
     const payload = {
-      areas: areas
+      areas: effectiveAreas
         .filter((area) => area.status === 'Completado')
-        .map((area) => {
-          const updated = updatedAreas.find((a) => a.id === area.id) || area;
-
+        .map((updated) => {
           const blockMap: Record<string, string> = {
             preprensa: 'prepress',
             impresion: 'impression',
@@ -552,7 +659,6 @@ const WorkOrderDetailScreen: React.FC = () => {
             hotstamping: 'hotStamping',
             personalizacion: 'personalizacion',
           };
-
           const normalizedName = updated.name.toLowerCase().replace(/\s/g, '');
           const block = blockMap[normalizedName] || 'otros';
           const blockId = (updated.response as any)?.[block]?.id;
@@ -571,23 +677,15 @@ const WorkOrderDetailScreen: React.FC = () => {
           };
 
           if (block === 'prepress') {
-            data = {
-              plates: updated.buenas,
-            };
+            data = { plates: updated.buenas };
           }
-          if (
-            ['impression', 'serigrafia', 'laminacion', 'empalme'].includes(
-              block
-            )
-          ) {
+          if (['impression', 'serigrafia', 'laminacion', 'empalme'].includes(block)) {
             data = {
               release_quantity: updated.buenas,
               bad_quantity: updated.malas,
               excess_quantity: updated.excedente,
             };
-            sample_data = {
-              sample_quantity: updated.cqm,
-            };
+            sample_data = { sample_quantity: updated.cqm };
           }
 
           return {
@@ -606,17 +704,16 @@ const WorkOrderDetailScreen: React.FC = () => {
 
     try {
       await updateWorkOrderAreas(workOrder.ot_id, payload);
-      alert('Cambios guardados correctamente');
+      Alert.alert('Éxito', 'Cambios guardados correctamente');
       await loadData();
     } catch (err) {
       console.error(err);
-      alert('Error al guardar los cambios');
+      Alert.alert('Error', 'Error al guardar los cambios');
     }
   };
 
   const filteredAreas = areas.filter(
-    (area) =>
-      area.status === 'Completado' && area.name.toLowerCase() !== 'preprensa'
+    (area) => area.status === 'Completado' && area.name.toLowerCase() !== 'preprensa'
   );
   const getStatusStyleMobile = (status: string) => {
     switch (status) {
@@ -639,23 +736,97 @@ const WorkOrderDetailScreen: React.FC = () => {
     }
   };
 
+  // helpers de render
+  const getPartialUserName = (
+    p: AreaData['partials'][number] | null | undefined,
+    area: AreaData
+  ) =>
+    p?.user?.username ??
+    (p?.user_id != null ? operatorById.get(p.user_id) : undefined) ??
+    area.usuario ??
+    'No definido';
+
+  const renderEditableNumber = (value: any, onChange: (t: string) => void) => (
+    <TextInput
+      mode="outlined"
+      activeOutlineColor="#000"
+      keyboardType="numeric"
+      value={String(value ?? 0)}
+      onChangeText={onChange}
+      style={[styles.input, { height: 40 }]}
+    />
+  );
+
+  const renderCell = (area: AreaData, field: NumericField) => {
+    if (workOrder?.status === 'Cerrado')
+      return <Text style={styles.cellUser}>{Number(area[field] ?? 0)}</Text>;
+    if (area.status !== 'Completado')
+      return <Text style={styles.cellUser}>{Number(area[field] ?? 0)}</Text>;
+
+    if (area.id === 1 && field === 'buenas')
+      return renderEditableNumber(area[field], (t) =>
+        handleValueChange(area.id, field, t)
+      );
+    if (area.id === 1 && field !== 'buenas')
+      return <Text style={styles.cellUser}>{Number(area[field] ?? 0)}</Text>;
+
+    if (field === 'cqm') {
+      if (area.id >= 2)
+        return renderEditableNumber(area[field], (t) =>
+          handleValueChange(area.id, field, t)
+        );
+      return <Text style={styles.cellUser}>{Number(area[field] ?? 0)}</Text>;
+    }
+
+    if (field === 'muestras' || field === 'defectuoso') {
+      if (area.id >= 6)
+        return renderEditableNumber(area[field], (t) =>
+          handleValueChange(area.id, field, t)
+        );
+      return <Text style={styles.cellUser}>{Number(area[field] ?? 0)}</Text>;
+    }
+
+    if (field === 'malas') {
+      if (area.id >= 6) {
+        return (
+          <TouchableOpacity onPress={handleOpenBadQuantityModal}>
+            <View
+              style={[
+                styles.input,
+                {
+                  height: 40,
+                  backgroundColor: '#eaeaf5',
+                  borderRadius: 9,
+                  justifyContent: 'center',
+                },
+              ]}
+            >
+              <Text style={{ textAlign: 'center' }}>
+                {getSumaMalasHasta(area.id)}
+              </Text>
+            </View>
+          </TouchableOpacity>
+        );
+      }
+      return renderEditableNumber(area[field], (t) =>
+        handleValueChange(area.id, field, t)
+      );
+    }
+
+    // buenas / excedente normales
+    return renderEditableNumber(area[field], (t) =>
+      handleValueChange(area.id, field, t)
+    );
+  };
+
   return (
     <ScrollView contentContainerStyle={styles.container}>
       <Text style={styles.title}>Información de la Orden #{id}</Text>
 
       <View style={styles.card}>
-        <InfoCard
-          label="Número de Orden"
-          value={String(workOrder?.ot_id ?? '')}
-        />
-        <InfoCard
-          label="Id del Presupuesto"
-          value={String(workOrder?.mycard_id ?? '')}
-        />
-        <InfoCard
-          label="Cantidad (TARJETAS)"
-          value={String(workOrder?.quantity ?? '')}
-        />
+        <InfoCard label="Número de Orden" value={String(workOrder?.ot_id ?? '')} />
+        <InfoCard label="Id del Presupuesto" value={String(workOrder?.mycard_id ?? '')} />
+        <InfoCard label="Cantidad (TARJETAS)" value={String(workOrder?.quantity ?? '')} />
         <InfoCard
           style={{ backgroundColor: '#93C5FD' }}
           label="Cantidad (Hojas Frente / Hojas Vuelta)"
@@ -669,10 +840,7 @@ const WorkOrderDetailScreen: React.FC = () => {
               : '—'
           }
         />
-        <InfoCard
-          label="Comentarios"
-          value={String(workOrder?.comments ?? '')}
-        />
+        <InfoCard label="Comentarios" value={String(workOrder?.comments ?? '')} />
         <InfoCard label="Archivos de la Orden de Trabajo">
           {Array.isArray(workOrder?.files) && workOrder.files.length > 0 ? (
             <ScrollView
@@ -683,7 +851,7 @@ const WorkOrderDetailScreen: React.FC = () => {
               {workOrder.files.map((file: any) => (
                 <TouchableOpacity
                   key={file.id}
-                  onPress={() => downloadFile(file.file_path)} // ver función abajo
+                  onPress={() => downloadFile(file.file_path)}
                   style={fileStyles.button}
                   activeOpacity={0.8}
                 >
@@ -694,38 +862,111 @@ const WorkOrderDetailScreen: React.FC = () => {
               ))}
             </ScrollView>
           ) : (
-            <Text style={fileStyles.empty}>
-              No se ha adjuntado ningún archivo
-            </Text>
+            <Text style={fileStyles.empty}>No se ha adjuntado ningún archivo</Text>
           )}
         </InfoCard>
       </View>
+
       {areas.length > 0 && <ProgressBarAreas areas={areas} />}
 
       <Text style={styles.subtitle}>Datos de Producción por Área</Text>
       <ScrollView horizontal>
         <View style={styles.table}>
-          {/* Encabezado */}
+          {/* Encabezado con columnas por parciales y remanente */}
           <View style={styles.headerRow}>
-            <Text style={styles.cellLabel}></Text>
-            {areas.map((area, index) => (
-              <Text key={`${area.id}-${index}`} style={[styles.cellUser, {}]}>
-                {area.name}
-              </Text>
+            <Text style={styles.cellLabel} />
+            {areas.map((area, idx) => (
+              <View key={`hdr-${area.id}-${idx}`} style={{ flexDirection: 'row' }}>
+                {area.parciales > 0 ? (
+                  <>
+                    {Array.from({ length: area.parciales }).map((_, i) => (
+                      <Text key={`hdr-${area.id}-p${i + 1}`} style={styles.cellUser}>
+                        {area.name}
+                        {'\n'}
+                        <Text style={{ fontSize: 11, color: '#6b7280' }}>{`P${i + 1}`}</Text>
+                      </Text>
+                    ))}
+                    {getRemainder(area) > 0 && (
+                      <Text key={`hdr-${area.id}-rem`} style={[styles.cellUser, { fontWeight: '600' }]}>
+                        {area.name}
+                        {'\n'}
+                        <Text style={{ fontSize: 11, color: '#6b7280' }}>Rem</Text>
+                      </Text>
+                    )}
+                  </>
+                ) : (
+                  <Text key={`hdr-${area.id}-total`} style={styles.cellUser}>
+                    {area.name}
+                    {'\n'}
+                    <Text style={{ fontSize: 11, color: '#6b7280' }}>Total</Text>
+                  </Text>
+                )}
+              </View>
             ))}
+          </View>
+
+          {/* Encargado (remanente) */}
+          <View style={styles.row}>
+            <Text style={styles.cellLabel}>Encargado (remanente)</Text>
+            {areas.map((area, index) => {
+              const editable = canEditUser(area, null);
+              const currentAssignedName =
+                (area.assigned_user_id != null
+                  ? operatorById.get(area.assigned_user_id)
+                  : undefined) ??
+                area.usuario ??
+                'No definido';
+              return (
+                <View key={`enc-${area.id}-${index}`} style={[styles.cellUser, { flexDirection: 'row' }]}>
+                  <TouchableOpacity
+                    disabled={!editable}
+                    onPress={() => openOperatorModal(area, null)}
+                    style={{
+                      paddingHorizontal: 8,
+                      paddingVertical: 6,
+                      borderRadius: 8,
+                      borderWidth: 1,
+                      borderColor: '#e5e7eb',
+                      backgroundColor: editable ? '#fff' : '#f3f4f6',
+                    }}
+                  >
+                    <Text style={{ color: '#111827' }}>{currentAssignedName}</Text>
+                  </TouchableOpacity>
+                </View>
+              );
+            })}
           </View>
 
           {/* Usuario */}
           <View style={styles.row}>
             <Text style={styles.cellLabel}>Usuario</Text>
-            {areas.map((area, index) => (
-              <Text
-                key={`${area.id}-usuario-${index}`}
-                style={[styles.cellUser, {}]}
-              >
-                {area.usuario}
-              </Text>
-            ))}
+            {areas.flatMap((area) => {
+              if (area.partials?.length > 0) {
+                const cells = area.partials.map((p, pIdx) => (
+                  <Text key={`usr-${area.id}-${p.id ?? pIdx}`} style={styles.cellUser}>
+                    {getPartialUserName(p, area)}
+                  </Text>
+                ));
+                if (getRemainder(area) > 0) {
+                  const lastP = getLastPartial(area);
+                  cells.push(
+                    <Text key={`usr-${area.id}-rem`} style={[styles.cellUser, { fontWeight: '600' }]}>
+                      {getPartialUserName(lastP, area)}
+                    </Text>
+                  );
+                }
+                return cells;
+              }
+              return (
+                <Text key={`usr-${area.id}-single`} style={styles.cellUser}>
+                  {(area.assigned_user_id != null
+                    ? operatorById.get(area.assigned_user_id)
+                    : undefined) ??
+                    area.usuario ??
+                    'No definido'}
+                </Text>
+              );
+            })}
           </View>
 
           {/* Auditor */}
@@ -742,14 +983,9 @@ const WorkOrderDetailScreen: React.FC = () => {
           <View style={styles.row}>
             <Text style={styles.cellLabel}>Estado</Text>
             {areas.map((area, index) => {
-              const { backgroundColor, textColor } = getStatusStyleMobile(
-                area.status
-              );
+              const { backgroundColor, textColor } = getStatusStyleMobile(area.status);
               return (
-                <View
-                  key={`${area.id}-status-${index}`}
-                  style={styles.cellUser}
-                >
+                <View key={`${area.id}-status-${index}`} style={styles.cellUser}>
                   <View
                     style={{
                       backgroundColor,
@@ -759,14 +995,7 @@ const WorkOrderDetailScreen: React.FC = () => {
                       alignSelf: 'center',
                     }}
                   >
-                    <Text
-                      style={{
-                        color: textColor,
-                        fontWeight: 'bold',
-                        fontSize: 12,
-                        alignItems: 'stretch',
-                      }}
-                    >
+                    <Text style={{ color: textColor, fontWeight: 'bold', fontSize: 12 }}>
                       {area.status}
                     </Text>
                   </View>
@@ -775,74 +1004,87 @@ const WorkOrderDetailScreen: React.FC = () => {
             })}
           </View>
 
-          {/* Buenas */}
-          <View style={styles.row}>
-            <Text style={styles.cellLabel}>Buenas</Text>
-            {areas.map((area, index) => (
-              <View key={`${area.id}-buenas-${index}`} style={styles.cellUser}>
-                {renderCell(area, 'buenas')}
-              </View>
+          {/* Producción */}
+          <View style={[styles.row, { backgroundColor: '#f3f4f6' }]}>
+            <Text style={[styles.cellLabel, { fontWeight: '700', color: '#6b7280' }]}>
+              📥 Producción
+            </Text>
+            {Array.from({ length: totalCols }).map((_, i) => (
+              <Text key={`prod-sp-${i}`} style={[styles.cellUser]} />
             ))}
           </View>
 
-          {/* Malas */}
-          <View style={styles.row}>
-            <Text style={styles.cellLabel}>Malas</Text>
-            {areas.map((area, index) => (
-              <View key={`${area.id}-malas-${index}`} style={styles.cellUser}>
-                {renderCell(area, 'malas')}
-              </View>
-            ))}
-          </View>
+          {(['buenas', 'malas', 'excedente'] as NumericField[]).map((field) => (
+            <View key={`row-${field}`} style={styles.row}>
+              <Text style={styles.cellLabel}>
+                {field[0].toUpperCase() + field.slice(1)}
+              </Text>
+              {areas.flatMap((area, aIndex) => {
+                if (area.parciales > 0 && area.partials?.length) {
+                  const cells = area.partials.map((p, pIndex) => {
+                    const value =
+                      field === 'buenas'
+                        ? p.quantity
+                        : field === 'malas'
+                        ? p.bad_quantity ?? 0
+                        : p.excess_quantity ?? 0;
+                    return (
+                      <Text
+                        key={`prod-${area.id}-${field}-${p.id ?? pIndex}`}
+                        style={styles.cellUser}
+                      >
+                        {value}
+                      </Text>
+                    );
+                  });
+                  const rem = getRemainder(area);
+                  if (rem > 0) {
+                    const remValue = field === 'buenas' ? rem : 0;
+                    cells.push(
+                      <Text
+                        key={`prod-${area.id}-${field}-rem`}
+                        style={[styles.cellUser, { fontWeight: '600' }]}
+                      >
+                        {remValue}
+                      </Text>
+                    );
+                  }
+                  return cells;
+                }
+                return (
+                  <View
+                    key={`prod-${area.id}-${field}-single-${aIndex}`}
+                    style={styles.cellUser}
+                  >
+                    {renderCell(area, field)}
+                  </View>
+                );
+              })}
+            </View>
+          ))}
 
-          {/* Excedente */}
-          <View style={styles.row}>
-            <Text style={styles.cellLabel}>Excedente</Text>
-            {areas.map((area, index) => (
-              <View
-                key={`${area.id}-excedente-${index}`}
-                style={styles.cellUser}
-              >
-                {renderCell(area, 'excedente')}
-              </View>
-            ))}
-          </View>
-
-          {/* Defectoso */}
-          <View style={styles.row}>
-            <Text style={styles.cellLabel}>Materia Prima Defectuosa</Text>
-            {areas.map((area, index) => (
-              <View
-                key={`${area.id}-defectuoso-${index}`}
-                style={styles.cellUser}
-              >
-                {renderCell(area, 'defectuoso')}
-              </View>
-            ))}
-          </View>
-
-          {/* CQM */}
-          <View style={styles.row}>
-            <Text style={styles.cellLabel}>CQM</Text>
-            {areas.map((area, index) => (
-              <View key={`${area.id}-cqm-${index}`} style={styles.cellUser}>
-                {renderCell(area, 'cqm')}
-              </View>
-            ))}
-          </View>
-
-          {/* Muestras */}
-          <View style={styles.row}>
-            <Text style={styles.cellLabel}>Muestras</Text>
-            {areas.map((area, index) => (
-              <View
-                key={`${area.id}-muestras-${index}`}
-                style={styles.cellUser}
-              >
-                {renderCell(area, 'muestras')}
-              </View>
-            ))}
-          </View>
+          {(['defectuoso', 'cqm', 'muestras'] as const).map((field) => (
+            <View key={`row-${field}`} style={styles.row}>
+              <Text style={styles.cellLabel}>
+                {field === 'defectuoso' ? 'Materia prima defectuosa' : field.toUpperCase()}
+              </Text>
+              {areas.flatMap((area, idx) => {
+                if (area.parciales > 0) {
+                  const vals = getPerPartialValues(area, field);
+                  return vals.map((v, i) => (
+                    <Text key={`qual-${area.id}-${field}-${i}`} style={styles.cellUser}>
+                      {v}
+                    </Text>
+                  ));
+                }
+                return (
+                  <View key={`qual-${area.id}-${field}-single-${idx}`} style={styles.cellUser}>
+                    {renderCell(area, field as NumericField)}
+                  </View>
+                );
+              })}
+            </View>
+          ))}
 
           {/* Suma Total */}
           <View style={styles.row}>
@@ -862,10 +1104,7 @@ const WorkOrderDetailScreen: React.FC = () => {
           <View style={[styles.row, { backgroundColor: '#d7e6d1' }]}>
             <Text style={styles.cellLabel}>BUENAS + EXCEDENTE</Text>
             {areas.map((area, index) => (
-              <Text
-                key={`${area.id}-buenas-excedente-${index}`}
-                style={styles.cellUser}
-              >
+              <Text key={`${area.id}-buenas-excedente-${index}`} style={styles.cellUser}>
                 {area.id >= 6 ? area.buenas + area.excedente : ''}
               </Text>
             ))}
@@ -883,18 +1122,14 @@ const WorkOrderDetailScreen: React.FC = () => {
             </View>
             <View style={styles.row}>
               <Text style={styles.cellLabel}>Excedente Última Operación</Text>
-              <Text style={styles.cellValue}>
-                {ultimaArea?.excedente ?? ''}
-              </Text>
+              <Text style={styles.cellValue}>{ultimaArea?.excedente ?? ''}</Text>
             </View>
             <View style={styles.row}>
               <Text style={styles.cellLabel}>Total Malas</Text>
               <Text style={styles.cellValue}>{totalMalas}</Text>
             </View>
             <View style={styles.row}>
-              <Text style={styles.cellLabel}>
-                Total Materia Prima Defectuosa
-              </Text>
+              <Text style={styles.cellLabel}>Total Materia Prima Defectuosa</Text>
               <Text style={styles.cellValue}>{totalDefectuoso}</Text>
             </View>
             <View style={styles.row}>
@@ -912,6 +1147,7 @@ const WorkOrderDetailScreen: React.FC = () => {
           </View>
         </>
       )}
+
       <VistosBuenosHistory
         history={vistosBuenosHistory}
         qualitySectionOpen={qualitySectionOpen}
@@ -947,29 +1183,89 @@ const WorkOrderDetailScreen: React.FC = () => {
         setAreaBadQuantities={setAreaBadQuantities}
         onConfirm={(updatedAreas) => {
           setShowBadQuantity(false);
-          console.log('updatedAreas:', updatedAreas);
-          handleSaveChanges(updatedAreas); // Usa las áreas ya actualizadas
+          handleSaveChanges(updatedAreas);
         }}
         onClose={() => setShowBadQuantity(false)}
       />
 
-      <Modal visible={showConfirm} transparent animationType="fade">
+      {/* Modal reasignación operador */}
+      <Modal visible={opModal.open} transparent animationType="fade">
         <View style={styles.modalOverlay}>
           <View style={styles.modalBox}>
-            <Text style={styles.modalText}>
-              ¿Deseas cerrar esta Orden de Trabajo?
+            <Text style={[styles.modalText, { fontWeight: '700' }]}>
+              Asignar operador {opModal.area ? `- ${opModal.area.name}` : ''}
+              {opModal.partial ? ' (Parcial abierto)' : ''}
             </Text>
-            <View style={styles.modalActions}>
-              <TouchableOpacity
-                onPress={() => setShowConfirm(false)}
-                style={styles.cancelButton}
-              >
+            <TextInput
+              mode="outlined"
+              activeOutlineColor="#000"
+              placeholder="Buscar operador por nombre..."
+              value={opModal.search}
+              onChangeText={(t) => setOpModal((s) => ({ ...s, search: t }))}
+              style={{ marginBottom: 12 }}
+            />
+            <ScrollView
+              style={{
+                maxHeight: 240,
+                borderWidth: 1,
+                borderColor: '#e5e7eb',
+                borderRadius: 10,
+              }}
+            >
+              {modalOptions.length === 0 ? (
+                <View style={{ padding: 12 }}>
+                  <Text style={{ color: '#6b7280' }}>
+                    No hay operadores para esta área o no hay coincidencias.
+                  </Text>
+                </View>
+              ) : (
+                modalOptions.map((u) => {
+                  const selected = u.id === opModal.selectedUserId;
+                  return (
+                    <TouchableOpacity
+                      key={u.id}
+                      onPress={() =>
+                        setOpModal((s) => ({ ...s, selectedUserId: u.id }))
+                      }
+                      style={{
+                        padding: 12,
+                        borderBottomWidth: 1,
+                        borderBottomColor: '#f3f4f6',
+                        backgroundColor: selected ? '#DBEAFE' : 'white',
+                      }}
+                    >
+                      <Text style={{ color: '#111827' }}>{u.username}</Text>
+                    </TouchableOpacity>
+                  );
+                })
+              )}
+            </ScrollView>
+
+            <View style={{ flexDirection: 'row', justifyContent: 'flex-end', gap: 12, marginTop: 16 }}>
+              <TouchableOpacity onPress={closeOperatorModal} style={styles.cancelButton}>
                 <Text style={styles.modalButtonText}>Cancelar</Text>
               </TouchableOpacity>
               <TouchableOpacity
-                onPress={handleCloseOrder}
-                style={styles.confirmButton}
+                onPress={confirmOperatorModal}
+                style={[styles.confirmButton, { opacity: opModal.selectedUserId == null ? 0.6 : 1 }]}
+                disabled={opModal.selectedUserId == null}
               >
+                <Text style={styles.modalButtonText}>Guardar</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
+
+      <Modal visible={showConfirm} transparent animationType="fade">
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalBox}>
+            <Text style={styles.modalText}>¿Deseas cerrar esta Orden de Trabajo?</Text>
+            <View style={styles.modalActions}>
+              <TouchableOpacity onPress={() => setShowConfirm(false)} style={styles.cancelButton}>
+                <Text style={styles.modalButtonText}>Cancelar</Text>
+              </TouchableOpacity>
+              <TouchableOpacity onPress={handleCloseOrder} style={styles.confirmButton}>
                 <Text style={styles.modalButtonText}>Confirmar</Text>
               </TouchableOpacity>
             </View>
@@ -1131,7 +1427,7 @@ const styles = StyleSheet.create({
   progressContainer: {
     height: 12,
     width: '100%',
-    backgroundColor: '#E5E7EB', // gris claro (tailwind: bg-gray-200)
+    backgroundColor: '#E5E7EB',
     borderRadius: 8,
     overflow: 'hidden',
     marginBottom: 20,
@@ -1139,10 +1435,11 @@ const styles = StyleSheet.create({
   },
   progressBar: {
     height: '100%',
-    backgroundColor: '#4ADE80', // verde tailwind: bg-green-400
+    backgroundColor: '#4ADE80',
     borderRadius: 8,
   },
 });
+
 const fileStyles = StyleSheet.create({
   row: { gap: 8, paddingVertical: 4 },
   button: {

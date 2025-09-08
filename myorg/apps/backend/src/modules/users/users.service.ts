@@ -2,6 +2,8 @@
 import { Injectable } from '@nestjs/common';
 import { PrismaClient } from '@prisma/client';
 import { UpdateUserDto } from '../../auth/dto/update-user.dto';
+import * as bcrypt from 'bcryptjs';
+const SALT_ROUNDS = 10;
 
 @Injectable()
 export class UsersService {
@@ -9,12 +11,12 @@ export class UsersService {
 
   async getUsers() {
     return await this.prisma.user.findMany({
-      include: { role: true } // Incluir la info del rol
+      include: { role: true }, // Incluir la info del rol
     });
   }
 
   async getUsersAndRoles() {
-    const users= await this.prisma.user.findMany({
+    const users = await this.prisma.user.findMany({
       select: {
         id: true,
         email: true,
@@ -23,34 +25,45 @@ export class UsersService {
         profile_image: true,
         role: {
           select: {
-            name: true
-          }
-        }
-      }
+            name: true,
+          },
+        },
+      },
     });
-    return users.map(user => ({
+    return users.map((user) => ({
       ...user,
-      role: user.role.name
-    }))
+      role: user.role.name,
+    }));
   }
 
   async updateUser(id: string, updateUserDto: UpdateUserDto) {
     try {
-      // Extraemos el campo 'role' para descartarlo y dejamos el resto en 'data'
-      // eslint-disable-next-line @typescript-eslint/no-unused-vars
-      const { role, ...data } = updateUserDto;
+      // 1) Extrae role y password explícitamente
+      const { role, password, ...rest } = updateUserDto;
+      void role; // 2) marca 'role' como usado de forma explícita (silencia no-unused-vars sin hacks)
 
-      const updatedUser = await this.prisma.user.update({
-        where: { id: parseInt(id) },
-        data, // Actualizamos solo con los campos permitidos
+      // 3) Construye 'data' tipado sin usar 'any'
+      //    - Si viene password no vacía, la hasheas y la incluyes
+      //    - Si no viene, simplemente no la pones en 'data'
+      const data: Omit<UpdateUserDto, 'role' | 'password'> & {
+        password?: string;
+      } = {
+        ...rest,
+        ...(password && password.trim().length > 0
+          ? { password: await bcrypt.hash(password, SALT_ROUNDS) }
+          : {}),
+      };
+
+      return await this.prisma.user.update({
+        where: { id: Number(id) },
+        data, // sólo campos permitidos + password hasheada si aplicó
       });
-      return updatedUser;
     } catch (error) {
       console.error('Error en el servicio updateUser:', error);
       throw error;
     }
   }
-  
+
   async deleteUser(id: string) {
     try {
       const deletedUser = await this.prisma.user.delete({

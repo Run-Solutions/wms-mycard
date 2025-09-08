@@ -963,6 +963,7 @@ export class FreeWorkOrderService {
             work_order_flow_id: dto.workOrderFlowId,
             quantity: dto.releaseQuantity,
             observation: dto.comments,
+            user_id: dto.assignedUser
           },
         });
         await tx.workOrderFlow.update({
@@ -1060,6 +1061,7 @@ export class FreeWorkOrderService {
             work_order_flow_id: dto.workOrderFlowId,
             quantity: dto.releaseQuantity,
             observation: dto.comments,
+            user_id: dto.assignedUser
           },
         });
         await tx.workOrderFlow.update({
@@ -1157,6 +1159,7 @@ export class FreeWorkOrderService {
             work_order_flow_id: dto.workOrderFlowId,
             quantity: dto.releaseQuantity,
             observation: dto.comments,
+            user_id: dto.assignedUser
           },
         });
         await tx.workOrderFlow.update({
@@ -1264,6 +1267,7 @@ export class FreeWorkOrderService {
             excess_quantity: dto.excessQuantity,
             material_quantity: dto.materialBadQuantity,
             observation: dto.comments,
+            user_id: dto.assignedUser
           },
         });
 
@@ -1477,6 +1481,7 @@ export class FreeWorkOrderService {
             excess_quantity: dto.excessQuantity,
             material_quantity: dto.materialBadQuantity,
             observation: dto.comments,
+            user_id: dto.assignedUser
           },
         });
 
@@ -1587,6 +1592,7 @@ export class FreeWorkOrderService {
             excess_quantity: dto.excessQuantity,
             material_quantity: dto.materialBadQuantity,
             observation: dto.comments,
+            user_id: dto.assignedUser
           },
         });
 
@@ -1697,6 +1703,7 @@ export class FreeWorkOrderService {
             excess_quantity: dto.excessQuantity,
             material_quantity: dto.materialBadQuantity,
             observation: dto.comments,
+            user_id: dto.assignedUser
           },
         });
 
@@ -1806,6 +1813,7 @@ export class FreeWorkOrderService {
             excess_quantity: dto.excessQuantity,
             material_quantity: dto.materialBadQuantity,
             observation: dto.comments,
+            user_id: dto.assignedUser
           },
         });
 

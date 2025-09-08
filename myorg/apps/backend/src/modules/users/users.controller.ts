@@ -1,5 +1,14 @@
 /* myorg\apps\backend\src\modules\users\users.controller.ts */
-import { Controller, Get, Delete, Patch, Param, Body, UseInterceptors, UploadedFile } from '@nestjs/common';
+import {
+  Controller,
+  Get,
+  Delete,
+  Patch,
+  Param,
+  Body,
+  UseInterceptors,
+  UploadedFile,
+} from '@nestjs/common';
 import { UsersService } from './users.service';
 import { UpdateUserDto } from '../../auth/dto/update-user.dto';
 import { FileInterceptor } from '@nestjs/platform-express';
@@ -24,9 +33,8 @@ export class UsersController {
   @UseInterceptors(
     FileInterceptor('profile_image', {
       storage: diskStorage({
-        destination: './uploads', // Asegúrate de que la carpeta 'uploads' exista
+        destination: './uploads',
         filename: (req, file, cb) => {
-          // Genera un nombre único manteniendo la extensión original
           const uniqueSuffix =
             Date.now() + '-' + Math.round(Math.random() * 1e9);
           const ext = extname(file.originalname);
@@ -40,14 +48,13 @@ export class UsersController {
     @UploadedFile() file: Express.Multer.File,
     @Body() updateUserDto: UpdateUserDto,
   ) {
-    if (file) {
-      // Guarda el nombre del archivo; puedes ajustar para guardar la ruta completa si lo deseas
-      updateUserDto.profile_image = file.filename;
-    }
-    const updatedUser = await this.usersService.updateUser(id, updateUserDto);
-    return updatedUser;
+    const payload: UpdateUserDto = {
+      ...updateUserDto,
+      ...(file ? { profile_image: file.filename } : {}),
+    };
+    return this.usersService.updateUser(id, payload);
   }
-  
+
   @Delete(':id')
   async deleteUser(@Param('id') id: string) {
     return this.usersService.deleteUser(id);

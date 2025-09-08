@@ -13,6 +13,7 @@ import {
   UseInterceptors,
   Req,
   Patch,
+  ParseIntPipe,
 } from '@nestjs/common';
 import { WorkOrderService } from './work-order.service';
 import {
@@ -136,6 +137,45 @@ export class WorkOrderController {
       user.id,
       statuses,
     );
+  }
+
+  // Para obtener los WorkOrderFlowPendientes
+  @Get('users')
+  async getUsers(
+    @Req() req: AuthenticatedRequest,
+  ) {
+    if (!req.user) {
+      throw new Error('Usuario no autenticado');
+      throw new ForbiddenException('Usuario no autenticado');
+    }
+    const { user } = req;
+    console.log('📌 ID del usuario:', user.id);
+    console.log('📌 Rol del usuario:', user.role_id);
+    console.log('📌 Áreas asignadas:', user.areas_operator_id);
+    return await this.workOrderService.getUsers(
+      user.id,
+    );
+  }
+
+  @Post(':flowId/assign')
+  async assignFlowUser(
+    @Param('flowId', ParseIntPipe) flowId: number,
+    @Body('userId', ParseIntPipe) userId: number,
+    @Body('note') note: string | undefined,
+    @Req() req: AuthenticatedRequest, // donde tengas al usuario autenticado
+  ) {
+    if (!req.user) {
+      throw new Error('Usuario no autenticado');
+      throw new ForbiddenException('Usuario no autenticado');
+    }
+    const changedByUserId = req.user.id; // o de tu guard
+    const updated = await this.workOrderService.updateFlowAssignedUser(
+      flowId,
+      userId,
+      changedByUserId,
+      note,
+    );
+    return updated;
   }
 
   // Para obtener los WorkOrder por Id

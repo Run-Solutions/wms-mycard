@@ -1,5 +1,9 @@
 /* myorg\apps\backend\src\modules\work-order\work-order.service.ts */
-import { Injectable, BadRequestException } from '@nestjs/common';
+import {
+  Injectable,
+  BadRequestException,
+  NotFoundException,
+} from '@nestjs/common';
 import { PrismaService } from 'prisma/prisma.service';
 import {
   CreateWorkOrderDto,
@@ -158,6 +162,111 @@ export class WorkOrderService {
     return inProgressWorkOrders;
   }
 
+  async getUsers(userId: number) {
+    console.log('Buscando usuarios');
+    if (!userId) {
+      throw new Error('No se proporcionan areas validas');
+    }
+    const users = await this.prisma.user.findMany({
+      where: {
+        role: { name: 'operador' }, // relación Role -> campo name
+      },
+      select: {
+        id: true,
+        username: true,
+        areasOperator: {
+          // relación a AreasOperator
+          select: { name: true, id: true },
+        },
+      },
+    });
+
+    return users;
+  }
+  // service.ts
+  async updateFlowAssignedUser(
+    flowId: number,
+    userId: number,
+    changedByUserId: number,
+    note?: string,
+  ) {
+    return this.prisma.$transaction(async (tx) => {
+      // 1) Flow previo (con info para el log)
+      const prev = await tx.workOrderFlow.findUnique({
+        where: { id: flowId },
+        select: {
+          id: true,
+          work_order_id: true,
+          area_id: true,
+          assigned_user: true,
+          user: { select: { id: true, username: true } }, // usuario asignado previo
+          area: { select: { id: true, name: true } }, // si tienes relación area
+        },
+      });
+      if (!prev) throw new NotFoundException(`Flow ${flowId} no encontrado`);
+
+      // 2) Validar nuevo usuario
+      const newUser = await tx.user.findUnique({
+        where: { id: userId },
+        select: { id: true, username: true, areas_operator_id: true },
+      });
+      if (!newUser)
+        throw new NotFoundException(`Usuario ${userId} no encontrado`);
+
+      // 3) (Opcional) validar que el actor existe
+      const actor = await tx.user.findUnique({
+        where: { id: changedByUserId },
+        select: { id: true, username: true },
+      });
+      if (!actor)
+        throw new NotFoundException(`Actor ${changedByUserId} no encontrado`);
+
+      // 4) Evitar log inútil si no hay cambio
+      if (prev.assigned_user === userId) {
+        // Puedes retornar el estado actual o forzar un log "no-op" si lo deseas
+        return tx.workOrderFlow.update({
+          where: { id: flowId },
+          data: { assigned_at: new Date() }, // opcional refrescar timestamp
+          include: { user: { select: { id: true, username: true } } },
+        });
+      }
+
+      // 5) Actualizar el encargado del flow
+      const updated = await tx.workOrderFlow.update({
+        where: { id: flowId },
+        data: {
+          assigned_user: userId,
+          assigned_at: new Date(),
+        },
+        include: {
+          user: { select: { id: true, username: true } }, // nuevo asignado
+        },
+      });
+
+      // 6) Crear log dedicado
+      await tx.flowAssigneeChangeLog.create({
+        data: {
+          flowId: flowId,
+          workOrderId: prev.work_order_id, // asegura que existe en tu modelo
+          areaId: prev.area_id,
+          areaName: prev.area?.name ?? 'Desconocida', // snapshot
+
+          oldAssigneeId: prev.assigned_user ?? null,
+          oldAssigneeUsername: prev.user?.username ?? null,
+
+          newAssigneeId: newUser.id,
+          newAssigneeUsername: newUser.username,
+
+          changedByUserId: actor.id,
+          changedByUsername: actor.username,
+
+          note: note ?? null,
+        },
+      });
+
+      return updated;
+    });
+  }
   // Para obtener una Orden de Trabajo En Proceso por ID
   async getInProgressWorkOrdersById(id: string) {
     const workOrder = await this.prisma.workOrder.findFirst({
@@ -172,6 +281,7 @@ export class WorkOrderService {
             user: true,
             partialReleases: {
               include: {
+                user: true,
                 formAuditory: {
                   include: {
                     user: true,

@@ -1,7 +1,7 @@
 // myorg/apps/frontend-web/src/app/(protected)/seguimientoDeOts/[id]/page.tsx
 'use client';
 
-import { use, useState, useEffect } from 'react';
+import { use, useState, Fragment, useEffect, useMemo } from 'react';
 import { useRouter } from 'next/navigation';
 import styled from 'styled-components';
 import { Card, CardContent } from '@/components/ui/card';
@@ -10,11 +10,140 @@ import InconformitiesHistory from '@/components/SeguimientoDeOts/InconformitiesH
 import BadQuantityModal from '@/components/SeguimientoDeOts/BadQuantityModal';
 import {
   fetchWorkOrderById,
+  fetchAllUsers,
+  updateFlowAssignedUser,
   closeWorkOrder,
   updateWorkOrderAreas,
 } from '@/api/seguimientoDeOts';
 import { VistosBuenosHistory } from '@/components/SeguimientoDeOts/VistosBuenosHistory';
 import { getFileByName } from '@/api/seguimientoDeOts';
+
+type NumericField =
+  | 'buenas'
+  | 'malas'
+  | 'excedente'
+  | 'defectuoso'
+  | 'cqm'
+  | 'muestras';
+
+const AREA_KEY_BY_ID: Record<number, string> = {
+  1: 'prepress',
+  2: 'impression',
+  3: 'serigrafia',
+  4: 'empalme',
+  5: 'laminacion',
+  6: 'corte',
+  7: 'colorEdge',
+  8: 'hotStamping',
+  9: 'millingChip',
+  10: 'personalizacion',
+};
+
+const getAreaKey = (area: AreaData) => AREA_KEY_BY_ID[area.id] ?? null;
+
+const getAreaReleaseTotal = (area: AreaData) => {
+  const key = getAreaKey(area);
+  const block: any = key ? (area.response as any)?.[key] : null;
+  if (!block) return 0;
+
+  // Total "bueno" según el tipo de bloque
+  // prepress usa 'plates', varios usan 'release_quantity' o 'good_quantity'
+  return block.release_quantity ?? block.good_quantity ?? block.plates ?? 0;
+};
+
+const getSumParciales = (area: AreaData) =>
+  (area.partials ?? []).reduce((acc, p) => acc + (p?.quantity ?? 0), 0);
+
+const getRemainder = (area: AreaData) =>
+  Math.max(getAreaReleaseTotal(area) - getSumParciales(area), 0);
+
+// último answer (por created_at)
+const getLastAnswer = (area: AreaData) => {
+  if (!area.answers?.length) return null;
+  return [...area.answers].sort(
+    (a, b) =>
+      new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
+  )[0];
+};
+
+const getPerPartialValues = (
+  area: AreaData,
+  field: 'cqm' | 'muestras' | 'defectuoso'
+) => {
+  const parc = area.parciales || 0;
+  const hasRem = getRemainder(area) > 0;
+  const cols = parc + (hasRem ? 1 : 0);
+
+  // Ordenamos por fecha ascendente para alinear P1->primera respuesta, etc.
+  const answersSorted = [...(area.answers ?? [])].sort(
+    (a, b) =>
+      new Date(a.created_at).getTime() - new Date(b.created_at).getTime()
+  );
+
+  // Valor por defecto
+  const defaultVal = field === 'defectuoso' ? 0 : 0;
+  const values: Array<number | string> = Array(cols).fill(defaultVal);
+
+  // Relleno por parcial usando respuestas (si existen)
+  for (let i = 0; i < parc; i++) {
+    const ans = answersSorted[i];
+    if (!ans) continue;
+
+    if (field === 'cqm') {
+      values[i] = ans.sample_quantity ?? 0;
+    } else if (field === 'muestras') {
+      // Nota: en tu payload de "answers" no hay 'sample_auditory'.
+      // Si en el futuro lo envías, cámbialo aquí:
+      values[i] = (ans.sample_auditory as any) ?? 0;
+    } else if (field === 'defectuoso') {
+      // Normalmente no viene por answer. Deja 0 por parcial.
+      values[i] = 0;
+    }
+  }
+
+  // Columna REM: usa la respuesta "extra" (answers[parc]) o la última disponible
+  if (hasRem) {
+    const block = (area.response as any)?.[getAreaKey(area)];
+    const remIndex = cols - 1;
+
+    if (field === 'cqm') {
+      const remAns =
+        answersSorted[parc] ?? answersSorted[answersSorted.length - 1];
+      values[remIndex] = remAns?.sample_quantity ?? 0;
+    } else if (field === 'muestras') {
+      const remAns =
+        answersSorted[parc] ?? answersSorted[answersSorted.length - 1];
+      values[remIndex] = (remAns as any)?.sample_auditory ?? '—';
+    } else if (field === 'defectuoso') {
+      // Para defectuoso usamos el bloque del área (material_quantity o bad_quantity)
+      values[remIndex] = block?.material_quantity ?? block?.bad_quantity ?? 0;
+    }
+  }
+
+  return values;
+};
+// último parcial por fecha
+const getLastPartial = (area: AreaData) => {
+  const list = area.partials ?? [];
+  if (!list.length) return null;
+  return [...list].sort(
+    (a, b) =>
+      new Date(a.created_at).getTime() - new Date(b.created_at).getTime()
+  )[list.length - 1];
+};
+
+const getPartialUserName = (
+  p: AreaData['partials'][number] | null | undefined,
+  area: AreaData,
+  operatorByIdMap: Map<number, string>
+) => {
+  return (
+    p?.user?.username ??
+    (p?.user_id != null ? operatorByIdMap.get(p.user_id) : undefined) ??
+    area.usuario ??
+    'No definido'
+  );
+};
 
 export type AreaData = {
   id: number;
@@ -35,7 +164,7 @@ export type AreaData = {
       username: string;
     };
   };
-  answers: any;
+  answers: any[];
   usuario: string;
   auditor: string;
   buenas: number;
@@ -44,6 +173,21 @@ export type AreaData = {
   excedente: number;
   defectuoso: number;
   muestras: number;
+  flowId?: number;
+  assigned_user_id?: number | null;
+
+  parciales: number; // total de parciales creados
+  parcialesValidados: number;
+  partials: Array<{
+    id: number;
+    quantity: number;
+    bad_quantity: number;
+    excess_quantity: number;
+    user_id: number | null; // 👈 puede venir null
+    validated: boolean;
+    user?: { username: string } | null; // 👈 opcional
+    created_at: string;
+  }>;
 };
 
 export type InconformityData = {
@@ -52,6 +196,12 @@ export type InconformityData = {
   createdAt: string;
   createdBy: string;
   area: string;
+};
+
+type OperatorUser = {
+  id: number;
+  username: string;
+  areasOperator?: { id: number; name: string };
 };
 
 interface Props {
@@ -80,6 +230,83 @@ export default function SeguimientoDeOtsAuxPage({ params }: Props) {
   const [progressWidth, setProgressWidth] = useState(0);
   const [loading, setLoading] = useState(true);
   const [vistosBuenosHistory, setVistosBuenosHistory] = useState([]);
+  const [operatorUsers, setOperatorUsers] = useState<OperatorUser[]>([]);
+
+  const operatorOptionsByAreaId = useMemo(() => {
+    const map = new Map<number, Array<{ id: number; username: string }>>();
+    operatorUsers.forEach((u) => {
+      const aId = u.areasOperator?.id;
+      if (!aId) return;
+      if (!map.has(aId)) map.set(aId, []);
+      map.get(aId)!.push({ id: u.id, username: u.username });
+    });
+    // orden opcional
+    for (const [k, arr] of map.entries()) {
+      arr.sort((a, b) => a.username.localeCompare(b.username));
+      map.set(k, arr);
+    }
+    return map;
+  }, [operatorUsers]);
+
+  const operatorById = useMemo(() => {
+    const m = new Map<number, string>();
+    operatorUsers.forEach((u) => m.set(u.id, u.username));
+    return m;
+  }, [operatorUsers]);
+
+  const getUserOptionsForArea = (areaId: number) =>
+    operatorOptionsByAreaId.get(areaId) ?? [];
+
+  // --- MODAL ASIGNACIÓN DE OPERADOR ---
+  type PartialType = AreaData['partials'][number] | null;
+
+  const [opModal, setOpModal] = useState<{
+    open: boolean;
+    area: AreaData | null;
+    partial: PartialType;
+    areaId: number | null;
+    selectedUserId: number | null;
+    search: string;
+  }>({
+    open: false,
+    area: null,
+    partial: null,
+    areaId: null,
+    selectedUserId: null,
+    search: '',
+  });
+
+  const openOperatorModal = (area: AreaData, partial: PartialType) => {
+    const currentId = partial?.user_id ?? area.assigned_user_id ?? null;
+    setOpModal({
+      open: true,
+      area,
+      partial,
+      areaId: area.id ?? null,
+      selectedUserId: currentId,
+      search: '',
+    });
+  };
+
+  const closeOperatorModal = () => setOpModal((s) => ({ ...s, open: false }));
+
+  const confirmOperatorModal = async () => {
+    if (!opModal.area || opModal.selectedUserId == null) return;
+    if (!canEditUser(opModal.area, opModal.partial)) return; // 🔒 bloqueo extra
+    await handleChangeUser(
+      opModal.area,
+      opModal.partial,
+      opModal.selectedUserId
+    );
+    closeOperatorModal();
+  };
+  // Opciones filtradas para el modal (por área + búsqueda)
+  const modalOptions = useMemo(() => {
+    if (!opModal.areaId) return [];
+    const base = getUserOptionsForArea(opModal.areaId);
+    const q = opModal.search.trim().toLowerCase();
+    return q ? base.filter((u) => u.username.toLowerCase().includes(q)) : base;
+  }, [opModal.areaId, opModal.search, operatorOptionsByAreaId]);
 
   useEffect(() => {
     const alreadyReloaded = sessionStorage.getItem('alreadyReloaded');
@@ -98,6 +325,8 @@ export default function SeguimientoDeOtsAuxPage({ params }: Props) {
 
         // Tu llamada original a la API
         const data = await fetchWorkOrderById(id);
+        const users = await fetchAllUsers();
+        setOperatorUsers(users || []);
         setWorkOrder(data);
         const historyData = data.flow
           .filter((item: any) => item.answers?.length > 0)
@@ -157,11 +386,13 @@ export default function SeguimientoDeOtsAuxPage({ params }: Props) {
             name: item.area?.name || 'Sin nombre',
             status: item.status || 'Desconocido',
             response: item.areaResponse || {},
-            answers: item.answers?.[0] || {},
+            answers: item.answers || [],
+            flowId: item.id, // 👈
+            assigned_user_id: item.assigned_user, // 👈
             ...getAreaData(
               item.area_id,
               item.areaResponse,
-              item.partialReleases,
+              item.partialReleases, // 👈 ya trae {id, user_id, user, validated, quantity...}
               item.user,
               index
             ),
@@ -230,6 +461,70 @@ export default function SeguimientoDeOtsAuxPage({ params }: Props) {
     loadData();
   }, [id]);
 
+  const areaColSpan = (area: AreaData) => {
+    const base = Math.max(1, area.parciales || 0);
+    const rem = area.parciales > 0 && getRemainder(area) > 0 ? 1 : 0;
+    return area.parciales > 0 ? base + rem : 1;
+  };
+  const handleChangeUser = async (
+    area: AreaData,
+    _partial: AreaData['partials'][number] | null,
+    newUserId: number
+  ) => {
+    const prevAreas = areas;
+
+    setAreas((prev) =>
+      prev.map((a) =>
+        a.id === area.id
+          ? {
+              ...a,
+              assigned_user_id: newUserId,
+              usuario: operatorById.get(newUserId) ?? a.usuario,
+            }
+          : a
+      )
+    );
+
+    try {
+      if (!area.flowId) throw new Error('Falta flowId del área');
+      await updateFlowAssignedUser(area.flowId, newUserId);
+    } catch (e) {
+      console.error(e);
+      setAreas(prevAreas);
+      alert('No se pudo actualizar el encargado. Se revirtieron los cambios.');
+    }
+  };
+
+  // Helpers
+  const areaColSpanByAnswers = (area: AreaData) =>
+    Math.max(area.answers?.length ?? 0, 1);
+
+  const getAnswerValue = (
+    ans: any,
+    field: 'defectuoso' | 'cqm' | 'muestras',
+    area: any
+  ) => {
+    switch (field) {
+      case 'cqm':
+        // Por answer → cuántas muestras reportó ese answer (sample_quantity)
+        return ans?.sample_quantity ?? 0;
+      case 'muestras':
+        // Si quieres ver el tipo de prueba por answer (string tipo "perfil")
+        // cámbialo por lo que necesites mostrar aquí:
+        return ans?.sample_auditory ?? '—';
+
+      case 'defectuoso':
+        // Sigue viniendo del bloque del área (no por answer)
+        return (
+          area?.areaResponse?.impression?.bad_quantity ??
+          area?.areaResponse?.prepress?.bad_quantity ??
+          0
+        );
+      default:
+        return 0;
+    }
+  };
+
   const handleCloseOrder = async () => {
     try {
       await closeWorkOrder(workOrder?.ot_id);
@@ -239,15 +534,15 @@ export default function SeguimientoDeOtsAuxPage({ params }: Props) {
     }
   };
 
-  const renderCell = (area: AreaData, field: keyof AreaData) => {
+  const renderCell = (area: AreaData, field: NumericField) => {
     // 1. Si la orden está cerrada, todo es lectura
     if (workOrder?.status === 'Cerrado') {
-      return <span>{area[field]}</span>;
+      return <span>{Number(area[field] ?? 0)}</span>;
     }
 
     // 2. Si el área no está en Completado, todo es lectura
     if (area.status !== 'Completado') {
-      return <span>{area[field]}</span>;
+      return <span>{Number(area[field] ?? 0)}</span>;
     }
 
     // 3. Preprensa: solo 'buenas' editable
@@ -256,9 +551,11 @@ export default function SeguimientoDeOtsAuxPage({ params }: Props) {
         return (
           <input
             type="number"
-            value={area[field]}
+            value={Number(area[field] ?? 0)}
             min={0}
-            onChange={(e) => handleValueChange(area.id, field, e.target.value)}
+            onChange={(e) =>
+              handleValueChange(area.id, field as NumericField, e.target.value)
+            }
             style={{
               width: '80px',
               padding: '4px',
@@ -267,7 +564,7 @@ export default function SeguimientoDeOtsAuxPage({ params }: Props) {
           />
         );
       } else {
-        return <span>{area[field]}</span>;
+        return <span>{Number(area[field] ?? 0)}</span>;
       }
     }
 
@@ -277,9 +574,11 @@ export default function SeguimientoDeOtsAuxPage({ params }: Props) {
         return (
           <input
             type="number"
-            value={area[field]}
+            value={Number(area[field] ?? 0)}
             min={0}
-            onChange={(e) => handleValueChange(area.id, field, e.target.value)}
+            onChange={(e) =>
+              handleValueChange(area.id, field as NumericField, e.target.value)
+            }
             style={{
               width: '80px',
               padding: '4px',
@@ -288,7 +587,7 @@ export default function SeguimientoDeOtsAuxPage({ params }: Props) {
           />
         );
       } else {
-        return <span>{area[field]}</span>;
+        return <span>{Number(area[field] ?? 0)}</span>;
       }
     }
 
@@ -298,9 +597,11 @@ export default function SeguimientoDeOtsAuxPage({ params }: Props) {
         return (
           <input
             type="number"
-            value={area[field]}
+            value={Number(area[field] ?? 0)}
             min={0}
-            onChange={(e) => handleValueChange(area.id, field, e.target.value)}
+            onChange={(e) =>
+              handleValueChange(area.id, field as NumericField, e.target.value)
+            }
             style={{
               width: '80px',
               padding: '4px',
@@ -309,7 +610,7 @@ export default function SeguimientoDeOtsAuxPage({ params }: Props) {
           />
         );
       } else {
-        return <span>{area[field]}</span>;
+        return <span>{Number(area[field] ?? 0)}</span>;
       }
     }
     if (field === 'malas') {
@@ -336,7 +637,9 @@ export default function SeguimientoDeOtsAuxPage({ params }: Props) {
             type="number"
             value={area[field]}
             min={0}
-            onChange={(e) => handleValueChange(area.id, field, e.target.value)}
+            onChange={(e) =>
+              handleValueChange(area.id, field as NumericField, e.target.value)
+            }
             style={{
               width: '80px',
               padding: '4px',
@@ -353,7 +656,9 @@ export default function SeguimientoDeOtsAuxPage({ params }: Props) {
         type="number"
         value={area[field]}
         min={0}
-        onChange={(e) => handleValueChange(area.id, field, e.target.value)}
+        onChange={(e) =>
+          handleValueChange(area.id, field as NumericField, e.target.value)
+        }
         style={{
           width: '80px',
           padding: '4px',
@@ -395,6 +700,11 @@ export default function SeguimientoDeOtsAuxPage({ params }: Props) {
     flowUser: any = null,
     index: number = -1
   ) => {
+    const parciales = partialReleases.length;
+    const parcialesValidados = partialReleases.filter(
+      (p) => p?.validated
+    ).length;
+
     const sumFromPartials = () => {
       return partialReleases.reduce(
         (acc: any, curr: any) => {
@@ -413,10 +723,19 @@ export default function SeguimientoDeOtsAuxPage({ params }: Props) {
       const auditor =
         areaResponse?.[areaKey]?.formAuditory?.user?.username || '';
 
-      if (!hasResponse && partialReleases.length > 0) {
+      if (!hasResponse && parciales > 0) {
         const resumen = sumFromPartials();
         console.log('[PARCIAL DETECTADO]', areaKey, resumen);
-        return { ...resumen, cqm: 0, muestras: 0, usuario, auditor: '' };
+        return {
+          ...resumen,
+          cqm: 0,
+          muestras: 0,
+          usuario,
+          auditor,
+          parciales,
+          parcialesValidados,
+          partials: partialReleases, // 👈 aquí
+        };
       }
 
       return {
@@ -432,6 +751,9 @@ export default function SeguimientoDeOtsAuxPage({ params }: Props) {
         muestras: areaResponse?.[areaKey]?.formAuditory?.sample_auditory ?? 0,
         usuario,
         auditor,
+        parciales,
+        parcialesValidados,
+        partials: partialReleases, // 👈 y aquí también
       };
     };
 
@@ -466,6 +788,9 @@ export default function SeguimientoDeOtsAuxPage({ params }: Props) {
           muestras: 0,
           usuario: '',
           auditor: '',
+          parciales: 0,
+          parcialesValidados: 0,
+          partials: [], // 👈 default
         };
     }
   };
@@ -498,7 +823,7 @@ export default function SeguimientoDeOtsAuxPage({ params }: Props) {
 
   const handleValueChange = (
     areaId: number,
-    field: keyof AreaData,
+    field: NumericField,
     value: string | number
   ) => {
     setAreas((prev) =>
@@ -509,7 +834,6 @@ export default function SeguimientoDeOtsAuxPage({ params }: Props) {
   };
 
   const handleSaveChanges = async (updatedAreas: AreaData[]) => {
-    const effectiveAreas = updatedAreas ?? areas;
     const payload = {
       areas: areas
         .filter((area) => area.status === 'Completado')
@@ -672,7 +996,27 @@ export default function SeguimientoDeOtsAuxPage({ params }: Props) {
   };
 
   // pasar al return normal sin más guards globales
+  const totalCols = areas.reduce((sum, area) => {
+    return sum + (area.parciales > 0 ? area.parciales : 1);
+  }, 0);
 
+  const canEditUser = (
+    area: AreaData,
+    partial?: AreaData['partials'][number] | null
+  ) => {
+    // bloquea si la OT completa está cerrada
+    if (workOrder?.status === 'Cerrado') return false;
+
+    // con parciales: solo si el parcial NO está validado y el área está "En proceso"
+    if (partial)
+      return (
+        !partial.validated &&
+        ['En proceso', 'Parcial' /*, 'Otro estado'*/].includes(area.status)
+      );
+
+    // sin parciales: solo si el área está "En proceso"
+    return ['En proceso', 'Parcial' /*, 'Otro estado'*/].includes(area.status);
+  };
   return (
     <>
       <Container>
@@ -798,11 +1142,14 @@ export default function SeguimientoDeOtsAuxPage({ params }: Props) {
               <table className="min-w-full border-collapse bg-white rounded-xl shadow text-sm">
                 <thead className="bg-gray-100 sticky top-0 z-10 text-gray-600 text-xs uppercase tracking-wide">
                   <tr>
-                    <th className="text-left p-3">Dato</th>
+                    <th className="text-left p-3 align-bottom" rowSpan={2}>
+                      Dato
+                    </th>
                     {areas.map((area, index) => (
                       <th
-                        key={`${area.id}-${index}`}
-                        className="p-3 text-center font-semibold"
+                        key={`${area.id}-${index}-header-area`}
+                        className="p-3 text-center font-semibold align-bottom"
+                        colSpan={areaColSpan(area)} // antes: Math.max(1, area.parciales)
                       >
                         {area.name}
                         <div className="text-[0.65rem] text-gray-400 mt-1">
@@ -811,20 +1158,141 @@ export default function SeguimientoDeOtsAuxPage({ params }: Props) {
                       </th>
                     ))}
                   </tr>
+                  <tr>
+                    {areas.map((area, index) => {
+                      if (area.parciales > 0) {
+                        const rem = getRemainder(area) > 0;
+                        return (
+                          <Fragment key={`${area.id}-${index}-subgroup`}>
+                            {Array.from({ length: area.parciales }).map(
+                              (_, i) => (
+                                <th
+                                  key={`${area.id}-${index}-sub-${i}`}
+                                  className="p-2 text-center font-normal text-[0.7rem] text-gray-500"
+                                >
+                                  {`P${i + 1}`}
+                                </th>
+                              )
+                            )}
+                            {rem && (
+                              <th
+                                key={`${area.id}-${index}-sub-rem`}
+                                className="p-2 text-center font-normal text-[0.7rem] text-gray-500"
+                              >
+                                Rem
+                              </th>
+                            )}
+                          </Fragment>
+                        );
+                      }
+                      return (
+                        <th
+                          key={`${area.id}-${index}-sub-total`}
+                          className="p-2 text-center font-normal text-[0.7rem] text-gray-500"
+                        >
+                          Total
+                        </th>
+                      );
+                    })}
+                  </tr>
                 </thead>
 
                 <tbody className="divide-y divide-gray-200 text-gray-800">
+                  {/* Encargado (remanente) */}
+                  <tr>
+                    <td className="p-3 font-semibold">Encargado (remanente)</td>
+                    {areas.map((area, index) => {
+                      const editable = canEditUser(area, null);
+                      const currentAssignedName =
+                        (area.assigned_user_id != null
+                          ? operatorById.get(area.assigned_user_id)
+                          : undefined) ??
+                        area.usuario ??
+                        'No definido';
+
+                      return (
+                        <td
+                          key={`${area.id}-encargado-${index}`}
+                          className="text-center"
+                          colSpan={areaColSpan(area)} // 👈 cubre todos los parciales de esa área
+                        >
+                          {editable ? (
+                            <button
+                              className="border rounded px-2 py-1 hover:bg-gray-50"
+                              onClick={() => openOperatorModal(area, null)} // 👈 SOLO reasigna el flow
+                              title="Cambiar encargado del remanente"
+                            >
+                              {currentAssignedName}
+                            </button>
+                          ) : (
+                            currentAssignedName
+                          )}
+                        </td>
+                      );
+                    })}
+                  </tr>
                   {/* Usuario */}
                   <tr>
                     <td className="p-3 font-semibold">Usuario</td>
-                    {areas.map((area, index) => (
-                      <td
-                        key={`${area.id}-usuario-${index}`}
-                        className="text-center"
-                      >
-                        {area.usuario}
-                      </td>
-                    ))}
+                    {areas.flatMap((area, aIndex) => {
+                      const hasPartials = area.partials?.length > 0;
+
+                      if (hasPartials) {
+                        const cells = area.partials.map((p, pIndex) => {
+                          const releasedByName = getPartialUserName(
+                            p,
+                            area,
+                            operatorById
+                          );
+                          return (
+                            <td
+                              key={`area-${area.id}-usuario-${p.id ?? pIndex}`}
+                              className="text-center"
+                            >
+                              {releasedByName}
+                            </td>
+                          );
+                        });
+
+                        // si hay remanente, añade columna Rem con el usuario del último parcial
+                        const rem = getRemainder(area) > 0;
+                        if (rem) {
+                          const lastP = getLastPartial(area);
+                          const lastUser = getPartialUserName(
+                            lastP,
+                            area,
+                            operatorById
+                          );
+                          cells.push(
+                            <td
+                              key={`area-${area.id}-usuario-rem`}
+                              className="text-center font-medium"
+                              title="Remanente"
+                            >
+                              {lastUser}
+                            </td>
+                          );
+                        }
+                        return cells;
+                      }
+
+                      // Sin parciales: mostrar encargado actual como texto (edición se hace en fila Encargado)
+                      const currentNameNoPartial =
+                        (area.assigned_user_id != null
+                          ? operatorById.get(area.assigned_user_id)
+                          : undefined) ??
+                        area.usuario ??
+                        'No definido';
+
+                      return (
+                        <td
+                          key={`area-${area.id}-usuario-${aIndex}`}
+                          className="text-center"
+                        >
+                          {currentNameNoPartial}
+                        </td>
+                      );
+                    })}
                   </tr>
 
                   {/* Auditor */}
@@ -834,6 +1302,7 @@ export default function SeguimientoDeOtsAuxPage({ params }: Props) {
                       <td
                         key={`${area.id}-auditor-${index}`}
                         className="text-center"
+                        colSpan={areaColSpan(area)} // 👈 clave
                       >
                         {area.auditor}
                       </td>
@@ -847,6 +1316,7 @@ export default function SeguimientoDeOtsAuxPage({ params }: Props) {
                       <td
                         key={`${area.id}-status-${index}`}
                         className="text-center"
+                        colSpan={areaColSpan(area)} // 👈 clave
                       >
                         <span
                           className={`px-2 py-1 rounded-lg text-sm font-medium ${getStatusStyle(
@@ -862,7 +1332,7 @@ export default function SeguimientoDeOtsAuxPage({ params }: Props) {
                   {/* Entradas */}
                   <tr>
                     <td
-                      colSpan={areas.length + 1}
+                      colSpan={1 + totalCols} // 1 extra por la primera columna "Dato"
                       className="bg-gray-50 px-3 py-2 font-bold text-gray-500"
                     >
                       📥 Producción
@@ -871,41 +1341,112 @@ export default function SeguimientoDeOtsAuxPage({ params }: Props) {
                   {['buenas', 'malas', 'excedente'].map((field) => (
                     <tr key={field}>
                       <td className="p-3 capitalize font-semibold">{field}</td>
-                      {areas.map((area, index) => (
-                        <td
-                          key={`${area.id}-${field}-${index}`}
-                          className="text-center"
-                        >
-                          {renderCell(area, field as keyof AreaData)}
-                        </td>
-                      ))}
+                      {/* Por cada área, creamos tantas celdas como parciales (o 1 si no hay) */}
+                      {areas.flatMap((area, aIndex) => {
+                        // Si hay parciales, pintamos cada parcial como una columna
+                        if (area.parciales > 0 && area.partials?.length) {
+                          const cells = area.partials.map((p, pIndex) => {
+                            const value =
+                              field === 'buenas'
+                                ? p.quantity
+                                : field === 'malas'
+                                ? p.bad_quantity ?? 0
+                                : /* excedente */ p.excess_quantity ?? 0;
+                            return (
+                              <td
+                                key={`area-${area.id}-parcial-${p.id}-${field}-${pIndex}`}
+                                className="text-center"
+                              >
+                                {value}
+                              </td>
+                            );
+                          });
+
+                          // Columna de REMANENTE solo si hay resto > 0
+                          const rem = getRemainder(area);
+                          if (rem > 0) {
+                            const remValue = field === 'buenas' ? rem : 0; // por defecto 0 para malas/excedente
+                            cells.push(
+                              <td
+                                key={`area-${area.id}-parcial-rem-${field}`}
+                                className="text-center font-semibold"
+                                title="Remanente"
+                              >
+                                {remValue}
+                              </td>
+                            );
+                          }
+                          return cells;
+                        }
+
+                        // Si NO hay parciales, dejamos una sola celda (Total del área)
+                        const totalValue =
+                          renderCell(area, field as NumericField) || 0;
+                        return (
+                          <td
+                            key={`area-${area.id}-no-parciales-${field}-${aIndex}`}
+                            className="text-center"
+                          >
+                            {totalValue}
+                          </td>
+                        );
+                      })}
                     </tr>
                   ))}
 
                   {/* Control de calidad */}
                   <tr>
                     <td
-                      colSpan={areas.length + 1}
+                      colSpan={1 + totalCols} // 1 extra por la primera columna "Dato"
                       className="bg-gray-50 px-3 py-2 font-bold text-gray-500"
                     >
                       🔍 Calidad
                     </td>
                   </tr>
-                  {['defectuoso', 'cqm', 'muestras'].map((field, rowIndex) => (
+                  {['defectuoso', 'cqm', 'muestras'].map((field) => (
                     <tr key={field}>
                       <td className="p-3 capitalize font-semibold">
                         {field === 'defectuoso'
                           ? 'materia prima defectuosa'
                           : field}
                       </td>
-                      {areas.map((area, colIndex) => (
-                        <td
-                          key={`cell-${rowIndex}-${colIndex}-${field}-${area.name}-${area.id}`}
-                          className="text-center"
-                        >
-                          {renderCell(area, field as keyof AreaData)}
-                        </td>
-                      ))}
+
+                      {areas.flatMap((area, aIdx) => {
+                        if (area.parciales > 0) {
+                          // ✅ AHORA llenamos cada parcial y (si existe) REM con datos reales
+                          const vals = getPerPartialValues(
+                            area,
+                            field as 'defectuoso' | 'cqm' | 'muestras'
+                          );
+                          return vals.map((v, i) => (
+                            <td
+                              key={`cell-area-${area.id}-parcial-${i}-${field}`}
+                              className="text-center"
+                              title={
+                                i >= area.parciales
+                                  ? 'Remanente'
+                                  : `Parcial ${i + 1}`
+                              }
+                            >
+                              {v}
+                            </td>
+                          ));
+                        }
+
+                        // Sin parciales → comportamiento anterior (una sola celda)
+                        const totalValue =
+                          renderCell?.(area, field as any) ??
+                          getAnswerValue(undefined, field as any, area);
+
+                        return (
+                          <td
+                            key={`cell-area-${area.id}-no-ans-${field}-${aIdx}`}
+                            className="text-center"
+                          >
+                            {totalValue ?? 0}
+                          </td>
+                        );
+                      })}
                     </tr>
                   ))}
 
@@ -916,6 +1457,7 @@ export default function SeguimientoDeOtsAuxPage({ params }: Props) {
                       <td
                         key={`${area.id}-total-${index}`}
                         className="text-center"
+                        colSpan={areaColSpan(area)} // 👈 clave
                       >
                         {area.buenas +
                           area.malas +
@@ -933,6 +1475,7 @@ export default function SeguimientoDeOtsAuxPage({ params }: Props) {
                       <td
                         key={`${area.id}-b+e-${index}`}
                         className="text-center"
+                        colSpan={areaColSpan(area)} // 👈 clave
                       >
                         {area.id >= 6 ? area.buenas + area.excedente : ''}
                       </td>
@@ -1005,6 +1548,67 @@ export default function SeguimientoDeOtsAuxPage({ params }: Props) {
             qualitySectionOpen={inconformitySectionOpen}
             toggleQualitySection={toggleInconformitySection}
           />
+
+          {opModal.open && (
+            <ModalOverlay>
+              <ModalBox>
+                <h4 className="font-semibold mb-3">
+                  Asignar operador{' '}
+                  {opModal.area ? `- ${opModal.area.name}` : ''}
+                  {opModal.partial ? ' (Parcial abierto)' : ''}
+                </h4>
+
+                {/* Buscador */}
+                <input
+                  type="text"
+                  value={opModal.search}
+                  onChange={(e) =>
+                    setOpModal((s) => ({ ...s, search: e.target.value }))
+                  }
+                  placeholder="Buscar operador por nombre..."
+                  className="w-full border rounded px-3 py-2 mb-3"
+                />
+
+                {/* Lista de operadores */}
+                <div className="max-h-64 overflow-y-auto border rounded">
+                  {modalOptions.length === 0 ? (
+                    <div className="p-3 text-sm text-gray-500">
+                      No hay operadores para esta área o no hay coincidencias.
+                    </div>
+                  ) : (
+                    modalOptions.map((u) => {
+                      const selected = u.id === opModal.selectedUserId;
+                      return (
+                        <button
+                          key={u.id}
+                          onClick={() =>
+                            setOpModal((s) => ({ ...s, selectedUserId: u.id }))
+                          }
+                          className={`w-full text-left px-3 py-2 border-b last:border-b-0 ${
+                            selected ? 'bg-blue-100' : 'hover:bg-gray-50'
+                          }`}
+                        >
+                          {u.username}
+                        </button>
+                      );
+                    })
+                  )}
+                </div>
+
+                <div className="flex justify-end gap-3 mt-4">
+                  <CancelButton onClick={closeOperatorModal}>
+                    Cancelar
+                  </CancelButton>
+                  <ConfirmButton
+                    onClick={confirmOperatorModal}
+                    disabled={opModal.selectedUserId == null}
+                  >
+                    Guardar
+                  </ConfirmButton>
+                </div>
+              </ModalBox>
+            </ModalOverlay>
+          )}
 
           {workOrder?.status !== 'Cerrado' && (
             <>

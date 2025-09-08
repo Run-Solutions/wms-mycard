@@ -617,3 +617,26 @@ model LogAreaDataUpdate {
 
   @@map("area_update_logs")
 }
+
+model FlowAssigneeChangeLog {
+  id                      Int       @id @default(autoincrement())
+  flowId                  Int
+  workOrderId             Int
+  areaId                  Int
+  areaName                String
+
+  oldAssigneeId           Int?
+  oldAssigneeUsername     String?
+  newAssigneeId           Int
+  newAssigneeUsername     String
+
+  changedByUserId         Int
+  changedByUsername       String
+  note                    String?   // opcional: razón del cambio
+
+  changedAt               DateTime  @default(now())
+
+  @@index([workOrderId, areaId, changedAt])
+  @@index([flowId, changedAt])
+  @@map("flow_assignee_change_logs")
+}
