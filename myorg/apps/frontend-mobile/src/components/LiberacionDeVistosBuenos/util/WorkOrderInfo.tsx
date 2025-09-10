@@ -123,6 +123,8 @@ export default function WorkOrderInfo({ workOrder }: Props) {
 export function WorkOrderHojasInfo({ workOrder }: Props) {
   const cantidadHojasRaw = Number(workOrder?.workOrder.quantity) / 24;
   const cantidadHojas = cantidadHojasRaw > 0 ? Math.ceil(cantidadHojasRaw) : 0;
+  const totalSheetsEffective = workOrder?.workOrder?.total_sheets ?? cantidadHojas;
+  
   function getLabelByType(type: string) {
     switch (type) {
       case 'OT':
@@ -182,7 +184,7 @@ export function WorkOrderHojasInfo({ workOrder }: Props) {
             <InfoCard
               style={{ backgroundColor: "#93C5FD" }}
               label="Cantidad (Hojas Frente / Hojas Vuelta):"
-              value={cantidadHojas || 'No definida'}
+              value={String(totalSheetsEffective)}
             />
           </View>
         </View>

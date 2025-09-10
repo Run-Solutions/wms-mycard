@@ -2,13 +2,14 @@
 // permite crear nuevas ordenes de trabajo con form que incluye datos
 'use client';
 
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useMemo } from 'react';
 import styled, { useTheme } from 'styled-components';
 import IconButton from '@mui/material/IconButton';
 import DeleteIcon from '@mui/icons-material/Delete';
 import UploadFileIcon from '@mui/icons-material/UploadFile';
 import Typography from '@mui/material/Typography';
 import { getAreasOperator, createWorkOrder } from '@/api/ordenesDeTrabajo';
+import { toast } from 'react-toastify';
 
 const WorkOrdersPage: React.FC = () => {
   const theme = useTheme();
@@ -19,13 +20,16 @@ const WorkOrdersPage: React.FC = () => {
     mycard_id: '',
     quantity: '',
     comments: '',
+    quantity_contacts: '24',
+    tipoSeleccion: 1,
     areasOperatorIds: [] as string[],
     priority: false,
+    total_sheets: 0,
     files: [] as File[],
   });
   const [message, setMessage] = useState('');
   const [areasOperator, setAreasOperator] = useState<
-    { label: string; value: string }[]
+    { label: string; value: string; sheets: number }[]
   >([]);
   const [dropdownCount, setDropdownCount] = useState(4);
   const [files, setFiles] = useState<{
@@ -51,13 +55,82 @@ const WorkOrdersPage: React.FC = () => {
     }
     return true;
   };
+  const [totalSheets, setTotalSheets] = useState(0);
+
+  const totalSheetsAreas = useMemo(() => {
+    return formData.areasOperatorIds.reduce((acc: number, id: any) => {
+      const a = areasOperator.find((x: any) => String(x.value) === String(id));
+      return acc + (a?.sheets ?? 0);
+    }, 0);
+  }, [formData.areasOperatorIds, areasOperator]);
 
   // Para obtener las areas de operacion
+  // 1) Sólo al montar: cargar áreas y forzar value a string
   useEffect(() => {
     getAreasOperator()
-      .then(setAreasOperator)
+      .then((data) =>
+        setAreasOperator(
+          data.map((a: any) => ({
+            ...a,
+            value: String(a.value),
+            sheets: Number(a.sheets ?? a.sheets_count ?? 0), // 👈 fuerza número
+          }))
+        )
+      )
       .catch(() => alert('Error: No se pudieron cargar las áreas'));
   }, []);
+
+  // 2) Cálculo de totalSheets (sin llamadas al API)
+  useEffect(() => {
+    const quantity = Number(formData.quantity) || 0;
+    const contacts = Number(formData.quantity_contacts) || 0;
+
+    const hojasBase = contacts > 0 ? Math.ceil(quantity / contacts) : 0;
+    const extraEmpalme = formData.tipoSeleccion === 0 ? 26 : 0;
+    const merma = Math.ceil(hojasBase * 0.07);
+
+    const tsa = Number(totalSheetsAreas) || 0; // 👈 por si acaso
+    setTotalSheets(hojasBase + tsa + extraEmpalme + merma); // 👈 todo numérico
+  }, [
+    formData.quantity,
+    formData.quantity_contacts,
+    formData.tipoSeleccion,
+    totalSheetsAreas,
+  ]);
+
+  const askWithToast = () =>
+    new Promise<1 | 0>((resolve) => {
+      const id = toast(
+        ({ closeToast }) => (
+          <ChoiceBox>
+            <Sub>Elige una opción:</Sub>
+            <Actions>
+              <BtnEmpalme
+                onClick={() => {
+                  closeToast(); // ✅ usa el prop aquí
+                  resolve(1);
+                }}
+              >
+                Empalme
+              </BtnEmpalme>
+              <BtnCollector
+                onClick={() => {
+                  closeToast(); // ✅ usa el prop aquí
+                  resolve(0);
+                }}
+              >
+                Collector
+              </BtnCollector>
+            </Actions>
+          </ChoiceBox>
+        ),
+        {
+          autoClose: false,
+          closeOnClick: false,
+          position: 'top-center',
+        }
+      );
+    });
 
   const AREA_NAMES: Record<string, string> = {
     '1': 'Preprensa',
@@ -85,7 +158,7 @@ const WorkOrdersPage: React.FC = () => {
     '10': ['7', '10'], // después de Personalización → Color Edge o Personalización
   };
 
-  const handleChange = (
+  const handleChange = async (
     e: React.ChangeEvent<
       HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement
     >,
@@ -98,6 +171,7 @@ const WorkOrdersPage: React.FC = () => {
         ? (target as HTMLInputElement).checked
         : target.value;
 
+    let updated: any[] = [];
     if (areaIndex !== undefined) {
       // 1) El primer área SIEMPRE debe ser '1' (Preprensa)
       if (areaIndex === 0 && value !== '1' && value !== '') {
@@ -153,9 +227,14 @@ const WorkOrdersPage: React.FC = () => {
         }
       }
 
+      if (String(value) === '4') {
+        const tipo = await askWithToast();
+        setFormData((p) => ({ ...p, tipoSeleccion: tipo }));
+      }
+      console.log('area', areasOperator);
       // Actualiza y limpia en cascada lo que viene después para mantener la secuencia válida
       setFormData((prev) => {
-        const updated = [...(prev.areasOperatorIds || [])];
+        updated = [...(prev.areasOperatorIds || [])];
         updated[areaIndex] = value as string;
         for (let i = areaIndex + 1; i < updated.length; i++) updated[i] = '';
         return { ...prev, areasOperatorIds: updated };
@@ -211,6 +290,7 @@ const WorkOrdersPage: React.FC = () => {
 
     setFiles((prev) => ({ ...prev, [type]: file }));
   };
+
   const handleExtraFilesChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const picked = Array.from(e.target.files || []);
     if (picked.length === 0) return;
@@ -255,14 +335,10 @@ const WorkOrdersPage: React.FC = () => {
   // Para el envío de la informacion
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-
-    // Archivos obligatorios
     if (!files.ot || !files.sku || !files.op) {
       alert('Todos los archivos (OT, SKU, OP) son obligatorios.');
       return;
     }
-
-    // Campos obligatorios
     if (
       !formData.ot_id.trim() ||
       !formData.mycard_id.trim() ||
@@ -299,8 +375,6 @@ const WorkOrdersPage: React.FC = () => {
       );
       return;
     }
-
-    // Normalizar áreas
     const cleanedAreasOperatorIds = formData.areasOperatorIds.filter(
       (id) => id !== '' && id !== undefined && id !== null
     );
@@ -308,7 +382,8 @@ const WorkOrdersPage: React.FC = () => {
     const payload = {
       ...formData,
       areasOperatorIds: cleanedAreasOperatorIds,
-      files: extraFiles, // opcional si lo usas en el body JSON además de FormData
+      files: extraFiles,
+      total_sheets: totalSheets,
     };
 
     try {
@@ -316,23 +391,23 @@ const WorkOrdersPage: React.FC = () => {
         ot: files.ot!,
         sku: files.sku!,
         op: files.op!,
-        attachments: extraFiles, // << enviar adjuntos adicionales
+        attachments: extraFiles,
       });
-
       setMessage(result.message || 'Orden de trabajo creada correctamente');
-
       // Reseteamos
       setFormData({
         ot_id: '',
         mycard_id: '',
         quantity: '',
         comments: '',
+        quantity_contacts: '',
+        tipoSeleccion: 1,
         areasOperatorIds: [],
         priority: false,
+        total_sheets: 0,
         files: [],
       });
       setFiles({ ot: null, sku: null, op: null });
-      setExtraFiles([]); // << limpiar adjuntos adicionales
       setDropdownCount(4);
     } catch (error: any) {
       console.error(error);
@@ -340,9 +415,6 @@ const WorkOrdersPage: React.FC = () => {
       alert('La OT es duplicada');
     }
   };
-  const cantidadHojas: number =
-    Math.ceil(parseInt(formData.quantity) / 24) || 0;
-
   return (
     <PageContainer>
       <TitleWrapper>
@@ -385,9 +457,20 @@ const WorkOrdersPage: React.FC = () => {
             <Label>Cantidad (Hojas Frente / Hojas Vuelta):</Label>
             <Input
               type="number"
-              name="quantity"
-              value={cantidadHojas}
+              name="total_sheets"
+              value={totalSheets}
               readOnly
+            />
+          </Auxiliar>
+          <Auxiliar>
+            <Label>Cantidad de Contactos:</Label>
+            <Input
+              style={{ width: '80%' }}
+              type="number"
+              name="quantity_contacts"
+              value={formData.quantity_contacts}
+              onChange={handleChange}
+              required
             />
           </Auxiliar>
         </DataWrapper>
@@ -423,7 +506,7 @@ const WorkOrdersPage: React.FC = () => {
                             <option value="">Selecciona un área</option>
                             {getAvailableAreas(index).map((area) => (
                               <option key={area.value} value={area.value}>
-                                {area.label}
+                                {`${area.label}`}
                               </option>
                             ))}
                           </Select>
@@ -512,7 +595,7 @@ const WorkOrdersPage: React.FC = () => {
                     (files.sku ? 1 : 0) +
                     (files.op ? 1 : 0) +
                     extraFiles.length >=
-                    MAX_TOTAL_FILES
+                  MAX_TOTAL_FILES
                 }
               />
               <IconButton color="primary" component="span">
@@ -524,7 +607,6 @@ const WorkOrdersPage: React.FC = () => {
                   : `${extraFiles.length} archivo(s) añadidos`}
               </Typography>
             </label>
-
             {/* Lista (solo una vez) */}
             {extraFiles.length > 0 && (
               <div
@@ -567,14 +649,13 @@ const WorkOrdersPage: React.FC = () => {
                 ))}
               </div>
             )}
-
             {/* Ayuda de límite (solo una vez) */}
             <Typography
               variant="caption"
               style={{ marginTop: '6px', color: '#555' }}
             >
-              Límite total por orden: {MAX_TOTAL_FILES} archivos (incluye OT, SKU,
-              OP).
+              Límite total por orden: {MAX_TOTAL_FILES} archivos (incluye OT,
+              SKU, OP).
             </Typography>
           </Auxiliar>
 
@@ -705,7 +786,6 @@ const WorkOrdersPage: React.FC = () => {
               />
             </CheckboxWrapper>
           </Auxiliar>
-          <Auxiliar></Auxiliar>
         </OperationWrapper>
         <Button type="submit">Crear Orden</Button>
       </FormWrapper>
@@ -773,7 +853,7 @@ const TextArea = styled.textarea`
 const DataWrapper = styled.div`
   display: flex;
   flex-direction: row;
-  gap: 3rem;
+  gap: 5rem;
   margin: 0 auto;
 `;
 
@@ -894,3 +974,44 @@ const Message = styled.p`
 const HiddenInput = styled('input')({
   display: 'none',
 });
+
+const ChoiceBox = styled.div`
+  display: flex;
+  flex-direction: column;
+  gap: 12px; /* más espacio interno */
+  min-width: 300px; /* ancho cómodo */
+`;
+
+const Sub = styled.div`
+  color: #6b7280;
+`;
+
+const Actions = styled.div`
+  display: flex;
+  gap: 10px; /* espacio entre botones */
+  justify-content: flex-end;
+`;
+
+const Btn = styled.button`
+  border: none;
+  padding: 7px 11px; /* botones más grandes */
+  border-radius: 10px;
+  font-weight: 600;
+  cursor: pointer;
+`;
+
+const BtnEmpalme = styled(Btn)`
+  background: #0038a8; /* azul */
+  color: #fff;
+  &:hover {
+    filter: brightness(0.95);
+  }
+`;
+
+const BtnCollector = styled(Btn)`
+  background: #e5e7eb; /* gris claro */
+  color: #111827;
+  &:hover {
+    filter: brightness(0.95);
+  }
+`;

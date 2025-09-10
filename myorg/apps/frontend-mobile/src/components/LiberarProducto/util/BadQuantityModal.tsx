@@ -9,17 +9,22 @@ import {
   StyleSheet,
   ScrollView,
 } from 'react-native';
-import { AreaData } from '../../../app/protected/seguimientoDeOts/[id]/page';
+export type AreaForBadQty = {
+  id: number;
+  name: string;
+  malas: number;
+  defectuoso: number;
+};
 
 interface Props {
   visible: boolean;
-  areas: AreaData[];
+  areas: AreaForBadQty[];
   areaBadQuantities: { [key: string]: string };
   setAreaBadQuantities: React.Dispatch<
     React.SetStateAction<{ [key: string]: string }>
   >;
   onConfirm: (params: {
-    updatedAreas: AreaData[];
+    updatedAreas: AreaForBadQty[];
     totalBad: number;
     totalMaterial: number;
     lastAreaBad: number;

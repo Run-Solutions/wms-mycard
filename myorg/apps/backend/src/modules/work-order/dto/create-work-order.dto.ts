@@ -1,43 +1,57 @@
-import { IsInt, IsNumber, IsNotEmpty, IsString, IsArray, IsOptional, ValidateNested } from "class-validator";
+import {
+  IsInt,
+  IsNumber,
+  IsNotEmpty,
+  IsString,
+  IsArray,
+  IsOptional,
+  ValidateNested,
+} from 'class-validator';
 import { Type } from 'class-transformer';
 
 export class CreateWorkOrderDto {
-    @IsString()
-    @IsNotEmpty()
-    ot_id: string;
+  @IsString()
+  @IsNotEmpty()
+  ot_id: string;
 
-    @IsString()
-    @IsNotEmpty()
-    mycard_id: string;
+  @IsString()
+  @IsNotEmpty()
+  mycard_id: string;
 
-    @IsOptional() // Hacemos que el comentario sea opcional
-    @IsString()
-    comments?: string;
+  @IsOptional() // Hacemos que el comentario sea opcional
+  @IsString()
+  comments?: string;
 
-    @IsString()
-    @IsNotEmpty()
-    status: string;
+  @IsString()
+  @IsNotEmpty()
+  status: string;
 
-    @IsString()
-    @IsNotEmpty()
-    priority: string;
+  @IsString()
+  @IsNotEmpty()
+  priority: string;
 
-    @IsInt()
-    quantity: number;
+  @IsInt()
+  quantity: number;
 
-    @IsInt()
-    created_by: number;
+  @IsInt()
+  total_sheets: number;
 
-    @IsArray()
-    @IsInt({ each: true })
-    areasOperatorIds: number[];
+  @IsInt()
+  quantity_contacts: number;
+
+  @IsInt()
+  created_by: number;
+
+  @IsArray()
+  @IsInt({ each: true })
+  areasOperatorIds: number[];
 }
 
 export class SampleDataDto {
   @IsOptional()
   @IsNumber()
   sample_quantity?: number;
-  
+
   @IsOptional()
   @IsNumber()
   sample_auditory?: number;
@@ -62,9 +76,28 @@ export class UpdateAreaDataDto {
   sample_data: SampleDataDto;
 }
 
-  export class UpdateWorkOrderAreasDto {
-    @IsArray()
-    @ValidateNested({ each: true })
-    @Type(() => UpdateAreaDataDto)
-    areas: UpdateAreaDataDto[];
-  }
+export class UpdateWorkOrderAreasDto {
+  @IsArray()
+  @ValidateNested({ each: true })
+  @Type(() => UpdateAreaDataDto)
+  areas: UpdateAreaDataDto[];
+}
+export class UpdateFlowUserDto {
+  @Type(() => Number)
+  @IsInt()
+  flowId!: number;
+
+  @Type(() => Number)
+  @IsInt()
+  userId!: number;
+}
+
+export class UpdateFlowPartialUserDto {
+  @Type(() => Number)
+  @IsInt()
+  partialId!: number;
+
+  @Type(() => Number)
+  @IsInt()
+  userId!: number;
+}

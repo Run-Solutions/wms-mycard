@@ -22,6 +22,7 @@ export default function WorkOrderInfo({
 }: Props) {
   const cantidadHojasRaw = Number(workOrder?.workOrder.quantity) / 24;
   const cantidadHojas = cantidadHojasRaw > 0 ? Math.ceil(cantidadHojasRaw) : 0;
+  const totalSheetsEffective = workOrder?.workOrder?.total_sheets ?? cantidadHojas;
 
   function getLabelByType(type: string) {
     switch (type) {
@@ -83,7 +84,7 @@ export default function WorkOrderInfo({
             <InfoCard
               style={{ backgroundColor: "#93C5FD" }}
               label="Cantidad (Hojas Frente / Hojas Vuelta):"
-              value={cantidadHojas}
+              value={String(totalSheetsEffective)}
             />
           </View>
         </View>
@@ -148,6 +149,7 @@ export function WorkOrderHojasInfo({
 }: Props) {
   const cantidadHojasRaw = Number(workOrder?.workOrder.quantity) / 24;
   const cantidadHojas = cantidadHojasRaw > 0 ? Math.ceil(cantidadHojasRaw) : 0;
+  const totalSheetsEffective = workOrder?.workOrder?.total_sheets ?? cantidadHojas;
 
   function getLabelByType(type: string) {
     switch (type) {
@@ -209,7 +211,7 @@ export function WorkOrderHojasInfo({
             <InfoCard
               style={{ backgroundColor: "#93C5FD" }}
               label="Cantidad (Hojas Frente / Hojas Vuelta):"
-              value={cantidadHojas}
+              value={String(totalSheetsEffective)}
             />
           </View>
         </View>
@@ -268,6 +270,7 @@ export function WorkOrderPrePressInfo({
 }: Props) {
   const cantidadHojasRaw = Number(workOrder?.workOrder.quantity) / 24;
   const cantidadHojas = cantidadHojasRaw > 0 ? Math.ceil(cantidadHojasRaw) : 0;
+  const totalSheetsEffective = workOrder?.workOrder?.total_sheets ?? cantidadHojas;
 
   function getLabelByType(type: string) {
     switch (type) {
@@ -329,7 +332,7 @@ export function WorkOrderPrePressInfo({
             <InfoCard
               style={{ backgroundColor: "#93C5FD" }}
               label="Cantidad (Hojas Frente / Hojas Vuelta):"
-              value={cantidadHojas}
+              value={String(totalSheetsEffective)}
             />
           </View>
         </View>

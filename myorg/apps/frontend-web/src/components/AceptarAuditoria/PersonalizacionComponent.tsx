@@ -10,15 +10,7 @@ import {
 import BadQuantityModal from './util/BadQuantityModal';
 import { AreaData } from '../LiberarProducto/PersonalizacionComponent';
 import WorkOrderInfo from './util/WorkOrderInfo';
-
-// Define un tipo para los valores del formulario
-type PersonalizacionData = {
-  good_quantity: number | string;
-  bad_quantity: number | string;
-  excess_quantity: number | string;
-  cqm_quantity: string;
-  comments: string;
-};
+import { AfterCorteData } from './CorteComponent';
 
 interface Props {
   workOrder: any;
@@ -52,10 +44,11 @@ export default function PersonalizacionComponentAcceptAuditory({
 
   if (workOrder.area_id >= 2) {
     // Estados tipados para los valores predeterminados y actuales
-    const [defaultValues, setDefaultValues] = useState<PersonalizacionData>({
-      good_quantity: 0,
-      bad_quantity: 0,
-      excess_quantity: 0,
+    const [defaultValues, setDefaultValues] = useState<AfterCorteData>({
+      good_quantity: '',
+      bad_quantity: '',
+      excess_quantity: '',
+      noprocess_quantity: '',
       cqm_quantity: '',
       comments: '',
     });
@@ -77,10 +70,11 @@ export default function PersonalizacionComponentAcceptAuditory({
 
       if (personalizacion && partials.length === 0) {
         // Caso original: hay empalme pero no hay parciales
-        const vals: PersonalizacionData = {
+        const vals: AfterCorteData = {
           good_quantity: personalizacion.good_quantity || '',
           bad_quantity: personalizacion.bad_quantity || '',
           excess_quantity: personalizacion.excess_quantity || '',
+          noprocess_quantity: personalizacion.noprocess_quantity || '',
           cqm_quantity: cqm_quantity || '',
           comments: personalizacion.comments || '',
         };
@@ -99,16 +93,23 @@ export default function PersonalizacionComponentAcceptAuditory({
           (acc: any, curr: any) => acc + (curr.excess_quantity || 0),
           0
         );
+        const totalParcialesnopro = partials.reduce(
+          (acc: any, curr: any) => acc + (curr.noprocess_quantity || 0),
+          0
+        );
         const restante = (personalizacion.good_quantity || 0) - totalParciales;
         const restantebad =
           (personalizacion.bad_quantity || 0) - totalParcialesbad;
         const restanteexc =
           (personalizacion.excess_quantity || 0) - totalParcialesexec;
+        const restantenopro =
+          (personalizacion.noprocess_quantity || 0) - totalParcialesnopro;
 
-        const vals: PersonalizacionData = {
+        const vals: AfterCorteData = {
           good_quantity: restante > 0 ? restante : 0,
           bad_quantity: restantebad > 0 ? restantebad : 0,
           excess_quantity: restanteexc > 0 ? restanteexc : 0,
+          noprocess_quantity: restantenopro > 0 ? restantenopro : 0,
           cqm_quantity: cqm_quantity || '',
           comments: personalizacion.comments || '',
         };
@@ -117,10 +118,11 @@ export default function PersonalizacionComponentAcceptAuditory({
         // Caso original: se busca el primer parcial sin validar
         const firstUnvalidatedPartial = partials.find((p: any) => !p.validated);
 
-        const vals: PersonalizacionData = {
+        const vals: AfterCorteData = {
           good_quantity: firstUnvalidatedPartial.quantity || '',
           bad_quantity: firstUnvalidatedPartial.bad_quantity || '',
           excess_quantity: firstUnvalidatedPartial.excess_quantity || '',
+          noprocess_quantity: firstUnvalidatedPartial.noprocess_quantity || '',
           cqm_quantity: cqm_quantity || '',
           comments: firstUnvalidatedPartial.observation || '',
         };
@@ -319,8 +321,8 @@ export default function PersonalizacionComponentAcceptAuditory({
     return (
       <Container>
         <Title>Área: {workOrder?.area.name || 'No definida'}</Title>
-        <WorkOrderInfo workOrder={workOrder}/>
-      
+        <WorkOrderInfo workOrder={workOrder} />
+
         <NewData>
           <SectionTitle>Datos de Producción</SectionTitle>
           <NewDataWrapper>
@@ -345,6 +347,13 @@ export default function PersonalizacionComponentAcceptAuditory({
                 type="number"
                 name="excess_quantity"
                 value={defaultValues.excess_quantity}
+                disabled
+              />
+              <Label>Sin procesar:</Label>
+              <Input
+                type="number"
+                name="excess_quantity"
+                value={defaultValues.noprocess_quantity}
                 disabled
               />
               <Label>Muestras en CQM:</Label>

@@ -154,6 +154,8 @@ export default function CloseWorkOrderAuxPage({ params }: Props) {
       })) || [];
   const cantidadHojasRaw = Number(workOrder?.workOrder.quantity) / 24;
   const cantidadHojas = cantidadHojasRaw > 0 ? Math.ceil(cantidadHojasRaw) : 0;
+  const totalSheetsEffective = workOrder?.workOrder?.total_sheets ?? cantidadHojas;
+  
   const ultimaArea = areas[areas.length - 1];
   const totalMalas = areas.reduce((acc, area) => acc + (area.malas || 0), 0);
   const totalCqm = areas
@@ -252,7 +254,7 @@ export default function CloseWorkOrderAuxPage({ params }: Props) {
                 Cantidad (Hojas Frente / Hojas Vuelta)
               </p>
               <p className="text-xl font-semibold text-black">
-                {cantidadHojas}
+                {totalSheetsEffective}
               </p>
             </CardContent>
           </Card>

@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect, useRef } from 'react';
 import {
   View,
   Text,
@@ -38,6 +38,7 @@ const MillingChipComponent = ({ workOrder }: { workOrder: any }) => {
   const [goodQuantity, setGoodQuantity] = useState('');
   const [badQuantity, setBadQuantity] = useState('');
   const [excessQuantity, setExcessQuantity] = useState('');
+  const [noProcessQuantity, setNoProcessQuantity] = useState('');
   const [comments, setComments] = useState('');
   const [showCqmModal, setShowCqmModal] = useState(false);
   const [showConfirm, setShowConfirm] = useState(false);
@@ -115,9 +116,6 @@ const MillingChipComponent = ({ workOrder }: { workOrder: any }) => {
     currentIndex !== -1 && currentIndex < flowList.length - 1
       ? flowList[currentIndex + 1]
       : null;
-  console.log('El flujo actual (currentFlow)', currentFlow);
-  console.log('El siguiente flujo (nextFlow)', nextFlow);
-  console.log('Ultimo parcial o completado', lastCompletedOrPartial);
   const cantidadporliberar = calcularCantidadPorLiberar(
     currentFlow,
     lastCompletedOrPartial
@@ -281,6 +279,30 @@ const MillingChipComponent = ({ workOrder }: { workOrder: any }) => {
     }
   };
 
+  const warned = useRef(false);
+  const loggedOnce = useRef(false);
+  // 👇 Logs SOLO una vez
+  useEffect(() => {
+    if (loggedOnce.current) return; // evita duplicado del StrictMode
+    console.log('workOrder', workOrder);
+    console.log('currentFlow', currentFlow);
+    console.log('nextFlow', nextFlow);
+    console.log('lastCompletedOrPartial', lastCompletedOrPartial);
+    loggedOnce.current = true;
+  }, [workOrder, currentFlow, nextFlow, lastCompletedOrPartial]);
+  useEffect(() => {
+    if (!currentFlow && !warned.current) {
+      alert('No tienes una orden activa para esta área.');
+      warned.current = true;
+      // opcional: router.push('/liberarProducto');
+    }
+  }, [currentFlow]);
+
+  // 👇 En el render ya no hay alert ni logs
+  if (!currentFlow) {
+    return null; // o mostrar un <p>No tienes una orden activa</p>
+  }
+
   const liberarProducto = async () => {
     const numValue = Number(goodQuantity);
     if (isNaN(numValue) || !Number.isInteger(numValue) || numValue <= 0) {
@@ -296,6 +318,7 @@ const MillingChipComponent = ({ workOrder }: { workOrder: any }) => {
       badQuantity: Number(lastAreaBadQuantity),
       materialBadQuantity: Number(materialBadQuantity),
       excessQuantity: Number(excessQuantity),
+      noProcessQuantity: Number(noProcessQuantity),
       comments,
       formAnswerId: currentFlow.answers?.[0]?.id,
     };
@@ -402,8 +425,7 @@ const MillingChipComponent = ({ workOrder }: { workOrder: any }) => {
     muestras: 0,
   }));
 
-  const handleSaveChanges = async (updatedAreas: AreaData[]) => {
-    const effectiveAreas = updatedAreas ?? previousFlows;
+  const handleSaveChanges = async () => {
     const payload = {
       areas: previousFlows.flatMap((flow) => {
         const areaKey = flow.area.name.toLowerCase().replace(/\s/g, '');
@@ -546,7 +568,11 @@ const MillingChipComponent = ({ workOrder }: { workOrder: any }) => {
   return (
     <ScrollView style={styles.container}>
       <Text style={styles.title}>Área: Milling Chip</Text>
-      <WorkOrderInfo workOrder={workOrder} lastCompletedOrPartial={lastCompletedOrPartial} cantidadporliberar={cantidadporliberar} />
+      <WorkOrderInfo
+        workOrder={workOrder}
+        lastCompletedOrPartial={lastCompletedOrPartial}
+        cantidadporliberar={cantidadporliberar}
+      />
 
       <Text style={styles.label}>Cantidad a liberar</Text>
       <Text style={styles.label}>Buenas:</Text>
@@ -577,6 +603,17 @@ const MillingChipComponent = ({ workOrder }: { workOrder: any }) => {
           pointerEvents="none" // evita que se abra el teclado
         />
       </TouchableOpacity>
+      <Text style={styles.label}>Sin procesar:</Text>
+      <TextInput
+        style={styles.input}
+        theme={{ roundness: 30 }}
+        mode="outlined"
+        activeOutlineColor="#000"
+        keyboardType="numeric"
+        placeholder="Ej: 100"
+        value={noProcessQuantity}
+        onChangeText={setNoProcessQuantity}
+      />
       <Text style={styles.label}>Excedente:</Text>
       <TextInput
         style={styles.input}
@@ -632,19 +669,9 @@ const MillingChipComponent = ({ workOrder }: { workOrder: any }) => {
         areas={normalizedAreas}
         areaBadQuantities={areaBadQuantities}
         setAreaBadQuantities={setAreaBadQuantities}
-        onConfirm={({
-          updatedAreas,
-          totalBad,
-          totalMaterial,
-          lastAreaBad,
-          lastAreaMaterial,
-        }) => {
+        onConfirm={({ totalBad, totalMaterial, lastAreaBad }) => {
           setShowBadQuantity(false);
-
-          // Guarda lo necesario
-          handleSaveChanges(updatedAreas);
-
-          // Actualiza variables como antes
+          handleSaveChanges(); // ✅ sin arg
           setBadQuantity(String(totalBad));
           setMaterialBadQuantity(String(totalMaterial));
           setLastBadQuantity(String(lastAreaBad));

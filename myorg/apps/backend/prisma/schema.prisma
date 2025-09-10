@@ -99,6 +99,7 @@ model Role {
 model AreasOperator {
   id                    Int                 @id @default(autoincrement())
   name                  String              @unique
+  sheets                Int?
 
   users                 User[]              //Relacion con User si aplica 
   workOrderFlows        WorkOrderFlow[]     //Relacion con flujo de OTs
@@ -145,11 +146,13 @@ model WorkOrder {
   ot_id                 String              @unique
   mycard_id             String
   quantity              Int                 // Estado general de la OT
+  quantity_contacts     Int?
   created_by            Int                 // Usuario que creó la OT
   comments              String?
   closed_by             Int?                // Usuario que cerró la OT
   status                String?
   priority              Boolean             @default(false)
+  total_sheets          Int?
   
   user                  User                @relation("UserWorkOrders", fields: [created_by], references: [id])
   user_closed           User?               @relation("UserWorkOrdersClosed", fields: [closed_by], references: [id])
@@ -160,7 +163,7 @@ model WorkOrder {
 
   createdAt             DateTime            @default(now()) @map("created_at")
   updatedAt             DateTime            @updatedAt @map("updated_at")
-
+  
   @@map("work_orders")
 }
 
@@ -210,6 +213,7 @@ model PartialRelease {
   test_type              String?
   bad_quantity           Int?               
   excess_quantity        Int?
+  noprocess_quantity     Int?
   material_quantity      Int?
 
   observation            String?
@@ -353,6 +357,7 @@ model CorteResponse {
   good_quantity          Int      
   bad_quantity           Int      
   excess_quantity        Int   
+  noprocess_quantity     Int?   
   material_quantity      Int?   
   
   comments               String?                  // Comentarios opcionales
@@ -374,7 +379,8 @@ model ColorEdgeResponse {
   id                     Int                      @id @default(autoincrement())
   good_quantity          Int      
   bad_quantity           Int      
-  excess_quantity        Int     
+  excess_quantity        Int   
+  noprocess_quantity     Int?   
   material_quantity      Int?    
   
   comments               String?                  // Comentarios opcionales
@@ -396,7 +402,8 @@ model HotStampingResponse {
   id                     Int                      @id @default(autoincrement())
   good_quantity          Int      
   bad_quantity           Int      
-  excess_quantity        Int     
+  excess_quantity        Int
+  noprocess_quantity     Int?      
   material_quantity      Int?    
   
   comments               String?                  // Comentarios opcionales
@@ -418,7 +425,8 @@ model MillingChipResponse {
   id                     Int                       @id @default(autoincrement())
   good_quantity          Int      
   bad_quantity           Int      
-  excess_quantity        Int      
+  excess_quantity        Int  
+  noprocess_quantity     Int?     
   material_quantity      Int?   
   
   comments               String?                    // Comentarios opcionales
@@ -440,7 +448,8 @@ model PersonalizacionResponse {
   id                     Int                         @id @default(autoincrement())
   good_quantity          Int      
   bad_quantity           Int      
-  excess_quantity        Int      
+  excess_quantity        Int   
+  noprocess_quantity     Int?    
   material_quantity      Int?   
   
   comments               String?                      // Comentarios opcionales
@@ -616,4 +625,27 @@ model LogAreaDataUpdate {
   user            User      @relation(fields: [user_id], references: [id])
 
   @@map("area_update_logs")
+}
+
+model FlowAssigneeChangeLog {
+  id                      Int       @id @default(autoincrement())
+  flowId                  Int
+  workOrderId             Int
+  areaId                  Int
+  areaName                String
+
+  oldAssigneeId           Int?
+  oldAssigneeUsername     String?
+  newAssigneeId           Int
+  newAssigneeUsername     String
+
+  changedByUserId         Int
+  changedByUsername       String
+  note                    String?   // opcional: razón del cambio
+
+  changedAt               DateTime  @default(now())
+
+  @@index([workOrderId, areaId, changedAt])
+  @@index([flowId, changedAt])
+  @@map("flow_assignee_change_logs")
 }

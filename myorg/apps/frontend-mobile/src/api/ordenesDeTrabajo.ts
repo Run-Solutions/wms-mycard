@@ -16,6 +16,7 @@ export const getAreasOperator = async () => {
     .map((item: any) => ({
       label: item.name,
       value: String(item.id),
+      sheets: item.sheets,
     }))
     .sort(
       (a: { value: string }, b: { value: string }) =>
@@ -64,7 +65,9 @@ export const createWorkOrder = async (
   formDataToSend.append('quantity', formData.quantity);
   formDataToSend.append('comments', formData.comments ?? '');
   formDataToSend.append('priority', String(formData.priority));
-
+  formDataToSend.append('total_sheets', formData.total_sheets);
+  formDataToSend.append('quantity_contacts', formData.quantity_contacts);
+  
   const response = await API.post('/work-orders', formDataToSend, {
     headers: {
       Authorization: `Bearer ${token}`,

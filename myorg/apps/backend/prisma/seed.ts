@@ -7,22 +7,22 @@ async function main() {
 
   // 🔹 Seed para AreasOperator
   const areas = [
-    { id: 1, name: "preprensa" },
-    { id: 2, name: "impresion" },
-    { id: 3, name: "serigrafia" },
-    { id: 4, name: "empalme" },
-    { id: 5, name: "laminacion" },
-    { id: 6, name: "corte" },
-    { id: 7, name: "color edge" },
-    { id: 8, name: "hot stamping" },
-    { id: 9, name: "milling chip" },
-    { id: 10, name: "personalizacion" },
+    { id: 1, name: "preprensa", sheets: 0 },
+    { id: 2, name: "impresion", sheets: 50 },
+    { id: 3, name: "serigrafia", sheets: 20 },
+    { id: 4, name: "empalme", sheets: 4 },
+    { id: 5, name: "laminacion", sheets: 8},
+    { id: 6, name: "corte", sheets: 8 },
+    { id: 7, name: "color edge", sheets: 0 },
+    { id: 8, name: "hot stamping", sheets: 2 },
+    { id: 9, name: "milling chip", sheets: 2 },
+    { id: 10, name: "personalizacion", sheets: 1 },
   ];
   
   for (const area of areas) {
     await prisma.areasOperator.upsert({
       where: { id: area.id },
-      update: {}, // o podrías usar `update: { name: area.name }` si quieres actualizar el nombre si cambia
+      update: { sheets: area.sheets}, // o podrías usar `update: { name: area.name }` si quieres actualizar el nombre si cambia
       create: area,
     });
   }
@@ -79,13 +79,10 @@ async function main() {
   
   for (const perm of permissions) {
     await prisma.modulePermission.upsert({
-      where: { id: perm.id },
-      update: {
-        role_id: perm.role_id,
-        module_id: perm.module_id,
-        enabled: perm.enabled,
-      },
-      create: perm,
+      // usa la clave compuesta generada por Prisma a partir de @@unique([module_id, role_id])
+      where: { module_id_role_id: { module_id: perm.module_id, role_id: perm.role_id } },
+      update: { enabled: perm.enabled },
+      create: { module_id: perm.module_id, role_id: perm.role_id, enabled: perm.enabled },
     });
   }
   

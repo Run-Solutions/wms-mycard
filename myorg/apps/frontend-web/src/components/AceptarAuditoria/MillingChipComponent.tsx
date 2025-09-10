@@ -8,15 +8,7 @@ import {
   registrarInconformidadAuditory,
 } from '@/api/aceptarAuditoria';
 import WorkOrderInfo from './util/WorkOrderInfo';
-
-// Define un tipo para los valores del formulario
-type MillingChipData = {
-  good_quantity: number | string;
-  bad_quantity: number | string;
-  excess_quantity: number | string;
-  cqm_quantity: string;
-  comments: string;
-};
+import { AfterCorteData } from './CorteComponent';
 
 interface Props {
   workOrder: any;
@@ -51,10 +43,11 @@ export default function MillingChipComponentAcceptAuditory({
 
   if (workOrder.area_id >= 2) {
     // Estados tipados para los valores predeterminados y actuales
-    const [defaultValues, setDefaultValues] = useState<MillingChipData>({
-      good_quantity: 0,
-      bad_quantity: 0,
-      excess_quantity: 0,
+    const [defaultValues, setDefaultValues] = useState<AfterCorteData>({
+      good_quantity: '',
+      bad_quantity: '',
+      excess_quantity: '',
+      noprocess_quantity: '',
       cqm_quantity: '',
       comments: '',
     });
@@ -76,10 +69,11 @@ export default function MillingChipComponentAcceptAuditory({
 
       if (millingChip && partials.length === 0) {
         // Caso original: hay empalme pero no hay parciales
-        const vals: MillingChipData = {
+        const vals: AfterCorteData = {
           good_quantity: millingChip.good_quantity || '',
           bad_quantity: millingChip.bad_quantity || '',
           excess_quantity: millingChip.excess_quantity || '',
+          noprocess_quantity: millingChip.noprocess_quantity || '',
           cqm_quantity: cqm_quantity || '',
           comments: millingChip.comments || '',
         };
@@ -98,15 +92,22 @@ export default function MillingChipComponentAcceptAuditory({
           (acc: any, curr: any) => acc + (curr.excess_quantity || 0),
           0
         );
+        const totalParcialesnopro = partials.reduce(
+          (acc: any, curr: any) => acc + (curr.noprocess_quantity || 0),
+          0
+        );
         const restante = (millingChip.good_quantity || 0) - totalParciales;
         const restantebad = (millingChip.bad_quantity || 0) - totalParcialesbad;
         const restanteexc =
           (millingChip.excess_quantity || 0) - totalParcialesexec;
+        const restantenopro =
+          (millingChip.noprocess_quantity || 0) - totalParcialesnopro;
 
-        const vals: MillingChipData = {
+        const vals: AfterCorteData = {
           good_quantity: restante > 0 ? restante : 0,
           bad_quantity: restantebad > 0 ? restantebad : 0,
           excess_quantity: restanteexc > 0 ? restanteexc : 0,
+          noprocess_quantity: restantenopro > 0 ? restantenopro : 0,
           cqm_quantity: cqm_quantity || '',
           comments: millingChip.comments || '',
         };
@@ -115,10 +116,11 @@ export default function MillingChipComponentAcceptAuditory({
         // Caso original: se busca el primer parcial sin validar
         const firstUnvalidatedPartial = partials.find((p: any) => !p.validated);
 
-        const vals: MillingChipData = {
+        const vals: AfterCorteData = {
           good_quantity: firstUnvalidatedPartial.quantity || '',
           bad_quantity: firstUnvalidatedPartial.bad_quantity || '',
           excess_quantity: firstUnvalidatedPartial.excess_quantity || '',
+          noprocess_quantity: firstUnvalidatedPartial.noprocess_quantity || '',
           cqm_quantity: cqm_quantity || '',
           comments: firstUnvalidatedPartial.observation || '',
         };
@@ -288,7 +290,7 @@ export default function MillingChipComponentAcceptAuditory({
     return (
       <Container>
         <Title>Área: {workOrder?.area.name || 'No definida'}</Title>
-        <WorkOrderInfo workOrder={workOrder}/>
+        <WorkOrderInfo workOrder={workOrder} />
         <NewData>
           <SectionTitle>Datos de Producción</SectionTitle>
           <NewDataWrapper>
@@ -313,6 +315,13 @@ export default function MillingChipComponentAcceptAuditory({
                 type="number"
                 name="excess_quantity"
                 value={defaultValues.excess_quantity}
+                disabled
+              />
+              <Label>Sin procesar:</Label>
+              <Input
+                type="number"
+                name="excess_quantity"
+                value={defaultValues.noprocess_quantity}
                 disabled
               />
               <Label>Muestras en CQM:</Label>
@@ -350,7 +359,7 @@ export default function MillingChipComponentAcceptAuditory({
                 const areaKey = flow.area.name.toLowerCase(); // para coincidir con las claves
                 return (
                   <div
-                  key={`${flow.id}-${index}`}
+                    key={`${flow.id}-${index}`}
                     style={{
                       display: 'flex',
                       flexDirection: 'column',

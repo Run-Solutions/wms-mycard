@@ -17,6 +17,7 @@ interface WorkOrder {
   ot_id: string;
   mycard_id: string;
   quantity: number;
+  total_sheets: number;
   status: string;
   validated: boolean;
   createdAt: string;

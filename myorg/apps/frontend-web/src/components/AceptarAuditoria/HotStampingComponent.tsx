@@ -8,15 +8,7 @@ import {
   registrarInconformidadAuditory,
 } from '@/api/aceptarAuditoria';
 import WorkOrderInfo from './util/WorkOrderInfo';
-
-// Define un tipo para los valores del formulario
-type HotStampingData = {
-  good_quantity: number | string;
-  bad_quantity: number | string;
-  excess_quantity: number | string;
-  cqm_quantity: string;
-  comments: string;
-};
+import { AfterCorteData } from './CorteComponent';
 
 interface Props {
   workOrder: any;
@@ -51,10 +43,11 @@ export default function HotStampingComponentAcceptAuditory({
 
   if (workOrder.area_id >= 2) {
     // Estados tipados para los valores predeterminados y actuales
-    const [defaultValues, setDefaultValues] = useState<HotStampingData>({
+    const [defaultValues, setDefaultValues] = useState<AfterCorteData>({
       good_quantity: 0,
       bad_quantity: 0,
       excess_quantity: 0,
+      noprocess_quantity: '',
       cqm_quantity: '',
       comments: '',
     });
@@ -76,10 +69,11 @@ export default function HotStampingComponentAcceptAuditory({
 
       if (hotStamping && partials.length === 0) {
         // Caso original: hay empalme pero no hay parciales
-        const vals: HotStampingData = {
+        const vals: AfterCorteData = {
           good_quantity: hotStamping.good_quantity || '',
           bad_quantity: hotStamping.bad_quantity || '',
           excess_quantity: hotStamping.excess_quantity || '',
+          noprocess_quantity: hotStamping.noprocess_quantity || '',
           cqm_quantity: cqm_quantity || '',
           comments: hotStamping.comments || '',
         };
@@ -98,15 +92,21 @@ export default function HotStampingComponentAcceptAuditory({
           (acc: any, curr: any) => acc + (curr.excess_quantity || 0),
           0
         );
+        const totalParcialesnopro = partials.reduce(
+          (acc: any, curr: any) => acc + (curr.noprocess_quantity || 0),
+          0
+        );
         const restante = (hotStamping.good_quantity || 0) - totalParciales;
         const restantebad = (hotStamping.bad_quantity || 0) - totalParcialesbad;
         const restanteexc =
           (hotStamping.excess_quantity || 0) - totalParcialesexec;
-
-        const vals: HotStampingData = {
+        const restantenopro =
+          (hotStamping.noprocess_quantity || 0) - totalParcialesnopro;
+        const vals: AfterCorteData = {
           good_quantity: restante > 0 ? restante : 0,
           bad_quantity: restantebad > 0 ? restantebad : 0,
           excess_quantity: restanteexc > 0 ? restanteexc : 0,
+          noprocess_quantity: restantenopro > 0 ? restantenopro : 0,
           cqm_quantity: cqm_quantity || '',
           comments: hotStamping.comments || '',
         };
@@ -115,10 +115,11 @@ export default function HotStampingComponentAcceptAuditory({
         // Caso original: se busca el primer parcial sin validar
         const firstUnvalidatedPartial = partials.find((p: any) => !p.validated);
 
-        const vals: HotStampingData = {
+        const vals: AfterCorteData = {
           good_quantity: firstUnvalidatedPartial.quantity || '',
           bad_quantity: firstUnvalidatedPartial.bad_quantity || '',
           excess_quantity: firstUnvalidatedPartial.excess_quantity || '',
+          noprocess_quantity: firstUnvalidatedPartial.noprocess_quantity || '',
           cqm_quantity: cqm_quantity || '',
           comments: firstUnvalidatedPartial.observation || '',
         };
@@ -306,6 +307,13 @@ export default function HotStampingComponentAcceptAuditory({
                 type="number"
                 name="excess_quantity"
                 value={defaultValues.excess_quantity}
+                disabled
+              />
+              <Label>Sin procesar:</Label>
+              <Input
+                type="number"
+                name="excess_quantity"
+                value={defaultValues.noprocess_quantity}
                 disabled
               />
               <Label>Muestras en CQM:</Label>

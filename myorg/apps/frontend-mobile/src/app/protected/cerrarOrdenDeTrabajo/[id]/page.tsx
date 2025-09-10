@@ -163,6 +163,7 @@ const CerrarOrdenDeTrabajoAuxScreen: React.FC = () => {
 
   const cantidadHojasRaw = Number(workOrder?.quantity) / 24;
   const cantidadHojas = cantidadHojasRaw > 0 ? Math.ceil(cantidadHojasRaw) : 0;
+  const totalSheetsEffective = workOrder?.total_sheets ?? cantidadHojas;
   const ultimaArea = areas[areas.length - 1];
   const totalMalas = areas.reduce(
     (acc: any, area: any) => acc + (area.malas || 0),
@@ -254,7 +255,7 @@ const CerrarOrdenDeTrabajoAuxScreen: React.FC = () => {
         <InfoCard
           style={{ backgroundColor: '#93C5FD' }}
           label="Cantidad (Hojas Frente / Hojas Vuelta)"
-          value={String(cantidadHojas ?? '')}
+          value={String(totalSheetsEffective)}
         />
         <InfoCard
           label="Fecha de Creación"

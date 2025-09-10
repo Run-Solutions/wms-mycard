@@ -1,15 +1,22 @@
 // myorg/apps/frontend-web/src/api/seguimientoDeOts.ts
-import API from "./http";
+import API from './http';
 
+export type UpdateFlowUserPayload = {
+  userId: number;
+  note?: string;
+};
 export const fetchWorkOrdersInProgress = async () => {
   const token = await localStorage.getItem('token');
   if (!token) throw new Error('Token no encontrado');
 
-  const response = await API.get('/work-orders/in-progress?statuses=En%20proceso', {
-    headers: {
-      Authorization: `Bearer ${token}`,
-    },
-  });
+  const response = await API.get(
+    '/work-orders/in-progress?statuses=En%20proceso',
+    {
+      headers: {
+        Authorization: `Bearer ${token}`,
+      },
+    }
+  );
 
   return response.data;
 };
@@ -30,6 +37,49 @@ export const fetchWorkOrderById = async (id: number | string) => {
   return response.data;
 };
 
+export const fetchAllUsers = async () => {
+  const token = await localStorage.getItem('token');
+  if (!token) throw new Error('Token no encontrado');
+
+  console.log('Buscando usuarios:');
+
+  const response = await API.get(`/work-orders/users`, {
+    headers: {
+      Authorization: `Bearer ${token}`,
+    },
+  });
+
+  console.log('Respuesta del servidor:', response.data);
+  return response.data;
+};
+
+export const updateFlowAssignedUser = async (
+  flowId: number,
+  userId: number,
+  note?: string
+) => {
+  const token = localStorage.getItem('token');
+  if (!token) throw new Error('Token no encontrado');
+
+  try {
+    const { data } = await API.post(
+      `/work-orders/${flowId}/assign`,
+      { userId, note } as UpdateFlowUserPayload,
+      {
+        headers: { Authorization: `Bearer ${token}` },
+      }
+    );
+    return data; // debería ser el flow actualizado que devuelve tu servicio
+  } catch (err: any) {
+    // Propaga un error legible
+    const msg =
+      err?.response?.data?.message ??
+      err?.message ??
+      'Error al actualizar encargado';
+    throw new Error(msg);
+  }
+};
+
 export const closeWorkOrder = async (ot_id: string) => {
   const token = await localStorage.getItem('token');
   if (!token) throw new Error('Token no encontrado');
@@ -48,13 +98,15 @@ export const closeWorkOrder = async (ot_id: string) => {
 
 export const getFileByName = async (filename: string) => {
   try {
-    const response = await API.get(`free-order-flow/file/${filename}`, {responseType: 'arraybuffer'})
+    const response = await API.get(`free-order-flow/file/${filename}`, {
+      responseType: 'arraybuffer',
+    });
     if (response.status === 200) {
-      return response.data
+      return response.data;
     }
-    throw new Error('Error al obtener el archivo')
+    throw new Error('Error al obtener el archivo');
   } catch (error) {
-    throw error
+    throw error;
   }
 };
 

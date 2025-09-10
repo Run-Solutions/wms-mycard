@@ -1,13 +1,13 @@
 // myorg/apps/frontend-web/src/components/AceptarAuditoria/util/BadQuantityModal.tsx
 import React from 'react';
-import { AreaData } from '@/app/(protected)/seguimientoDeOts/[id]/page';
+import { AreaForBadQty } from '@/components/LiberarProducto/util/BadQuantityModal';
 
 interface Props {
-  areas: AreaData[];
+  areas: AreaForBadQty[];
   areaBadQuantities: { [key: string]: string };
   setAreaBadQuantities: React.Dispatch<React.SetStateAction<{ [key: string]: string }>>;
   onConfirm: (params: {
-    updatedAreas: AreaData[];
+    updatedAreas: AreaForBadQty[];      // ✅ shape mínimo
     totalBad: number;
     totalMaterial: number;
     lastAreaBad: number;

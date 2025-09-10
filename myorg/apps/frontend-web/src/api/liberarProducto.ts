@@ -202,6 +202,7 @@ interface ReleasePayloadForAuditory {
   badQuantity: number;
   materialBadQuantity: number;
   excessQuantity: number;
+  noProcessQuantity: number;
   comments: string;
   formAnswerId?: number;
 }

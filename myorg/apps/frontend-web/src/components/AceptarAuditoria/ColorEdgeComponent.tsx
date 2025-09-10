@@ -8,15 +8,7 @@ import {
   registrarInconformidadAuditory,
 } from '@/api/aceptarAuditoria';
 import WorkOrderInfo from './util/WorkOrderInfo';
-
-// Define un tipo para los valores del formulario
-type ColorEdgeData = {
-  good_quantity: number | string;
-  bad_quantity: number | string;
-  excess_quantity: number | string;
-  cqm_quantity: string;
-  comments: string;
-};
+import { AfterCorteData } from './CorteComponent';
 
 interface Props {
   workOrder: any;
@@ -26,6 +18,7 @@ type PartialRelease = {
   quantity: string;
   bad_quantity: string;
   excess_quantity: string;
+  noprocess_quantity: string;
   observation: string;
   validated: boolean;
 };
@@ -48,10 +41,11 @@ export default function ColorEdgeComponentAcceptAuditory({ workOrder }: Props) {
 
   if (workOrder.area_id >= 2) {
     // Estados tipados para los valores predeterminados y actuales
-    const [defaultValues, setDefaultValues] = useState<ColorEdgeData>({
+    const [defaultValues, setDefaultValues] = useState<AfterCorteData>({
       good_quantity: '',
       bad_quantity: '',
       excess_quantity: '',
+      noprocess_quantity: '',
       cqm_quantity: '',
       comments: '',
     });
@@ -73,10 +67,11 @@ export default function ColorEdgeComponentAcceptAuditory({ workOrder }: Props) {
 
       if (colorEdge && partials.length === 0) {
         // Caso original: hay empalme pero no hay parciales
-        const vals: ColorEdgeData = {
+        const vals: AfterCorteData = {
           good_quantity: colorEdge.good_quantity || '',
           bad_quantity: colorEdge.bad_quantity || '',
           excess_quantity: colorEdge.excess_quantity || '',
+          noprocess_quantity: colorEdge.noprocess_quantity || '',
           cqm_quantity: cqm_quantity || '',
           comments: colorEdge.comments || '',
         };
@@ -95,15 +90,22 @@ export default function ColorEdgeComponentAcceptAuditory({ workOrder }: Props) {
           (acc: any, curr: any) => acc + (curr.excess_quantity || 0),
           0
         );
+        const totalParcialesnopro = partials.reduce(
+          (acc: any, curr: any) => acc + (curr.noprocess_quantity || 0),
+          0
+        );
         const restante = (colorEdge.good_quantity || 0) - totalParciales;
         const restantebad = (colorEdge.bad_quantity || 0) - totalParcialesbad;
         const restanteexc =
           (colorEdge.excess_quantity || 0) - totalParcialesexec;
+        const restantenopro =
+          (colorEdge.noprocess_quantity || 0) - totalParcialesnopro;
 
-        const vals: ColorEdgeData = {
+        const vals: AfterCorteData = {
           good_quantity: restante > 0 ? restante : 0,
           bad_quantity: restantebad > 0 ? restantebad : 0,
           excess_quantity: restanteexc > 0 ? restanteexc : 0,
+          noprocess_quantity: restantenopro > 0 ? restantenopro : 0,
           cqm_quantity: cqm_quantity || '',
           comments: colorEdge.comments || '',
         };
@@ -112,10 +114,11 @@ export default function ColorEdgeComponentAcceptAuditory({ workOrder }: Props) {
         // Caso original: se busca el primer parcial sin validar
         const firstUnvalidatedPartial = partials.find((p: any) => !p.validated);
 
-        const vals: ColorEdgeData = {
+        const vals: AfterCorteData = {
           good_quantity: firstUnvalidatedPartial.quantity || '',
           bad_quantity: firstUnvalidatedPartial.bad_quantity || '',
           excess_quantity: firstUnvalidatedPartial.excess_quantity || '',
+          noprocess_quantity: firstUnvalidatedPartial.noprocess_quantity || '',
           cqm_quantity: cqm_quantity || '',
           comments: firstUnvalidatedPartial.observation || '',
         };
@@ -293,6 +296,13 @@ export default function ColorEdgeComponentAcceptAuditory({ workOrder }: Props) {
                 type="number"
                 name="excess_quantity"
                 value={defaultValues.excess_quantity}
+                disabled
+              />
+              <Label>Sin procesar:</Label>
+              <Input
+                type="number"
+                name="excess_quantity"
+                value={defaultValues.noprocess_quantity}
                 disabled
               />
               <Label>Muestras en CQM:</Label>
