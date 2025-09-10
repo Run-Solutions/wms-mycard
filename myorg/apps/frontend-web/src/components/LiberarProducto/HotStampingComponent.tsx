@@ -1,7 +1,7 @@
 'use client';
 
 import { useRouter } from 'next/navigation';
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect, useRef } from 'react';
 import styled from 'styled-components';
 import {
   submitToCQMHotStamping,
@@ -40,12 +40,10 @@ export default function HotStampingComponent({ workOrder }: Props) {
   const closeModal = () => {
     setShowModal(false);
   };
-  console.log('El mismo workOrder (workOrder)', workOrder);
-  const flowList = [...workOrder.workOrder.flow];
-
   const { user } = useAuthContext();
   const currentUserId = user?.id;
 
+  const flowList = [...workOrder.workOrder.flow];
   const currentFlow = workOrder.workOrder.flow.find(
     (f: any) =>
       f.area_id === workOrder.area.id &&
@@ -62,10 +60,6 @@ export default function HotStampingComponent({ workOrder }: Props) {
       f.user?.id === currentUserId
   );
 
-  if (!currentFlow) {
-    alert('No tienes una orden activa para esta área.');
-    return;
-  }
   const allParcialsValidated = currentFlow.partialReleases?.every(
     (r: PartialRelease) => r.validated
   );
@@ -81,9 +75,6 @@ export default function HotStampingComponent({ workOrder }: Props) {
     currentIndex !== -1 && currentIndex < flowList.length - 1
       ? flowList[currentIndex + 1]
       : null;
-  console.log('El flujo actual (currentFlow)', currentFlow);
-  console.log('El siguiente flujo (nextFlow)', nextFlow);
-  console.log('Ultimo parcial o completado', lastCompletedOrPartial);
   const cantidadporliberar = calcularCantidadPorLiberar(
     currentFlow,
     lastCompletedOrPartial
@@ -218,9 +209,10 @@ export default function HotStampingComponent({ workOrder }: Props) {
   const [goodQuantity, setGoodQuantity] = useState<number | string>('');
   const [badQuantity, setBadQuantity] = useState<number | string>('');
   const [excessQuantity, setExcessQuantity] = useState<number | string>('');
-  // Para controlar qué preguntas están marcadas
-  const [checkedQuestions, setCheckedQuestions] = useState<number[]>([]);
-  // Función para manejar el cambio en el campo de muestras y color edge
+  const [noProcessQuantity, setNoProcessQuantity] = useState<number | string>(
+    ''
+  );
+
   const handleSampleQuantityChange = (
     e: React.ChangeEvent<HTMLInputElement>
   ) => {
@@ -321,6 +313,30 @@ export default function HotStampingComponent({ workOrder }: Props) {
   };
   console.log('Revisar posición:', revisarPosicion);
   console.log('Imagen holograma:', imagenHolograma);
+
+  const warned = useRef(false);
+  const loggedOnce = useRef(false);
+  // 👇 Logs SOLO una vez
+  useEffect(() => {
+    if (loggedOnce.current) return; // evita duplicado del StrictMode
+    console.log('workOrder', workOrder);
+    console.log('currentFlow', currentFlow);
+    console.log('nextFlow', nextFlow);
+    console.log('lastCompletedOrPartial', lastCompletedOrPartial);
+    loggedOnce.current = true;
+  }, [workOrder, currentFlow, nextFlow, lastCompletedOrPartial]);
+  useEffect(() => {
+    if (!currentFlow && !warned.current) {
+      alert('No tienes una orden activa para esta área.');
+      warned.current = true;
+      // opcional: router.push('/liberarProducto');
+    }
+  }, [currentFlow]);
+
+  // 👇 En el render ya no hay alert ni logs
+  if (!currentFlow) {
+    return null; // o mostrar un <p>No tienes una orden activa</p>
+  }
   const handleSubmit = async () => {
     const flowId = currentFlow.id;
     const numValue = Number(sampleQuantity);
@@ -401,6 +417,7 @@ export default function HotStampingComponent({ workOrder }: Props) {
       badQuantity: Number(lastAreaBadQuantity),
       materialBadQuantity: Number(materialBadQuantity),
       excessQuantity: Number(excessQuantity),
+      noProcessQuantity: Number(noProcessQuantity),
       comments: document.querySelector('textarea')?.value || '',
       formAnswerId: currentFlow.answers[0].id,
     };
@@ -501,8 +518,7 @@ export default function HotStampingComponent({ workOrder }: Props) {
     muestras: 0,
   }));
 
-  const handleSaveChanges = async (updatedAreas: AreaData[]) => {
-    const effectiveAreas = updatedAreas ?? previousFlows;
+  const handleSaveChanges = async () => {
     const payload = {
       areas: previousFlows.flatMap((flow) => {
         const areaKey = flow.area.name.toLowerCase().replace(/\s/g, '');
@@ -635,6 +651,15 @@ export default function HotStampingComponent({ workOrder }: Props) {
                 onClick={handleOpenBadQuantityModal}
                 readOnly
               />
+              <Label>Sin procesar:</Label>
+              <Input
+                type="number"
+                min="0"
+                placeholder="Ej: 2"
+                value={noProcessQuantity}
+                onChange={(e) => setNoProcessQuantity(e.target.value)}
+                disabled={isDisabled}
+              />
               <Label>Excedente:</Label>
               <Input
                 type="number"
@@ -677,18 +702,12 @@ export default function HotStampingComponent({ workOrder }: Props) {
           areaBadQuantities={areaBadQuantities}
           setAreaBadQuantities={setAreaBadQuantities}
           onConfirm={({
-            updatedAreas,
             totalBad,
             totalMaterial,
             lastAreaBad,
-            lastAreaMaterial,
           }) => {
             setShowBadQuantity(false);
-
-            // Guarda lo necesario
-            handleSaveChanges(updatedAreas);
-
-            // Actualiza variables como antes
+            handleSaveChanges(); // ✅ sin arg
             setBadQuantity(String(totalBad));
             setMaterialBadQuantity(String(totalMaterial));
             setLastBadQuantity(String(lastAreaBad));

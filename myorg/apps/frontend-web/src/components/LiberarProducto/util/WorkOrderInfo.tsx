@@ -6,7 +6,7 @@ import { getFileByName } from '@/api/seguimientoDeOts';
 interface Props {
   workOrder: any;
   lastCompletedOrPartial?: any;
-  cantidadporliberar?: any
+  cantidadporliberar?: any;
 }
 interface PartialRelease {
   validated: boolean;
@@ -16,7 +16,7 @@ interface PartialRelease {
 export default function WorkOrderInfo({
   workOrder,
   lastCompletedOrPartial,
-  cantidadporliberar
+  cantidadporliberar,
 }: Props) {
   const guessMimeFromName = (filename: string): string => {
     const ext = filename.split('.').pop()?.toLowerCase();
@@ -151,13 +151,17 @@ export default function WorkOrderInfo({
           </CardContent>
         </Card>
         {workOrder?.partialReleases?.length > 0 && (
-            <Card>
-              <CardContent>
-              <p className="text-sm text-muted-foreground text-black">Cantidad por Liberar:</p>
-              <p className="text-xl font-semibold text-black">{cantidadporliberar}</p>
-              </CardContent>
-            </Card>
-          )}
+          <Card>
+            <CardContent>
+              <p className="text-sm text-muted-foreground text-black">
+                Cantidad por Liberar:
+              </p>
+              <p className="text-xl font-semibold text-black">
+                {cantidadporliberar}
+              </p>
+            </CardContent>
+          </Card>
+        )}
       </div>
 
       {/* Comentarios y Archivos */}
@@ -221,11 +225,11 @@ export default function WorkOrderInfo({
 export function WorkOrderHojasInfo({
   workOrder,
   lastCompletedOrPartial,
-  cantidadporliberar
+  cantidadporliberar,
 }: Props) {
   const cantidadHojasRaw = Number(workOrder?.workOrder.quantity) / 24;
   const cantidadHojas = cantidadHojasRaw > 0 ? Math.ceil(cantidadHojasRaw) : 0;
-
+  const totalSheetsEffective = workOrder?.workOrder?.total_sheets ?? cantidadHojas;
 
   const guessMimeFromName = (filename: string): string => {
     const ext = filename.split('.').pop()?.toLowerCase();
@@ -282,7 +286,7 @@ export function WorkOrderHojasInfo({
           </CardContent>
         </Card>
         <Card>
-          <CardContent className=''>
+          <CardContent className="">
             <p className="text-sm text-muted-foreground text-black">
               Cantidad (Tarjetas)
             </p>
@@ -296,10 +300,11 @@ export function WorkOrderHojasInfo({
             <p className="text-sm text-muted-foreground text-black">
               Cantidad (Hojas Frente / Hojas Vuelta):
             </p>
-            <p className="text-xl font-semibold text-black">{cantidadHojas}</p>
+            <p className="text-xl font-semibold text-black">
+              {totalSheetsEffective}
+            </p>
           </CardContent>
         </Card>
-
       </div>
 
       {/* Comentarios y Archivos */}
@@ -381,13 +386,17 @@ export function WorkOrderHojasInfo({
           </CardContent>
         </Card>
         {workOrder?.partialReleases?.length > 0 && (
-            <Card>
-              <CardContent>
-              <p className="text-sm text-muted-foreground text-black">Cantidad por Liberar:</p>
-              <p className="text-xl font-semibold text-black">{cantidadporliberar}</p>
-              </CardContent>
-            </Card>
-          )}
+          <Card>
+            <CardContent>
+              <p className="text-sm text-muted-foreground text-black">
+                Cantidad por Liberar:
+              </p>
+              <p className="text-xl font-semibold text-black">
+                {cantidadporliberar}
+              </p>
+            </CardContent>
+          </Card>
+        )}
       </div>
       <div className="grid grid-cols-1 md:grid-cols-1 gap-4 mb-6">
         <Card>
@@ -446,11 +455,10 @@ export function WorkOrderHojasInfo({
   );
 }
 
-export function WorkOrderPrePressInfo({
-  workOrder,
-}: Props) {
+export function WorkOrderPrePressInfo({ workOrder }: Props) {
   const cantidadHojasRaw = Number(workOrder?.workOrder.quantity) / 24;
   const cantidadHojas = cantidadHojasRaw > 0 ? Math.ceil(cantidadHojasRaw) : 0;
+  const totalSheetsEffective = workOrder?.workOrder?.total_sheets ?? cantidadHojas;
 
   const guessMimeFromName = (filename: string): string => {
     const ext = filename.split('.').pop()?.toLowerCase();
@@ -521,7 +529,9 @@ export function WorkOrderPrePressInfo({
             <p className="text-sm text-muted-foreground text-black">
               Cantidad (Hojas Frente / Hojas Vuelta):
             </p>
-            <p className="text-xl font-semibold text-black">{cantidadHojas}</p>
+            <p className="text-xl font-semibold text-black">
+              {totalSheetsEffective}
+            </p>
           </CardContent>
         </Card>
       </div>

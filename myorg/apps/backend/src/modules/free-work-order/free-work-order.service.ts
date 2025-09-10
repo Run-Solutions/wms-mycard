@@ -1248,6 +1248,10 @@ export class FreeWorkOrderService {
         (sum, p) => sum + (p.excess_quantity ?? 0),
         0,
       );
+      const totalNoProcessPrevio = partials.reduce(
+        (sum, p) => sum + (p.noprocess_quantity ?? 0),
+        0,
+      );
       const totalMaterialPrevio = partials.reduce(
         (sum, p) => sum + (p.material_quantity ?? 0),
         0,
@@ -1255,6 +1259,7 @@ export class FreeWorkOrderService {
       // 3. Calcular nuevos totales
       const totalLiberadoActual = totalLiberadoPrevio + dto.goodQuantity;
       const totalBadActual = totalBadPrevio + dto.badQuantity;
+      const totalNoProcessActual = totalNoProcessPrevio + dto.noProcessQuantity;
       const totalExcessActual = totalExcessPrevio + dto.excessQuantity;
       const totalMaterialActual = totalMaterialPrevio + dto.materialBadQuantity;
       // 4. Si NO se alcanza la cantidad solicitada => solo crear liberación parcial
@@ -1265,6 +1270,7 @@ export class FreeWorkOrderService {
             quantity: dto.goodQuantity,
             bad_quantity: dto.badQuantity,
             excess_quantity: dto.excessQuantity,
+            noprocess_quantity: dto.noProcessQuantity,
             material_quantity: dto.materialBadQuantity,
             observation: dto.comments,
             user_id: dto.assignedUser
@@ -1316,6 +1322,7 @@ export class FreeWorkOrderService {
           good_quantity: totalLiberadoActual,
           bad_quantity: totalBadActual,
           excess_quantity: totalExcessActual,
+          noprocess_quantity: totalNoProcessActual,
           material_quantity: totalMaterialActual,
           comments: dto.comments,
           form_answer_id: dto.formAnswerId,
@@ -1462,6 +1469,10 @@ export class FreeWorkOrderService {
         (sum, p) => sum + (p.excess_quantity ?? 0),
         0,
       );
+      const totalNoProcessPrevio = partials.reduce(
+        (sum, p) => sum + (p.noprocess_quantity ?? 0),
+        0,
+      );
       const totalMaterialPrevio = partials.reduce(
         (sum, p) => sum + (p.material_quantity ?? 0),
         0,
@@ -1469,6 +1480,7 @@ export class FreeWorkOrderService {
       // 3. Calcular nuevos totales
       const totalLiberadoActual = totalLiberadoPrevio + dto.goodQuantity;
       const totalBadActual = totalBadPrevio + dto.badQuantity;
+      const totalNoProcessActual = totalNoProcessPrevio + dto.noProcessQuantity;
       const totalExcessActual = totalExcessPrevio + dto.excessQuantity;
       const totalMaterialActual = totalMaterialPrevio + dto.materialBadQuantity;
       // 4. Si NO se alcanza la cantidad solicitada => solo crear liberación parcial
@@ -1479,6 +1491,7 @@ export class FreeWorkOrderService {
             quantity: dto.goodQuantity,
             bad_quantity: dto.badQuantity,
             excess_quantity: dto.excessQuantity,
+            noprocess_quantity: dto.noProcessQuantity,
             material_quantity: dto.materialBadQuantity,
             observation: dto.comments,
             user_id: dto.assignedUser
@@ -1530,6 +1543,7 @@ export class FreeWorkOrderService {
           good_quantity: totalLiberadoActual,
           bad_quantity: totalBadActual,
           excess_quantity: totalExcessActual,
+          noprocess_quantity: totalNoProcessActual,
           material_quantity: totalMaterialActual,
           comments: dto.comments,
           form_answer_id: dto.formAnswerId,
@@ -1573,6 +1587,10 @@ export class FreeWorkOrderService {
         (sum, p) => sum + (p.excess_quantity ?? 0),
         0,
       );
+      const totalNoProcessPrevio = partials.reduce(
+        (sum, p) => sum + (p.noprocess_quantity ?? 0),
+        0,
+      );
       const totalMaterialPrevio = partials.reduce(
         (sum, p) => sum + (p.material_quantity ?? 0),
         0,
@@ -1581,6 +1599,7 @@ export class FreeWorkOrderService {
       const totalLiberadoActual = totalLiberadoPrevio + dto.goodQuantity;
       const totalBadActual = totalBadPrevio + dto.badQuantity;
       const totalExcessActual = totalExcessPrevio + dto.excessQuantity;
+      const totalNoProcessActual = totalNoProcessPrevio + dto.noProcessQuantity;
       const totalMaterialActual = totalMaterialPrevio + dto.materialBadQuantity;
       // 4. Si NO se alcanza la cantidad solicitada => solo crear liberación parcial
       if (totalLiberadoActual < workOrder.quantity) {
@@ -1590,6 +1609,7 @@ export class FreeWorkOrderService {
             quantity: dto.goodQuantity,
             bad_quantity: dto.badQuantity,
             excess_quantity: dto.excessQuantity,
+            noprocess_quantity: dto.noProcessQuantity,
             material_quantity: dto.materialBadQuantity,
             observation: dto.comments,
             user_id: dto.assignedUser
@@ -1641,6 +1661,7 @@ export class FreeWorkOrderService {
           good_quantity: totalLiberadoActual,
           bad_quantity: totalBadActual,
           excess_quantity: totalExcessActual,
+          noprocess_quantity: totalNoProcessActual,
           material_quantity: totalMaterialActual,
           comments: dto.comments,
           form_answer_id: dto.formAnswerId,
@@ -1684,6 +1705,10 @@ export class FreeWorkOrderService {
         (sum, p) => sum + (p.excess_quantity ?? 0),
         0,
       );
+      const totalNoProcessPrevio = partials.reduce(
+        (sum, p) => sum + (p.noprocess_quantity ?? 0),
+        0,
+      );
       const totalMaterialPrevio = partials.reduce(
         (sum, p) => sum + (p.material_quantity ?? 0),
         0,
@@ -1692,6 +1717,7 @@ export class FreeWorkOrderService {
       const totalLiberadoActual = totalLiberadoPrevio + dto.goodQuantity;
       const totalBadActual = totalBadPrevio + dto.badQuantity;
       const totalExcessActual = totalExcessPrevio + dto.excessQuantity;
+      const totalNoProcessActual = totalNoProcessPrevio + dto.noProcessQuantity;
       const totalMaterialActual = totalMaterialPrevio + dto.materialBadQuantity;
       // 4. Si NO se alcanza la cantidad solicitada => solo crear liberación parcial
       if (totalLiberadoActual < workOrder.quantity) {
@@ -1701,6 +1727,7 @@ export class FreeWorkOrderService {
             quantity: dto.goodQuantity,
             bad_quantity: dto.badQuantity,
             excess_quantity: dto.excessQuantity,
+            noprocess_quantity: dto.noProcessQuantity,
             material_quantity: dto.materialBadQuantity,
             observation: dto.comments,
             user_id: dto.assignedUser
@@ -1752,6 +1779,7 @@ export class FreeWorkOrderService {
           good_quantity: totalLiberadoActual,
           bad_quantity: totalBadActual,
           excess_quantity: totalExcessActual,
+          noprocess_quantity: totalNoProcessActual,
           material_quantity: totalMaterialActual,
           comments: dto.comments,
           form_answer_id: dto.formAnswerId,
@@ -1794,6 +1822,10 @@ export class FreeWorkOrderService {
         (sum, p) => sum + (p.excess_quantity ?? 0),
         0,
       );
+      const totalNoProcessPrevio = partials.reduce(
+        (sum, p) => sum + (p.noprocess_quantity ?? 0),
+        0,
+      );
       const totalMaterialPrevio = partials.reduce(
         (sum, p) => sum + (p.material_quantity ?? 0),
         0,
@@ -1801,6 +1833,7 @@ export class FreeWorkOrderService {
       // 3. Calcular nuevos totales
       const totalLiberadoActual = totalLiberadoPrevio + dto.goodQuantity;
       const totalBadActual = totalBadPrevio + dto.badQuantity;
+      const totalNoProcessActual = totalNoProcessPrevio + dto.noProcessQuantity;
       const totalExcessActual = totalExcessPrevio + dto.excessQuantity;
       const totalMaterialActual = totalMaterialPrevio + dto.materialBadQuantity;
       // 4. Si NO se alcanza la cantidad solicitada => solo crear liberación parcial
@@ -1811,6 +1844,7 @@ export class FreeWorkOrderService {
             quantity: dto.goodQuantity,
             bad_quantity: dto.badQuantity,
             excess_quantity: dto.excessQuantity,
+            noprocess_quantity: dto.noProcessQuantity,
             material_quantity: dto.materialBadQuantity,
             observation: dto.comments,
             user_id: dto.assignedUser
@@ -1862,6 +1896,7 @@ export class FreeWorkOrderService {
           good_quantity: totalLiberadoActual,
           bad_quantity: totalBadActual,
           excess_quantity: totalExcessActual,
+          noprocess_quantity: totalNoProcessActual,
           material_quantity: totalMaterialActual,
           comments: dto.comments,
           form_answer_id: dto.formAnswerId,

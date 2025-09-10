@@ -18,23 +18,7 @@ import {
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { RootStackParamList } from '../../navigation/types';
 import { TextInput } from 'react-native-paper';
-
-type PersonalizacionData = {
-  good_quantity: number;
-  bad_quantity: number;
-  excess_quantity: number;
-  cqm_quantity: string;
-  comments: string;
-};
-
-type PartialRelease = {
-  area: string;
-  quantity: string;
-  bad_quantity: string;
-  excess_quantity: string;
-  observation: string;
-  validated: boolean;
-};
+import { AfterCorteData } from './CorteComponents';
 
 const PersonalizacionComponentAcceptAuditory: React.FC<{ workOrder: any }> = ({
   workOrder,
@@ -45,10 +29,11 @@ const PersonalizacionComponentAcceptAuditory: React.FC<{ workOrder: any }> = ({
   const [showInconformidad, setShowInconformidad] = useState(false);
   const [inconformidad, setInconformidad] = useState('');
   const [sampleAuditory, setSampleAuditory] = useState('');
-  const [defaultValues, setDefaultValues] = useState({
+  const [defaultValues, setDefaultValues] = useState<AfterCorteData>({
     good_quantity: 0,
     bad_quantity: 0,
     excess_quantity: 0,
+    noprocess_quantity: 0,
     cqm_quantity: '',
     comments: '',
   });
@@ -76,10 +61,11 @@ const PersonalizacionComponentAcceptAuditory: React.FC<{ workOrder: any }> = ({
 
     if (personalizacion && partials.length === 0) {
       // Caso original: hay empalme pero no hay parciales
-      const vals: PersonalizacionData = {
+      const vals: AfterCorteData = {
         good_quantity: personalizacion.good_quantity || '',
         bad_quantity: personalizacion.bad_quantity || '',
         excess_quantity: personalizacion.excess_quantity || '',
+        noprocess_quantity: personalizacion.noprocess_quantity || '',
         cqm_quantity: cqm_quantity || '',
         comments: personalizacion.comments || '',
       };
@@ -98,16 +84,23 @@ const PersonalizacionComponentAcceptAuditory: React.FC<{ workOrder: any }> = ({
         (acc: any, curr: any) => acc + (curr.excess_quantity || 0),
         0
       );
+      const totalParcialesnopro = partials.reduce(
+        (acc: any, curr: any) => acc + (curr.noprocess_quantity || 0),
+        0
+      );
       const restante = (personalizacion.good_quantity || 0) - totalParciales;
       const restantebad =
         (personalizacion.bad_quantity || 0) - totalParcialesbad;
       const restanteexc =
         (personalizacion.excess_quantity || 0) - totalParcialesexec;
+      const restantenopro =
+        (personalizacion.noprocess_quantity || 0) - totalParcialesnopro;
 
-      const vals: PersonalizacionData = {
+      const vals: AfterCorteData = {
         good_quantity: restante > 0 ? restante : 0,
         bad_quantity: restantebad > 0 ? restantebad : 0,
         excess_quantity: restanteexc > 0 ? restanteexc : 0,
+        noprocess_quantity: restantenopro > 0 ? restantenopro : 0,
         cqm_quantity: cqm_quantity || '',
         comments: personalizacion.comments || '',
       };
@@ -116,10 +109,11 @@ const PersonalizacionComponentAcceptAuditory: React.FC<{ workOrder: any }> = ({
       // Caso original: se busca el primer parcial sin validar
       const firstUnvalidatedPartial = partials.find((p: any) => !p.validated);
 
-      const vals: PersonalizacionData = {
+      const vals: AfterCorteData = {
         good_quantity: firstUnvalidatedPartial.quantity || '',
         bad_quantity: firstUnvalidatedPartial.bad_quantity || '',
         excess_quantity: firstUnvalidatedPartial.excess_quantity || '',
+        noprocess_quantity: firstUnvalidatedPartial.noprocess_quantity || '',
         cqm_quantity: cqm_quantity || '',
         comments: firstUnvalidatedPartial.observation || '',
       };
@@ -300,7 +294,6 @@ const PersonalizacionComponentAcceptAuditory: React.FC<{ workOrder: any }> = ({
 
   return (
     <ScrollView contentContainerStyle={styles.container}>
-
       <Text style={styles.subtitle}>Buenas:</Text>
       <TextInput
         style={styles.input}
@@ -332,6 +325,15 @@ const PersonalizacionComponentAcceptAuditory: React.FC<{ workOrder: any }> = ({
         style={styles.input}
         editable={false}
         value={String(defaultValues.excess_quantity)}
+        mode="outlined"
+        activeOutlineColor="#000"
+        theme={{ roundness: 30 }}
+      />
+      <Text style={styles.subtitle}>Sin procesar:</Text>
+      <TextInput
+        style={styles.input}
+        editable={false}
+        value={String(defaultValues.noprocess_quantity)}
         mode="outlined"
         activeOutlineColor="#000"
         theme={{ roundness: 30 }}

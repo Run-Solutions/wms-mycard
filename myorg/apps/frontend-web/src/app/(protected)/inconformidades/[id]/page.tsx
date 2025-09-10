@@ -52,6 +52,7 @@ export default function InconformidadesAuxPage({ params }: Props) {
 
   const cantidadHojasRaw = Number(workOrder?.quantity) / 24;
   const cantidadHojas = cantidadHojasRaw > 0 ? Math.ceil(cantidadHojasRaw) : 0;
+  const totalSheetsEffective = workOrder?.total_sheets ?? cantidadHojas;
 
   useEffect(() => {
     async function fetchWorkOrder() {
@@ -208,7 +209,7 @@ export default function InconformidadesAuxPage({ params }: Props) {
                 Cantidad (Hojas Frente / Hojas Vuelta)
               </p>
               <p className="text-xl font-semibold text-black">
-                {cantidadHojas}
+                {totalSheetsEffective}
               </p>
             </CardContent>
           </Card>

@@ -197,6 +197,7 @@ export function WorkOrderHojasInfo({
 }: Props) {
   const cantidadHojasRaw = Number(workOrder?.workOrder.quantity) / 24;
   const cantidadHojas = cantidadHojasRaw > 0 ? Math.ceil(cantidadHojasRaw) : 0;
+  const totalSheetsEffective = workOrder?.workOrder?.total_sheets ?? cantidadHojas;
 
   function getLabelByType(type: string) {
     switch (type) {
@@ -258,7 +259,7 @@ export function WorkOrderHojasInfo({
             <InfoCard
               style={{ backgroundColor: '#93C5FD' }}
               label="Cantidad (Hojas Frente / Hojas Vuelta):"
-              value={cantidadHojas}
+              value={String(totalSheetsEffective)}
             />
           </View>
         </View>
@@ -378,6 +379,7 @@ export function WorkOrderHojasInfo({
 export function WorkOrderPrePressInfo({ workOrder }: Props) {
   const cantidadHojasRaw = Number(workOrder?.workOrder.quantity) / 24;
   const cantidadHojas = cantidadHojasRaw > 0 ? Math.ceil(cantidadHojasRaw) : 0;
+  const totalSheetsEffective = workOrder?.workOrder?.total_sheets ?? cantidadHojas;
 
   function getLabelByType(type: string) {
     switch (type) {
@@ -439,7 +441,7 @@ export function WorkOrderPrePressInfo({ workOrder }: Props) {
             <InfoCard
               style={{ backgroundColor: '#93C5FD' }}
               label="Cantidad (Hojas Frente / Hojas Vuelta):"
-              value={cantidadHojas}
+              value={String(totalSheetsEffective)}
             />
           </View>
         </View>

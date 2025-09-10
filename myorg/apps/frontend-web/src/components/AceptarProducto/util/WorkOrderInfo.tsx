@@ -20,6 +20,7 @@ export default function WorkOrderInfo({
 }: Props) {
   const cantidadHojasRaw = Number(workOrder?.workOrder.quantity) / 24;
   const cantidadHojas = cantidadHojasRaw > 0 ? Math.ceil(cantidadHojasRaw) : 0;
+  const totalSheetsEffective = workOrder?.workOrder?.total_sheets ?? cantidadHojas;
   const guessMimeFromName = (filename: string): string => {
     const ext = filename.split('.').pop()?.toLowerCase();
     switch (ext) {
@@ -84,12 +85,14 @@ export default function WorkOrderInfo({
             </p>
           </CardContent>
         </Card>
-        <Card className='bg-blue-400'>
+        <Card className="bg-blue-400">
           <CardContent>
             <p className="text-sm text-muted-foreground text-black">
               Cantidad (Hojas Frente / Hojas Vuelta):
             </p>
-            <p className="text-xl font-semibold text-black">{cantidadHojas}</p>
+            <p className="text-xl font-semibold text-black">
+              {totalSheetsEffective}
+            </p>
           </CardContent>
         </Card>
       </div>
@@ -190,6 +193,7 @@ export function WorkOrderHojasInfo({
 }: Props) {
   const cantidadHojasRaw = Number(workOrder?.workOrder.quantity) / 24;
   const cantidadHojas = cantidadHojasRaw > 0 ? Math.ceil(cantidadHojasRaw) : 0;
+  const totalSheetsEffective = workOrder?.workOrder?.total_sheets ?? cantidadHojas;
 
   const guessMimeFromName = (filename: string): string => {
     const ext = filename.split('.').pop()?.toLowerCase();
@@ -256,11 +260,13 @@ export function WorkOrderHojasInfo({
           </CardContent>
         </Card>
         <Card className="bg-blue-400">
-          <CardContent >
+          <CardContent>
             <p className="text-sm text-muted-foreground text-black">
               Cantidad (Hojas Frente / Hojas Vuelta):
             </p>
-            <p className="text-xl font-semibold text-black">{cantidadHojas}</p>
+            <p className="text-xl font-semibold text-black">
+              {totalSheetsEffective}
+            </p>
           </CardContent>
         </Card>
       </div>
@@ -345,9 +351,13 @@ export function WorkOrderHojasInfo({
   );
 }
 
-export function WorkOrderPrePressInfo({ workOrder, lastCompletedOrPartial }: Props) {
+export function WorkOrderPrePressInfo({
+  workOrder,
+  lastCompletedOrPartial,
+}: Props) {
   const cantidadHojasRaw = Number(workOrder?.workOrder.quantity) / 24;
   const cantidadHojas = cantidadHojasRaw > 0 ? Math.ceil(cantidadHojasRaw) : 0;
+  const totalSheetsEffective = workOrder?.workOrder?.total_sheets ?? cantidadHojas;
   const guessMimeFromName = (filename: string): string => {
     const ext = filename.split('.').pop()?.toLowerCase();
     switch (ext) {
@@ -417,7 +427,9 @@ export function WorkOrderPrePressInfo({ workOrder, lastCompletedOrPartial }: Pro
             <p className="text-sm text-muted-foreground text-black">
               Cantidad (Hojas Frente / Hojas Vuelta):
             </p>
-            <p className="text-xl font-semibold text-black">{cantidadHojas}</p>
+            <p className="text-xl font-semibold text-black">
+              {totalSheetsEffective}
+            </p>
           </CardContent>
         </Card>
       </div>
@@ -435,9 +447,11 @@ export function WorkOrderPrePressInfo({ workOrder, lastCompletedOrPartial }: Pro
         <Card>
           <CardContent>
             <p className="text-sm text-muted-foreground text-black">
-            Usuario que lo envía:
+              Usuario que lo envía:
             </p>
-            <p className="text-xl font-semibold text-black">{lastCompletedOrPartial?.user.username || "No definida"}</p>
+            <p className="text-xl font-semibold text-black">
+              {lastCompletedOrPartial?.user.username || 'No definida'}
+            </p>
           </CardContent>
         </Card>
       </div>

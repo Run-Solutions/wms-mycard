@@ -18,26 +18,10 @@ import {
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { RootStackParamList } from '../../navigation/types';
 import { TextInput } from 'react-native-paper';
-
-type MillingChipData = {
-  good_quantity: number;
-  bad_quantity: number;
-  excess_quantity: number;
-  cqm_quantity: string;
-  comments: string;
-};
-
-type PartialRelease = {
-  area: string;
-  quantity: string;
-  bad_quantity: string;
-  excess_quantity: string;
-  observation: string;
-  validated: boolean;
-};
+import { AfterCorteData } from './CorteComponents';
 
 const MillingChipComponentAcceptAuditory: React.FC<{ workOrder: any }> = ({
-  workOrder
+  workOrder,
 }) => {
   const navigation =
     useNavigation<NativeStackNavigationProp<RootStackParamList>>();
@@ -45,10 +29,11 @@ const MillingChipComponentAcceptAuditory: React.FC<{ workOrder: any }> = ({
   const [showInconformidad, setShowInconformidad] = useState(false);
   const [inconformidad, setInconformidad] = useState('');
   const [sampleAuditory, setSampleAuditory] = useState('');
-  const [defaultValues, setDefaultValues] = useState({
+  const [defaultValues, setDefaultValues] = useState<AfterCorteData>({
     good_quantity: 0,
     bad_quantity: 0,
     excess_quantity: 0,
+    noprocess_quantity: 0,
     cqm_quantity: '',
     comments: '',
   });
@@ -56,7 +41,6 @@ const MillingChipComponentAcceptAuditory: React.FC<{ workOrder: any }> = ({
   const [areaBadQuantities, setAreaBadQuantities] = useState<{
     [areaName: string]: string;
   }>({});
-  const [materialBadQuantity, setMaterialBadQuantity] = useState<string>('0');
 
   const cqm_quantity = workOrder.answers.reduce(
     (total: number, answer: { sample_quantity?: number | string }) => {
@@ -76,10 +60,11 @@ const MillingChipComponentAcceptAuditory: React.FC<{ workOrder: any }> = ({
 
     if (millingChip && partials.length === 0) {
       // Caso original: hay empalme pero no hay parciales
-      const vals: MillingChipData = {
+      const vals: AfterCorteData = {
         good_quantity: millingChip.good_quantity || '',
         bad_quantity: millingChip.bad_quantity || '',
         excess_quantity: millingChip.excess_quantity || '',
+        noprocess_quantity: millingChip.noprocess_quantity || '',
         cqm_quantity: cqm_quantity || '',
         comments: millingChip.comments || '',
       };
@@ -98,15 +83,22 @@ const MillingChipComponentAcceptAuditory: React.FC<{ workOrder: any }> = ({
         (acc: any, curr: any) => acc + (curr.excess_quantity || 0),
         0
       );
+      const totalParcialesnopro = partials.reduce(
+        (acc: any, curr: any) => acc + (curr.noprocess_quantity || 0),
+        0
+      );
       const restante = (millingChip.good_quantity || 0) - totalParciales;
       const restantebad = (millingChip.bad_quantity || 0) - totalParcialesbad;
       const restanteexc =
         (millingChip.excess_quantity || 0) - totalParcialesexec;
+      const restantenopro =
+        (millingChip.noprocess_quantity || 0) - totalParcialesnopro;
 
-      const vals: MillingChipData = {
+      const vals: AfterCorteData = {
         good_quantity: restante > 0 ? restante : 0,
         bad_quantity: restantebad > 0 ? restantebad : 0,
         excess_quantity: restanteexc > 0 ? restanteexc : 0,
+        noprocess_quantity: restantenopro > 0 ? restantenopro : 0,
         cqm_quantity: cqm_quantity || '',
         comments: millingChip.comments || '',
       };
@@ -115,10 +107,11 @@ const MillingChipComponentAcceptAuditory: React.FC<{ workOrder: any }> = ({
       // Caso original: se busca el primer parcial sin validar
       const firstUnvalidatedPartial = partials.find((p: any) => !p.validated);
 
-      const vals: MillingChipData = {
+      const vals: AfterCorteData = {
         good_quantity: firstUnvalidatedPartial.quantity || '',
         bad_quantity: firstUnvalidatedPartial.bad_quantity || '',
         excess_quantity: firstUnvalidatedPartial.excess_quantity || '',
+        noprocess_quantity: firstUnvalidatedPartial.noprocess_quantity || '',
         cqm_quantity: cqm_quantity || '',
         comments: firstUnvalidatedPartial.observation || '',
       };
@@ -321,6 +314,15 @@ const MillingChipComponentAcceptAuditory: React.FC<{ workOrder: any }> = ({
         style={styles.input}
         editable={false}
         value={String(defaultValues.excess_quantity)}
+        mode="outlined"
+        activeOutlineColor="#000"
+        theme={{ roundness: 30 }}
+      />
+      <Text style={styles.subtitle}>Sin procesar:</Text>
+      <TextInput
+        style={styles.input}
+        editable={false}
+        value={String(defaultValues.noprocess_quantity)}
         mode="outlined"
         activeOutlineColor="#000"
         theme={{ roundness: 30 }}

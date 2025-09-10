@@ -26,6 +26,8 @@ export class WorkOrderService {
   ) {
     const { ot_id, mycard_id, areasOperatorIds, comments } = dto;
     const quantity = Number(dto.quantity); // Se debe asegurar de que llegue como numero
+    const quantity_contacts = Number(dto.quantity_contacts); // Se debe asegurar de que llegue como numero
+    const total_sheets = Number(dto.total_sheets); // Se debe asegurar de que llegue como numero
     // Asegurarse de que priority sea un booleano
     let priority = false; // Valor por defecto
     if (dto.priority === 'true') {
@@ -55,7 +57,9 @@ export class WorkOrderService {
         status: 'En proceso',
         priority,
         comments,
+        quantity_contacts,
         created_by: userId,
+        total_sheets,
       },
     });
 

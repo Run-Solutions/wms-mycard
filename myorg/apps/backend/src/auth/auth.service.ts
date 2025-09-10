@@ -296,7 +296,7 @@ export class AuthService {
     });
   }
 
-  async getAreasOperator(): Promise<{ id: number; name: string }[]> {
+  async getAreasOperator(): Promise<{ id: number; name: string; sheets: number | null }[]> {
     const areas = await this.prisma.areasOperator.findMany();
     return areas.sort((a, b) => a.id - b.id);
   }

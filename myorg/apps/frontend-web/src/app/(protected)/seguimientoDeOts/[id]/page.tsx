@@ -17,11 +17,19 @@ import {
 } from '@/api/seguimientoDeOts';
 import { VistosBuenosHistory } from '@/components/SeguimientoDeOts/VistosBuenosHistory';
 import { getFileByName } from '@/api/seguimientoDeOts';
+import {
+  getPerPartialReviewers,
+  getLastAnswer,
+  getSingleCqm,
+  getReviewerNameFromAnswer,
+  getPerPartialCqm,
+} from '@/components/SeguimientoDeOts/util/quality';
 
 type NumericField =
   | 'buenas'
   | 'malas'
   | 'excedente'
+  | 'noprocess'
   | 'defectuoso'
   | 'cqm'
   | 'muestras';
@@ -45,9 +53,6 @@ const getAreaReleaseTotal = (area: AreaData) => {
   const key = getAreaKey(area);
   const block: any = key ? (area.response as any)?.[key] : null;
   if (!block) return 0;
-
-  // Total "bueno" según el tipo de bloque
-  // prepress usa 'plates', varios usan 'release_quantity' o 'good_quantity'
   return block.release_quantity ?? block.good_quantity ?? block.plates ?? 0;
 };
 
@@ -56,15 +61,6 @@ const getSumParciales = (area: AreaData) =>
 
 const getRemainder = (area: AreaData) =>
   Math.max(getAreaReleaseTotal(area) - getSumParciales(area), 0);
-
-// último answer (por created_at)
-const getLastAnswer = (area: AreaData) => {
-  if (!area.answers?.length) return null;
-  return [...area.answers].sort(
-    (a, b) =>
-      new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
-  )[0];
-};
 
 const getPerPartialValues = (
   area: AreaData,
@@ -171,6 +167,7 @@ export type AreaData = {
   malas: number;
   cqm: number;
   excedente: number;
+  noprocess: number;
   defectuoso: number;
   muestras: number;
   flowId?: number;
@@ -183,6 +180,7 @@ export type AreaData = {
     quantity: number;
     bad_quantity: number;
     excess_quantity: number;
+    noprocess_quantity: number;
     user_id: number | null; // 👈 puede venir null
     validated: boolean;
     user?: { username: string } | null; // 👈 opcional
@@ -387,12 +385,12 @@ export default function SeguimientoDeOtsAuxPage({ params }: Props) {
             status: item.status || 'Desconocido',
             response: item.areaResponse || {},
             answers: item.answers || [],
-            flowId: item.id, // 👈
-            assigned_user_id: item.assigned_user, // 👈
+            flowId: item.id,
+            assigned_user_id: item.assigned_user,
             ...getAreaData(
               item.area_id,
               item.areaResponse,
-              item.partialReleases, // 👈 ya trae {id, user_id, user, validated, quantity...}
+              item.partialReleases,
               item.user,
               index
             ),
@@ -496,9 +494,6 @@ export default function SeguimientoDeOtsAuxPage({ params }: Props) {
   };
 
   // Helpers
-  const areaColSpanByAnswers = (area: AreaData) =>
-    Math.max(area.answers?.length ?? 0, 1);
-
   const getAnswerValue = (
     ans: any,
     field: 'defectuoso' | 'cqm' | 'muestras',
@@ -650,7 +645,7 @@ export default function SeguimientoDeOtsAuxPage({ params }: Props) {
       }
     }
 
-    // 6. El resto de campos (buenas, malas, excedente) editables si el área está en Completado
+    // 6. El resto de campos (buenas, malas, noprocess) editables si el área está en Completado
     return (
       <input
         type="number"
@@ -711,9 +706,10 @@ export default function SeguimientoDeOtsAuxPage({ params }: Props) {
           acc.buenas += curr.quantity || 0;
           acc.malas += curr.bad_quantity || 0;
           acc.excedente += curr.excess_quantity || 0;
+          acc.noprocess += curr.noprocess_quantity || 0;
           return acc;
         },
-        { buenas: 0, malas: 0, excedente: 0 }
+        { buenas: 0, malas: 0, excedente: 0, noprocess: 0 }
       );
     };
 
@@ -734,7 +730,7 @@ export default function SeguimientoDeOtsAuxPage({ params }: Props) {
           auditor,
           parciales,
           parcialesValidados,
-          partials: partialReleases, // 👈 aquí
+          partials: partialReleases, 
         };
       }
 
@@ -746,6 +742,7 @@ export default function SeguimientoDeOtsAuxPage({ params }: Props) {
           0,
         malas: areaResponse?.[areaKey]?.bad_quantity || 0,
         excedente: areaResponse?.[areaKey]?.excess_quantity || 0,
+        noprocess: areaResponse?.[areaKey]?.noprocess_quantity || 0,
         defectuoso: areaResponse?.[areaKey]?.material_quantity || 0,
         cqm: areaResponse?.[areaKey]?.form_answer?.sample_quantity ?? 0,
         muestras: areaResponse?.[areaKey]?.formAuditory?.sample_auditory ?? 0,
@@ -753,7 +750,7 @@ export default function SeguimientoDeOtsAuxPage({ params }: Props) {
         auditor,
         parciales,
         parcialesValidados,
-        partials: partialReleases, // 👈 y aquí también
+        partials: partialReleases, 
       };
     };
 
@@ -783,6 +780,7 @@ export default function SeguimientoDeOtsAuxPage({ params }: Props) {
           buenas: 0,
           malas: 0,
           excedente: 0,
+          noprocess: 0,
           defectuoso: 0,
           cqm: 0,
           muestras: 0,
@@ -790,13 +788,14 @@ export default function SeguimientoDeOtsAuxPage({ params }: Props) {
           auditor: '',
           parciales: 0,
           parcialesValidados: 0,
-          partials: [], // 👈 default
+          partials: [], 
         };
     }
   };
 
   const cantidadHojasRaw = Number(workOrder?.quantity) / 24;
   const cantidadHojas = cantidadHojasRaw > 0 ? Math.ceil(cantidadHojasRaw) : 0;
+  const totalSheetsEffective = workOrder?.total_sheets ?? cantidadHojas;
   const ultimaArea = areas[areas.length - 1];
   const totalMalas = areas.reduce((acc, area) => acc + (area.malas || 0), 0);
   const totalDefectuoso = areas.reduce(
@@ -812,10 +811,12 @@ export default function SeguimientoDeOtsAuxPage({ params }: Props) {
   );
   const totalUltimaBuenas = ultimaArea?.buenas || 0;
   const totalUltimaExcedente = ultimaArea?.excedente || 0;
+  const totalUltimaNoProcess = ultimaArea?.noprocess || 0;
 
   const totalGeneral =
     totalUltimaBuenas +
     totalUltimaExcedente +
+    totalUltimaNoProcess +
     totalMalas +
     totalDefectuoso +
     totalCqm +
@@ -863,6 +864,7 @@ export default function SeguimientoDeOtsAuxPage({ params }: Props) {
             good_quantity: updated.buenas,
             bad_quantity: updated.malas,
             excess_quantity: updated.excedente,
+            noprocess_quantity: updated.noprocess,
             material_quantity: updated.defectuoso,
           };
           let sample_data: Record<string, number> = {
@@ -1017,6 +1019,13 @@ export default function SeguimientoDeOtsAuxPage({ params }: Props) {
     // sin parciales: solo si el área está "En proceso"
     return ['En proceso', 'Parcial' /*, 'Otro estado'*/].includes(area.status);
   };
+
+  const fieldLabels: Record<string, string> = {
+    buenas: "Buenas",
+    malas: "Malas",
+    excedente: "Excedente",
+    noprocess: "Sin procesar",
+  };
   return (
     <>
       <Container>
@@ -1062,7 +1071,7 @@ export default function SeguimientoDeOtsAuxPage({ params }: Props) {
                 Cantidad (Hojas Frente / Hojas Vuelta)
               </p>
               <p className="text-xl font-semibold text-black">
-                {cantidadHojas}
+                {totalSheetsEffective}
               </p>
             </CardContent>
           </Card>
@@ -1294,6 +1303,57 @@ export default function SeguimientoDeOtsAuxPage({ params }: Props) {
                       );
                     })}
                   </tr>
+                  {/* ✅ Calidad (reviewer por answer, alineado por parciales y Rem) */}
+                  <tr>
+                    <td className="p-3 font-semibold">Calidad</td>
+                    {areas.flatMap((area, aIdx) => {
+                      if (area.parciales > 0) {
+                        const reviewers = getPerPartialReviewers(area);
+                        return reviewers.map((name, i) => (
+                          <td
+                            key={`cell-area-${area.id}-parcial-${i}-calidad`}
+                            className="text-center"
+                            title={
+                              i >= area.parciales
+                                ? 'Remanente'
+                                : `Parcial ${i + 1}`
+                            }
+                          >
+                            <span
+                              className={`px-2 py-1 rounded-lg text-sm font-medium ${
+                                name && name !== '—'
+                                  ? 'bg-yellow-100 text-yellow-800' // badge “Calidad”
+                                  : '' // badge vacío
+                              }`}
+                            >
+                              {name || '—'}
+                            </span>
+                          </td>
+                        ));
+                      }
+
+                      // Sin parciales → último answer
+                      const lastAns = getLastAnswer(area);
+                      const reviewerName = getReviewerNameFromAnswer(lastAns);
+
+                      return (
+                        <td
+                          key={`cell-area-${area.id}-calidad-${aIdx}`}
+                          className="text-center"
+                        >
+                          <span
+                            className={`px-2 py-1 rounded-lg text-sm font-medium ${
+                              reviewerName && reviewerName !== '—'
+                                ? 'bg-yellow-100 text-yellow-800'
+                                : ''
+                            }`}
+                          >
+                            {reviewerName || '—'}
+                          </span>
+                        </td>
+                      );
+                    })}
+                  </tr>
 
                   {/* Auditor */}
                   <tr>
@@ -1338,61 +1398,66 @@ export default function SeguimientoDeOtsAuxPage({ params }: Props) {
                       📥 Producción
                     </td>
                   </tr>
-                  {['buenas', 'malas', 'excedente'].map((field) => (
-                    <tr key={field}>
-                      <td className="p-3 capitalize font-semibold">{field}</td>
-                      {/* Por cada área, creamos tantas celdas como parciales (o 1 si no hay) */}
-                      {areas.flatMap((area, aIndex) => {
-                        // Si hay parciales, pintamos cada parcial como una columna
-                        if (area.parciales > 0 && area.partials?.length) {
-                          const cells = area.partials.map((p, pIndex) => {
-                            const value =
-                              field === 'buenas'
-                                ? p.quantity
-                                : field === 'malas'
-                                ? p.bad_quantity ?? 0
-                                : /* excedente */ p.excess_quantity ?? 0;
-                            return (
-                              <td
-                                key={`area-${area.id}-parcial-${p.id}-${field}-${pIndex}`}
-                                className="text-center"
-                              >
-                                {value}
-                              </td>
-                            );
-                          });
+                  {['buenas', 'malas', 'excedente', 'noprocess'].map(
+                    (field) => (
+                      <tr key={field}>
+                        <td className="p-3 capitalize font-semibold">
+                        {fieldLabels[field]}
+                        </td>
+                        {/* Por cada área, creamos tantas celdas como parciales (o 1 si no hay) */}
+                        {areas.flatMap((area, aIndex) => {
+                          // Si hay parciales, pintamos cada parcial como una columna
+                          if (area.parciales > 0 && area.partials?.length) {
+                            const cells = area.partials.map((p, pIndex) => {
+                              const value =
+                                field === 'buenas'
+                                  ? p.quantity
+                                  : field === 'malas'
+                                  ? p.bad_quantity ?? 0
+                                  : field === 'excedente' ? p.excess_quantity ?? 0
+                                  : p.noprocess_quantity ?? '';
+                              return (
+                                <td
+                                  key={`area-${area.id}-parcial-${p.id}-${field}-${pIndex}`}
+                                  className="text-center"
+                                >
+                                  {value}
+                                </td>
+                              );
+                            });
 
-                          // Columna de REMANENTE solo si hay resto > 0
-                          const rem = getRemainder(area);
-                          if (rem > 0) {
-                            const remValue = field === 'buenas' ? rem : 0; // por defecto 0 para malas/excedente
-                            cells.push(
-                              <td
-                                key={`area-${area.id}-parcial-rem-${field}`}
-                                className="text-center font-semibold"
-                                title="Remanente"
-                              >
-                                {remValue}
-                              </td>
-                            );
+                            // Columna de REMANENTE solo si hay resto > 0
+                            const rem = getRemainder(area);
+                            if (rem > 0) {
+                              const remValue = field === 'buenas' ? rem : 0; // por defecto 0 para malas/excedente
+                              cells.push(
+                                <td
+                                  key={`area-${area.id}-parcial-rem-${field}`}
+                                  className="text-center font-semibold"
+                                  title="Remanente"
+                                >
+                                  {remValue}
+                                </td>
+                              );
+                            }
+                            return cells;
                           }
-                          return cells;
-                        }
 
-                        // Si NO hay parciales, dejamos una sola celda (Total del área)
-                        const totalValue =
-                          renderCell(area, field as NumericField) || 0;
-                        return (
-                          <td
-                            key={`area-${area.id}-no-parciales-${field}-${aIndex}`}
-                            className="text-center"
-                          >
-                            {totalValue}
-                          </td>
-                        );
-                      })}
-                    </tr>
-                  ))}
+                          // Si NO hay parciales, dejamos una sola celda (Total del área)
+                          const totalValue =
+                            renderCell(area, field as NumericField) || 0;
+                          return (
+                            <td
+                              key={`area-${area.id}-no-parciales-${field}-${aIndex}`}
+                              className="text-center"
+                            >
+                              {totalValue}
+                            </td>
+                          );
+                        })}
+                      </tr>
+                    )
+                  )}
 
                   {/* Control de calidad */}
                   <tr>
@@ -1414,10 +1479,13 @@ export default function SeguimientoDeOtsAuxPage({ params }: Props) {
                       {areas.flatMap((area, aIdx) => {
                         if (area.parciales > 0) {
                           // ✅ AHORA llenamos cada parcial y (si existe) REM con datos reales
-                          const vals = getPerPartialValues(
-                            area,
-                            field as 'defectuoso' | 'cqm' | 'muestras'
-                          );
+                          const vals =
+                            field === 'cqm'
+                              ? getPerPartialCqm(area) // ✅ sin fallback para Rem
+                              : getPerPartialValues(
+                                  area,
+                                  field as 'defectuoso' | 'muestras'
+                                );
                           return vals.map((v, i) => (
                             <td
                               key={`cell-area-${area.id}-parcial-${i}-${field}`}
@@ -1435,8 +1503,10 @@ export default function SeguimientoDeOtsAuxPage({ params }: Props) {
 
                         // Sin parciales → comportamiento anterior (una sola celda)
                         const totalValue =
-                          renderCell?.(area, field as any) ??
-                          getAnswerValue(undefined, field as any, area);
+                          field === 'cqm'
+                            ? getSingleCqm(area) // ✅ ahora toma el sample_quantity del último answer
+                            : renderCell?.(area, field as any) ??
+                              getAnswerValue(undefined, field as any, area);
 
                         return (
                           <td

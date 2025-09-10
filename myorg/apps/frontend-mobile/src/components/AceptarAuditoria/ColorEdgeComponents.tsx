@@ -18,23 +18,7 @@ import {
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { RootStackParamList } from '../../navigation/types';
 import { TextInput } from 'react-native-paper';
-
-type ColorEdgeData = {
-  good_quantity: number;
-  bad_quantity: number;
-  excess_quantity: number;
-  cqm_quantity: string;
-  comments: string;
-};
-
-type PartialRelease = {
-  area: string;
-  quantity: string;
-  bad_quantity: string;
-  excess_quantity: string;
-  observation: string;
-  validated: boolean;
-};
+import { AfterCorteData } from './CorteComponents';
 
 const ColorEdgeComponentAcceptAuditory: React.FC<{ workOrder: any }> = ({
   workOrder,
@@ -45,10 +29,11 @@ const ColorEdgeComponentAcceptAuditory: React.FC<{ workOrder: any }> = ({
   const [showInconformidad, setShowInconformidad] = useState(false);
   const [inconformidad, setInconformidad] = useState('');
   const [sampleAuditory, setSampleAuditory] = useState('');
-  const [defaultValues, setDefaultValues] = useState<ColorEdgeData>({
+  const [defaultValues, setDefaultValues] = useState<AfterCorteData>({
     good_quantity: 0,
     bad_quantity: 0,
     excess_quantity: 0,
+    noprocess_quantity: 0,
     cqm_quantity: '',
     comments: '',
   });
@@ -56,7 +41,6 @@ const ColorEdgeComponentAcceptAuditory: React.FC<{ workOrder: any }> = ({
   const [areaBadQuantities, setAreaBadQuantities] = useState<{
     [areaName: string]: string;
   }>({});
-  const [materialBadQuantity, setMaterialBadQuantity] = useState<string>('0');
 
   const cqm_quantity = workOrder.answers.reduce(
     (total: number, answer: { sample_quantity?: number | string }) => {
@@ -76,10 +60,11 @@ const ColorEdgeComponentAcceptAuditory: React.FC<{ workOrder: any }> = ({
 
     if (colorEdge && partials.length === 0) {
       // Caso original: hay empalme pero no hay parciales
-      const vals: ColorEdgeData = {
+      const vals: AfterCorteData = {
         good_quantity: colorEdge.good_quantity || '',
         bad_quantity: colorEdge.bad_quantity || '',
         excess_quantity: colorEdge.excess_quantity || '',
+        noprocess_quantity: colorEdge.noprocess_quantity || '',
         cqm_quantity: cqm_quantity || '',
         comments: colorEdge.comments || '',
       };
@@ -98,14 +83,20 @@ const ColorEdgeComponentAcceptAuditory: React.FC<{ workOrder: any }> = ({
         (acc: any, curr: any) => acc + (curr.excess_quantity || 0),
         0
       );
+      const totalParcialesnopro = partials.reduce(
+        (acc: any, curr: any) => acc + (curr.noprocess_quantity || 0),
+        0
+      );
       const restante = (colorEdge.good_quantity || 0) - totalParciales;
       const restantebad = (colorEdge.bad_quantity || 0) - totalParcialesbad;
       const restanteexc = (colorEdge.excess_quantity || 0) - totalParcialesexec;
-
-      const vals: ColorEdgeData = {
+      const restantenopro =
+        (colorEdge.noprocess_quantity || 0) - totalParcialesnopro;
+      const vals: AfterCorteData = {
         good_quantity: restante > 0 ? restante : 0,
         bad_quantity: restantebad > 0 ? restantebad : 0,
         excess_quantity: restanteexc > 0 ? restanteexc : 0,
+        noprocess_quantity: restantenopro > 0 ? restantenopro : 0,
         cqm_quantity: cqm_quantity || '',
         comments: colorEdge.comments || '',
       };
@@ -114,10 +105,11 @@ const ColorEdgeComponentAcceptAuditory: React.FC<{ workOrder: any }> = ({
       // Caso original: se busca el primer parcial sin validar
       const firstUnvalidatedPartial = partials.find((p: any) => !p.validated);
 
-      const vals: ColorEdgeData = {
+      const vals: AfterCorteData = {
         good_quantity: firstUnvalidatedPartial.quantity || '',
         bad_quantity: firstUnvalidatedPartial.bad_quantity || '',
         excess_quantity: firstUnvalidatedPartial.excess_quantity || '',
+        noprocess_quantity: firstUnvalidatedPartial.noprocess_quantity || '',
         cqm_quantity: cqm_quantity || '',
         comments: firstUnvalidatedPartial.observation || '',
       };
@@ -285,7 +277,6 @@ const ColorEdgeComponentAcceptAuditory: React.FC<{ workOrder: any }> = ({
 
   return (
     <ScrollView contentContainerStyle={styles.container}>
-
       <Text style={styles.subtitle}>Buenas:</Text>
       <TextInput
         style={styles.input}
@@ -317,6 +308,15 @@ const ColorEdgeComponentAcceptAuditory: React.FC<{ workOrder: any }> = ({
         style={styles.input}
         editable={false}
         value={String(defaultValues.excess_quantity)}
+        mode="outlined"
+        activeOutlineColor="#000"
+        theme={{ roundness: 30 }}
+      />
+      <Text style={styles.subtitle}>Sin procesar:</Text>
+      <TextInput
+        style={styles.input}
+        editable={false}
+        value={String(defaultValues.noprocess_quantity)}
         mode="outlined"
         activeOutlineColor="#000"
         theme={{ roundness: 30 }}

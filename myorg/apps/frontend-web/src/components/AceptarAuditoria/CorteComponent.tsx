@@ -10,10 +10,11 @@ import {
 import WorkOrderInfo from './util/WorkOrderInfo';
 
 // Define un tipo para los valores del formulario
-type CorteData = {
+export type AfterCorteData = {
   good_quantity: number | string;
   bad_quantity: number | string;
   excess_quantity: number | string;
+  noprocess_quantity: number | string;
   cqm_quantity: string;
   comments: string;
 };
@@ -49,10 +50,11 @@ export default function CorteComponentAcceptAuditory({ workOrder }: Props) {
 
   if (workOrder.area_id >= 2) {
     // Estados tipados para los valores predeterminados y actuales
-    const [defaultValues, setDefaultValues] = useState<CorteData>({
+    const [defaultValues, setDefaultValues] = useState<AfterCorteData>({
       good_quantity: '',
       bad_quantity: '',
       excess_quantity: '',
+      noprocess_quantity: '',
       cqm_quantity: '',
       comments: '',
     });
@@ -74,10 +76,11 @@ export default function CorteComponentAcceptAuditory({ workOrder }: Props) {
 
       if (corte && partials.length === 0) {
         // Caso original: hay empalme pero no hay parciales
-        const vals: CorteData = {
+        const vals: AfterCorteData = {
           good_quantity: corte.good_quantity || '',
           bad_quantity: corte.bad_quantity || '',
           excess_quantity: corte.excess_quantity || '',
+          noprocess_quantity: corte.noprocess_quantity || '',
           cqm_quantity: cqm_quantity || '',
           comments: corte.comments || '',
         };
@@ -96,14 +99,21 @@ export default function CorteComponentAcceptAuditory({ workOrder }: Props) {
           (acc: any, curr: any) => acc + (curr.excess_quantity || 0),
           0
         );
+        const totalParcialesnopro = partials.reduce(
+          (acc: any, curr: any) => acc + (curr.noprocess_quantity || 0),
+          0
+        );
         const restante = (corte.good_quantity || 0) - totalParciales;
         const restantebad = (corte.bad_quantity || 0) - totalParcialesbad;
         const restanteexc = (corte.excess_quantity || 0) - totalParcialesexec;
+        const restantenopro =
+          (corte.noprocess_quantity || 0) - totalParcialesnopro;
 
-        const vals: CorteData = {
+        const vals: AfterCorteData = {
           good_quantity: restante > 0 ? restante : 0,
           bad_quantity: restantebad > 0 ? restantebad : 0,
           excess_quantity: restanteexc > 0 ? restanteexc : 0,
+          noprocess_quantity: restantenopro > 0 ? restantenopro : 0,
           cqm_quantity: cqm_quantity || '',
           comments: corte.comments || '',
         };
@@ -112,10 +122,11 @@ export default function CorteComponentAcceptAuditory({ workOrder }: Props) {
         // Caso original: se busca el primer parcial sin validar
         const firstUnvalidatedPartial = partials.find((p: any) => !p.validated);
 
-        const vals: CorteData = {
+        const vals: AfterCorteData = {
           good_quantity: firstUnvalidatedPartial.quantity || '',
           bad_quantity: firstUnvalidatedPartial.bad_quantity || '',
           excess_quantity: firstUnvalidatedPartial.excess_quantity || '',
+          noprocess_quantity: firstUnvalidatedPartial.noprocess_quantity || '',
           cqm_quantity: cqm_quantity || '',
           comments: firstUnvalidatedPartial.observation || '',
         };
@@ -283,6 +294,13 @@ export default function CorteComponentAcceptAuditory({ workOrder }: Props) {
                 type="number"
                 name="excess_quantity"
                 value={defaultValues.excess_quantity}
+                disabled
+              />
+              <Label>Sin procesar:</Label>
+              <Input
+                type="number"
+                name="excess_quantity"
+                value={defaultValues.noprocess_quantity}
                 disabled
               />
               <Label>Muestras en CQM:</Label>

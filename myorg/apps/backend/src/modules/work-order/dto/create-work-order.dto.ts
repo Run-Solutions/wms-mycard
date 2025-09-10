@@ -34,6 +34,12 @@ export class CreateWorkOrderDto {
   quantity: number;
 
   @IsInt()
+  total_sheets: number;
+
+  @IsInt()
+  quantity_contacts: number;
+
+  @IsInt()
   created_by: number;
 
   @IsArray()

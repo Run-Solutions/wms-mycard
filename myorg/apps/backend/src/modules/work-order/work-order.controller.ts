@@ -141,9 +141,7 @@ export class WorkOrderController {
 
   // Para obtener los WorkOrderFlowPendientes
   @Get('users')
-  async getUsers(
-    @Req() req: AuthenticatedRequest,
-  ) {
+  async getUsers(@Req() req: AuthenticatedRequest) {
     if (!req.user) {
       throw new Error('Usuario no autenticado');
       throw new ForbiddenException('Usuario no autenticado');
@@ -152,9 +150,7 @@ export class WorkOrderController {
     console.log('📌 ID del usuario:', user.id);
     console.log('📌 Rol del usuario:', user.role_id);
     console.log('📌 Áreas asignadas:', user.areas_operator_id);
-    return await this.workOrderService.getUsers(
-      user.id,
-    );
+    return await this.workOrderService.getUsers(user.id);
   }
 
   @Post(':flowId/assign')
