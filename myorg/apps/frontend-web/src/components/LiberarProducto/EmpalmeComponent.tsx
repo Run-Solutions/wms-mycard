@@ -342,7 +342,7 @@ export default function EmpalmeComponent({ workOrder }: Props) {
   return (
     <>
       <Container>
-        <Title>Área: Empalme</Title>
+        <Title>Área: Empalme {workOrder.isCollator ? '(Collator)': ''}</Title>
 
         <WorkOrderHojasInfo
           workOrder={workOrder}

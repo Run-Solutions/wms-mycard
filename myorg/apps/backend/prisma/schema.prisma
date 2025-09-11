@@ -153,6 +153,7 @@ model WorkOrder {
   status                String?
   priority              Boolean             @default(false)
   total_sheets          Int?
+  isCollator            Boolean            @default(false) // Indica si la OT es de tipo Collator
   
   user                  User                @relation("UserWorkOrders", fields: [created_by], references: [id])
   user_closed           User?               @relation("UserWorkOrdersClosed", fields: [closed_by], references: [id])

@@ -39,6 +39,9 @@ export class CreateWorkOrderDto {
   @IsInt()
   quantity_contacts: number;
 
+  @IsString()
+  isCollator: string;
+
   @IsInt()
   created_by: number;
 

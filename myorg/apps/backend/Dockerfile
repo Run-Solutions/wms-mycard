@@ -4,7 +4,7 @@ WORKDIR /app
 
 COPY package*.json ./
 
-RUN npm install && npm rebuild bcrypt --update-binary
+RUN npm install --legacy-peer-deps && npm rebuild bcrypt --update-binary
 
 COPY . .
 
