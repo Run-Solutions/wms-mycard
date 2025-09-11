@@ -47,6 +47,7 @@ export type AreaData = {
   id: number;
   name: string;
   status: string;
+  isCollator: boolean;
   response: {
     prepress: { id: number };
     impression: { id: number };
@@ -511,6 +512,7 @@ const WorkOrderDetailScreen: React.FC = () => {
           name: item.area?.name || 'Sin nombre',
           status: item.status || 'Desconocido',
           response: item.areaResponse || {},
+          isCollator: data.isCollator || false,
           answers: item.answers || [],
           flowId: item.id,
           assigned_user_id: item.assigned_user,
@@ -1000,7 +1002,7 @@ const WorkOrderDetailScreen: React.FC = () => {
                         key={`hdr-${area.id}-p${i + 1}`}
                         style={styles.cellUser}
                       >
-                        {area.name}
+                        {area.name} {area.isCollator && area.id === 4? ' (Colector)' : ''}
                         {'\n'}
                         <Text style={{ fontSize: 11, color: '#6b7280' }}>{`P${
                           i + 1

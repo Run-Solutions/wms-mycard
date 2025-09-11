@@ -145,6 +145,7 @@ export type AreaData = {
   id: number;
   name: string;
   status: string;
+  isCollator: boolean;
   response: {
     prepress: { id: number };
     impression: { id: number };
@@ -331,7 +332,6 @@ export default function SeguimientoDeOtsAuxPage({ params }: Props) {
           .map((item: any) => {
             const areaName = item.area?.name?.toLowerCase() || '';
             const mode = ['impresion'].includes(areaName) ? 'doble' : 'simple';
-
             return {
               areaName: item.area?.name || 'Sin nombre',
               username: item.user?.username || '',
@@ -383,6 +383,7 @@ export default function SeguimientoDeOtsAuxPage({ params }: Props) {
             id: item.area_id,
             name: item.area?.name || 'Sin nombre',
             status: item.status || 'Desconocido',
+            isCollator: data.isCollator || false,
             response: item.areaResponse || {},
             answers: item.answers || [],
             flowId: item.id,
@@ -1160,7 +1161,7 @@ export default function SeguimientoDeOtsAuxPage({ params }: Props) {
                         className="p-3 text-center font-semibold align-bottom"
                         colSpan={areaColSpan(area)} // antes: Math.max(1, area.parciales)
                       >
-                        {area.name}
+                        {area.name}{area.isCollator && area.id === 4? '(Collator)' : ''}
                         <div className="text-[0.65rem] text-gray-400 mt-1">
                           {area.status}
                         </div>

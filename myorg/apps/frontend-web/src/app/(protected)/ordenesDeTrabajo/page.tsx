@@ -21,7 +21,7 @@ const WorkOrdersPage: React.FC = () => {
     quantity: '',
     comments: '',
     quantity_contacts: '24',
-    tipoSeleccion: 1,
+    tipoSeleccion: 0,
     areasOperatorIds: [] as string[],
     priority: false,
     total_sheets: 0,
@@ -86,7 +86,7 @@ const WorkOrdersPage: React.FC = () => {
     const contacts = Number(formData.quantity_contacts) || 0;
 
     const hojasBase = contacts > 0 ? Math.ceil(quantity / contacts) : 0;
-    const extraEmpalme = formData.tipoSeleccion === 0 ? 26 : 0;
+    const extraEmpalme = formData.tipoSeleccion === 1 ? 26 : 0;
     const merma = Math.ceil(hojasBase * 0.07);
 
     const tsa = Number(totalSheetsAreas) || 0; // 👈 por si acaso
@@ -108,7 +108,7 @@ const WorkOrdersPage: React.FC = () => {
               <BtnEmpalme
                 onClick={() => {
                   closeToast(); // ✅ usa el prop aquí
-                  resolve(1);
+                  resolve(0);
                 }}
               >
                 Empalme
@@ -116,10 +116,10 @@ const WorkOrdersPage: React.FC = () => {
               <BtnCollector
                 onClick={() => {
                   closeToast(); // ✅ usa el prop aquí
-                  resolve(0);
+                  resolve(1);
                 }}
               >
-                Collector
+                Collator
               </BtnCollector>
             </Actions>
           </ChoiceBox>
@@ -401,7 +401,7 @@ const WorkOrdersPage: React.FC = () => {
         quantity: '',
         comments: '',
         quantity_contacts: '',
-        tipoSeleccion: 1,
+        tipoSeleccion: 0,
         areasOperatorIds: [],
         priority: false,
         total_sheets: 0,

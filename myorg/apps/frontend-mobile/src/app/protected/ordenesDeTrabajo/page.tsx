@@ -71,7 +71,7 @@ const OrdenesDeTrabajoScreen: React.FC = () => {
     comments: '',
     quantity_contacts: '24',
     total_sheets: 0,
-    tipoSeleccion: 1,
+    tipoSeleccion: 0,
     areasOperatorIds: [] as string[],
     priority: false,
   });
@@ -107,7 +107,7 @@ const OrdenesDeTrabajoScreen: React.FC = () => {
     const total =
       hojas +
       areasSum +
-      (formData.tipoSeleccion == 0 ? 26 : 0) +
+      (formData.tipoSeleccion == 1 ? 26 : 0) +
       Math.ceil(hojas * 0.07);
 
     setTotalSheets(total);
@@ -124,8 +124,8 @@ const OrdenesDeTrabajoScreen: React.FC = () => {
         'Máximo 4 áreas',
         'Elige una opción',
         [
-          { text: 'Empalme', onPress: () => resolve(1) }, // 1 = empalme
-          { text: 'Collector', onPress: () => resolve(0) }, // 0 = collector
+          { text: 'Empalme', onPress: () => resolve(0) }, // 0 = empalme
+          { text: 'Collator', onPress: () => resolve(1) }, // 1 = collector
         ],
         { cancelable: true }
       );
