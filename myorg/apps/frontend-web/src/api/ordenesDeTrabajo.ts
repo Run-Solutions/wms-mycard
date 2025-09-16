@@ -43,6 +43,7 @@ export const createWorkOrder = async (
   formDataToSend.append('priority', String(formData.priority));
   formDataToSend.append('total_sheets', formData.total_sheets);
   formDataToSend.append('quantity_contacts', formData.quantity_contacts);
+  formDataToSend.append('isCollator', formData.tipoSeleccion);
 
   const response = await API.post('/work-orders', formDataToSend, {
     headers: {

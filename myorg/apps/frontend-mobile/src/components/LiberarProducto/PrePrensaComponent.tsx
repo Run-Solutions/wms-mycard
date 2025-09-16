@@ -41,7 +41,6 @@ const PrePrensaComponent: React.FC<{ workOrder: any }> = ({ workOrder }) => {
   const handleSubmit = async () => {
     const platesNumber = Number(plates);
     const positivesNumber = Number(positives);
-    const testTypesNumber = Number(testType);
 
     if (!plates || !positives || !testType) {
       Alert.alert('Completa todos los campos obligatorios.');
@@ -52,9 +51,7 @@ const PrePrensaComponent: React.FC<{ workOrder: any }> = ({ workOrder }) => {
       platesNumber < 0 ||
       !Number.isInteger(platesNumber) ||
       positivesNumber < 0 ||
-      !Number.isInteger(positivesNumber) ||
-      testTypesNumber < 0 ||
-      !Number.isInteger(testTypesNumber)
+      !Number.isInteger(positivesNumber)
     ) {
       Alert.alert('Los valores deben ser números enteros positivos');
       return;

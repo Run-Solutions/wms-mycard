@@ -338,11 +338,12 @@ export default function EmpalmeComponent({ workOrder }: Props) {
       console.log('Error al enviar datos:', error);
     }
   };
+  console.log(workOrder);
 
   return (
     <>
       <Container>
-        <Title>Área: Empalme</Title>
+        <Title>Área: Empalme {workOrder.workOrder.isCollator ? '(Collator)': ''}</Title>
 
         <WorkOrderHojasInfo
           workOrder={workOrder}
@@ -534,7 +535,7 @@ const Title = styled.h2`
   font-size: 1.75rem;
   font-weight: 700;
   margin-bottom: 1.5rem;
-  color: #1f2937;
+  color: ${({ theme }) => theme.palette.text.primary};
 `;
 
 const NewData = styled.div``;
@@ -543,12 +544,12 @@ const SectionTitle = styled.h3`
   font-size: 1.25rem;
   font-weight: 600;
   margin: 2rem 0 1rem;
-  color: #374151;
+  color: ${({ theme }) => theme.palette.text.primary};
 `;
 
 const Label = styled.label`
   font-weight: 600;
-  color: #6b7280;
+  color: ${({ theme }) => theme.palette.text.primary};
   width: 50%;
 `;
 
