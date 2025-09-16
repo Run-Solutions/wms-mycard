@@ -70,39 +70,39 @@ const getPerPartialValues = (
   const hasRem = getRemainder(area) > 0;
   const cols = parc + (hasRem ? 1 : 0);
 
-  // Ordenamos por fecha ascendente para alinear P1->primera respuesta, etc.
+  // Ordenamos las answers por fecha (te sigue sirviendo para cqm/muestras)
   const answersSorted = [...(area.answers ?? [])].sort(
     (a, b) =>
       new Date(a.created_at).getTime() - new Date(b.created_at).getTime()
   );
 
-  // Valor por defecto
-  const defaultVal = field === 'defectuoso' ? 0 : 0;
-  const values: Array<number | string> = Array(cols).fill(defaultVal);
+  // 👇 Para defectuoso leeremos de partials. Para cqm/muestras seguimos con answers.
+  const values: Array<number | string> = Array(cols).fill(0);
 
-  // Relleno por parcial usando respuestas (si existen)
   for (let i = 0; i < parc; i++) {
-    const ans = answersSorted[i];
-    if (!ans) continue;
-
-    if (field === 'cqm') {
-      values[i] = ans.sample_quantity ?? 0;
+    if (field === 'defectuoso') {
+      values[i] = area.partials?.[i]?.material_quantity ?? 0; // 👈 aquí el cambio
+    } else if (field === 'cqm') {
+      values[i] = answersSorted[i]?.sample_quantity ?? 0;
     } else if (field === 'muestras') {
-      // Nota: en tu payload de "answers" no hay 'sample_auditory'.
-      // Si en el futuro lo envías, cámbialo aquí:
-      values[i] = (ans.sample_auditory as any) ?? 0;
-    } else if (field === 'defectuoso') {
-      // Normalmente no viene por answer. Deja 0 por parcial.
-      values[i] = 0;
+      values[i] = (answersSorted[i] as any)?.sample_auditory ?? '—';
     }
   }
 
-  // Columna REM: usa la respuesta "extra" (answers[parc]) o la última disponible
   if (hasRem) {
     const block = (area.response as any)?.[getAreaKey(area)];
     const remIndex = cols - 1;
 
-    if (field === 'cqm') {
+    if (field === 'defectuoso') {
+      // Remanente = total del bloque - suma parcial de material_quantity
+      const totalDefectuoso =
+        block?.material_quantity ?? 0;
+      const sumParcialDefectuoso = (area.partials ?? []).reduce(
+        (acc, p) => acc + (p?.material_quantity ?? 0),
+        0
+      );
+      values[remIndex] = Math.max(totalDefectuoso - sumParcialDefectuoso, 0);
+    } else if (field === 'cqm') {
       const remAns =
         answersSorted[parc] ?? answersSorted[answersSorted.length - 1];
       values[remIndex] = remAns?.sample_quantity ?? 0;
@@ -110,12 +110,8 @@ const getPerPartialValues = (
       const remAns =
         answersSorted[parc] ?? answersSorted[answersSorted.length - 1];
       values[remIndex] = (remAns as any)?.sample_auditory ?? '—';
-    } else if (field === 'defectuoso') {
-      // Para defectuoso usamos el bloque del área (material_quantity o bad_quantity)
-      values[remIndex] = block?.material_quantity ?? block?.bad_quantity ?? 0;
     }
   }
-
   return values;
 };
 // último parcial por fecha
@@ -181,6 +177,7 @@ export type AreaData = {
     quantity: number;
     bad_quantity: number;
     excess_quantity: number;
+    material_quantity: number;
     noprocess_quantity: number;
     user_id: number | null; // 👈 puede venir null
     validated: boolean;
@@ -502,15 +499,10 @@ export default function SeguimientoDeOtsAuxPage({ params }: Props) {
   ) => {
     switch (field) {
       case 'cqm':
-        // Por answer → cuántas muestras reportó ese answer (sample_quantity)
         return ans?.sample_quantity ?? 0;
       case 'muestras':
-        // Si quieres ver el tipo de prueba por answer (string tipo "perfil")
-        // cámbialo por lo que necesites mostrar aquí:
         return ans?.sample_auditory ?? '—';
-
       case 'defectuoso':
-        // Sigue viniendo del bloque del área (no por answer)
         return (
           area?.areaResponse?.impression?.bad_quantity ??
           area?.areaResponse?.prepress?.bad_quantity ??
@@ -708,9 +700,10 @@ export default function SeguimientoDeOtsAuxPage({ params }: Props) {
           acc.malas += curr.bad_quantity || 0;
           acc.excedente += curr.excess_quantity || 0;
           acc.noprocess += curr.noprocess_quantity || 0;
+          acc.defectuoso += curr.material_quantity || 0;
           return acc;
         },
-        { buenas: 0, malas: 0, excedente: 0, noprocess: 0 }
+        { buenas: 0, malas: 0, excedente: 0, noprocess: 0, defectuoso: 0 }
       );
     };
 
@@ -1161,7 +1154,7 @@ export default function SeguimientoDeOtsAuxPage({ params }: Props) {
                         className="p-3 text-center font-semibold align-bottom"
                         colSpan={areaColSpan(area)} // antes: Math.max(1, area.parciales)
                       >
-                        {area.name}{area.isCollator && area.id === 4? '(Collator)' : ''}
+                        {area.name}{' '}{area.isCollator && area.id === 4? '(C)' : ''}
                         <div className="text-[0.65rem] text-gray-400 mt-1">
                           {area.status}
                         </div>
@@ -1528,11 +1521,13 @@ export default function SeguimientoDeOtsAuxPage({ params }: Props) {
                       <td
                         key={`${area.id}-total-${index}`}
                         className="text-center"
-                        colSpan={areaColSpan(area)} // 👈 clave
+                        colSpan={areaColSpan(area)} 
                       >
                         {area.buenas +
                           area.malas +
                           area.excedente +
+                          area.noprocess +
+                          area.defectuoso +
                           area.cqm +
                           area.muestras}
                       </td>

@@ -612,11 +612,12 @@ export default function PersonalizacionComponent({ workOrder }: Props) {
 
 // =================== Styled Components ===================
 
-const Container = styled.div`
+const Container = styled.div<{ elevation?: number }>`
   padding: 2rem;
   margin-top: 1.5rem;
   border-radius: 1rem;
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+  box-shadow: ${({ theme, elevation = 2 }) =>
+    theme.shadows?.[elevation] ?? 'none'};
   max-width: 1000px;
   margin-left: auto;
   margin-right: auto;
@@ -626,7 +627,7 @@ const Title = styled.h2`
   font-size: 1.75rem;
   font-weight: 700;
   margin-bottom: 1.5rem;
-  color: #1f2937;
+  color: ${({ theme }) => theme.palette.text.primary};
 `;
 
 const NewData = styled.div``;
@@ -635,12 +636,12 @@ const SectionTitle = styled.h3`
   font-size: 1.25rem;
   font-weight: 600;
   margin: 2rem 0 1rem;
-  color: #374151;
+  color: ${({ theme }) => theme.palette.text.primary};
 `;
 
 const Label = styled.label`
   font-weight: 600;
-  color: #6b7280;
+  color: ${({ theme }) => theme.palette.text.primary};
   width: 50%;
 `;
 

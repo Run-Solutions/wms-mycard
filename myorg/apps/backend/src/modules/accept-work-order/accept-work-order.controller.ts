@@ -74,11 +74,6 @@ export class AcceptWorkOrderController {
     console.log('📌 ID del usuario:', user.id);
     console.log('📌 Rol del usuario:', user.role_id);
     console.log('📌 Áreas asignadas:', user.areas_operator_id);
-    if (user.role_id !== 2 && user.role_id !== 4) {
-      throw new ForbiddenException(
-        'No tienes permiso para acceder a las ordenes.',
-      );
-    }
     const statuses = statusesRaw
       ? statusesRaw
           .split(',')

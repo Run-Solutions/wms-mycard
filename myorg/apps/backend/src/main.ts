@@ -17,7 +17,7 @@ async function bootstrap() {
 
   app.enableCors({
     origin: [
-      'http://localhost:3002',
+      'http://localhost:3001',
       'http://64.23.225.99:3002',
       'https://64.23.225.99:3002',
       'https://mycard.runsolutions-services.com/api/',

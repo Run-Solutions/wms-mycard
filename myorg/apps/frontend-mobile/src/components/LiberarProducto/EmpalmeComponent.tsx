@@ -354,7 +354,7 @@ const EmpalmeComponent = ({ workOrder }: { workOrder: any }) => {
 
   return (
     <ScrollView style={styles.container}>
-      <Text style={styles.title}>Área: Empalme</Text>
+      <Text style={styles.title}>Área: Empalme {workOrder.workOrder.isCollator ? '(Collator)': ''}</Text>
 
       <WorkOrderHojasInfo
         workOrder={workOrder}
