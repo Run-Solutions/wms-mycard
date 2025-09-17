@@ -11,9 +11,11 @@ export type AreaForBadQty = {
 interface Props {
   areas: AreaForBadQty[];
   areaBadQuantities: { [key: string]: string };
-  setAreaBadQuantities: React.Dispatch<React.SetStateAction<{ [key: string]: string }>>;
+  setAreaBadQuantities: React.Dispatch<
+    React.SetStateAction<{ [key: string]: string }>
+  >;
   onConfirm: (params: {
-    updatedAreas: AreaForBadQty[];      // ✅ shape mínimo
+    updatedAreas: AreaForBadQty[]; // ✅ shape mínimo
     totalBad: number;
     totalMaterial: number;
     lastAreaBad: number;
@@ -41,21 +43,23 @@ const BadQuantityModal: React.FC<Props> = ({
             : area.defectuoso,
       };
     });
-  
+
     const lastArea = updatedAreas[updatedAreas.length - 1];
     const areaKey = lastArea.name.toLowerCase().replace(/\s/g, '');
-  
+
     const lastAreaBad = Number(areaBadQuantities[`${areaKey}_bad`] || 0);
-    const lastAreaMaterial = Number(areaBadQuantities[`${areaKey}_material`] || 0);
-  
+    const lastAreaMaterial = Number(
+      areaBadQuantities[`${areaKey}_material`] || 0
+    ); 
+
     const totalBad = Object.keys(areaBadQuantities)
       .filter((key) => key.endsWith('_bad'))
       .reduce((sum, key) => sum + Number(areaBadQuantities[key] || 0), 0);
-  
+
     const totalMaterial = Object.keys(areaBadQuantities)
       .filter((key) => key.endsWith('_material'))
       .reduce((sum, key) => sum + Number(areaBadQuantities[key] || 0), 0);
-  
+
     onConfirm({
       updatedAreas,
       totalBad,
@@ -64,7 +68,7 @@ const BadQuantityModal: React.FC<Props> = ({
       lastAreaMaterial,
     });
   };
-  console.log('areas desde componente',areas)
+  console.log('areas desde componente', areas);
 
   return (
     <div className="fixed inset-0 z-50 bg-black/40 flex items-center justify-center p-4">
@@ -120,7 +124,9 @@ const BadQuantityModal: React.FC<Props> = ({
                           type="number"
                           min="0"
                           className="w-full border border-gray-300 rounded px-3 py-2 text-sm outline-blue-500"
-                          value={areaBadQuantities[`${areaKey}_material`] || '0'}
+                          value={
+                            areaBadQuantities[`${areaKey}_material`] || '0'
+                          }
                           onChange={(e) =>
                             setAreaBadQuantities((prev) => ({
                               ...prev,

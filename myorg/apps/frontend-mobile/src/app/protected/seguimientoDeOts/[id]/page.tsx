@@ -84,6 +84,7 @@ export type AreaData = {
     bad_quantity: number;
     excess_quantity: number;
     noprocess_quantity: number;
+    material_quantity: number;
     user_id: number | null; // 👈 puede venir null
     validated: boolean;
     user?: { username: string } | null; // 👈 opcional
@@ -134,21 +135,22 @@ function getPerPartialValues(
   const hasRem = getRemainder(area) > 0;
   const cols = parc + (hasRem ? 1 : 0);
 
+  // Ordenamos las answers por fecha (te sigue sirviendo para cqm/muestras)
   const answersSorted = [...(area.answers ?? [])].sort(
     (a, b) =>
       new Date(a.created_at).getTime() - new Date(b.created_at).getTime()
   );
 
-  const defaultVal = 0;
-  const values: Array<number | string> = Array(cols).fill(defaultVal);
+  const values: Array<number | string> = Array(cols).fill(0);
 
   for (let i = 0; i < parc; i++) {
-    const ans = answersSorted[i];
-    if (!ans) continue;
-    if (field === 'cqm') values[i] = ans.sample_quantity ?? 0;
-    else if (field === 'muestras')
-      values[i] = (ans as any)?.sample_auditory ?? 0;
-    else if (field === 'defectuoso') values[i] = 0;
+    if (field === 'defectuoso') {
+      values[i] = area.partials?.[i]?.material_quantity ?? 0; // 👈 aquí el cambio
+    } else if (field === 'cqm') {
+      values[i] = answersSorted[i]?.sample_quantity ?? 0;
+    } else if (field === 'muestras') {
+      values[i] = (answersSorted[i] as any)?.sample_auditory ?? '—';
+    }
   }
 
   if (hasRem) {
@@ -197,9 +199,7 @@ const getAreaData = (
   index: number = -1
 ) => {
   const parciales = partialReleases.length;
-  const parcialesValidados = partialReleases.filter(
-    (p) => p?.validated
-  ).length;
+  const parcialesValidados = partialReleases.filter((p) => p?.validated).length;
 
   const sumFromPartials = () => {
     return partialReleases.reduce(
@@ -217,8 +217,7 @@ const getAreaData = (
   const getCommonData = (areaKey: string) => {
     const hasResponse = !!areaResponse?.[areaKey];
     const usuario = areaResponse?.user?.username || flowUser?.username || '';
-    const auditor =
-      areaResponse?.[areaKey]?.formAuditory?.user?.username || '';
+    const auditor = areaResponse?.[areaKey]?.formAuditory?.user?.username || '';
 
     if (!hasResponse && parciales > 0) {
       const resumen = sumFromPartials();
@@ -231,7 +230,7 @@ const getAreaData = (
         auditor,
         parciales,
         parcialesValidados,
-        partials: partialReleases, 
+        partials: partialReleases,
       };
     }
 
@@ -251,7 +250,7 @@ const getAreaData = (
       auditor,
       parciales,
       parcialesValidados,
-      partials: partialReleases, 
+      partials: partialReleases,
     };
   };
 
@@ -289,7 +288,7 @@ const getAreaData = (
         auditor: '',
         parciales: 0,
         parcialesValidados: 0,
-        partials: [], 
+        partials: [],
       };
   }
 };
@@ -914,10 +913,10 @@ const WorkOrderDetailScreen: React.FC = () => {
   };
 
   const fieldLabels: Record<string, string> = {
-    buenas: "Buenas",
-    malas: "Malas",
-    excedente: "Excedente",
-    noprocess: "Sin procesar",
+    buenas: 'Buenas',
+    malas: 'Malas',
+    excedente: 'Excedente',
+    noprocess: 'Sin procesar',
   };
 
   return (
@@ -1002,7 +1001,8 @@ const WorkOrderDetailScreen: React.FC = () => {
                         key={`hdr-${area.id}-p${i + 1}`}
                         style={styles.cellUser}
                       >
-                        {area.name} {area.isCollator && area.id === 4? ' (Colector)' : ''}
+                        {area.name}
+                        {area.isCollator && area.id === 4 ? ' (C)' : ''}
                         {'\n'}
                         <Text style={{ fontSize: 11, color: '#6b7280' }}>{`P${
                           i + 1
@@ -1025,6 +1025,7 @@ const WorkOrderDetailScreen: React.FC = () => {
                 ) : (
                   <Text key={`hdr-${area.id}-total`} style={styles.cellUser}>
                     {area.name}
+                    {area.isCollator && area.id === 4 ? ' (C)' : ''}
                     {'\n'}
                     <Text style={{ fontSize: 11, color: '#6b7280' }}>
                       Total
@@ -1113,6 +1114,50 @@ const WorkOrderDetailScreen: React.FC = () => {
             })}
           </View>
 
+          {/* Calidad */}
+          <View style={styles.row}>
+            <Text style={styles.cellLabel}>Calidad</Text>
+            {areas.flatMap((area, aIdx) => {
+              if (area.parciales > 0) {
+                const reviewers = getPerPartialReviewers(area);
+                return reviewers.map((name, i) => (
+                  <View
+                    style={{
+                      backgroundColor: '#FEF3C7',
+                      borderRadius: 10,
+                      paddingHorizontal: 6,
+                      paddingVertical: 2,
+                      alignSelf: 'center', 
+                      alignItems: 'center', 
+                    }}
+                  >
+                    <Text
+                      key={`cell-area-${area.id}-parcial-${i}-calidad`}
+                      style={[
+                        styles.cellUser,
+                        { color: '#92400E', textAlign: 'center' },
+                      ]}
+                    >
+                      {name || '—'}
+                    </Text>
+                  </View>
+                ));
+              }
+
+              const lastAns = getLastAnswer(area);
+              const reviewerName = getReviewerNameFromAnswer(lastAns);
+
+              return (
+                <Text
+                  key={`cell-area-${area.id}-calidad-${aIdx}`}
+                  style={styles.cellUser}
+                >
+                  {reviewerName || '-'}
+                </Text>
+              );
+            })}
+          </View>
+
           {/* Auditor */}
           <View style={styles.row}>
             <Text style={styles.cellLabel}>Auditor</Text>
@@ -1174,11 +1219,11 @@ const WorkOrderDetailScreen: React.FC = () => {
             ))}
           </View>
 
-          {(['buenas', 'malas', 'excedente', 'noprocess'] as NumericField[]).map((field) => (
+          {(
+            ['buenas', 'malas', 'excedente', 'noprocess'] as NumericField[]
+          ).map((field) => (
             <View key={`row-${field}`} style={styles.row}>
-              <Text style={styles.cellLabel}>
-                {fieldLabels[field]}
-              </Text>
+              <Text style={styles.cellLabel}>{fieldLabels[field]}</Text>
               {areas.flatMap((area, aIndex) => {
                 if (area.parciales > 0 && area.partials?.length) {
                   const cells = area.partials.map((p, pIndex) => {
@@ -1276,6 +1321,8 @@ const WorkOrderDetailScreen: React.FC = () => {
                 {Number(area.buenas) +
                   Number(area.malas) +
                   Number(area.excedente) +
+                  Number(area.noprocess) +
+                  Number(area.defectuoso) +
                   Number(area.cqm) +
                   Number(area.muestras)}
               </Text>

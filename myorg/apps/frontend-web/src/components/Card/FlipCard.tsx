@@ -7,6 +7,28 @@ const CardWrapper = styled.div`
   width: 300px;
   height: 250px;
   perspective: 1000px;
+  position: relative; /* <-- necesario para posicionar el badge */
+`;
+
+// Badge de conteo (overlay)
+const CountBadge = styled.div`
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  z-index: 5;
+  min-width: 24px;
+  height: 24px;
+  padding: 0 8px;
+  border-radius: 9999px;
+  background: ${({ theme }) => theme.palette.error.main};
+  color: #fff;
+  font-weight: 700;
+  font-size: 12px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 2px 6px rgba(0,0,0,0.35);
+  pointer-events: none; /* no bloquea el hover/flip */
 `;
 
 // Contenedor interno que realiza el flip
@@ -43,7 +65,7 @@ const Face = styled.div`
   transform: translateZ(0);
 `;
 
-// Parte frontal: el fondo se genera a partir del theme y se fuerza texto blanco y en negrita
+// Parte frontal
 const Front = styled(Face)`
   background: ${({ theme }) =>
     `linear-gradient(45deg, ${theme.palette.primary.main}, ${theme.palette.secondary.main})`};
@@ -59,7 +81,7 @@ interface BackProps {
   $backgroundUrl: string;
 }
 const Back = styled(Face)<BackProps>`
-  background: ${({ theme, $backgroundUrl }) =>
+  background: ${({ $backgroundUrl }) =>
     `linear-gradient(rgba(0, 0, 0, 0.5), rgba(0, 0, 0, 0.5)), url(${$backgroundUrl}) no-repeat center center`};
   background-size: cover;
   color: #fff;
@@ -77,7 +99,7 @@ const IconContainer = styled.div`
   }
 `;
 
-// Etiqueta para el título: texto blanco y negrita
+// Etiqueta para el título
 const TitleBadge = styled.div`
   background-color: rgba(0, 0, 0, 0.3);
   padding: 4px 12px;
@@ -88,7 +110,7 @@ const TitleBadge = styled.div`
   font-weight: bold;
 `;
 
-// Texto en la parte trasera: forzamos texto blanco y en negrita
+// Texto en la parte trasera
 const BackText = styled.p`
   text-align: center;
   font-size: 14px;
@@ -103,6 +125,7 @@ interface FlipCardProps {
   imageName: string;
   logoName: string;
   frontIcon?: React.ReactNode;
+  badgeCount?: number;            /* <-- NUEVO */
 }
 
 const FlipCard: React.FC<FlipCardProps> = ({
@@ -111,12 +134,16 @@ const FlipCard: React.FC<FlipCardProps> = ({
   imageName,
   logoName,
   frontIcon,
+  badgeCount = 0,                 /* <-- NUEVO */
 }) => {
   const backgroundUrl = `/images/${imageName}`;
   const logoUrl = `/logos/${logoName}`;
 
   return (
     <CardWrapper>
+      {/* Badge encima del flip (no lo corta el overflow ni el 3D) */}
+      {badgeCount > 0 && <CountBadge>{badgeCount}</CountBadge>}
+
       <Content>
         <Front>
           <IconContainer>
@@ -124,6 +151,7 @@ const FlipCard: React.FC<FlipCardProps> = ({
           </IconContainer>
           <TitleBadge>{title}</TitleBadge>
         </Front>
+
         <Back $backgroundUrl={backgroundUrl}>
           <BackText>{description}</BackText>
         </Back>
