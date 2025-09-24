@@ -16,8 +16,8 @@ import { RootStackParamList } from '../../navigation/types';
 import { acceptCorteInconformityAuditory } from '../../api/rechazos';
 
 interface Props {
-  workOrder: any; // toda la OT con .flow
-  currentFlow: any; // flujo actual (ej: corte)
+  workOrder: any; 
+  currentFlow: any; 
 }
 interface PartialRelease {
   quantity: string;
@@ -26,9 +26,11 @@ interface PartialRelease {
   work_order_flow_id: number;
   inconformities: any[];
 }
-type InconformityData = {
+
+export type InconformityData = {
   quantity: number | string;
   excess: number | string;
+  noprocess: number | string;
   sample: number | string;
   comments: string;
   user: string;
@@ -50,6 +52,7 @@ const CorteComponent: React.FC<Props> = ({ workOrder, currentFlow }) => {
     useState<InconformityData>({
       quantity: '',
       excess: '',
+      noprocess: '',
       sample: '',
       comments: '',
       user: '',
@@ -75,6 +78,7 @@ const CorteComponent: React.FC<Props> = ({ workOrder, currentFlow }) => {
       setInconformityValues({
         quantity: corte.good_quantity || '',
         excess: corte.excess_quantity || '',
+        noprocess: corte.noprocess_quantity || '',
         sample: corte.formAuditory?.sample_auditory || '',
         comments: corte.comments || '',
         user: corte.formAuditory?.inconformities.at(-1)?.user.username || '',
@@ -90,10 +94,15 @@ const CorteComponent: React.FC<Props> = ({ workOrder, currentFlow }) => {
         (acc: any, p: any) => acc + (p.excess_quantity || 0),
         0
       );
+      const totalNoProcess = partials.reduce(
+        (acc: any, p: any) => acc + (p.noprocess_quantity || 0),
+        0
+      );
 
       setInconformityValues({
         quantity: Math.max((corte.good_quantity || 0) - totalGood, 0),
         excess: Math.max((corte.excess_quantity || 0) - totalExcess, 0),
+        noprocess: Math.max((corte.noprocess_quantity || 0) - totalNoProcess, 0),
         sample: corte.formAuditory?.sample_auditory || '',
         comments: corte.comments || '',
         user:
@@ -109,6 +118,7 @@ const CorteComponent: React.FC<Props> = ({ workOrder, currentFlow }) => {
       setInconformityValues({
         quantity: firstUnvalidated?.quantity || '',
         excess: firstUnvalidated?.excess_quantity || '',
+        noprocess: firstUnvalidated?.noprocess_quantity || '',
         sample: firstUnvalidated?.formAuditory?.sample_auditory || '',
         comments: firstUnvalidated?.observation || '',
         user:
@@ -277,6 +287,15 @@ const CorteComponent: React.FC<Props> = ({ workOrder, currentFlow }) => {
               editable={false}
             />
           </TouchableOpacity>
+          <Text style={styles.subtitle}>Sin procesar:</Text>
+          <TextInput
+            style={styles.input}
+            editable={false}
+            value={String(inconformityValues.noprocess)}
+            mode="outlined"
+            activeOutlineColor="#000"
+            theme={{ roundness: 30 }}
+          />
           <Text style={styles.subtitle}>Excedente:</Text>
           <TextInput
             style={styles.input}

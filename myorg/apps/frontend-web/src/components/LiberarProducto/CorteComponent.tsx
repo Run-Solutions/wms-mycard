@@ -63,7 +63,6 @@ const NEXT_INVALID_FOR_PARTIAL = [
   'En Calidad',
   'Enviado a auditoria parcial',
   'Pendiente',
-  'Parcial',
   'Pendiente parcial',
   'En inconformidad CQM',
 ] as const;

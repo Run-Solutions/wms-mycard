@@ -11,6 +11,7 @@ export class CloseAuditoryWorkOrderService {
     if (!userId) {
       throw new Error('No se proporcionan areas validas');
     }
+    console.log('Estados que se reciben:', statuses);
     // Para obtener las ordenes de trabajo con estado en auditoria o estados solicitados
     const inAuditoryOrders = await this.prisma.formAuditory.findMany({
       where: {
@@ -55,7 +56,7 @@ export class CloseAuditoryWorkOrderService {
             },
           },
         },
-        personalizacion_answer_auditory: { 
+        personalizacion_answer_auditory: {
           include: {
             areas_response: {
               include: {
@@ -74,7 +75,7 @@ export class CloseAuditoryWorkOrderService {
             },
           },
         },
-        hot_stamping_answer_auditory: { 
+        hot_stamping_answer_auditory: {
           include: {
             areas_response: {
               include: {
@@ -93,7 +94,7 @@ export class CloseAuditoryWorkOrderService {
             },
           },
         },
-        milling_chip_answer_auditory: { 
+        milling_chip_answer_auditory: {
           include: {
             areas_response: {
               include: {
@@ -131,9 +132,13 @@ export class CloseAuditoryWorkOrderService {
         ? order.milling_chip_answer_auditory?.areas_response?.workOrder?.id
         : undefined;
 
-      return [corteWorkOrderId, colorEdgeWorkOrderId, personalizacionWorkOrderId, hotStampingWorkOrderId, millingChipWorkOrderId].filter(
-        (id): id is number => !!id,
-      );
+      return [
+        corteWorkOrderId,
+        colorEdgeWorkOrderId,
+        personalizacionWorkOrderId,
+        hotStampingWorkOrderId,
+        millingChipWorkOrderId,
+      ].filter((id): id is number => !!id);
     });
 
     const filteredWorkOrderIds = workOrderIds.filter(
@@ -141,17 +146,37 @@ export class CloseAuditoryWorkOrderService {
     );
     console.log(filteredWorkOrderIds, 'Ordenes pendientes filtradas');
     // Traer las workOrders asociadas a los IDs
+    // helper: construye el where para flow.status
+    // Dedup de IDs por si llegan repetidos
+    const uniqueIds = Array.from(new Set(filteredWorkOrderIds));
+
+    const allowedStatuses =
+      statuses && statuses.length ? statuses : ['En auditoria'];
+
+    // Construye un OR de equals (case-sensitive)
+    const flowStatusOr = allowedStatuses.map((s) => ({
+      status: { equals: s }, // sin mode
+    }));
+
+    // Filtro para flow.status: alguno de los estados permitidos Y que NO contenga "inconformidad"
+    const flowWhere = {
+      AND: [
+        { OR: flowStatusOr },
+        { NOT: { status: { contains: 'inconformidad' } } }, // sin mode => respeta el casing exacto
+      ],
+    };
+
     const allRelatedWorkOrders = await this.prisma.workOrder.findMany({
       where: {
-        id: { in: filteredWorkOrderIds },
+        id: { in: uniqueIds },
+        status: { notIn: ['Cerrado'] }, // si status es nullable, incluye null
+        flow: { some: flowWhere }, // ⬅️ esto sí filtra la orden
       },
       include: {
         user: true,
         flow: {
-          include: {
-            user: true,
-            area: true,
-          },
+          where: flowWhere, // devuelves solo los pasos relevantes
+          include: { user: true, area: true },
         },
         files: true,
       },

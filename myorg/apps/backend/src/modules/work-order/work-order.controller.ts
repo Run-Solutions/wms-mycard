@@ -63,6 +63,7 @@ export class WorkOrderController {
         { name: 'ot', maxCount: 1 },
         { name: 'sku', maxCount: 1 },
         { name: 'op', maxCount: 1 },
+        { name: 'cardImage', maxCount: 1 },
         { name: 'attachments', maxCount: 5 },
       ],
       multerOptions,
@@ -76,13 +77,14 @@ export class WorkOrderController {
       ot?: Express.Multer.File[];
       sku?: Express.Multer.File[];
       op?: Express.Multer.File[];
+      cardImage?: Express.Multer.File[];
       attachments?: Express.Multer.File[];
     },
   ) {
     console.log('Request Body:', createWorkOrderDto);
     console.log('Usuario autenticado:', req.user?.id);
 
-    const userId = req.user?.id; // Obtener el ID del usuario autenticado
+    const userId = req.user?.id; 
     if (!userId) {
       throw new Error('No se pudo obtener el usuario autenticado.');
     }
@@ -93,8 +95,8 @@ export class WorkOrderController {
 
     // Límite total: 3 obligatorios + adjuntos
     const extras = files.attachments || [];
-    const MAX_FILES = 8;
-    const total = 3 + extras.length;
+    const MAX_FILES = 9;
+    const total = 3 + (files.cardImage?.length ? 1 : 0) + extras.length;
     if (total > MAX_FILES) {
       throw new BadRequestException(`Máximo ${MAX_FILES} archivos por orden.`);
     }
@@ -106,6 +108,7 @@ export class WorkOrderController {
         ot: files.ot ? files.ot[0] : null,
         sku: files.sku ? files.sku[0] : null,
         op: files.op ? files.op[0] : null,
+        cardImage: files.cardImage?.[0] || null,
         attachments: extras,
       },
       userId,

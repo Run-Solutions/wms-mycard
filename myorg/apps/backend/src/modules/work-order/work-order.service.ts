@@ -20,6 +20,7 @@ export class WorkOrderService {
       ot: Express.Multer.File | null;
       sku: Express.Multer.File | null;
       op: Express.Multer.File | null;
+      cardImage: Express.Multer.File | null;
       attachments?: Express.Multer.File[];
     },
     userId: number,
@@ -40,11 +41,12 @@ export class WorkOrderService {
     }
 
     const extras = files.attachments || [];
-    const MAX_FILES = 8;
+    const MAX_FILES = 9;
     const total =
       (files.ot ? 1 : 0) +
       (files.sku ? 1 : 0) +
       (files.op ? 1 : 0) +
+      (files.cardImage ? 1 : 0) + 
       extras.length;
     if (total > MAX_FILES) {
       throw new BadRequestException(`Máximo ${MAX_FILES} archivos por orden.`);
@@ -84,6 +86,15 @@ export class WorkOrderService {
             },
           });
         }
+      }
+      if (files.cardImage) {
+        await this.prisma.workOrderFiles.create({
+          data: {
+            work_order_id: workOrder.id,
+            type: 'CARD_IMAGE',   // 👈 usa un tipo claro y consistente
+            file_path: files.cardImage.filename,
+          },
+        });
       }
 
       // Guardar adjuntos adicionales

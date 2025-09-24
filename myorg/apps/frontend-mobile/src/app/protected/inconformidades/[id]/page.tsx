@@ -89,6 +89,8 @@ const InconformidadesAuxScreen: React.FC = () => {
         return 'Ver SKU';
       case 'OP':
         return 'Ver OP';
+      case 'CARD_IMAGE':
+        return 'Ver TARJETA';
       default:
         return 'Adjunto';
     }

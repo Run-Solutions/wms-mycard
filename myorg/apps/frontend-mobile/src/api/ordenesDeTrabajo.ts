@@ -2,12 +2,11 @@ import API from './http';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
 export type FileLike =
-  | File
+  | File // Web
   | {
-      uri: string;
+      uri: string; // RN
       name: string;
       type: string;
-      size?: number | null;
     };
 
 export const getAreasOperator = async () => {
@@ -28,7 +27,7 @@ export const getAreasOperator = async () => {
 // ✅ Firma acepta FileLike en lugar de File
 export const createWorkOrder = async (
   formData: any,
-  files: { ot: FileLike; sku: FileLike; op: FileLike; attachments?: FileLike[] }
+  files: { ot: FileLike; sku: FileLike; op: FileLike; attachments?: FileLike[], cardImage?: FileLike }
 ) => {
   const token = await AsyncStorage.getItem('token');
   if (!token) throw new Error('Token no disponible');
@@ -54,6 +53,7 @@ export const createWorkOrder = async (
   appendFile('ot', files.ot);
   appendFile('sku', files.sku);
   appendFile('op', files.op);
+  if (files.cardImage) appendFile('cardImage', files.cardImage);
 
   (files.attachments || []).forEach((f) => appendFile('attachments', f));
 
@@ -72,8 +72,6 @@ export const createWorkOrder = async (
   const response = await API.post('/work-orders', formDataToSend, {
     headers: {
       Authorization: `Bearer ${token}`,
-      // Deja que Axios/RN ponga el boundary; este header es OK:
-      'Content-Type': 'multipart/form-data',
     },
   });
 

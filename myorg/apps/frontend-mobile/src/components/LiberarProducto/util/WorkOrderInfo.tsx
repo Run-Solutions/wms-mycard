@@ -34,6 +34,8 @@ export default function WorkOrderInfo({
         return 'Ver SKU';
       case 'OP':
         return 'Ver OP';
+      case 'CARD_IMAGE':
+        return 'Ver TARJETA';
       default:
         return 'Adjunto';
     }
@@ -197,7 +199,8 @@ export function WorkOrderHojasInfo({
 }: Props) {
   const cantidadHojasRaw = Number(workOrder?.workOrder.quantity) / 24;
   const cantidadHojas = cantidadHojasRaw > 0 ? Math.ceil(cantidadHojasRaw) : 0;
-  const totalSheetsEffective = workOrder?.workOrder?.total_sheets ?? cantidadHojas;
+  const totalSheetsEffective =
+    workOrder?.workOrder?.total_sheets ?? cantidadHojas;
 
   function getLabelByType(type: string) {
     switch (type) {
@@ -207,6 +210,8 @@ export function WorkOrderHojasInfo({
         return 'Ver SKU';
       case 'OP':
         return 'Ver OP';
+      case 'CARD_IMAGE':
+        return 'Ver TARJETA';
       default:
         return 'Adjunto';
     }
@@ -379,7 +384,8 @@ export function WorkOrderHojasInfo({
 export function WorkOrderPrePressInfo({ workOrder }: Props) {
   const cantidadHojasRaw = Number(workOrder?.workOrder.quantity) / 24;
   const cantidadHojas = cantidadHojasRaw > 0 ? Math.ceil(cantidadHojasRaw) : 0;
-  const totalSheetsEffective = workOrder?.workOrder?.total_sheets ?? cantidadHojas;
+  const totalSheetsEffective =
+    workOrder?.workOrder?.total_sheets ?? cantidadHojas;
 
   function getLabelByType(type: string) {
     switch (type) {
@@ -389,6 +395,8 @@ export function WorkOrderPrePressInfo({ workOrder }: Props) {
         return 'Ver SKU';
       case 'OP':
         return 'Ver OP';
+      case 'CARD_IMAGE':
+        return 'Ver TARJETA';
       default:
         return 'Adjunto';
     }

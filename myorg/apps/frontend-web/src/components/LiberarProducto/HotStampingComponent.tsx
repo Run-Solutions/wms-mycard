@@ -64,10 +64,11 @@ const NEXT_INVALID_FOR_PARTIAL = [
   'En Calidad',
   'Enviado a auditoria parcial',
   'Pendiente',
-  'Parcial',
   'Pendiente parcial',
   'En inconformidad CQM',
 ] as const;
+
+
 
 const NEXT_CORTE_STATUSES = ['Enviado a auditoria parcial'] as const;
 
@@ -156,6 +157,7 @@ export default function HotStampingComponent({ workOrder }: Props) {
     () => calcularCantidadPorLiberar(currentFlow, lastCompletedOrPartial),
     [currentFlow, lastCompletedOrPartial]
   );
+  console.log('Cantidad por liberar:', cantidadporliberar);
 
   const orderQuantity: number = useMemo(
     () =>
@@ -609,6 +611,7 @@ export default function HotStampingComponent({ workOrder }: Props) {
         <WorkOrderInfo
           workOrder={workOrder}
           lastCompletedOrPartial={lastCompletedOrPartial}
+          cantidadporliberar={cantidadporliberar}
         />
         <NewData>
           <SectionTitle>Datos de Producción</SectionTitle>

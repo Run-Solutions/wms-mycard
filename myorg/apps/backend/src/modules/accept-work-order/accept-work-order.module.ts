@@ -2,8 +2,10 @@ import { Module } from '@nestjs/common';
 import { AcceptWorkOrderController } from './accept-work-order.controller';
 import { AcceptWorkOrderService } from './accept-work-order.service';
 import { PrismaService } from 'prisma/prisma.service';
+import { NotificationsModule } from 'src/notifications/notifications.module';
 
 @Module({
+  imports: [NotificationsModule],
   controllers: [AcceptWorkOrderController],
   providers: [AcceptWorkOrderService, PrismaService],
 })

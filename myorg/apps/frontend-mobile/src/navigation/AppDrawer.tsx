@@ -5,11 +5,9 @@ import CustomDrawerContent from './CustomDrawerContent';
 import { useModules, ModuleFromApi } from '../api/navigation';
 import { MODULE_CONFIG, type ModuleConfig } from './moduleConfig';
 import { InternalStack } from './InternalStack';
-import { TouchableOpacity } from 'react-native';
-import { Ionicons } from '@expo/vector-icons';
-import NotificationsScreen from '../screens/NotificationsScreen';
-
+import NotificationsBell from '../screens/NotificationsBell.tsx';
 import { stripAccents } from '../utils/stringUtils';
+import { useUnreadNotificationsCount } from '../screens/useUnreadNotificationsCount';
 
 const Drawer = createDrawerNavigator();
 
@@ -32,6 +30,9 @@ const AppDrawer: React.FC = () => {
     ));
   }, [modules]);
 
+  // ← trae el conteo (sin polling; si quieres, pasa por ej. pollMs=60000)
+  const { count } = useUnreadNotificationsCount();
+
   return (
     <Drawer.Navigator
       initialRouteName="Principal"
@@ -44,16 +45,15 @@ const AppDrawer: React.FC = () => {
           headerShown: true,
           title: 'Inicio',
           headerRight: () => (
-            <TouchableOpacity
+            <NotificationsBell
+              count={count}
               onPress={() =>
                 navigation.navigate('Principal', {
                   screen: 'NotificationsScreen',
                 })
               }
               style={{ marginRight: 16 }}
-            >
-              <Ionicons name="notifications-outline" size={24} color="black" />
-            </TouchableOpacity>
+            />
           ),
         })}
       >

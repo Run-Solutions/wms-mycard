@@ -3,10 +3,18 @@
 import React, { useEffect, useState } from 'react';
 import { Box, CircularProgress } from '@mui/material';
 import MuiGrid from '@mui/material/Grid';
-import FlipCard from '@/components/Card/FlipCard';
+import MotionCard from '@/components/Card/FlipCard';
 import { useRouter } from 'next/navigation';
 import { BASE_URL } from '@/api/http';
 import { getWorkOrdersWithInconformidad } from '@/api/inconformidades';
+import { fetchWorkOrdersInProgress } from '@/api/liberarProducto';
+import { fetchWorkOrdersInProgress as fetchWorkOrdersInProgressFromSeguimiento } from '@/api/seguimientoDeOts';
+import { fetchWorkOrdersInProgress as fetchWorkOrdersInProgressAuditory } from '@/api/cerrarOrdenDeTrabajo';
+import { getPendingOrders } from '@/api/aceptarProducto';
+import { getOrdersInCalidad } from '@/api/recepcionCQM';
+import { getPendingOrders as getPendingOrdersAuditoria } from '@/api/aceptarAuditoria';
+import { getWorkOrders } from '@/api/finalizacion';
+import { getWorkOrdersWithInconformidadAuditory } from '@/api/rechazos';
 import { fetchPendingOrders } from '@/api/vistosBuenos';
 
 interface Module {
@@ -38,6 +46,70 @@ const normalize = (s: string) =>
 
 // 🔹 Resolvers que devuelven el conteo por módulo
 const COUNT_RESOLVERS: Partial<Record<string, () => Promise<number>>> = {
+  'aceptar producto': async () => {
+    try {
+      const data = await getPendingOrders();
+      return getPendingCount(data);
+    } catch {
+      return 0;
+    }
+  },
+  'aceptar auditoria': async () => {
+    try {
+      const data = await getPendingOrdersAuditoria();
+      return getPendingCount(data);
+    } catch {
+      return 0;
+    }
+  },
+  'recepcion de vistos buenos': async () => {
+    try {
+      const data = await fetchPendingOrders();
+      return getPendingCount(data);
+    } catch {
+      return 0;
+    }
+  },
+  'liberacion de vistos buenos': async () => {
+    try {
+      const data = await getOrdersInCalidad();
+      return getPendingCount(data);
+    } catch {
+      return 0;
+    }
+  },
+  'liberar producto': async () => {
+    try {
+      const data = await fetchWorkOrdersInProgress();
+      return getPendingCount(data);
+    } catch {
+      return 0;
+    }
+  },
+  'seguimiento de ots': async () => {
+    try {
+      const data = await fetchWorkOrdersInProgressFromSeguimiento();
+      return getPendingCount(data);
+    } catch {
+      return 0;
+    }
+  },
+  finalizacion: async () => {
+    try {
+      const data = await getWorkOrders();
+      return getPendingCount(data);
+    } catch {
+      return 0;
+    }
+  },
+  'cerrar orden de trabajo': async () => {
+    try {
+      const data = await fetchWorkOrdersInProgressAuditory();
+      return getPendingCount(data);
+    } catch {
+      return 0;
+    }
+  },
   inconformidades: async () => {
     try {
       const data = await getWorkOrdersWithInconformidad();
@@ -46,11 +118,18 @@ const COUNT_RESOLVERS: Partial<Record<string, () => Promise<number>>> = {
       return 0;
     }
   },
-  'liberar producto': async () => {
+  rechazos: async (): Promise<number> => {
     try {
-      const data = await fetchPendingOrders();
-      return getPendingCount(data);
-    } catch {
+      const { pendingOrdersAuditory } = await getWorkOrdersWithInconformidadAuditory();
+  
+      const workOrders = Array.isArray(pendingOrdersAuditory)
+        ? pendingOrdersAuditory.map((item: any) => item.workOrder)
+        : [];
+  
+      const count = getPendingCount(workOrders);
+      return typeof count === 'number' ? count : 0; // siempre número
+    } catch (err) {
+      console.warn('rechazos error:', err);
       return 0;
     }
   },
@@ -106,6 +185,7 @@ const DashboardPage: React.FC = () => {
           })
         );
         setCounts(Object.fromEntries(pairs));
+        console.log('Modules with counts:', Object.fromEntries(pairs));
       } catch (error) {
         console.error(error);
       } finally {
@@ -127,9 +207,8 @@ const DashboardPage: React.FC = () => {
           {modules.map((module) => (
             <MuiGrid item xs={12} sm={6} md={4} key={module.id}>
               <Box onClick={() => handleCardClick(module.name)} sx={{ cursor: 'pointer' }}>
-                <FlipCard
+                <MotionCard
                   title={module.name}
-                  description={module.description}
                   imageName={module.imageName}
                   logoName={module.logoName}
                   badgeCount={counts[module.name] ?? 0}  // <- badge dentro del FlipCard

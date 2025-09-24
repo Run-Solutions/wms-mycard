@@ -419,6 +419,8 @@ const WorkOrderDetailScreen: React.FC = () => {
         return 'Ver SKU';
       case 'OP':
         return 'Ver OP';
+      case 'CARD_IMAGE':
+        return 'Ver TARJETA';
       default:
         return 'Adjunto';
     }
@@ -1127,8 +1129,8 @@ const WorkOrderDetailScreen: React.FC = () => {
                       borderRadius: 10,
                       paddingHorizontal: 6,
                       paddingVertical: 2,
-                      alignSelf: 'center', 
-                      alignItems: 'center', 
+                      alignSelf: 'center',
+                      alignItems: 'center',
                     }}
                   >
                     <Text

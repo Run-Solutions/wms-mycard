@@ -1,53 +1,50 @@
-import React, { useEffect, useState } from 'react';
-import { View, Text, Image, ScrollView } from 'react-native';
-import { Pressable, StyleSheet } from 'react-native';
+import React, { useMemo } from 'react';
+import { View, Text, FlatList, StyleSheet } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
-import { MODULE_CONFIG, ModuleFromApi } from '../navigation/moduleConfig';
-import getLocalLogo from '../utils/logoMap';
+
+import { MODULE_CONFIG } from '../navigation/moduleConfig';
 import { useModules } from '../api/navigation';
+import getLocalLogo from '../utils/logoMap';
+
+import ModuleCard from './ModuleCard';
+import { useModuleCounts } from './useModuleCounts';
 
 const DashboardScreen: React.FC = () => {
-  const modules = useModules();
+  const modules = useModules(); // [{ id, name, description, imageName, logoName }]
   const navigation = useNavigation();
-  
+
+  const moduleNames = useMemo(() => modules.map(m => m.name), [modules]);
+  const { counts } = useModuleCounts(moduleNames);
+
   return (
     <View style={{ flex: 1 }}>
       {/* Encabezado */}
       <View style={styles.headerContainer}>
         <Text style={styles.headerText}>Bienvenido/a a MyCard</Text>
-        <Text style={styles.subHeaderText}>Seleccioná un módulo para continuar</Text>
+        <Text style={styles.subHeaderText}>Selecciona un módulo para continuar</Text>
       </View>
-  
-      {/* Lista de módulos */}
-      <ScrollView contentContainerStyle={{ padding: 16 }}>
-        {modules.map((mod) => {
-          const config = MODULE_CONFIG.find(c => c.name === mod.name);
+
+      {/* Grilla de módulos */}
+      <FlatList
+        contentContainerStyle={styles.listContent}
+        data={modules}
+        keyExtractor={(item) => String(item.id)}
+        numColumns={2}
+        renderItem={({ item }) => {
+          const config = MODULE_CONFIG.find(c => c.name === item.name);
           if (!config) return null;
-  
           return (
-            <Pressable
-              key={mod.id}
+            <ModuleCard
+              title={item.name}
+              imageName={item.imageName}   
+              logoName={item.logoName}
+              badgeCount={counts[item.name] ?? 0}
+              getLocalLogo={getLocalLogo}
               onPress={() => navigation.navigate(config.route as never)}
-              style={({ pressed }) => [
-                styles.moduleCard,
-                pressed && styles.pressedCard
-              ]}
-            >
-              <View style={styles.cardContent}>
-                <Image
-                  source={getLocalLogo(mod.logoName)}
-                  style={styles.logo}
-                  resizeMode="contain"
-                />
-                <View style={styles.textContainer}>
-                  <Text style={styles.moduleTitle}>{mod.name}</Text>
-                  <Text style={styles.moduleDescription}>{mod.description}</Text>
-                </View>
-              </View>
-            </Pressable>
+            />
           );
-        })}
-      </ScrollView>
+        }}
+      />
     </View>
   );
 };
@@ -57,61 +54,28 @@ export default DashboardScreen;
 const styles = StyleSheet.create({
   headerContainer: {
     paddingHorizontal: 16,
-    paddingTop: 30,
-    paddingBottom: 15,
-    backgroundColor: '#f4f4f4',
-    borderBottomWidth: 1,
-    borderBottomColor: '#ddd',
+    paddingTop: 18,
+    paddingBottom: 10,
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    borderBottomColor: 'rgba(255,255,255,0.06)',
     alignItems: 'center',
+    color: '#000000',
     justifyContent: 'center',
-    gap: 8,
+    gap: 6,
   },
   headerText: {
-    fontSize: 22,
-    fontWeight: '600',
-    color: '#222',
+    fontSize: 20,
+    fontWeight: '700',
+    color: '#000000',
   },
   subHeaderText: {
-    fontSize: 14,
-    color: '#666',
-    marginTop: 4,
+    fontSize: 13,
+    color: '#000000',
+    marginTop: 2,
   },
-  moduleCard: {
-    padding: 16,
-    marginBottom: 16,
-    backgroundColor: '#fff',
-    borderRadius: 12,
-    elevation: 3,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-  },
-  pressedCard: {
-    opacity: 0.9,
-    transform: [{ scale: 0.98 }],
-  },
-  cardContent: {
-    flexDirection: 'row',
-    alignItems: 'center',
-  },
-  logo: {
-    width: 48,
-    height: 48,
-    marginRight: 16,
-    borderRadius: 8,
-  },
-  textContainer: {
-    flexShrink: 1,
-  },
-  moduleTitle: {
-    fontSize: 16,
-    fontWeight: 'bold',
-    color: '#222',
-    marginBottom: 4,
-  },
-  moduleDescription: {
-    fontSize: 14,
-    color: '#666',
+  listContent: {
+    paddingHorizontal: 8,
+    paddingVertical: 12,
+    alignItems: 'center', // centra las columnas como en web
   },
 });

@@ -11,10 +11,7 @@ interface PartialRelease {
   quantity: number;
 }
 
-export default function WorkOrderInfo({
-  workOrder,
-}: Props) {
-
+export default function WorkOrderInfo({ workOrder }: Props) {
   const guessMimeFromName = (filename: string): string => {
     const ext = filename.split('.').pop()?.toLowerCase();
     switch (ext) {
@@ -131,6 +128,8 @@ export default function WorkOrderInfo({
                       ? 'SKU'
                       : file.type === 'OP'
                       ? 'OP'
+                      : file.type === 'CARD_IMAGE'
+                      ? 'Ver TARJETA'
                       : 'Adjunto';
                   return (
                     <button
@@ -160,4 +159,3 @@ export default function WorkOrderInfo({
     </>
   );
 }
-

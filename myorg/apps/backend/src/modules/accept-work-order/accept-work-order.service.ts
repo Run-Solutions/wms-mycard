@@ -1,9 +1,15 @@
 import { Injectable } from '@nestjs/common';
 import { PrismaService } from 'prisma/prisma.service';
+import { NotificationsService } from 'src/notifications/notifications.service';
+import { Inconformities, WorkOrderFlow } from '@prisma/client';
+
 
 @Injectable()
 export class AcceptWorkOrderService {
-  constructor(private prisma: PrismaService) {}
+  constructor(
+    private prisma: PrismaService,
+    private notificationService: NotificationsService,
+  ) {}
 
   // Para obtener los WorkOrderFlowPendientes
   async getPendingWorkOrders(areasOperatorIds: number) {
@@ -250,22 +256,25 @@ export class AcceptWorkOrderService {
     inconformidad: string,
   ) {
     console.log('Marcando inconformidad...');
+  
     const lastCompletedOrPartial = await this.prisma.workOrderFlow.findUnique({
       where: { id: workOrderFlowId },
-    });
-    const partial = await this.prisma.partialRelease.findFirst({
-      where: {
-        work_order_flow_id: workOrderFlowId,
-        validated: false,
-      },
+      include: { area: true },
     });
     if (!lastCompletedOrPartial) throw new Error('Flujo no encontrado');
-    let createInconformidad: object | null;
-    // Si el flujo anterior es parcial o está en estado de 'Parcial' debe crear la inconformidad en el partial
+  
+    const partial = await this.prisma.partialRelease.findFirst({
+      where: { work_order_flow_id: workOrderFlowId, validated: false },
+    });
+  
+    // Tipado correcto
+    let createInconformidad: Inconformities;
+  
+    // Crear inconformidad en partial o en areasResponse
     if (lastCompletedOrPartial.status === 'Parcial' || partial) {
       createInconformidad = await this.prisma.inconformities.create({
         data: {
-          partial_release_id: partial?.id,
+          partial_release_id: partial?.id ?? null, // si la columna acepta null
           comments: inconformidad,
           created_by: userId,
           reviewed: false,
@@ -276,6 +285,7 @@ export class AcceptWorkOrderService {
         where: { work_order_flow_id: workOrderFlowId },
       });
       if (!areasResponse) throw new Error('Área response no encontrada');
+  
       createInconformidad = await this.prisma.inconformities.create({
         data: {
           areas_response_id: areasResponse.id,
@@ -285,15 +295,47 @@ export class AcceptWorkOrderService {
         },
       });
     }
-    // Actualiza estado a 'En inconformidad'
+  
     const updated = await this.prisma.workOrderFlow.update({
       where: { id: workOrderFlowId },
-      data: { status: 'En inconformidad' },
+      data: { status: 'En inconformidad' as WorkOrderFlow['status'] },
       include: { user: true, area: true },
     });
-    // Cambiar estado del siguiente flujo si existe
-    await this.updateNextWorkOrderFlow(workOrderFlowId, updated.work_order_id);
-    return { updated, createInconformidad };
+  
+    const nextFLow = await this.updateNextWorkOrderFlow(
+      workOrderFlowId,
+      updated.work_order_id,
+    );
+  
+    const assignedUserId = updated.assigned_user ?? null; 
+    const otId = await this.prisma.workOrder.findUnique({
+      where: { id: updated.work_order_id },
+      select: { ot_id: true },
+    });
+    const inconformityUser = await this.prisma.user.findUnique({
+      where: { id: userId },
+      select: { username: true },
+    });
+  
+    if (assignedUserId !== null && typeof createInconformidad.id === 'number') {
+      await this.notificationService.createAndSendNotification(
+        assignedUserId,
+        'Tienes una inconformidad por revisar',
+        `La orden ${otId?.ot_id} tiene una inconformidad del área receptora por parte del usuario ${inconformityUser?.username}.`,
+        { workOrderId: updated.work_order_id },
+        createInconformidad.id 
+      );
+    }
+  
+    await this.notificationService.createAndSendNotificationToRole(
+      'planeador',
+      'Nueva inconformidad',
+      `La orden ${otId?.ot_id} tiene una inconformidad del área receptora o auditoría a área previa ${lastCompletedOrPartial?.area.name} por parte del usuario ${inconformityUser?.username}.`,
+      { workOrderId: updated.work_order_id },
+      createInconformidad.id 
+    );
+  
+    return { updated, createInconformidad, nextFLow };
   }
 
   // Actualiza siguiente flujo de trabajo a 'En espera' si existe
@@ -310,6 +352,7 @@ export class AcceptWorkOrderService {
         },
       },
       orderBy: { id: 'asc' },
+      select: { id: true, area: true },
     });
 
     if (nextWorkOrderFlow) {
@@ -317,6 +360,7 @@ export class AcceptWorkOrderService {
         where: { id: nextWorkOrderFlow.id },
         data: { status: 'En espera' },
       });
+      return nextWorkOrderFlow;
     } else {
       console.log('No se encontró un siguiente WorkOrderFlow.');
     }
@@ -355,8 +399,39 @@ export class AcceptWorkOrderService {
         form_answer_id: formAnswer.id,
         comments: inconformidad,
         created_by: userId,
+        reviewed: false,
       },
     });
+    const otId = await this.prisma.workOrder.findUnique({
+      where: { id: updated.work_order_id },
+      select: { ot_id: true },
+    });
+    const calidad = await this.prisma.user.findUnique({
+      where: { id: userId },
+      select: { username: true },
+    });
+    if (updated.assigned_user) {
+      await this.notificationService.createAndSendNotification(
+        updated.assigned_user,
+        'Tienes una inconformidad CQM por revisar',
+        `La orden ${otId?.ot_id} tiene una inconformidad CQM por parte del usuario ${calidad?.username}.`,
+        {
+          workOrderId: updated.work_order_id,
+          inconformityId: createInconformidad.id,
+        },
+        createInconformidad.id,
+      );
+      await this.notificationService.createAndSendNotificationToRole(
+        'planeador',
+        'Nueva inconformidad CQM',
+        `La orden ${otId?.ot_id} en el área ${updated.area.name}, con operador ${updated.user?.username} reporta una inconformidad CQM por parte del usuario ${calidad?.username}.`,
+        {
+          workOrderId: updated.work_order_id,
+          inconformityId: createInconformidad.id,
+        },
+        createInconformidad.id,
+      );
+    }
     return { updated, createInconformidad };
   }
 
@@ -374,13 +449,13 @@ export class AcceptWorkOrderService {
         `No se encontró el workOrderFlow con id ${workOrderFlowId}`,
       );
     }
-  
+
     const updated = await this.prisma.workOrderFlow.update({
       where: { id: workOrderFlowId },
       data: { status: 'En inconformidad auditoria' },
       include: { user: true, area: true },
     });
-  
+
     // 3. Buscar el siguiente flujo por orden
     const siguiente = await this.prisma.workOrderFlow.findFirst({
       where: {
@@ -389,8 +464,8 @@ export class AcceptWorkOrderService {
       },
       orderBy: { id: 'asc' },
     });
-  
-    if (siguiente?.assigned_user === null ) {
+
+    if (siguiente?.assigned_user === null) {
       await this.prisma.workOrderFlow.update({
         where: { id: siguiente.id },
         data: { status: 'En espera' },
@@ -401,9 +476,9 @@ export class AcceptWorkOrderService {
         data: { status: 'En proceso' },
       });
     }
-  
+
     let formAuditoryId: number | undefined;
-  
+
     // 1. Buscar último partialRelease validado
     const validatedPartial = await this.prisma.partialRelease.findFirst({
       where: {
@@ -413,7 +488,7 @@ export class AcceptWorkOrderService {
       },
       orderBy: { id: 'desc' },
     });
-  
+
     if (validatedPartial?.form_auditory_id) {
       formAuditoryId = validatedPartial.form_auditory_id;
     } else {
@@ -422,62 +497,117 @@ export class AcceptWorkOrderService {
         where: { work_order_flow_id: workOrderFlowId },
         include: { area: true },
       });
-  
+
       if (!response) throw new Error('No se encontró áreasResponse');
-  
+
       switch (response.area?.id) {
         case 6:
-          formAuditoryId = (
-            await this.prisma.corteResponse.findFirst({
-              where: { areas_response_id: response.id },
-            })
-          )?.form_auditory_id ?? undefined;
+          formAuditoryId =
+            (
+              await this.prisma.corteResponse.findFirst({
+                where: { areas_response_id: response.id },
+              })
+            )?.form_auditory_id ?? undefined;
           break;
         case 7:
-          formAuditoryId = (
-            await this.prisma.colorEdgeResponse.findFirst({
-              where: { areas_response_id: response.id },
-            })
-          )?.form_auditory_id ?? undefined;
+          formAuditoryId =
+            (
+              await this.prisma.colorEdgeResponse.findFirst({
+                where: { areas_response_id: response.id },
+              })
+            )?.form_auditory_id ?? undefined;
           break;
         case 8:
-          formAuditoryId = (
-            await this.prisma.hotStampingResponse.findFirst({
-              where: { areas_response_id: response.id },
-            })
-          )?.form_auditory_id ?? undefined;
+          formAuditoryId =
+            (
+              await this.prisma.hotStampingResponse.findFirst({
+                where: { areas_response_id: response.id },
+              })
+            )?.form_auditory_id ?? undefined;
           break;
         case 9:
-          formAuditoryId = (
-            await this.prisma.millingChipResponse.findFirst({
-              where: { areas_response_id: response.id },
-            })
-          )?.form_auditory_id ?? undefined;
+          formAuditoryId =
+            (
+              await this.prisma.millingChipResponse.findFirst({
+                where: { areas_response_id: response.id },
+              })
+            )?.form_auditory_id ?? undefined;
           break;
         case 10:
-          formAuditoryId = (
-            await this.prisma.personalizacionResponse.findFirst({
-              where: { areas_response_id: response.id },
-            })
-          )?.form_auditory_id ?? undefined;
+          formAuditoryId =
+            (
+              await this.prisma.personalizacionResponse.findFirst({
+                where: { areas_response_id: response.id },
+              })
+            )?.form_auditory_id ?? undefined;
           break;
         default:
           throw new Error(`Área no soportada: ${response.area?.name}`);
       }
     }
-  
+
     if (!formAuditoryId) {
       throw new Error('No se pudo obtener form_auditory_id');
     }
-  
+
     const createInconformidad = await this.prisma.inconformities.create({
       data: {
         form_auditory_id: formAuditoryId,
         comments: inconformidad,
         created_by: userId,
+        reviewed: false,
       },
     });
-  
+    const auditory = await this.prisma.formAuditory.findUnique({
+      where: { id: formAuditoryId },
+      include: { user: true, workOrderFlow: true },
+    });
+    if (!auditory) {
+      throw new Error('No se encontró la auditoría');
+    }
+    const flowId = auditory.work_order_flow_id;
+    const WorkOrderFlow = await this.prisma.workOrderFlow.findUnique({
+      where: { id: Number(flowId) },
+      select: { work_order_id: true },
+    });
+    const otId = await this.prisma.workOrder.findUnique({
+      where: { id: WorkOrderFlow?.work_order_id },
+      select: { ot_id: true },
+    });
+    if (
+      flowId == null &&
+      WorkOrderFlow?.work_order_id == null &&
+      otId == null
+    ) {
+      throw new Error('La auditoría no está ligada a un flujo');
+    }
+    if (auditory?.reviewed_by_id) {
+      const inconformityUser = await this.prisma.user.findUnique({
+        where: { id: userId },
+        select: { username: true },
+      });
+      await this.notificationService.createAndSendNotification(
+        auditory?.reviewed_by_id,
+        'Tienes una inconformidad por revisar',
+        `La orden ${otId?.ot_id} tiene una inconformidad de auditoría por parte del usuario ${inconformityUser?.username}.`,
+        {
+          workOrderId: WorkOrderFlow?.work_order_id,
+          inconformityId: createInconformidad.id,
+        },
+        createInconformidad.id,
+      );
+      await this.notificationService.createAndSendNotificationToRole(
+        'planeador',
+        'Nueva inconformidad auditoria',
+        `La orden ${otId?.ot_id} reporta una inconformidad de auditoría por parte del operador ${inconformityUser?.username}.`,
+        {
+          workOrderId: WorkOrderFlow?.work_order_id,
+          inconformityId: createInconformidad.id,
+        },
+        createInconformidad.id,
+      );
+    }
+
     return { updated, createInconformidad };
   }
 

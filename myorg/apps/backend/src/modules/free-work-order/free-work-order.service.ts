@@ -285,7 +285,7 @@ export class FreeWorkOrderService {
         await this.notificationsService.createAndSendNotificationToRole(
           'calidad',
           'Nueva orden disponible',
-          'Hay una orden pendiente de aceptación',
+          `La orden ${workOrderId} está pendiente de aceptación en recepción de vistos buenos.`,
           { workOrderId },
         );
 
@@ -313,49 +313,19 @@ export class FreeWorkOrderService {
 
     try {
       return await this.prisma.$transaction(async (tx) => {
-        // Buscar si ya existe un FormAnswer con ese work_order_flow_id
-        const existingFormAnswer = await tx.formAnswer.findFirst({
-          where: {
+        // Crear siempre un nuevo FormAnswer
+        const newFormAnswer = await tx.formAnswer.create({
+          data: {
+            user_id,
+            area_id,
+            sample_quantity,
+            work_order_id,
+            reviewed: reviewed ?? false,
             work_order_flow_id,
           },
         });
+        const formAnswerId = newFormAnswer.id;
 
-        let formAnswerId: number;
-
-        if (existingFormAnswer) {
-          // Si existe, actualizar los datos
-          const updatedFormAnswer = await tx.formAnswer.update({
-            where: { id: existingFormAnswer.id },
-            data: {
-              user_id,
-              area_id,
-              sample_quantity,
-              work_order_id,
-              reviewed: reviewed ?? false,
-            },
-          });
-
-          formAnswerId = updatedFormAnswer.id;
-
-          // Eliminar las respuestas anteriores
-          await tx.formAnswerResponse.deleteMany({
-            where: { form_answer_id: formAnswerId },
-          });
-        } else {
-          // Si no existe, crear el FormAnswer
-          const newFormAnswer = await tx.formAnswer.create({
-            data: {
-              user_id,
-              area_id,
-              sample_quantity,
-              work_order_id,
-              reviewed: reviewed ?? false,
-              work_order_flow_id,
-            },
-          });
-
-          formAnswerId = newFormAnswer.id;
-        }
         // Mapear las respuestas de cada pregunta, primero del frente
         // Frente
         const respuestasFrente = question_id.flatMap((questionId, idx) =>
@@ -408,7 +378,7 @@ export class FreeWorkOrderService {
         await this.notificationsService.createAndSendNotificationToRole(
           'calidad',
           'Nueva orden disponible',
-          'Hay una orden pendiente de aceptación',
+          `La orden ${workOrderId} está pendiente de aceptación en recepción de vistos buenos.`,
           { workOrderId },
         );
 
@@ -482,7 +452,7 @@ export class FreeWorkOrderService {
         await this.notificationsService.createAndSendNotificationToRole(
           'calidad',
           'Nueva orden disponible',
-          'Hay una orden pendiente de aceptación',
+          `La orden ${workOrderId} está pendiente de aceptación en recepción de vistos buenos.`,
           { workOrderId },
         );
 
@@ -510,55 +480,22 @@ export class FreeWorkOrderService {
     } = dto;
     try {
       return await this.prisma.$transaction(async (tx) => {
-        // Buscar si ya existe un FormAnswer con ese work_order_flow_id
-        const existingFormAnswer = await tx.formAnswer.findFirst({
-          where: {
+        // Crear siempre un nuevo FormAnswer
+        const newFormAnswer = await tx.formAnswer.create({
+          data: {
+            user_id,
+            area_id,
+            sample_quantity,
+            color_foil,
+            work_order_id,
+            revisar_posicion,
+            imagen_holograma,
+            reviewed: reviewed ?? false,
             work_order_flow_id,
           },
         });
 
-        let formAnswerId: number;
-
-        if (existingFormAnswer) {
-          // Si existe, actualizar los datos
-          const updatedFormAnswer = await tx.formAnswer.update({
-            where: { id: existingFormAnswer.id },
-            data: {
-              user_id,
-              area_id,
-              sample_quantity,
-              color_foil,
-              work_order_id,
-              revisar_posicion,
-              imagen_holograma,
-              reviewed: reviewed ?? false,
-            },
-          });
-
-          formAnswerId = updatedFormAnswer.id;
-
-          // Eliminar las respuestas anteriores
-          await tx.formAnswerResponse.deleteMany({
-            where: { form_answer_id: formAnswerId },
-          });
-        } else {
-          // Si no existe, crear el FormAnswer
-          const newFormAnswer = await tx.formAnswer.create({
-            data: {
-              user_id,
-              area_id,
-              sample_quantity,
-              color_foil,
-              work_order_id,
-              revisar_posicion,
-              imagen_holograma,
-              reviewed: reviewed ?? false,
-              work_order_flow_id,
-            },
-          });
-
-          formAnswerId = newFormAnswer.id;
-        }
+        const formAnswerId = newFormAnswer.id;
 
         // Mapear las nuevas respuestas
         const respuestas = question_id.map((questionId, index) => ({
@@ -594,7 +531,7 @@ export class FreeWorkOrderService {
         await this.notificationsService.createAndSendNotificationToRole(
           'calidad',
           'Nueva orden disponible',
-          'Hay una orden pendiente de aceptación',
+          `La orden ${workOrderId} está pendiente de aceptación en recepción de vistos buenos.`,
           { workOrderId },
         );
 
@@ -623,53 +560,22 @@ export class FreeWorkOrderService {
 
     try {
       return await this.prisma.$transaction(async (tx) => {
-        // Buscar si ya existe un FormAnswer con ese work_order_flow_id
-        const existingFormAnswer = await tx.formAnswer.findFirst({
-          where: {
+        // Crear siempre un nuevo FormAnswer
+        const newFormAnswer = await tx.formAnswer.create({
+          data: {
+            user_id,
+            area_id,
+            sample_quantity,
+            revisar_tecnologia,
+            work_order_id,
+            validar_kvc,
+            reviewed: reviewed ?? false,
             work_order_flow_id,
           },
         });
 
-        let formAnswerId: number;
+        const formAnswerId = newFormAnswer.id;
 
-        if (existingFormAnswer) {
-          // Si existe, actualizar los datos
-          const updatedFormAnswer = await tx.formAnswer.update({
-            where: { id: existingFormAnswer.id },
-            data: {
-              user_id,
-              area_id,
-              sample_quantity,
-              revisar_tecnologia,
-              work_order_id,
-              validar_kvc,
-              reviewed: reviewed ?? false,
-            },
-          });
-
-          formAnswerId = updatedFormAnswer.id;
-
-          // Eliminar las respuestas anteriores
-          await tx.formAnswerResponse.deleteMany({
-            where: { form_answer_id: formAnswerId },
-          });
-        } else {
-          // Si no existe, crear el FormAnswer
-          const newFormAnswer = await tx.formAnswer.create({
-            data: {
-              user_id,
-              area_id,
-              sample_quantity,
-              revisar_tecnologia,
-              work_order_id,
-              validar_kvc,
-              reviewed: reviewed ?? false,
-              work_order_flow_id,
-            },
-          });
-
-          formAnswerId = newFormAnswer.id;
-        }
         // Mapear las respuestas de cada pregunta
         const respuestas = question_id.map((questionId, index) => ({
           question_id: questionId,
@@ -702,7 +608,7 @@ export class FreeWorkOrderService {
         await this.notificationsService.createAndSendNotificationToRole(
           'calidad',
           'Nueva orden disponible',
-          'Hay una orden pendiente de aceptación',
+          `La orden ${workOrderId} está pendiente de aceptación en recepción de vistos buenos.`,
           { workOrderId },
         );
 
@@ -734,61 +640,26 @@ export class FreeWorkOrderService {
 
     try {
       return await this.prisma.$transaction(async (tx) => {
-        // Buscar si ya existe un FormAnswer con ese work_order_flow_id
-        const existingFormAnswer = await tx.formAnswer.findFirst({
-          where: {
+        // Crear siempre un nuevo FormAnswer
+        const newFormAnswer = await tx.formAnswer.create({
+          data: {
+            user_id,
+            area_id,
+            sample_quantity,
+            tipo_personalizacion,
+            work_order_id,
+            verificar_etiqueta,
+            color_personalizacion,
+            codigo_barras,
+            verificar_script,
+            validar_kvc_perso,
+            reviewed: reviewed ?? false,
             work_order_flow_id,
           },
         });
 
-        let formAnswerId: number;
+        const formAnswerId = newFormAnswer.id;
 
-        if (existingFormAnswer) {
-          // Si existe, actualizar los datos
-          const updatedFormAnswer = await tx.formAnswer.update({
-            where: { id: existingFormAnswer.id },
-            data: {
-              user_id,
-              area_id,
-              sample_quantity,
-              tipo_personalizacion,
-              work_order_id,
-              verificar_etiqueta,
-              color_personalizacion,
-              codigo_barras,
-              verificar_script,
-              validar_kvc_perso,
-              reviewed: reviewed ?? false,
-            },
-          });
-
-          formAnswerId = updatedFormAnswer.id;
-
-          // Eliminar las respuestas anteriores
-          await tx.formAnswerResponse.deleteMany({
-            where: { form_answer_id: formAnswerId },
-          });
-        } else {
-          // Si no existe, crear el FormAnswer
-          const newFormAnswer = await tx.formAnswer.create({
-            data: {
-              user_id,
-              area_id,
-              sample_quantity,
-              tipo_personalizacion,
-              work_order_id,
-              verificar_etiqueta,
-              color_personalizacion,
-              codigo_barras,
-              verificar_script,
-              validar_kvc_perso,
-              reviewed: reviewed ?? false,
-              work_order_flow_id,
-            },
-          });
-
-          formAnswerId = newFormAnswer.id;
-        }
         // Mapear las respuestas de cada pregunta
         const respuestas = question_id.map((questionId, index) => ({
           question_id: questionId,
@@ -821,7 +692,7 @@ export class FreeWorkOrderService {
         await this.notificationsService.createAndSendNotificationToRole(
           'calidad',
           'Nueva orden disponible',
-          'Hay una orden pendiente de aceptación',
+          `La orden ${workOrderId} está pendiente de aceptación en recepción de vistos buenos.`,
           { workOrderId },
         );
 
@@ -963,7 +834,7 @@ export class FreeWorkOrderService {
             work_order_flow_id: dto.workOrderFlowId,
             quantity: dto.releaseQuantity,
             observation: dto.comments,
-            user_id: dto.assignedUser
+            user_id: dto.assignedUser,
           },
         });
         await tx.workOrderFlow.update({
@@ -1061,7 +932,7 @@ export class FreeWorkOrderService {
             work_order_flow_id: dto.workOrderFlowId,
             quantity: dto.releaseQuantity,
             observation: dto.comments,
-            user_id: dto.assignedUser
+            user_id: dto.assignedUser,
           },
         });
         await tx.workOrderFlow.update({
@@ -1159,7 +1030,7 @@ export class FreeWorkOrderService {
             work_order_flow_id: dto.workOrderFlowId,
             quantity: dto.releaseQuantity,
             observation: dto.comments,
-            user_id: dto.assignedUser
+            user_id: dto.assignedUser,
           },
         });
         await tx.workOrderFlow.update({
@@ -1273,7 +1144,7 @@ export class FreeWorkOrderService {
             noprocess_quantity: dto.noProcessQuantity,
             material_quantity: dto.materialBadQuantity,
             observation: dto.comments,
-            user_id: dto.assignedUser
+            user_id: dto.assignedUser,
           },
         });
 
@@ -1356,51 +1227,21 @@ export class FreeWorkOrderService {
 
     try {
       return await this.prisma.$transaction(async (tx) => {
-        // Buscar si ya existe un FormAnswer con ese work_order_flow_id
-        const existingFormAnswer = await tx.formAnswer.findFirst({
-          where: {
+        // Crear siempre un nuevo FormAnswer
+        const newFormAnswer = await tx.formAnswer.create({
+          data: {
+            user_id,
+            area_id,
+            sample_quantity,
+            color_edge,
+            work_order_id,
+            reviewed: reviewed ?? false,
             work_order_flow_id,
           },
         });
 
-        let formAnswerId: number;
+        const formAnswerId = newFormAnswer.id;
 
-        if (existingFormAnswer) {
-          // Si existe, actualizar los datos
-          const updatedFormAnswer = await tx.formAnswer.update({
-            where: { id: existingFormAnswer.id },
-            data: {
-              user_id,
-              area_id,
-              sample_quantity,
-              color_edge,
-              work_order_id,
-              reviewed: reviewed ?? false,
-            },
-          });
-
-          formAnswerId = updatedFormAnswer.id;
-
-          // Eliminar las respuestas anteriores
-          await tx.formAnswerResponse.deleteMany({
-            where: { form_answer_id: formAnswerId },
-          });
-        } else {
-          // Si no existe, crear el FormAnswer
-          const newFormAnswer = await tx.formAnswer.create({
-            data: {
-              user_id,
-              area_id,
-              sample_quantity,
-              color_edge,
-              work_order_id,
-              reviewed: reviewed ?? false,
-              work_order_flow_id,
-            },
-          });
-
-          formAnswerId = newFormAnswer.id;
-        }
         // Mapear las respuestas de cada pregunta
         const respuestas = question_id.map((questionId, index) => ({
           question_id: questionId,
@@ -1433,7 +1274,7 @@ export class FreeWorkOrderService {
         await this.notificationsService.createAndSendNotificationToRole(
           'calidad',
           'Nueva orden disponible',
-          'Hay una orden pendiente de aceptación',
+          `La orden ${workOrderId} está pendiente de aceptación en recepción de vistos buenos.`,
           { workOrderId },
         );
 
@@ -1494,7 +1335,7 @@ export class FreeWorkOrderService {
             noprocess_quantity: dto.noProcessQuantity,
             material_quantity: dto.materialBadQuantity,
             observation: dto.comments,
-            user_id: dto.assignedUser
+            user_id: dto.assignedUser,
           },
         });
 
@@ -1612,7 +1453,7 @@ export class FreeWorkOrderService {
             noprocess_quantity: dto.noProcessQuantity,
             material_quantity: dto.materialBadQuantity,
             observation: dto.comments,
-            user_id: dto.assignedUser
+            user_id: dto.assignedUser,
           },
         });
 
@@ -1730,7 +1571,7 @@ export class FreeWorkOrderService {
             noprocess_quantity: dto.noProcessQuantity,
             material_quantity: dto.materialBadQuantity,
             observation: dto.comments,
-            user_id: dto.assignedUser
+            user_id: dto.assignedUser,
           },
         });
 
@@ -1847,7 +1688,7 @@ export class FreeWorkOrderService {
             noprocess_quantity: dto.noProcessQuantity,
             material_quantity: dto.materialBadQuantity,
             observation: dto.comments,
-            user_id: dto.assignedUser
+            user_id: dto.assignedUser,
           },
         });
 

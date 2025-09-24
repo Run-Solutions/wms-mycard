@@ -3,10 +3,11 @@ import styled from 'styled-components';
 import { useRouter } from 'next/navigation';
 import { useState, useEffect } from 'react';
 import { acceptHotStampingInconformityAuditory } from '@/api/rechazos';
+import { InconformityData } from './CorteComponent';
 
 interface Props {
-  workOrder: any; // toda la OT con .flow
-  currentFlow: any; // flujo actual (ej: corte)
+  workOrder: any;
+  currentFlow: any;
 }
 interface PartialRelease {
   quantity: string;
@@ -15,14 +16,6 @@ interface PartialRelease {
   work_order_flow_id: number;
   inconformities: any[];
 }
-type InconformityData = {
-  quantity: number | string;
-  excess: number | string;
-  sample: number | string;
-  comments: string;
-  user: string;
-  inconformity: string;
-};
 
 export default function HotStampingComponent({
   workOrder,
@@ -44,6 +37,7 @@ export default function HotStampingComponent({
     useState<InconformityData>({
       quantity: '',
       excess: '',
+      noprocess: '',
       sample: '',
       comments: '',
       user: '',
@@ -92,6 +86,7 @@ export default function HotStampingComponent({
       setInconformityValues({
         quantity: hotStamping.good_quantity || '',
         excess: hotStamping.excess_quantity || '',
+        noprocess: hotStamping.noprocess_quantity || '',
         sample: hotStamping.formAuditory?.sample_auditory || '',
         comments: hotStamping.comments || '',
         user:
@@ -109,10 +104,18 @@ export default function HotStampingComponent({
         (acc: any, p: any) => acc + (p.excess_quantity || 0),
         0
       );
+      const totalNoProcess = partials.reduce(
+        (acc: any, p: any) => acc + (p.noprocess_quantity || 0),
+        0
+      );
 
       setInconformityValues({
         quantity: Math.max((hotStamping.good_quantity || 0) - totalGood, 0),
         excess: Math.max((hotStamping.excess_quantity || 0) - totalExcess, 0),
+        noprocess: Math.max(
+          (hotStamping.noprocess_quantity || 0) - totalNoProcess,
+          0
+        ),
         sample: hotStamping.formAuditory?.sample_auditory || '',
         comments: hotStamping.comments || '',
         user:
@@ -128,6 +131,7 @@ export default function HotStampingComponent({
       setInconformityValues({
         quantity: firstUnvalidated?.quantity || '',
         excess: firstUnvalidated?.excess_quantity || '',
+        noprocess: firstUnvalidated?.noprocess_quantity || '',
         sample: firstUnvalidated?.formAuditory?.sample_auditory || '',
         comments: firstUnvalidated?.observation || '',
         user:
@@ -276,6 +280,13 @@ export default function HotStampingComponent({
                   onClick={handleOpenBadQuantityModal}
                   readOnly
                 />
+                <Label>Sin procesar:</Label>
+                <Input
+                  type="number"
+                  name="excess_quantity"
+                  value={inconformityValues.noprocess}
+                  disabled
+                />
                 <Label>Excedente:</Label>
                 <Input
                   type="number"
@@ -322,7 +333,7 @@ export default function HotStampingComponent({
               const areaKey = flow.area.name.toLowerCase(); // para coincidir con las claves
               return (
                 <div
-                key={`${flow.id}-${index}`}
+                  key={`${flow.id}-${index}`}
                   style={{
                     display: 'flex',
                     flexDirection: 'column',

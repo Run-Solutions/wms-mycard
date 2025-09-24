@@ -297,6 +297,8 @@ export default function CloseWorkOrderAuxPage({ params }: Props) {
                         ? 'Ver SKU'
                         : file.type === 'OP'
                         ? 'Ver OP'
+                        : file.type === 'CARD_IMAGE'
+                        ? 'Ver TARJETA'
                         : 'Adjunto';
                     return (
                       <button

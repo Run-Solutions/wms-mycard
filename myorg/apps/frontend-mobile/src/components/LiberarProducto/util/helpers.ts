@@ -53,6 +53,7 @@ export const getFileLabel = (filePath: string) => {
   if (lower.includes('ot')) return 'Ver OT';
   if (lower.includes('sku')) return 'Ver SKU';
   if (lower.includes('op')) return 'Ver OP';
+  if (lower.includes('image')) return 'Ver TARJETA';
   return 'Ver Archivo';
 };
 

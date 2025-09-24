@@ -43,9 +43,6 @@ const CloseWorkOrderPage: React.FC = () => {
     async function fetchWorkOrdersInAuditory() {
       try {
         const data = await fetchWorkOrdersInProgress();
-        console.log('Datos obtenidos de las Ordenes en Proceso: ', data);
-        const orders = data.map((item: any) => item.workOrder);
-        console.log('Datos obtenidos de las Ordenes en Proceso: ', data);
         setWorkOrders(data);
       } catch (error) {
         console.error(error);

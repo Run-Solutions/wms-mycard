@@ -5,8 +5,8 @@ import { useState, useEffect } from 'react';
 import { acceptCorteInconformityAuditory } from '@/api/rechazos';
 
 interface Props {
-  workOrder: any; // toda la OT con .flow
-  currentFlow: any; // flujo actual (ej: corte)
+  workOrder: any; 
+  currentFlow: any; 
 }
 interface PartialRelease {
   quantity: string;
@@ -16,9 +16,10 @@ interface PartialRelease {
   inconformities: any[];
 }
 
-type InconformityData = {
+export type InconformityData = {
   quantity: number | string;
   excess: number | string;
+  noprocess: number | string;
   sample: number | string;
   comments: string;
   user: string;
@@ -42,6 +43,7 @@ export default function CorteComponent({ workOrder, currentFlow }: Props) {
     useState<InconformityData>({
       quantity: '',
       excess: '',
+      noprocess: '',
       sample: '',
       comments: '',
       user: '',
@@ -90,6 +92,7 @@ export default function CorteComponent({ workOrder, currentFlow }: Props) {
       setInconformityValues({
         quantity: corte.good_quantity || '',
         excess: corte.excess_quantity || '',
+        noprocess: corte.noprocess_quantity || '',
         sample: corte.formAuditory?.sample_auditory || '',
         comments: corte.comments || '',
         user: corte.formAuditory?.inconformities.at(-1)?.user.username || '',
@@ -105,10 +108,15 @@ export default function CorteComponent({ workOrder, currentFlow }: Props) {
         (acc: any, p: any) => acc + (p.excess_quantity || 0),
         0
       );
+      const totalNoProcess = partials.reduce(
+        (acc: any, p: any) => acc + (p.noprocess_quantity || 0),
+        0
+      );
 
       setInconformityValues({
         quantity: Math.max((corte.good_quantity || 0) - totalGood, 0),
         excess: Math.max((corte.excess_quantity || 0) - totalExcess, 0),
+        noprocess: Math.max((corte.noprocess_quantity || 0) - totalNoProcess, 0),
         sample: corte.formAuditory?.sample_auditory || '',
         comments: corte.comments || '',
         user:
@@ -124,6 +132,7 @@ export default function CorteComponent({ workOrder, currentFlow }: Props) {
       setInconformityValues({
         quantity: firstUnvalidated?.quantity || '',
         excess: firstUnvalidated?.excess_quantity || '',
+        noprocess: firstUnvalidated?.noprocess_quantity || '',
         sample: firstUnvalidated?.formAuditory?.sample_auditory || '',
         comments: firstUnvalidated?.observation || '',
         user:
@@ -263,6 +272,13 @@ export default function CorteComponent({ workOrder, currentFlow }: Props) {
                   value={sumaBadQuantity}
                   onClick={handleOpenBadQuantityModal}
                   readOnly
+                />
+                <Label>Sin procesar:</Label>
+                <Input
+                  type="number"
+                  name="excess_quantity"
+                  value={inconformityValues.noprocess}
+                  disabled
                 />
                 <Label>Excedente:</Label>
                 <Input

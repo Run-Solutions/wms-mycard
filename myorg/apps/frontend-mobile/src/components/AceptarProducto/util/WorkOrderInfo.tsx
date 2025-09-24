@@ -3,7 +3,13 @@ import { getFileByName } from '../../../api/finalizacion';
 import * as FileSystem from 'expo-file-system';
 import { Buffer } from 'buffer';
 import FileViewer from 'react-native-file-viewer';
-import { View, Text, ScrollView, StyleSheet, TouchableOpacity } from 'react-native';
+import {
+  View,
+  Text,
+  ScrollView,
+  StyleSheet,
+  TouchableOpacity,
+} from 'react-native';
 
 interface Props {
   workOrder: any;
@@ -22,7 +28,8 @@ export default function WorkOrderInfo({
 }: Props) {
   const cantidadHojasRaw = Number(workOrder?.workOrder.quantity) / 24;
   const cantidadHojas = cantidadHojasRaw > 0 ? Math.ceil(cantidadHojasRaw) : 0;
-  const totalSheetsEffective = workOrder?.workOrder?.total_sheets ?? cantidadHojas;
+  const totalSheetsEffective =
+    workOrder?.workOrder?.total_sheets ?? cantidadHojas;
 
   function getLabelByType(type: string) {
     switch (type) {
@@ -32,6 +39,8 @@ export default function WorkOrderInfo({
         return 'Ver SKU';
       case 'OP':
         return 'Ver OP';
+      case 'CARD_IMAGE':
+        return 'Ver TARJETA';
       default:
         return 'Adjunto';
     }
@@ -82,7 +91,7 @@ export default function WorkOrderInfo({
           </View>
           <View style={{ flex: 1 }}>
             <InfoCard
-              style={{ backgroundColor: "#93C5FD" }}
+              style={{ backgroundColor: '#93C5FD' }}
               label="Cantidad (Hojas Frente / Hojas Vuelta):"
               value={String(totalSheetsEffective)}
             />
@@ -149,7 +158,8 @@ export function WorkOrderHojasInfo({
 }: Props) {
   const cantidadHojasRaw = Number(workOrder?.workOrder.quantity) / 24;
   const cantidadHojas = cantidadHojasRaw > 0 ? Math.ceil(cantidadHojasRaw) : 0;
-  const totalSheetsEffective = workOrder?.workOrder?.total_sheets ?? cantidadHojas;
+  const totalSheetsEffective =
+    workOrder?.workOrder?.total_sheets ?? cantidadHojas;
 
   function getLabelByType(type: string) {
     switch (type) {
@@ -159,6 +169,8 @@ export function WorkOrderHojasInfo({
         return 'Ver SKU';
       case 'OP':
         return 'Ver OP';
+      case 'CARD_IMAGE':
+        return 'Ver TARJETA';
       default:
         return 'Adjunto';
     }
@@ -209,7 +221,7 @@ export function WorkOrderHojasInfo({
           </View>
           <View style={{ flex: 1 }}>
             <InfoCard
-              style={{ backgroundColor: "#93C5FD" }}
+              style={{ backgroundColor: '#93C5FD' }}
               label="Cantidad (Hojas Frente / Hojas Vuelta):"
               value={String(totalSheetsEffective)}
             />
@@ -270,7 +282,8 @@ export function WorkOrderPrePressInfo({
 }: Props) {
   const cantidadHojasRaw = Number(workOrder?.workOrder.quantity) / 24;
   const cantidadHojas = cantidadHojasRaw > 0 ? Math.ceil(cantidadHojasRaw) : 0;
-  const totalSheetsEffective = workOrder?.workOrder?.total_sheets ?? cantidadHojas;
+  const totalSheetsEffective =
+    workOrder?.workOrder?.total_sheets ?? cantidadHojas;
 
   function getLabelByType(type: string) {
     switch (type) {
@@ -280,6 +293,8 @@ export function WorkOrderPrePressInfo({
         return 'Ver SKU';
       case 'OP':
         return 'Ver OP';
+      case 'CARD_IMAGE':
+        return 'Ver TARJETA';
       default:
         return 'Adjunto';
     }
@@ -330,7 +345,7 @@ export function WorkOrderPrePressInfo({
           </View>
           <View style={{ flex: 1 }}>
             <InfoCard
-              style={{ backgroundColor: "#93C5FD" }}
+              style={{ backgroundColor: '#93C5FD' }}
               label="Cantidad (Hojas Frente / Hojas Vuelta):"
               value={String(totalSheetsEffective)}
             />
@@ -386,14 +401,12 @@ export function WorkOrderPrePressInfo({
   );
 }
 const styles = StyleSheet.create({
-
   card: {
     backgroundColor: '#fff',
     padding: 16,
     borderRadius: 16,
     elevation: 2,
   },
-
 });
 const fileStyles = StyleSheet.create({
   row: { gap: 8, paddingVertical: 4 },

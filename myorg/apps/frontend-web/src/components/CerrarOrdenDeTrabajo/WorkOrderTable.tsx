@@ -96,6 +96,7 @@ const WorkOrderTable: React.FC<Props> = ({ orders, title, statusFilter }) => {
     setPage(0);
   };
   const validOrders = Array.isArray(orders) ? orders : [];
+  console.log('Valid Orders:', validOrders);
   const filteredOrders = validOrders.filter((order) => {
     const statusMatch =
       order.status.toLowerCase().includes(statusFilter.toLowerCase()) ||
@@ -118,6 +119,7 @@ const WorkOrderTable: React.FC<Props> = ({ orders, title, statusFilter }) => {
       (!toDate || createdDate <= toDate);
     return statusMatch && searchMatch && areaMatch && dateMatch;
   });
+  console.log('Filtered Orders:', filteredOrders);
   const sorted = filteredOrders.sort((a, b) => {
     let cmp = 0;
     if (orderBy === 'createdAt') {

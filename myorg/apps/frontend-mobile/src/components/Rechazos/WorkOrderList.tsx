@@ -99,27 +99,29 @@ const WorkOrderList: React.FC<Props> = ({ orders, onSelectOrder }) => {
             </View>
 
             <View style={styles.filesBlock}>
-            {item.files && item.files.length > 0 ? (
+              {item.files && item.files.length > 0 ? (
                 item.files
                   .filter((file) => ['OT', 'SKU', 'OP'].includes(file.type))
                   .map((file) => {
-                  const label = file.file_path.toLowerCase().includes('ot')
-                    ? 'Ver OT'
-                    : file.file_path.toLowerCase().includes('sku')
-                    ? 'Ver SKU'
-                    : file.file_path.toLowerCase().includes('op')
-                    ? 'Ver OP'
-                    : 'Ver Archivo';
-                  return (
-                    <TouchableOpacity
-                      key={file.id}
-                      onPress={() => downloadFile(file.file_path)}
-                      style={styles.fileButton}
-                    >
-                      <Text style={styles.fileText}>{label}</Text>
-                    </TouchableOpacity>
-                  );
-                })
+                    const label = file.file_path.toLowerCase().includes('ot')
+                      ? 'Ver OT'
+                      : file.file_path.toLowerCase().includes('sku')
+                      ? 'Ver SKU'
+                      : file.file_path.toLowerCase().includes('op')
+                      ? 'Ver OP'
+                      : file.file_path.toLowerCase().includes('image')
+                      ? 'Ver TARJETA'
+                      : 'Ver Archivo';
+                    return (
+                      <TouchableOpacity
+                        key={file.id}
+                        onPress={() => downloadFile(file.file_path)}
+                        style={styles.fileButton}
+                      >
+                        <Text style={styles.fileText}>{label}</Text>
+                      </TouchableOpacity>
+                    );
+                  })
               ) : (
                 <Text style={styles.noFiles}>No hay archivos</Text>
               )}

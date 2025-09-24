@@ -1007,11 +1007,11 @@ export default function SeguimientoDeOtsAuxPage({ params }: Props) {
     if (partial)
       return (
         !partial.validated &&
-        ['En proceso', 'Parcial' /*, 'Otro estado'*/].includes(area.status)
+        ['En proceso', 'Parcial', 'Enviado a CQM', 'Listo', 'En inconformidad', 'En inconformidad CQM' /*, 'Otro estado'*/].includes(area.status)
       );
 
     // sin parciales: solo si el área está "En proceso"
-    return ['En proceso', 'Parcial' /*, 'Otro estado'*/].includes(area.status);
+    return ['En proceso', 'Parcial', 'Enviado a CQM', 'Listo', 'En inconformidad', 'En inconformidad CQM'/*, 'Otro estado'*/].includes(area.status);
   };
 
   const fieldLabels: Record<string, string> = {
@@ -1020,6 +1020,7 @@ export default function SeguimientoDeOtsAuxPage({ params }: Props) {
     excedente: "Excedente",
     noprocess: "Sin procesar",
   };
+
   return (
     <>
       <Container>
@@ -1108,6 +1109,8 @@ export default function SeguimientoDeOtsAuxPage({ params }: Props) {
                         ? 'Ver SKU'
                         : file.type === 'OP'
                         ? 'Ver OP'
+                        : file.type === 'CARD_IMAGE'
+                        ? 'Ver TARJETA'
                         : 'Adjunto';
                     return (
                       <button
