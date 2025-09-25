@@ -30,6 +30,8 @@ export default function WorkOrderInfo({ workOrder }: Props) {
         return 'Ver SKU';
       case 'OP':
         return 'Ver OP';
+      case 'CARD_IMAGE':
+        return 'Ver TARJETA';
       default:
         return 'Adjunto';
     }
@@ -123,8 +125,9 @@ export default function WorkOrderInfo({ workOrder }: Props) {
 export function WorkOrderHojasInfo({ workOrder }: Props) {
   const cantidadHojasRaw = Number(workOrder?.workOrder.quantity) / 24;
   const cantidadHojas = cantidadHojasRaw > 0 ? Math.ceil(cantidadHojasRaw) : 0;
-  const totalSheetsEffective = workOrder?.workOrder?.total_sheets ?? cantidadHojas;
-  
+  const totalSheetsEffective =
+    workOrder?.workOrder?.total_sheets ?? cantidadHojas;
+
   function getLabelByType(type: string) {
     switch (type) {
       case 'OT':
@@ -133,6 +136,8 @@ export function WorkOrderHojasInfo({ workOrder }: Props) {
         return 'Ver SKU';
       case 'OP':
         return 'Ver OP';
+      case 'CARD_IMAGE':
+        return 'Ver TARJETA';
       default:
         return 'Adjunto';
     }
@@ -182,7 +187,7 @@ export function WorkOrderHojasInfo({ workOrder }: Props) {
           </View>
           <View style={{ flex: 1 }}>
             <InfoCard
-              style={{ backgroundColor: "#93C5FD" }}
+              style={{ backgroundColor: '#93C5FD' }}
               label="Cantidad (Hojas Frente / Hojas Vuelta):"
               value={String(totalSheetsEffective)}
             />

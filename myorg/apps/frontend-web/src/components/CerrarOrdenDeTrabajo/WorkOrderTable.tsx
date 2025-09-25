@@ -52,7 +52,7 @@ interface WorkOrder {
 interface Props {
   orders: WorkOrder[];
   title: string;
-  statusFilter: string;
+  statusFilter: string[];
 }
 type OrderDirection = 'asc' | 'desc';
 type SortableField = 'ot_id' | 'createdAt';
@@ -67,7 +67,7 @@ const WorkOrderTable: React.FC<Props> = ({ orders, title, statusFilter }) => {
   const [endDate, setEndDate] = useState<string>('');
   const [orderBy, setOrderBy] = useState<SortableField>('createdAt');
   const [orderDirection, setOrderDirection] = useState<OrderDirection>('asc');
-
+  
   const handleSearchChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     setSearchValue(e.target.value);
     setPage(0);
@@ -98,9 +98,9 @@ const WorkOrderTable: React.FC<Props> = ({ orders, title, statusFilter }) => {
   const validOrders = Array.isArray(orders) ? orders : [];
   const filteredOrders = validOrders.filter((order) => {
     const statusMatch =
-      order.status.toLowerCase().includes(statusFilter.toLowerCase()) ||
+      order.status.toLowerCase().includes(statusFilter[1].toLowerCase()) ||
       order.flow.some((f) =>
-        f.status.toLowerCase().includes(statusFilter.toLowerCase())
+        f.status.toLowerCase().includes(statusFilter[1].toLowerCase())
       );
     const searchMatch = order.ot_id
       .toLowerCase()

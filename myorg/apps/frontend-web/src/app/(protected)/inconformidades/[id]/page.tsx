@@ -251,6 +251,8 @@ export default function InconformidadesAuxPage({ params }: Props) {
                         ? 'Ver SKU'
                         : file.type === 'OP'
                         ? 'Ver OP'
+                        : file.type === 'CARD_IMAGE'
+                        ? 'Ver TARJETA'
                         : 'Adjunto';
                     return (
                       <button
@@ -302,7 +304,7 @@ const Title = styled.h2`
 
 const Section = styled.section`
   margin-top: 3rem;
-  max-width: 80%;
+  width: 100%;
 `;
 
 const SectionTitle = styled.h3`

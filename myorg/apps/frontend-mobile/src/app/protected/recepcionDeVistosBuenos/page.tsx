@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useState } from 'react';
+import React, { useCallback, useMemo, useEffect, useState } from 'react';
 import {
   View,
   Text,
@@ -9,11 +9,19 @@ import {
   Alert,
   Modal,
   Pressable,
+  TextInput,
 } from 'react-native';
-import { NavigationProp, useNavigation, useFocusEffect } from '@react-navigation/native';
+import {
+  NavigationProp,
+  useNavigation,
+  useFocusEffect,
+} from '@react-navigation/native';
 import { RootStackParamList } from '../../../navigation/types';
 import { fetchPendingOrders, acceptWorkOrder } from '../../../api/vistosBuenos';
 import { useAuth } from '../../../contexts/AuthContext';
+import DropDownPicker from 'react-native-dropdown-picker';
+import { getFileByName } from '../../../api/finalizacion';
+import { MobileCardPreview } from '../../../utils/MobileCardPreview';
 
 interface WorkOrder {
   id: number;
@@ -97,13 +105,25 @@ function puedeAceptarOTCQM(
   return true; // ✅ No hay bloqueos, puede aceptar
 }
 
+type SortBy = 'priority' | 'createdAt' | 'quantity' | 'ot' | 'mycard';
+type SortDir = 'asc' | 'desc';
+
 const RecepcionDeVistosBuenosScreen = () => {
   const [orders, setOrders] = useState<WorkOrder[]>([]);
   const [loading, setLoading] = useState(true);
+
+  // 🔎 Buscador + Organizador (como la web)
+  const [query, setQuery] = useState('');
+  const [sortBy, setSortBy] = useState<SortBy>('priority');
+  const [sortDir, setSortDir] = useState<SortDir>('asc');
+
+  // DropDownPicker states (dos pickers: sortBy, sortDir)
+  const [openSortBy, setOpenSortBy] = useState(false);
+  const [openSortDir, setOpenSortDir] = useState(false);
+
   const [modalVisible, setModalVisible] = useState(false);
   const [selectedOrder, setSelectedOrder] = useState<WorkOrder | null>(null);
   const { user } = useAuth();
-
   const navigation = useNavigation<NavigationProp<RootStackParamList>>();
 
   const loadData = useCallback(async () => {
@@ -121,12 +141,74 @@ const RecepcionDeVistosBuenosScreen = () => {
   useEffect(() => {
     loadData();
   }, [loadData]);
-  
+
   useFocusEffect(
     React.useCallback(() => {
       loadData();
     }, [loadData])
   );
+
+  // Lista filtrada + ordenada (igual lógica que en web)
+  const filteredSorted = useMemo(() => {
+    const q = query.trim().toLowerCase();
+    const filtered = (orders || []).filter((o) => {
+      const w = o.workOrder;
+      const m =
+        w?.ot_id?.toLowerCase().includes(q) ||
+        w?.mycard_id?.toLowerCase().includes(q) ||
+        w?.user?.username?.toLowerCase().includes(q) ||
+        w?.comments?.toLowerCase().includes(q);
+      return q === '' ? true : !!m;
+    });
+
+    const dir = sortDir === 'asc' ? 1 : -1;
+
+    const sorted = filtered.sort((a, b) => {
+      const wa = a.workOrder;
+      const wb = b.workOrder;
+      if (!wa || !wb) return 0;
+
+      switch (sortBy) {
+        case 'priority': {
+          const pa = wa.priority ? 1 : 0;
+          const pb = wb.priority ? 1 : 0;
+          if (pa !== pb) return (pb - pa) * dir; // prioridad primero/último
+          const da = new Date(wa.createdAt).getTime();
+          const db = new Date(wb.createdAt).getTime();
+          return (da - db) * dir;
+        }
+        case 'createdAt': {
+          const da = new Date(wa.createdAt).getTime();
+          const db = new Date(wb.createdAt).getTime();
+          return (da - db) * dir;
+        }
+        case 'quantity':
+          return (wa.quantity - wb.quantity) * dir;
+        case 'ot':
+          return (wa.ot_id || '').localeCompare(wb.ot_id || '') * dir;
+        case 'mycard':
+          return (wa.mycard_id || '').localeCompare(wb.mycard_id || '') * dir;
+        default:
+          return 0;
+      }
+    });
+
+    // En web invertimos si sortBy='priority' para mostrar true arriba en "desc".
+    if (sortBy === 'priority') {
+      return sortDir === 'asc' ? sorted.reverse() : sorted;
+    }
+    return sorted;
+  }, [orders, query, sortBy, sortDir]);
+
+  const openModal = (order: WorkOrder) => {
+    setSelectedOrder(order);
+    setModalVisible(true);
+  };
+
+  const closeModal = () => {
+    setSelectedOrder(null);
+    setModalVisible(false);
+  };
 
   const aceptarOT = async () => {
     console.log(selectedOrder);
@@ -151,56 +233,134 @@ const RecepcionDeVistosBuenosScreen = () => {
     }
   };
 
-  const openModal = (order: WorkOrder) => {
-    setSelectedOrder(order);
-    setModalVisible(true);
-  };
-
-  const closeModal = () => {
-    setSelectedOrder(null);
-    setModalVisible(false);
-  };
-
   const puedeAceptar =
     selectedOrder && user ? puedeAceptarOTCQM(selectedOrder, user.sub) : false;
 
   console.log('✅ ¿Puede aceptar?:', puedeAceptar);
 
-  const renderItem = ({ item }: { item: WorkOrder }) => (
-    <TouchableOpacity style={styles.card} onPress={() => openModal(item)}>
-      {item.workOrder.priority && <View style={styles.priorityBadge} />}
-      <View style={styles.cardContent}>
-        <Text style={styles.otId}>{item.workOrder.ot_id}</Text>
-        <View style={styles.row}>
-          <Text style={styles.bold}>{item.workOrder.mycard_id}</Text>
-          <Text style={[styles.bold, { marginLeft: 'auto' }]}>
-            Cantidad: {item.workOrder.quantity}
-          </Text>
+  const renderItem = ({ item }: { item: WorkOrder }) => {
+    const fecha = new Date(item.workOrder.createdAt).toLocaleDateString(
+      'es-ES'
+    );
+    const files = (item as any).workOrder?.files || [];
+
+    return (
+      <TouchableOpacity style={styles.card} onPress={() => openModal(item)}>
+        {item.workOrder.priority && <View style={styles.priorityBadge} />}
+
+        {/* Preview como en la web */}
+        <View style={{ flex: 1 }}>
+          <MobileCardPreview
+            files={files}
+            getFile={(name) => getFileByName(name)} // devuelve binario/base64, el helper lo normaliza
+          />
+
+          <View style={styles.cardContent}>
+            <Text style={styles.otId}>{item.workOrder.ot_id}</Text>
+            <View style={styles.row}>
+              <Text style={styles.bold}>{item.workOrder.mycard_id}</Text>
+              <Text style={[styles.bold, { marginLeft: 'auto' }]}>
+                Cantidad: {item.workOrder.quantity}
+              </Text>
+            </View>
+            <Text style={styles.text}>
+              Creado por: {item.workOrder.user.username}
+            </Text>
+            <Text style={styles.text}>Fecha de creación: {fecha}</Text>
+          </View>
         </View>
-        <Text style={styles.text}>
-          Creado por: {item.workOrder.user.username}
-        </Text>
-        <Text style={styles.text}>
-          Fecha:{' '}
-          {new Date(item.workOrder.createdAt).toLocaleDateString('es-ES')}
-        </Text>
-      </View>
-    </TouchableOpacity>
-  );
+      </TouchableOpacity>
+    );
+  };
 
   return (
     <View style={styles.container}>
+      {/* 🔎 Toolbar móvil */}
+      <View style={styles.toolbar}>
+        <View style={styles.searchBox}>
+          <TextInput
+            placeholder="Buscar por OT / MyCard / usuario / comentario"
+            style={styles.searchInput}
+            value={query}
+            onChangeText={setQuery}
+            placeholderTextColor="#888"
+          />
+          {query ? (
+            <TouchableOpacity
+              style={styles.clearBtn}
+              onPress={() => setQuery('')}
+            >
+              <Text style={styles.clearBtnText}>×</Text>
+            </TouchableOpacity>
+          ) : null}
+        </View>
+
+        <View style={styles.sortRow}>
+          <View style={{ flex: 1, zIndex: 5000 }}>
+            <DropDownPicker
+              open={openSortBy}
+              setOpen={(val) => {
+                const isOpen =
+                  typeof val === 'function' ? val(openSortBy) : val;
+                setOpenSortBy(isOpen);
+                if (isOpen) setOpenSortDir(false);
+              }}
+              value={sortBy}
+              setValue={(v) =>
+                setSortBy((typeof v === 'function' ? v(sortBy) : v) as SortBy)
+              }
+              items={[
+                { label: 'Ordenar: Prioridad', value: 'priority' },
+                { label: 'Ordenar: Fecha creación', value: 'createdAt' },
+                { label: 'Ordenar: Cantidad', value: 'quantity' },
+                { label: 'Ordenar: OT', value: 'ot' },
+                { label: 'Ordenar: MyCard', value: 'mycard' },
+              ]}
+              style={styles.ddPicker}
+              dropDownContainerStyle={styles.ddContainer}
+              placeholder="Ordenar por…"
+            />
+          </View>
+
+          <View style={{ width: 150, zIndex: 4000 }}>
+            <DropDownPicker
+              open={openSortDir}
+              setOpen={(val) => {
+                const isOpen =
+                  typeof val === 'function' ? val(openSortDir) : val;
+                setOpenSortDir(isOpen);
+                if (isOpen) setOpenSortBy(false);
+              }}
+              value={sortDir}
+              setValue={(v) =>
+                setSortDir(
+                  (typeof v === 'function' ? v(sortDir) : v) as SortDir
+                )
+              }
+              items={[
+                { label: 'Descendente', value: 'desc' },
+                { label: 'Ascendente', value: 'asc' },
+              ]}
+              style={styles.ddPicker}
+              dropDownContainerStyle={styles.ddContainer}
+              placeholder="Dirección"
+            />
+          </View>
+        </View>
+      </View>
+
       {loading ? (
         <ActivityIndicator size="large" />
-      ) : orders.length === 0 ? (
+      ) : filteredSorted.length === 0 ? (
         <View style={styles.emptyState}>
-          <Text style={styles.emptyText}>No hay órdenes pendientes.</Text>
+          <Text style={styles.emptyText}>No hay órdenes que coincidan.</Text>
         </View>
       ) : (
         <FlatList
-          data={orders}
-          keyExtractor={(item) => item.id.toString()}
+          data={filteredSorted}
+          keyExtractor={(item) => String(item.id)}
           renderItem={renderItem}
+          contentContainerStyle={{ paddingBottom: 24 }}
         />
       )}
 
@@ -255,12 +415,61 @@ const RecepcionDeVistosBuenosScreen = () => {
   );
 };
 
+export default RecepcionDeVistosBuenosScreen;
+
 const styles = StyleSheet.create({
   container: {
     flex: 1,
     padding: 16,
     backgroundColor: '#fdfaf6',
   },
+  toolbar: {
+    marginBottom: 12,
+  },
+  searchBox: {
+    position: 'relative',
+    marginBottom: 10,
+  },
+  searchInput: {
+    backgroundColor: '#fff',
+    borderWidth: 1,
+    borderColor: '#e5e7eb',
+    borderRadius: 12,
+    paddingVertical: 10,
+    paddingHorizontal: 14,
+    height: 44,
+    color: '#111827',
+  },
+  clearBtn: {
+    position: 'absolute',
+    right: 6,
+    top: 6,
+    width: 32,
+    height: 32,
+    borderRadius: 8,
+    backgroundColor: '#f3f4f6',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  clearBtnText: {
+    fontSize: 20,
+    color: '#111827',
+    marginTop: -2,
+  },
+  sortRow: {
+    flexDirection: 'row',
+    gap: 8,
+  },
+  ddPicker: {
+    backgroundColor: '#fff',
+    borderColor: '#e5e7eb',
+    borderRadius: 12,
+    minHeight: 44,
+  },
+  ddContainer: {
+    borderColor: '#e5e7eb',
+  },
+
   card: {
     flexDirection: 'row',
     alignItems: 'flex-start',
@@ -335,15 +544,8 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     elevation: 10,
   },
-  modalTitle: {
-    fontSize: 20,
-    fontWeight: 'bold',
-    marginBottom: 12,
-  },
-  modalText: {
-    fontSize: 16,
-    marginVertical: 4,
-  },
+  modalTitle: { fontSize: 20, fontWeight: 'bold', marginBottom: 12 },
+  modalText: { fontSize: 16, marginVertical: 4 },
   modalButtonReject: {
     marginTop: 20,
     backgroundColor: '#A9A9A9',
@@ -358,41 +560,9 @@ const styles = StyleSheet.create({
     paddingHorizontal: 24,
     paddingVertical: 10,
   },
-  modalButtonText: {
-    color: '#fff',
-    fontWeight: 'bold',
-    fontSize: 16,
-  },
+  modalButtonText: { color: '#fff', fontWeight: 'bold', fontSize: 16 },
   emptyState: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginTop: 50,
+    flex: 1, justifyContent: 'center', alignItems: 'center', marginTop: 50,
   },
-  emptyText: {
-    fontSize: 16,
-    color: '#888',
-    textAlign: 'center',
-  },
-  fileLink: {
-    color: '#2563eb',
-    textDecorationLine: 'underline',
-    marginBottom: 4,
-  },
-  flowItem: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginBottom: 8,
-  },
-  flowCircle: {
-    width: 20,
-    height: 20,
-    borderRadius: 10,
-    backgroundColor: '#4a90e2',
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginRight: 8,
-  },
+  emptyText: { fontSize: 16, color: '#888', textAlign: 'center' },
 });
-
-export default RecepcionDeVistosBuenosScreen;

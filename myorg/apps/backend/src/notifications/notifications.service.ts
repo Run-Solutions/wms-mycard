@@ -17,7 +17,7 @@ export class NotificationsService {
   /**
    * Crea la notificación en base de datos y envía push.
    */
-  async createAndSendNotification(userId: number, title: string, body: string, data?: Record<string, any>) {
+  async createAndSendNotification(userId: number, title: string, body: string, data?: Record<string, any>, inconformityId?: number) {
     // 1. Guardar en base de datos
     const notification = await this.prisma.notification.create({
       data: {
@@ -25,6 +25,7 @@ export class NotificationsService {
         title,
         body,
         data,
+        ...(inconformityId && { inconformityId }),
       },
     });
 
@@ -43,6 +44,7 @@ export class NotificationsService {
     title: string,
     body: string,
     data?: Record<string, any>,
+    inconformityId?: number, 
   ) {
     // 1. Traer todos los usuarios con ese rol
     const users = await this.prisma.user.findMany({
@@ -59,6 +61,7 @@ export class NotificationsService {
           title,
           body,
           data,
+          ...(inconformityId && { inconformityId }),
         },
       });
   
@@ -86,6 +89,9 @@ export class NotificationsService {
     return this.prisma.notification.findMany({
       where: { userId },
       orderBy: { createdAt: 'desc' },
+      include: {
+        inconformity: { select: { id: true, comments: true, reviewed: true  } }, // 👈
+      },
     });
   }
 

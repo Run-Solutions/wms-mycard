@@ -119,6 +119,8 @@ const WorkOrderList: React.FC<Props> = ({ orders, onSelectOrder }) => {
                       ? 'Ver SKU'
                       : file.file_path.toLowerCase().includes('op')
                       ? 'Ver OP'
+                      : file.file_path.toLowerCase().includes('image')
+                      ? 'Ver TARJETA'
                       : 'Ver Archivo';
                     return (
                       <TouchableOpacity

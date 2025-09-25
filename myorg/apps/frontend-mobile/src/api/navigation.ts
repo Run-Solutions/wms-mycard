@@ -5,9 +5,9 @@ import API from './http';
 export interface ModuleFromApi {
   id: number;
   name: string;
+  imageName: string;
   logoName: string;
   description: string;
-  // agrega aquí cualquier otra propiedad que tenga el módulo
 }
 
 export const useModules = () => {

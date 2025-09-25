@@ -90,8 +90,10 @@ export class AcceptAuditoryWorkOrderService {
         data: {
           validated: true,
           form_auditory_id: formAuditory.id,
+          release_quantity: dto.release_quantity || 0,
         },
       });
+      
       await this.prisma.workOrderFlow.update({
         where: { id: partial.work_order_flow_id },
         data: { status: 'Parcial' },

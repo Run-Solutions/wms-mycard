@@ -36,9 +36,10 @@ const WorkOrdersPage: React.FC = () => {
     ot: File | null;
     sku: File | null;
     op: File | null;
-  }>({ ot: null, sku: null, op: null });
+    cardImage: File | null; // NEW
+  }>({ ot: null, sku: null, op: null, cardImage: null });
   const [extraFiles, setExtraFiles] = useState<File[]>([]);
-  const MAX_TOTAL_FILES = 8;
+  const MAX_TOTAL_FILES = 9;
   const MAX_ATTACHMENTS = 5;
   const ALLOWED_MIME_TYPES = [
     'application/pdf',
@@ -46,6 +47,35 @@ const WorkOrdersPage: React.FC = () => {
     'image/jpeg',
     'image/webp',
   ];
+  const ALLOWED_IMAGE_TYPES = ['image/png', 'image/jpeg', 'image/webp'] as const;
+  const ALLOWED_PDF_TYPES = ['application/pdf'] as const;
+
+  const hasExt = (name: string, exts: string[]) =>
+    exts.some((ext) => name.toLowerCase().endsWith(ext));
+  
+  const isPdf = (file: File) =>
+    ALLOWED_PDF_TYPES.includes(file.type as any) || hasExt(file.name, ['.pdf']);
+  
+  const isImage = (file: File) =>
+    ALLOWED_IMAGE_TYPES.includes(file.type as any) ||
+    hasExt(file.name, ['.png', '.jpg', '.jpeg', '.webp']);
+  
+  const validatePdfFile = (file: File) => {
+    if (!isPdf(file)) {
+      alert(`"${file.name}" no es un PDF válido.`);
+      return false;
+    }
+    return true;
+  };
+  
+  const validateImageFile = (file: File) => {
+    if (!isImage(file)) {
+      alert(`Formato no permitido: ${file.name} (${file.type}). Solo PNG/JPEG/WEBP.`);
+      return false;
+    }
+    return true;
+  };
+
   const validateFile = (file: File) => {
     if (!ALLOWED_MIME_TYPES.includes(file.type)) {
       alert(
@@ -107,7 +137,7 @@ const WorkOrdersPage: React.FC = () => {
             <Actions>
               <BtnEmpalme
                 onClick={() => {
-                  closeToast(); // ✅ usa el prop aquí
+                  closeToast(); 
                   resolve(0);
                 }}
               >
@@ -115,7 +145,7 @@ const WorkOrdersPage: React.FC = () => {
               </BtnEmpalme>
               <BtnCollector
                 onClick={() => {
-                  closeToast(); // ✅ usa el prop aquí
+                  closeToast(); 
                   resolve(1);
                 }}
               >
@@ -271,14 +301,17 @@ const WorkOrdersPage: React.FC = () => {
     const file = e.target.files?.[0];
     if (!file) return;
 
-    if (!validateFile(file)) {
+    // validar estrictamente PDF
+    if (!validatePdfFile(file)) {
       e.target.value = '';
       return;
     }
 
-    // Si reemplazamos uno existente, no debe contar doble
     const baseCount =
-      (files.ot ? 1 : 0) + (files.sku ? 1 : 0) + (files.op ? 1 : 0);
+      (files.ot ? 1 : 0) +
+      (files.sku ? 1 : 0) +
+      (files.op ? 1 : 0) +
+      (files.cardImage ? 1 : 0); 
     const replacing = files[type] ? 1 : 0;
     const newTotal = baseCount - replacing + 1 + extraFiles.length;
 
@@ -320,6 +353,37 @@ const WorkOrdersPage: React.FC = () => {
     // Limpia el input para poder volver a elegir los mismos archivos, si se quiere
     e.target.value = '';
   };
+
+  const handleCardImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+  
+    if (!validateImageFile(file)) {
+      e.target.value = '';
+      return;
+    }
+  
+    const baseCount =
+      (files.ot ? 1 : 0) +
+      (files.sku ? 1 : 0) +
+      (files.op ? 1 : 0) +
+      (files.cardImage ? 1 : 0);
+    const replacing = files.cardImage ? 1 : 0;
+    const newTotal = baseCount - replacing + 1 + extraFiles.length;
+  
+    if (newTotal > MAX_TOTAL_FILES) {
+      alert(`Con este archivo superas el máximo de ${MAX_TOTAL_FILES} por orden.`);
+      e.target.value = '';
+      return;
+    }
+  
+    setFiles((prev) => ({ ...prev, cardImage: file }));
+  };
+  
+  const removeCardImage = () => {
+    setFiles((prev) => ({ ...prev, cardImage: null }));
+  };
+
   const removeExtraFileAt = (index: number) => {
     setExtraFiles((prev) => prev.filter((_, i) => i !== index));
   };
@@ -335,8 +399,8 @@ const WorkOrdersPage: React.FC = () => {
   // Para el envío de la informacion
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!files.ot || !files.sku || !files.op) {
-      alert('Todos los archivos (OT, SKU, OP) son obligatorios.');
+    if (!files.ot || !files.sku || !files.op || !files.cardImage) {
+      alert('Los archivos OT, SKU, OP (PDF) y la imagen de tarjeta son obligatorios.');
       return;
     }
     if (
@@ -364,11 +428,13 @@ const WorkOrdersPage: React.FC = () => {
       (files.ot ? 1 : 0) +
       (files.sku ? 1 : 0) +
       (files.op ? 1 : 0) +
+      (files.cardImage ? 1 : 0) + 
       extraFiles.length;
-      if (extraFiles.length > MAX_ATTACHMENTS) {
-        alert(`Máximo ${MAX_ATTACHMENTS} adjuntos permitidos.`);
-        return;
-      }
+
+    if (extraFiles.length > MAX_ATTACHMENTS) {
+      alert(`Máximo ${MAX_ATTACHMENTS} adjuntos permitidos.`);
+      return;
+    }
     if (totalFiles > MAX_TOTAL_FILES) {
       alert(
         `Máximo ${MAX_TOTAL_FILES} archivos por orden. Actualmente: ${totalFiles}.`
@@ -391,6 +457,7 @@ const WorkOrdersPage: React.FC = () => {
         ot: files.ot!,
         sku: files.sku!,
         op: files.op!,
+        cardImage: files.cardImage,
         attachments: extraFiles,
       });
       setMessage(result.message || 'Orden de trabajo creada correctamente');
@@ -407,7 +474,7 @@ const WorkOrdersPage: React.FC = () => {
         total_sheets: 0,
         files: [],
       });
-      setFiles({ ot: null, sku: null, op: null });
+      setFiles({ ot: null, sku: null, op: null, cardImage: null });
       setDropdownCount(4);
     } catch (error: any) {
       console.error(error);
@@ -592,9 +659,10 @@ const WorkOrdersPage: React.FC = () => {
                 onChange={handleExtraFilesChange}
                 disabled={
                   (files.ot ? 1 : 0) +
-                    (files.sku ? 1 : 0) +
-                    (files.op ? 1 : 0) +
-                    extraFiles.length >=
+                  (files.sku ? 1 : 0) +
+                  (files.op ? 1 : 0) +
+                  (files.cardImage ? 1 : 0) + // NEW
+                  extraFiles.length >=
                   MAX_TOTAL_FILES
                 }
               />
@@ -771,6 +839,51 @@ const WorkOrdersPage: React.FC = () => {
                   <IconButton onClick={() => removeFile('op')} color="error">
                     <DeleteIcon />
                   </IconButton>
+                </div>
+              )}
+            </label>
+            <Label>Subir imagen de tarjeta (PNG/JPEG/WEBP):</Label>
+            <label
+              htmlFor="upload-card-image"
+              style={{
+                borderRadius: '10rem',
+                border: '2px solid #aeadab',
+                width: '100%',
+                minHeight: '44px',
+                display: 'flex',
+                flexDirection: 'row',
+                alignItems: 'center',
+              }}
+            >
+              <HiddenInput
+                accept={ALLOWED_IMAGE_TYPES.join(',')}
+                id="upload-card-image"
+                type="file"
+                onChange={handleCardImageChange}
+              />
+              <IconButton color="primary" component="span">
+                <UploadFileIcon />
+              </IconButton>
+
+              {files.cardImage && (
+                <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', flexWrap: 'wrap' }}>
+                  <Typography variant="body2" style={{ color: 'black' }}>
+                    {files.cardImage.name}
+                  </Typography>
+                  <IconButton onClick={removeCardImage} color="error">
+                    <DeleteIcon />
+                  </IconButton>
+                  <img
+                    src={URL.createObjectURL(files.cardImage)}
+                    alt="Previsualización tarjeta"
+                    style={{
+                      width: 64,
+                      height: 64,
+                      objectFit: 'cover',
+                      borderRadius: 8,
+                      border: '1px solid #aeadab',
+                    }}
+                  />
                 </div>
               )}
             </label>

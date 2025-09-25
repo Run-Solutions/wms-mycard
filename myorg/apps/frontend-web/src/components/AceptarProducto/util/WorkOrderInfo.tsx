@@ -20,7 +20,8 @@ export default function WorkOrderInfo({
 }: Props) {
   const cantidadHojasRaw = Number(workOrder?.workOrder.quantity) / 24;
   const cantidadHojas = cantidadHojasRaw > 0 ? Math.ceil(cantidadHojasRaw) : 0;
-  const totalSheetsEffective = workOrder?.workOrder?.total_sheets ?? cantidadHojas;
+  const totalSheetsEffective =
+    workOrder?.workOrder?.total_sheets ?? cantidadHojas;
   const guessMimeFromName = (filename: string): string => {
     const ext = filename.split('.').pop()?.toLowerCase();
     switch (ext) {
@@ -157,6 +158,8 @@ export default function WorkOrderInfo({
                       ? 'SKU'
                       : file.type === 'OP'
                       ? 'OP'
+                      : file.type === 'CARD_IMAGE'
+                      ? 'Ver TARJETA'
                       : 'Adjunto';
                   return (
                     <button
@@ -193,7 +196,8 @@ export function WorkOrderHojasInfo({
 }: Props) {
   const cantidadHojasRaw = Number(workOrder?.workOrder.quantity) / 24;
   const cantidadHojas = cantidadHojasRaw > 0 ? Math.ceil(cantidadHojasRaw) : 0;
-  const totalSheetsEffective = workOrder?.workOrder?.total_sheets ?? cantidadHojas;
+  const totalSheetsEffective =
+    workOrder?.workOrder?.total_sheets ?? cantidadHojas;
 
   const guessMimeFromName = (filename: string): string => {
     const ext = filename.split('.').pop()?.toLowerCase();
@@ -321,6 +325,8 @@ export function WorkOrderHojasInfo({
                       ? 'SKU'
                       : file.type === 'OP'
                       ? 'OP'
+                      : file.type === 'CARD_IMAGE'
+                      ? 'Ver TARJETA'
                       : 'Adjunto';
                   return (
                     <button
@@ -357,7 +363,8 @@ export function WorkOrderPrePressInfo({
 }: Props) {
   const cantidadHojasRaw = Number(workOrder?.workOrder.quantity) / 24;
   const cantidadHojas = cantidadHojasRaw > 0 ? Math.ceil(cantidadHojasRaw) : 0;
-  const totalSheetsEffective = workOrder?.workOrder?.total_sheets ?? cantidadHojas;
+  const totalSheetsEffective =
+    workOrder?.workOrder?.total_sheets ?? cantidadHojas;
   const guessMimeFromName = (filename: string): string => {
     const ext = filename.split('.').pop()?.toLowerCase();
     switch (ext) {
@@ -484,6 +491,8 @@ export function WorkOrderPrePressInfo({
                       ? 'SKU'
                       : file.type === 'OP'
                       ? 'OP'
+                      : file.type === 'CARD_IMAGE'
+                      ? 'Ver TARJETA'
                       : 'Adjunto';
                   return (
                     <button

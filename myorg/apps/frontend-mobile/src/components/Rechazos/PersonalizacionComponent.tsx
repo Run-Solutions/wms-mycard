@@ -14,10 +14,11 @@ import { useNavigation } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { RootStackParamList } from '../../navigation/types';
 import { acceptPersonalizacionInconformityAuditory } from '../../api/rechazos';
+import { InconformityData } from './CorteComponent';
 
 interface Props {
-  workOrder: any; // toda la OT con .flow
-  currentFlow: any; // flujo actual (ej: corte)
+  workOrder: any;
+  currentFlow: any;
 }
 interface PartialRelease {
   quantity: string;
@@ -26,15 +27,6 @@ interface PartialRelease {
   work_order_flow_id: number;
   inconformities: any[];
 }
-type InconformityData = {
-  quantity: number | string;
-  excess: number | string;
-  sample: number | string;
-  comments: string;
-  user: string;
-  inconformity: string;
-};
-
 const PersonalizacionComponent: React.FC<Props> = ({
   workOrder,
   currentFlow,
@@ -53,6 +45,7 @@ const PersonalizacionComponent: React.FC<Props> = ({
     useState<InconformityData>({
       quantity: '',
       excess: '',
+      noprocess: '',
       sample: '',
       comments: '',
       user: '',
@@ -77,6 +70,7 @@ const PersonalizacionComponent: React.FC<Props> = ({
       setInconformityValues({
         quantity: personalizacion.good_quantity || '',
         excess: personalizacion.excess_quantity || '',
+        noprocess: personalizacion.noprocess_quantity || '',
         sample: personalizacion.formAuditory?.sample_auditory || '',
         comments: personalizacion.comments || '',
         user:
@@ -95,11 +89,19 @@ const PersonalizacionComponent: React.FC<Props> = ({
         (acc: any, p: any) => acc + (p.excess_quantity || 0),
         0
       );
+      const totalNoProcess = partials.reduce(
+        (acc: any, p: any) => acc + (p.noprocess_quantity || 0),
+        0
+      );
 
       setInconformityValues({
         quantity: Math.max((personalizacion.good_quantity || 0) - totalGood, 0),
         excess: Math.max(
           (personalizacion.excess_quantity || 0) - totalExcess,
+          0
+        ),
+        noprocess: Math.max(
+          (personalizacion.noprocess_quantity || 0) - totalNoProcess,
           0
         ),
         sample: personalizacion.formAuditory?.sample_auditory || '',
@@ -117,6 +119,7 @@ const PersonalizacionComponent: React.FC<Props> = ({
       setInconformityValues({
         quantity: firstUnvalidated?.quantity || '',
         excess: firstUnvalidated?.excess_quantity || '',
+        noprocess: firstUnvalidated?.noprocess_quantity || '',
         sample: firstUnvalidated?.formAuditory?.sample_auditory || '',
         comments: firstUnvalidated?.observation || '',
         user:
@@ -310,6 +313,15 @@ const PersonalizacionComponent: React.FC<Props> = ({
               pointerEvents="none" // evita que se abra el teclado
             />
           </TouchableOpacity>
+          <Text style={styles.subtitle}>Sin procesar:</Text>
+          <TextInput
+            style={styles.input}
+            editable={false}
+            value={String(inconformityValues.noprocess)}
+            mode="outlined"
+            activeOutlineColor="#000"
+            theme={{ roundness: 30 }}
+          />
           <Text style={styles.subtitle}>Excedente:</Text>
           <TextInput
             style={styles.input}

@@ -1,7 +1,7 @@
 import API from './http';
 
 export const fetchWorkOrdersInProgress = async () => {
-  const estados = ['En auditoria'];
+  const estados = ['En Auditoria', 'Parcial'];
   const query = estados.map(estado => encodeURIComponent(estado)).join(',');
 
   const res = await API.get(`/free-work-order-auditory/in-auditory?statuses=${query}`);
@@ -18,5 +18,16 @@ export const liberarWorkOrderAuditory = async (payload: {
   workOrderId: number;
 }) => {
   const res = await API.patch('/free-work-order-auditory/cerrar-auditoria', payload);
+  return res.data;
+};
+
+export const cerrarParcialWorkOrderAuditory = async (
+  partialReleaseId: number,
+  quantityRelease: number
+) => {
+  const res = await API.patch(
+    '/free-work-order-auditory/cerrar-auditoria-parcial',
+    { partialReleaseId, quantityRelease }
+  );
   return res.data;
 };

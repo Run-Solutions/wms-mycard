@@ -1,27 +1,31 @@
 // myorg/apps/frontend-mobile/src/app/protected/cerrarOrdenDeTrabajo/[id]/page.tsx
 'use client';
 
-import React, { useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 import {
   View,
   Text,
   ScrollView,
   StyleSheet,
   Modal,
+  Platform,
   TouchableOpacity,
   Alert,
+  TextInput,
 } from 'react-native';
 import { useRoute, RouteProp, useNavigation } from '@react-navigation/native';
 import { InternalStackParamList } from '../../../../navigation/types';
 import {
   liberarWorkOrderAuditory,
   fetchWorkOrderById,
+  cerrarParcialWorkOrderAuditory,
 } from '../../../../api/cerrarOrdenDeTrabajo';
 import { getFileByName } from '../../../../api/finalizacion';
 import * as FileSystem from 'expo-file-system';
 import { Buffer } from 'buffer';
 import FileViewer from 'react-native-file-viewer';
 import InfoCard from '../../../../components/SeguimientoDeOts/InfoCard';
+import PartialHistory from '../../../../components/SeguimientoDeOts/PartialHistory';
 
 type WorkOrderDetailRouteProp = RouteProp<
   InternalStackParamList,
@@ -52,6 +56,21 @@ type AreaData = {
   cqm: number;
   excedente: number;
   muestras: number;
+  parciales: number;
+  parcialesValidados: number;
+  partials: Array<{
+    id: number;
+    quantity: number;
+    bad_quantity: number;
+    excess_quantity: number;
+    noprocess_quantity?: number;
+    material_quantity?: number;
+    release_quantity?: number;
+    validated?: boolean;
+    user?: { username: string } | null;
+    formAuditory?: { user?: { username?: string | null } | null } | null;
+    created_at?: string;
+  }>;
 };
 
 const CerrarOrdenDeTrabajoAuxScreen: React.FC = () => {
@@ -60,15 +79,23 @@ const CerrarOrdenDeTrabajoAuxScreen: React.FC = () => {
   const navigation = useNavigation();
   const [workOrder, setWorkOrder] = useState<any>(null);
   const [showConfirm, setShowConfirm] = useState(false);
+  const [showQtyModal, setShowQtyModal] = useState(false);
+  const [qtyToClient, setQtyToClient] = useState<string>('');
+  const [qtyError, setQtyError] = useState<string>('');
 
-  useEffect(() => {
-    const loadData = async () => {
+  const loadData = useCallback(async () => {
+    try {
       const data = await fetchWorkOrderById(id);
       setWorkOrder(data);
-    };
-    loadData();
+    } catch (error) {
+      console.error('Error al obtener la orden:', error);
+      Alert.alert('Error', 'No se pudo cargar la orden de trabajo.');
+    }
   }, [id]);
-  console.log(workOrder);
+
+  useEffect(() => {
+    loadData();
+  }, [loadData]);
 
   // Función para obtener los datos específicos de cada área
   const getAreaData = (
@@ -151,7 +178,7 @@ const CerrarOrdenDeTrabajoAuxScreen: React.FC = () => {
         name: item.area?.name || 'Sin nombre',
         status: item.status || 'Desconocido',
         response: item.areaResponse || {},
-        answers: item.answers?.[0] || {},
+        answers: item.answers || [],
         ...getAreaData(
           item.area_id,
           item.areaResponse,
@@ -159,6 +186,10 @@ const CerrarOrdenDeTrabajoAuxScreen: React.FC = () => {
           item.user,
           index
         ),
+        parciales: item.partialReleases?.length ?? 0,
+        parcialesValidados:
+          item.partialReleases?.filter((p: any) => p?.validated).length ?? 0,
+        partials: item.partialReleases ?? [],
       })) || [];
 
   const cantidadHojasRaw = Number(workOrder?.quantity) / 24;
@@ -186,7 +217,28 @@ const CerrarOrdenDeTrabajoAuxScreen: React.FC = () => {
     totalCqm +
     totalMuestras;
 
+  const lastFlow = workOrder?.flow?.[workOrder.flow.length - 1];
+  const lastStatus = lastFlow?.status?.toLowerCase?.() ?? '';
+  const lastPartialRelease = Array.isArray(lastFlow?.partialReleases)
+    ? lastFlow?.partialReleases[lastFlow.partialReleases.length - 1]
+    : undefined;
+  const totalPartialQuantity = Array.isArray(lastFlow?.partialReleases)
+    ? lastFlow.partialReleases.reduce(
+        (sum: number, release: any) => sum + (Number(release?.quantity) || 0),
+        0
+      )
+    : 0;
+  const totalPartialReleased = Array.isArray(lastFlow?.partialReleases)
+    ? lastFlow.partialReleases.reduce(
+        (sum: number, release: any) =>
+          sum + (Number(release?.release_quantity) || 0),
+        0
+      )
+    : 0;
+  const remainingPartialToRelease = totalPartialQuantity - totalPartialReleased;
+
   const handleCloseOrder = async () => {
+    setShowConfirm(false);
     const payload = {
       workOrderFlowId: workOrder.id,
       workOrderId: workOrder.workOrder.id,
@@ -201,6 +253,55 @@ const CerrarOrdenDeTrabajoAuxScreen: React.FC = () => {
       Alert.alert('Error', 'No se pudo cerrar la orden.');
     }
   };
+
+  const handleConfirmClose = () => {
+    if (lastStatus === 'parcial') {
+      setShowConfirm(false);
+      setShowQtyModal(true);
+      return;
+    }
+    handleCloseOrder();
+  };
+
+  const handleConfirmQuantity = async () => {
+    const numericQty = Number(qtyToClient);
+    if (!Number.isFinite(numericQty) || numericQty <= 0) {
+      setQtyError('Ingresa una cantidad válida mayor a 0.');
+      return;
+    }
+
+    const partialQty = Number(lastPartialRelease?.quantity ?? 0);
+    if (numericQty > partialQty) {
+      setQtyError('La cantidad no puede ser mayor a la del parcial.');
+      return;
+    }
+
+    if (!lastPartialRelease?.id) {
+      setQtyError('No se encontró un parcial para cerrar.');
+      return;
+    }
+
+    try {
+      await cerrarParcialWorkOrderAuditory(lastPartialRelease.id, numericQty);
+      Alert.alert('Parcial cerrado', 'Se registró la entrega parcial.');
+      setShowQtyModal(false);
+      setQtyToClient('');
+      setQtyError('');
+      await loadData();
+    } catch (error) {
+      console.error('Error al cerrar el parcial:', error);
+      Alert.alert(
+        'Error',
+        'No se pudo cerrar la parcialidad. Inténtalo nuevamente.'
+      );
+    }
+  };
+
+  const handleCancelQuantity = () => {
+    setShowQtyModal(false);
+    setQtyToClient('');
+    setQtyError('');
+  };
   function getLabelByType(type: string) {
     switch (type) {
       case 'OT':
@@ -209,6 +310,8 @@ const CerrarOrdenDeTrabajoAuxScreen: React.FC = () => {
         return 'Ver SKU';
       case 'OP':
         return 'Ver OP';
+      case 'CARD_IMAGE':
+        return 'Ver TARJETA';
       default:
         return 'Adjunto';
     }
@@ -362,12 +465,20 @@ const CerrarOrdenDeTrabajoAuxScreen: React.FC = () => {
               <Text style={styles.cellValue}>{totalMuestras}</Text>
             </View>
             <View style={styles.row}>
+              <Text style={styles.cellLabel}>
+                Cantidad restante parcial por liberar
+              </Text>
+              <Text style={styles.cellValue}>{remainingPartialToRelease}</Text>
+            </View>
+            <View style={styles.row}>
               <Text style={styles.cellLabel}>TOTAL</Text>
               <Text style={styles.cellValue}>{totalGeneral}</Text>
             </View>
           </View>
         </>
       )}
+
+      {workOrder && <PartialHistory workOrder={workOrder} />}
 
       {workOrder?.status !== 'Cerrado' && (
         <TouchableOpacity
@@ -392,7 +503,49 @@ const CerrarOrdenDeTrabajoAuxScreen: React.FC = () => {
                 <Text style={styles.modalButtonText}>Cancelar</Text>
               </TouchableOpacity>
               <TouchableOpacity
-                onPress={handleCloseOrder}
+                onPress={handleConfirmClose}
+                style={styles.confirmButton}
+              >
+                <Text style={styles.modalButtonText}>Confirmar</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
+
+      <Modal visible={showQtyModal} transparent animationType="fade">
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalBox}>
+            <Text style={styles.modalTitle}>
+              Esta OT está en estado parcial
+            </Text>
+            <Text style={[styles.modalText, { marginBottom: 12 }]}>
+              Ingresa la{' '}
+              <Text style={{ fontWeight: '700' }}>
+                cantidad a enviar al cliente
+              </Text>
+              :
+            </Text>
+            <TextInput
+              value={qtyToClient}
+              onChangeText={(text) => {
+                setQtyToClient(text);
+                if (qtyError) setQtyError('');
+              }}
+              keyboardType="numeric"
+              placeholder="Ej: 1000"
+              style={styles.modalInput}
+            />
+            {qtyError ? <Text style={styles.errorText}>{qtyError}</Text> : null}
+            <View style={styles.modalActions}>
+              <TouchableOpacity
+                onPress={handleCancelQuantity}
+                style={styles.cancelButton}
+              >
+                <Text style={styles.modalButtonText}>Cancelar</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                onPress={handleConfirmQuantity}
                 style={styles.confirmButton}
               >
                 <Text style={styles.modalButtonText}>Confirmar</Text>
@@ -514,9 +667,25 @@ const styles = StyleSheet.create({
     marginBottom: 16,
     textAlign: 'center',
   },
+  modalTitle: {
+    fontSize: 18,
+    fontWeight: '700',
+    textAlign: 'center',
+    color: '#111827',
+    marginBottom: 12,
+  },
   modalActions: {
     flexDirection: 'row',
     justifyContent: 'space-between',
+  },
+  modalInput: {
+    borderWidth: 1,
+    borderColor: '#d1d5db',
+    borderRadius: 12,
+    paddingHorizontal: 12,
+    paddingVertical: Platform.OS === 'ios' ? 12 : 8,
+    marginBottom: 8,
+    color: '#111827',
   },
   cancelButton: {
     backgroundColor: '#ccc',
@@ -535,6 +704,12 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     color: '#fff',
     fontWeight: '600',
+  },
+  errorText: {
+    color: '#b91c1c',
+    fontSize: 12,
+    marginBottom: 8,
+    textAlign: 'center',
   },
 });
 const fileStyles = StyleSheet.create({

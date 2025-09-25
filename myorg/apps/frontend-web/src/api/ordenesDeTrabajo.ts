@@ -19,37 +19,36 @@ export const getAreasOperator = async () => {
 // Crear orden de trabajo
 export const createWorkOrder = async (
   formData: any,
-  files: { ot: File; sku: File; op: File; attachments?: File[] }
+  files: { ot: File; sku: File; op: File; attachments?: File[]; cardImage?: File }
 ) => {
   const token = localStorage.getItem('token');
   if (!token) throw new Error('Token no disponible');
 
-  const formDataToSend = new FormData();
-  formDataToSend.append('ot', files.ot);
-  formDataToSend.append('sku', files.sku);
-  formDataToSend.append('op', files.op);
+  const fd = new FormData();
+  fd.append('ot', files.ot);
+  fd.append('sku', files.sku);
+  fd.append('op', files.op);
 
-  (files.attachments || []).forEach((f) => {
-    formDataToSend.append('attachments', f);
-  });
+  // ✅ Sólo si existe
+  if (files.cardImage) fd.append('cardImage', files.cardImage);
 
-  formData.areasOperatorIds.forEach((area: string) =>
-    formDataToSend.append('areasOperatorIds', area)
+  (files.attachments || []).forEach((f) => fd.append('attachments', f));
+
+  (formData.areasOperatorIds || []).forEach((area: string | number) =>
+    fd.append('areasOperatorIds', String(area))
   );
-  formDataToSend.append('ot_id', formData.ot_id);
-  formDataToSend.append('mycard_id', formData.mycard_id);
-  formDataToSend.append('quantity', formData.quantity);
-  formDataToSend.append('comments', formData.comments);
-  formDataToSend.append('priority', String(formData.priority));
-  formDataToSend.append('total_sheets', formData.total_sheets);
-  formDataToSend.append('quantity_contacts', formData.quantity_contacts);
-  formDataToSend.append('isCollator', formData.tipoSeleccion);
 
-  const response = await API.post('/work-orders', formDataToSend, {
-    headers: {
-      Authorization: `Bearer ${token}`,
-      'Content-Type': 'multipart/form-data',
-    },
+  fd.append('ot_id', String(formData.ot_id));
+  fd.append('mycard_id', String(formData.mycard_id));
+  fd.append('quantity', String(formData.quantity));
+  fd.append('comments', String(formData.comments));
+  fd.append('priority', String(!!formData.priority));
+  fd.append('total_sheets', String(formData.total_sheets));
+  fd.append('quantity_contacts', String(formData.quantity_contacts));
+  fd.append('isCollator', String(formData.tipoSeleccion)); // '0' | '1'
+
+  const response = await API.post('/work-orders', fd, {
+    headers: { Authorization: `Bearer ${token}` }, // ❌ sin Content-Type
   });
 
   return response.data;

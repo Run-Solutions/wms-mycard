@@ -24,6 +24,7 @@ import {
   getReviewerNameFromAnswer,
   getPerPartialCqm,
 } from '@/components/SeguimientoDeOts/util/quality';
+import PartialHistory from '@/components/SeguimientoDeOts/PartialHistory';
 
 type NumericField =
   | 'buenas'
@@ -181,6 +182,7 @@ export type AreaData = {
     noprocess_quantity: number;
     user_id: number | null; // 👈 puede venir null
     validated: boolean;
+    release_quantity?: number; // 👈 cantidad liberada 
     user?: { username: string } | null; // 👈 opcional
     created_at: string;
   }>;
@@ -324,6 +326,7 @@ export default function SeguimientoDeOtsAuxPage({ params }: Props) {
         const users = await fetchAllUsers();
         setOperatorUsers(users || []);
         setWorkOrder(data);
+
         const historyData = data.flow
           .filter((item: any) => item.answers?.length > 0)
           .map((item: any) => {
@@ -473,10 +476,10 @@ export default function SeguimientoDeOtsAuxPage({ params }: Props) {
       prev.map((a) =>
         a.id === area.id
           ? {
-              ...a,
-              assigned_user_id: newUserId,
-              usuario: operatorById.get(newUserId) ?? a.usuario,
-            }
+            ...a,
+            assigned_user_id: newUserId,
+            usuario: operatorById.get(newUserId) ?? a.usuario,
+          }
           : a
       )
     );
@@ -724,7 +727,7 @@ export default function SeguimientoDeOtsAuxPage({ params }: Props) {
           auditor,
           parciales,
           parcialesValidados,
-          partials: partialReleases, 
+          partials: partialReleases,
         };
       }
 
@@ -744,7 +747,7 @@ export default function SeguimientoDeOtsAuxPage({ params }: Props) {
         auditor,
         parciales,
         parcialesValidados,
-        partials: partialReleases, 
+        partials: partialReleases,
       };
     };
 
@@ -782,7 +785,7 @@ export default function SeguimientoDeOtsAuxPage({ params }: Props) {
           auditor: '',
           parciales: 0,
           parcialesValidados: 0,
-          partials: [], 
+          partials: [],
         };
     }
   };
@@ -1007,11 +1010,11 @@ export default function SeguimientoDeOtsAuxPage({ params }: Props) {
     if (partial)
       return (
         !partial.validated &&
-        ['En proceso', 'Parcial' /*, 'Otro estado'*/].includes(area.status)
+        ['En proceso', 'Parcial', 'Enviado a CQM', 'Listo', 'En inconformidad', 'En inconformidad CQM' /*, 'Otro estado'*/].includes(area.status)
       );
 
     // sin parciales: solo si el área está "En proceso"
-    return ['En proceso', 'Parcial' /*, 'Otro estado'*/].includes(area.status);
+    return ['En proceso', 'Parcial', 'Enviado a CQM', 'Listo', 'En inconformidad', 'En inconformidad CQM'/*, 'Otro estado'*/].includes(area.status);
   };
 
   const fieldLabels: Record<string, string> = {
@@ -1020,6 +1023,7 @@ export default function SeguimientoDeOtsAuxPage({ params }: Props) {
     excedente: "Excedente",
     noprocess: "Sin procesar",
   };
+
   return (
     <>
       <Container>
@@ -1108,6 +1112,8 @@ export default function SeguimientoDeOtsAuxPage({ params }: Props) {
                         ? 'Ver SKU'
                         : file.type === 'OP'
                         ? 'Ver OP'
+                        : file.type === 'CARD_IMAGE'
+                        ? 'Ver TARJETA'
                         : 'Adjunto';
                     return (
                       <button
@@ -1154,7 +1160,7 @@ export default function SeguimientoDeOtsAuxPage({ params }: Props) {
                         className="p-3 text-center font-semibold align-bottom"
                         colSpan={areaColSpan(area)} // antes: Math.max(1, area.parciales)
                       >
-                        {area.name}{' '}{area.isCollator && area.id === 4? '(C)' : ''}
+                        {area.name}{' '}{area.isCollator && area.id === 4 ? '(C)' : ''}
                         <div className="text-[0.65rem] text-gray-400 mt-1">
                           {area.status}
                         </div>
@@ -1314,11 +1320,10 @@ export default function SeguimientoDeOtsAuxPage({ params }: Props) {
                             }
                           >
                             <span
-                              className={`px-2 py-1 rounded-lg text-sm font-medium ${
-                                name && name !== '—'
-                                  ? 'bg-yellow-100 text-yellow-800' // badge “Calidad”
-                                  : '' // badge vacío
-                              }`}
+                              className={`px-2 py-1 rounded-lg text-sm font-medium ${name && name !== '—'
+                                ? 'bg-yellow-100 text-yellow-800' // badge “Calidad”
+                                : '' // badge vacío
+                                }`}
                             >
                               {name || '—'}
                             </span>
@@ -1336,11 +1341,10 @@ export default function SeguimientoDeOtsAuxPage({ params }: Props) {
                           className="text-center"
                         >
                           <span
-                            className={`px-2 py-1 rounded-lg text-sm font-medium ${
-                              reviewerName && reviewerName !== '—'
-                                ? 'bg-yellow-100 text-yellow-800'
-                                : ''
-                            }`}
+                            className={`px-2 py-1 rounded-lg text-sm font-medium ${reviewerName && reviewerName !== '—'
+                              ? 'bg-yellow-100 text-yellow-800'
+                              : ''
+                              }`}
                           >
                             {reviewerName || '—'}
                           </span>
@@ -1396,7 +1400,7 @@ export default function SeguimientoDeOtsAuxPage({ params }: Props) {
                     (field) => (
                       <tr key={field}>
                         <td className="p-3 capitalize font-semibold">
-                        {fieldLabels[field]}
+                          {fieldLabels[field]}
                         </td>
                         {/* Por cada área, creamos tantas celdas como parciales (o 1 si no hay) */}
                         {areas.flatMap((area, aIndex) => {
@@ -1407,9 +1411,9 @@ export default function SeguimientoDeOtsAuxPage({ params }: Props) {
                                 field === 'buenas'
                                   ? p.quantity
                                   : field === 'malas'
-                                  ? p.bad_quantity ?? 0
-                                  : field === 'excedente' ? p.excess_quantity ?? 0
-                                  : p.noprocess_quantity ?? '';
+                                    ? p.bad_quantity ?? 0
+                                    : field === 'excedente' ? p.excess_quantity ?? 0
+                                      : p.noprocess_quantity ?? '';
                               return (
                                 <td
                                   key={`area-${area.id}-parcial-${p.id}-${field}-${pIndex}`}
@@ -1477,9 +1481,9 @@ export default function SeguimientoDeOtsAuxPage({ params }: Props) {
                             field === 'cqm'
                               ? getPerPartialCqm(area) // ✅ sin fallback para Rem
                               : getPerPartialValues(
-                                  area,
-                                  field as 'defectuoso' | 'muestras'
-                                );
+                                area,
+                                field as 'defectuoso' | 'muestras'
+                              );
                           return vals.map((v, i) => (
                             <td
                               key={`cell-area-${area.id}-parcial-${i}-${field}`}
@@ -1500,7 +1504,7 @@ export default function SeguimientoDeOtsAuxPage({ params }: Props) {
                           field === 'cqm'
                             ? getSingleCqm(area) // ✅ ahora toma el sample_quantity del último answer
                             : renderCell?.(area, field as any) ??
-                              getAnswerValue(undefined, field as any, area);
+                            getAnswerValue(undefined, field as any, area);
 
                         return (
                           <td
@@ -1521,7 +1525,7 @@ export default function SeguimientoDeOtsAuxPage({ params }: Props) {
                       <td
                         key={`${area.id}-total-${index}`}
                         className="text-center"
-                        colSpan={areaColSpan(area)} 
+                        colSpan={areaColSpan(area)}
                       >
                         {area.buenas +
                           area.malas +
@@ -1546,6 +1550,25 @@ export default function SeguimientoDeOtsAuxPage({ params }: Props) {
                         {area.id >= 6 ? area.buenas + area.excedente : ''}
                       </td>
                     ))}
+                  </tr>
+
+                  {/* Control de Auditoria */}
+
+                  <tr className="font-semibold">
+                    <td className="p-3">🔍 Auditoría</td>
+                    {areas.map((area, index) => {
+                      const ps = area.partials ?? [];
+                      const totalQty = ps.reduce((s:any, p:any) => s + (Number(p?.quantity) || 0), 0);
+                      const totalRel = ps.reduce((s:any, p:any) => s + (Number(p?.release_quantity) || 0), 0);
+                      const restante = totalQty - totalRel;
+                      return (<td
+                        key={`${area.id}-b+e-${index}`}
+                        className="text-center"
+                        colSpan={areaColSpan(area)} // 👈 clave
+                      >
+                        {(index === (areas.length - 1) && area.parciales > 0) ? restante : ''}
+                      </td>)
+                    })}
                   </tr>
                 </tbody>
               </table>
@@ -1604,6 +1627,9 @@ export default function SeguimientoDeOtsAuxPage({ params }: Props) {
               </TableWrapper>
             </>
           )}
+          <PartialHistory
+          workOrder={workOrder}
+          />
           <VistosBuenosHistory
             history={vistosBuenosHistory}
             qualitySectionOpen={qualitySectionOpen}
@@ -1650,9 +1676,8 @@ export default function SeguimientoDeOtsAuxPage({ params }: Props) {
                           onClick={() =>
                             setOpModal((s) => ({ ...s, selectedUserId: u.id }))
                           }
-                          className={`w-full text-left px-3 py-2 border-b last:border-b-0 ${
-                            selected ? 'bg-blue-100' : 'hover:bg-gray-50'
-                          }`}
+                          className={`w-full text-left px-3 py-2 border-b last:border-b-0 ${selected ? 'bg-blue-100' : 'hover:bg-gray-50'
+                            }`}
                         >
                           {u.username}
                         </button>

@@ -11,6 +11,7 @@ export class CloseAuditoryWorkOrderService {
     if (!userId) {
       throw new Error('No se proporcionan areas validas');
     }
+    console.log('Estados que se reciben:', statuses);
     // Para obtener las ordenes de trabajo con estado en auditoria o estados solicitados
     const inAuditoryOrders = await this.prisma.formAuditory.findMany({
       where: {
@@ -55,7 +56,7 @@ export class CloseAuditoryWorkOrderService {
             },
           },
         },
-        personalizacion_answer_auditory: { 
+        personalizacion_answer_auditory: {
           include: {
             areas_response: {
               include: {
@@ -74,7 +75,7 @@ export class CloseAuditoryWorkOrderService {
             },
           },
         },
-        hot_stamping_answer_auditory: { 
+        hot_stamping_answer_auditory: {
           include: {
             areas_response: {
               include: {
@@ -93,7 +94,7 @@ export class CloseAuditoryWorkOrderService {
             },
           },
         },
-        milling_chip_answer_auditory: { 
+        milling_chip_answer_auditory: {
           include: {
             areas_response: {
               include: {
@@ -114,6 +115,70 @@ export class CloseAuditoryWorkOrderService {
         },
       },
     });
+
+    const workOrdersRaw = await this.prisma.workOrder.findMany({
+      where: {
+        // Filtra OTs que tengan al menos un flow con status en statuses
+        flow: { some: { status: { in: statuses } } },
+      },
+      select: {
+        id: true,
+        ot_id: true,
+        mycard_id: true,
+        quantity: true,
+        status: true,          // en tu schema puede ser null
+        created_by: true,
+        createdAt: true,
+        updatedAt: true,
+        user: { select: { username: true } },
+        // ⬇️ Trae TODOS los flows de la OT (sin where aquí)
+        flow: {
+          select: {
+            id: true,
+            work_order_id: true,
+            area_id: true,
+            status: true,
+            assigned_user: true,
+            assigned_at: true,
+            area_response_id: true,
+            created_at: true,
+            updated_at: true,
+            area: { select: { name: true } },
+            // para derivar validated a nivel OT
+            partialReleases: { select: { validated: true } },
+          },
+          orderBy: { id: 'asc' }, // opcional
+        },
+        files: { select: { file_path: true } },
+      },
+    });
+
+    // Mapear al shape y derivar validated (true si algún partialRelease.validated)
+    const workOrders = workOrdersRaw.map((wo) => {
+      const validated =
+        wo.flow?.some(f => f.partialReleases?.some(pr => pr.validated)) ?? false;
+
+      // quitar partialReleases del flow si no quieres exponerlo
+      const flow = wo.flow.map(({ partialReleases, ...rest }) => rest);
+
+      return {
+        id: wo.id,
+        ot_id: wo.ot_id,
+        mycard_id: wo.mycard_id,
+        quantity: wo.quantity,
+        status: wo.status ?? '',          // si tu DTO exige string estricto
+        created_by: wo.created_by,
+        validated,
+        createdAt: wo.createdAt.toISOString?.() ?? wo.createdAt,
+        updatedAt: wo.updatedAt.toISOString?.() ?? wo.updatedAt,
+        user: { username: wo.user.username },
+        flow,
+        files: wo.files,
+      };
+    });
+
+    console.log(workOrders, 'Ordenes en auditoria encontradas');
+
     // Extraer los IDs de las workOrders que estan en los flujos
     const workOrderIds = inAuditoryOrders.flatMap((order) => {
       const corteWorkOrderId =
@@ -131,9 +196,13 @@ export class CloseAuditoryWorkOrderService {
         ? order.milling_chip_answer_auditory?.areas_response?.workOrder?.id
         : undefined;
 
-      return [corteWorkOrderId, colorEdgeWorkOrderId, personalizacionWorkOrderId, hotStampingWorkOrderId, millingChipWorkOrderId].filter(
-        (id): id is number => !!id,
-      );
+      return [
+        corteWorkOrderId,
+        colorEdgeWorkOrderId,
+        personalizacionWorkOrderId,
+        hotStampingWorkOrderId,
+        millingChipWorkOrderId,
+      ].filter((id): id is number => !!id);
     });
 
     const filteredWorkOrderIds = workOrderIds.filter(
@@ -141,31 +210,51 @@ export class CloseAuditoryWorkOrderService {
     );
     console.log(filteredWorkOrderIds, 'Ordenes pendientes filtradas');
     // Traer las workOrders asociadas a los IDs
+    // helper: construye el where para flow.status
+    // Dedup de IDs por si llegan repetidos
+    const uniqueIds = Array.from(new Set(filteredWorkOrderIds));
+
+    const allowedStatuses =
+      statuses && statuses.length ? statuses : ['En auditoria', 'Parcial'];
+
+    // Construye un OR de equals (case-sensitive)
+    const flowStatusOr = allowedStatuses.map((s) => ({
+      status: { equals: s }, // sin mode
+    }));
+
+    // Filtro para flow.status: alguno de los estados permitidos Y que NO contenga "inconformidad"
+    const flowWhere = {
+      AND: [
+        { OR: flowStatusOr },
+        { NOT: { status: { contains: 'inconformidad' } } }, // sin mode => respeta el casing exacto
+      ],
+    };
+
     const allRelatedWorkOrders = await this.prisma.workOrder.findMany({
       where: {
-        id: { in: filteredWorkOrderIds },
+        id: { in: uniqueIds },
+        status: { notIn: ['Cerrado'] }, // si status es nullable, incluye null
+        flow: { some: flowWhere }, // ⬅️ esto sí filtra la orden
       },
       include: {
         user: true,
         flow: {
-          include: {
-            user: true,
-            area: true,
-          },
+          where: flowWhere, // devuelves solo los pasos relevantes
+          include: { user: true, area: true },
         },
         files: true,
       },
     });
     console.log(allRelatedWorkOrders.length, 'Ordenes pendientes encontradas');
 
-    if (allRelatedWorkOrders.length === 0) {
+    if (allRelatedWorkOrders.length === 0 && workOrders.length === 0) {
       return { message: 'No hay ordenes pendientes para esta area.' };
     }
     console.log(
       'Ordenes pendientes desde work-orders services',
       allRelatedWorkOrders,
     );
-    return allRelatedWorkOrders;
+    return [...allRelatedWorkOrders, ...workOrders];
   }
 
   // Para obtener los WorkOrderFlowEnAuditoria
@@ -177,7 +266,7 @@ export class CloseAuditoryWorkOrderService {
             ot_id: id,
           },
         },
-        status: 'En auditoria',
+        status: { in: ['En auditoria', 'Parcial']},
       },
       include: {
         workOrder: {
@@ -301,4 +390,18 @@ export class CloseAuditoryWorkOrderService {
       return { message: 'Respuesta guardada con exito' };
     });
   }
+
+  async updateWorkFlowAuditoryParcial(partialReleaseId: number, quantityRelease: number) {
+    return this.prisma.$transaction(async (tx) => {
+      await tx.partialRelease.update({
+        where: {
+          id: partialReleaseId,
+        },
+        data: {
+          release_quantity: quantityRelease,
+        },
+      });
+    });
+  }
+
 }

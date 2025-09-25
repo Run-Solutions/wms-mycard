@@ -92,6 +92,13 @@ export class FreeWorkOrderController {
       return formAnswer;
     }
     
+    // Para guardar respuesta de form cqm de laminacion
+    @Post('cqm-laminacion')
+    async saveFormAnswersLaminacion(@Body() dto: CreateFormAnswerImpressionDto) {
+      const formAnswer = await this.FreeWorkOrderService.saveFormAnswersLaminacion(dto);
+      return formAnswer;
+    }
+    
     @Post('cqm-corte')
     async saveFormAnswersCorte(@Body() dto: CreateFormAnswerImpressionDto) {
       const formAnswer = await this.FreeWorkOrderService.saveFormAnswers(dto);
@@ -126,12 +133,6 @@ export class FreeWorkOrderController {
       return formAnswer;
     }
     
-    // Para guardar respuesta de form cqm de laminacion
-    @Post('cqm-laminacion')
-    async saveFormAnswersLaminacion(@Body() dto: CreateFormAnswerImpressionDto) {
-      const formAnswer = await this.FreeWorkOrderService.saveFormAnswersLaminacion(dto);
-      return formAnswer;
-    }
 
     // Para guardar respuesta de liberacion de Impresion
     @Post('impress')

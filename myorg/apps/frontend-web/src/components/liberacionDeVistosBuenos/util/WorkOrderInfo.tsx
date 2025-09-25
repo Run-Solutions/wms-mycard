@@ -110,6 +110,8 @@ export default function WorkOrderInfo({ workOrder }: Props) {
                       ? 'SKU'
                       : file.type === 'OP'
                       ? 'OP'
+                      : file.type === 'CARD_IMAGE'
+                      ? 'Ver TARJETA'
                       : 'Adjunto';
                   return (
                     <button
@@ -141,11 +143,11 @@ export default function WorkOrderInfo({ workOrder }: Props) {
 }
 
 export function WorkOrderHojasInfo({ workOrder }: Props) {
-
   const cantidadHojasRaw = Number(workOrder?.workOrder.quantity) / 24;
   const cantidadHojas = cantidadHojasRaw > 0 ? Math.ceil(cantidadHojasRaw) : 0;
-  const totalSheetsEffective = workOrder?.workOrder?.total_sheets ?? cantidadHojas;
-  
+  const totalSheetsEffective =
+    workOrder?.workOrder?.total_sheets ?? cantidadHojas;
+
   const guessMimeFromName = (filename: string): string => {
     const ext = filename.split('.').pop()?.toLowerCase();
     switch (ext) {
@@ -215,7 +217,9 @@ export function WorkOrderHojasInfo({ workOrder }: Props) {
             <p className="text-sm text-muted-foreground text-black">
               Cantidad (Hojas Frente / Hojas Vuelta):
             </p>
-            <p className="text-xl font-semibold text-black">{totalSheetsEffective}</p>
+            <p className="text-xl font-semibold text-black">
+              {totalSheetsEffective}
+            </p>
           </CardContent>
         </Card>
       </div>
@@ -258,6 +262,8 @@ export function WorkOrderHojasInfo({ workOrder }: Props) {
                       ? 'SKU'
                       : file.type === 'OP'
                       ? 'OP'
+                      : file.type === 'CARD_IMAGE'
+                      ? 'Ver TARJETA'
                       : 'Adjunto';
                   return (
                     <button

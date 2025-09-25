@@ -1,30 +1,28 @@
-"use client";
-
+// App.tsx (o main entry)
+import 'react-native-gesture-handler';
+import { Buffer } from 'buffer';
+(global as any).Buffer = (global as any).Buffer || Buffer;
 import React from 'react';
-import 'react-native-get-random-values';
+import { GestureHandlerRootView } from 'react-native-gesture-handler';
+import { Provider as PaperProvider } from 'react-native-paper';
 import { NavigationContainer } from '@react-navigation/native';
+import { SafeAreaProvider } from 'react-native-safe-area-context';
+
 import RootNavigator from './src/navigation/RootNavigator';
 import { AuthProvider } from './src/contexts/AuthContext';
-import { StatusBar } from 'expo-status-bar';
-import { StyleSheet, View } from 'react-native';
 
 export default function App() {
   return (
-    <NavigationContainer>
-      <AuthProvider>
-        <View style={styles.container}>
-          <RootNavigator />
-          <StatusBar style="auto" />
-        </View>
-      </AuthProvider>
-    </NavigationContainer>
+    <GestureHandlerRootView style={{ flex: 1 }}>
+      <SafeAreaProvider>
+        <PaperProvider>
+          <AuthProvider>
+            <NavigationContainer>
+              <RootNavigator />
+            </NavigationContainer>
+          </AuthProvider>
+        </PaperProvider>
+      </SafeAreaProvider>
+    </GestureHandlerRootView>
   );
 }
-
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-  },
-});
-
-

@@ -56,17 +56,22 @@ model DeviceToken {
 }
 
 model Notification {
-  id          String   @id @default(cuid())
-  userId      Int                     
-  title       String
-  body        String
-  data        Json?
-  isRead      Boolean  @default(false)
-  createdAt   DateTime @default(now())
+  id              String   @id @default(cuid())
+  userId          Int
+  title           String
+  body            String
+  data            Json?
+  isRead          Boolean  @default(false)
+  createdAt       DateTime @default(now())
 
-  user        User     @relation(fields: [userId], references: [id])
+  // 👇 FK opcional hacia Inconformities
+  inconformityId  Int? 
+  inconformity    Inconformities? @relation("InconformityNotifications", fields: [inconformityId], references: [id])
+
+  user            User     @relation(fields: [userId], references: [id])
 
   @@index([userId, isRead])
+  @@index([inconformityId]) // opcional: ayuda a consultas por inconformidad
   @@map("notification")
 }
 
@@ -216,6 +221,7 @@ model PartialRelease {
   excess_quantity        Int?
   noprocess_quantity     Int?
   material_quantity      Int?
+  release_quantity       Int?
 
   observation            String?
   validated              Boolean             @default(false)
@@ -592,21 +598,24 @@ model FormAnswerResponse {
 
 model Inconformities {
   id                      Int               @id @default(autoincrement())
-  comments                String            // Relación con FormQuestion
+  comments                String
   reviewed                Boolean?          
-  created_by              Int?              // Respuesta individual
-  areas_response_id       Int?              // Relación con la tabla principal FormAnswer
+  created_by              Int?
+  areas_response_id       Int?
   form_answer_id          Int?
   partial_release_id      Int?      
   form_auditory_id        Int?
+  work_order_flow_id      Int?
 
-  partialReleases         PartialRelease?    @relation(fields: [partial_release_id], references: [id], onDelete: Cascade)
-  formAuditory            FormAuditory?      @relation(fields: [form_auditory_id], references: [id], onDelete: Cascade)
-  areaResponse            AreasResponse?     @relation(fields: [areas_response_id], references: [id], onDelete: Cascade)
-  formAnswer              FormAnswer?        @relation(fields: [form_answer_id], references: [id], onDelete: Cascade)
+  partialReleases         PartialRelease?   @relation(fields: [partial_release_id], references: [id])
+  formAuditory            FormAuditory?     @relation(fields: [form_auditory_id], references: [id])
+  areaResponse            AreasResponse?    @relation(fields: [areas_response_id], references: [id])
+  formAnswer              FormAnswer?       @relation(fields: [form_answer_id], references: [id])
   user                    User?             @relation("UserInconformities", fields: [created_by], references: [id])
-  
-  created_at             DateTime           @default(now())
+
+  notifications           Notification[]    @relation("InconformityNotifications")
+
+  created_at              DateTime          @default(now())
 
   @@map("inconformities")
 }

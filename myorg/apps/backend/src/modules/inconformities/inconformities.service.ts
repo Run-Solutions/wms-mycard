@@ -15,7 +15,14 @@ export class InconformitiesService {
       if (!areaResponse) {
         throw new NotFoundException('No se encontró el registro AreasResponse');
       }
-      // Eliminar el registro serigrafia asociado a ese AreasResponse
+      // Eliminar el registro asociado a ese AreasResponse
+      await tx.inconformities.updateMany({
+        where: {
+          areas_response_id: areaResponse.id,
+          OR: [{ reviewed: false }, { reviewed: null }],
+        },
+        data: { reviewed: true },
+      });
       await tx.prepressResponse.deleteMany({
         where: {
           areas_response_id: Number(areaResponseId),
@@ -50,13 +57,22 @@ export class InconformitiesService {
           id: Number(areaResponseId),
         },
       });
-      const flowParcial = await tx.partialRelease.findMany({
+      const flowParcial = await tx.partialRelease.findFirst({
         where: {
           work_order_flow_id: flow?.id,
+          validated: false,
         },
+        select: { id: true },
       });
       if (!areaResponse || (areaResponse && flowParcial)) {
         if (flowParcial) {
+          await tx.inconformities.updateMany({
+            where: {
+              partial_release_id: flowParcial.id,
+              OR: [{ reviewed: false }, { reviewed: null }],
+            },
+            data: { reviewed: true },
+          });
           await tx.partialRelease.deleteMany({
             where: {
               work_order_flow_id: flow?.id,
@@ -79,6 +95,13 @@ export class InconformitiesService {
         }
         return { message: 'Respuesta guardada con exito' };
       }
+      await tx.inconformities.updateMany({
+        where: {
+          areas_response_id: areaResponse.id,
+          OR: [{ reviewed: false }, { reviewed: null }],
+        },
+        data: { reviewed: true },
+      });
       // Eliminar el registro impresion asociado a ese AreasResponse
       await tx.impressionResponse.deleteMany({
         where: {
@@ -178,13 +201,22 @@ export class InconformitiesService {
           id: Number(areaResponseId),
         },
       });
-      const flowParcial = await tx.partialRelease.findMany({
+      const flowParcial = await tx.partialRelease.findFirst({
         where: {
           work_order_flow_id: flow?.id,
+          validated: false,
         },
+        select: { id: true },
       });
       if (!areaResponse || (areaResponse && flowParcial)) {
         if (flowParcial) {
+          await tx.inconformities.updateMany({
+            where: {
+              partial_release_id: flowParcial.id,
+              OR: [{ reviewed: false }, { reviewed: null }],
+            },
+            data: { reviewed: true },
+          });
           await tx.partialRelease.deleteMany({
             where: {
               work_order_flow_id: flow?.id,
@@ -207,6 +239,13 @@ export class InconformitiesService {
         }
         return { message: 'Respuesta guardada con exito' };
       }
+      await tx.inconformities.updateMany({
+        where: {
+          areas_response_id: areaResponse.id,
+          OR: [{ reviewed: false }, { reviewed: null }],
+        },
+        data: { reviewed: true },
+      });
       // Eliminar el registro serigrafia asociado a ese AreasResponse
       await tx.empalmeResponse.deleteMany({
         where: {
@@ -242,13 +281,22 @@ export class InconformitiesService {
           id: Number(areaResponseId),
         },
       });
-      const flowParcial = await tx.partialRelease.findMany({
+      const flowParcial = await tx.partialRelease.findFirst({
         where: {
           work_order_flow_id: flow?.id,
+          validated: false,
         },
+        select: { id: true },
       });
       if (!areaResponse || (areaResponse && flowParcial)) {
         if (flowParcial) {
+          await tx.inconformities.updateMany({
+            where: {
+              partial_release_id: flowParcial.id,
+              OR: [{ reviewed: false }, { reviewed: null }],
+            },
+            data: { reviewed: true },
+          });
           await tx.partialRelease.deleteMany({
             where: {
               work_order_flow_id: flow?.id,
@@ -271,6 +319,13 @@ export class InconformitiesService {
         }
         return { message: 'Respuesta guardada con exito' };
       }
+      await tx.inconformities.updateMany({
+        where: {
+          areas_response_id: areaResponse.id,
+          OR: [{ reviewed: false }, { reviewed: null }],
+        },
+        data: { reviewed: true },
+      });
       // Eliminar el registro empalme asociado a ese AreasResponse
       await tx.laminacionResponse.deleteMany({
         where: {
@@ -306,18 +361,23 @@ export class InconformitiesService {
         include: { inconformities: true },
       });
 
-      const unvalidatedPartials = await tx.partialRelease.findMany({
+      const flowParcial = await tx.partialRelease.findFirst({
         where: {
-          work_order_flow_id: flow.id,
+          work_order_flow_id: flow?.id,
           validated: false,
         },
+        select: { id: true },
       });
 
       // CASO 1: No hay respuesta de área pero hay parciales inválidos
-      if (
-        (!areaResponse && unvalidatedPartials.length > 0) ||
-        (areaResponse && unvalidatedPartials.length > 0)
-      ) {
+      if ((!areaResponse && flowParcial) || (areaResponse && flowParcial)) {
+        await tx.inconformities.updateMany({
+          where: {
+            partial_release_id: flowParcial.id,
+            OR: [{ reviewed: false }, { reviewed: null }],
+          },
+          data: { reviewed: true },
+        });
         await tx.partialRelease.deleteMany({
           where: { work_order_flow_id: flow.id, validated: false },
         });
@@ -325,7 +385,6 @@ export class InconformitiesService {
         await tx.areasResponse.deleteMany({
           where: { work_order_flow_id: flow.id },
         });
-
         await tx.workOrderFlow.update({
           where: { id: flow.id },
           data: { status: 'Listo' },
@@ -340,37 +399,34 @@ export class InconformitiesService {
         await tx.inconformities.updateMany({
           where: {
             areas_response_id: areaResponse.id,
-            reviewed: false,
+            OR: [{ reviewed: false }, { reviewed: null }],
           },
           data: { reviewed: true },
         });
-
         const corteResponse = await tx.corteResponse.findUnique({
           where: { areas_response_id: areaResponse.id },
         });
-
         if (corteResponse?.form_auditory_id) {
           await tx.formAuditory.deleteMany({
             where: { id: corteResponse.form_auditory_id },
           });
         }
-
         // ❌ Se elimina solo el corte, NO la inconformidad
         await tx.corteResponse.deleteMany({
           where: { areas_response_id: areaResponse.id },
         });
-
+        await tx.areasResponse.deleteMany({
+          where: { id: areaResponse.id },
+        });
         // ❌ No se elimina el áreaResponse (mantiene relación con la inconformidad)
         await tx.workOrderFlow.update({
           where: { id: flow.id },
           data: { status: 'Listo' },
         });
-
         return {
           message: 'Corte limpiado y la inconformidad marcada como revisada',
         };
       }
-
       return { message: 'No se encontró información para procesar' };
     });
   }
@@ -411,6 +467,13 @@ export class InconformitiesService {
             },
           },
         });
+        await tx.inconformities.updateMany({
+          where: {
+            form_answer_id: corteResponse?.form_auditory_id,
+            OR: [{ reviewed: false }, { reviewed: null }],
+          },
+          data: { reviewed: true },
+        });
 
         // Desvincular solo si NO hay inconformidades registradas
         if (
@@ -438,17 +501,30 @@ export class InconformitiesService {
         });
 
         if (lastValidatedPartial) {
+          const inconformity = await tx.inconformities.findFirst({
+            where: {
+              form_auditory_id: lastValidatedPartial.form_auditory_id,
+              OR: [{ reviewed: false }, { reviewed: null }],
+            },
+            select: { id: true },
+          });
+
+          if (inconformity) {
+            await tx.inconformities.update({
+              where: { id: inconformity.id },
+              data: { reviewed: true },
+            });
+          }
           await tx.partialRelease.update({
             where: { id: lastValidatedPartial.id },
             data: {
               validated: false,
-              form_auditory_id: null, // ❌ Desvincular en vez de eliminar
+              form_auditory_id: null,
             },
           });
         }
-
       }
-      
+
       // Verifica si queda alguna parcial no validada
       const hasPartial = await tx.partialRelease.findFirst({
         where: {
@@ -470,79 +546,81 @@ export class InconformitiesService {
 
   async inconformityColorEdge(areaResponseId: number) {
     return this.prisma.$transaction(async (tx) => {
-      const areaResponse = await tx.areasResponse.findFirst({
-        where: {
-          work_order_flow_id: Number(areaResponseId),
-        },
-      });
       const flow = await tx.workOrderFlow.findUnique({
-        where: {
-          id: Number(areaResponseId),
-        },
+        where: { id: Number(areaResponseId) },
       });
-      const flowParcial = await tx.partialRelease.findMany({
+      if (!flow) throw new Error('Flujo no encontrado');
+
+      const areaResponse = await tx.areasResponse.findFirst({
+        where: { work_order_flow_id: flow.id },
+        include: { inconformities: true },
+      });
+
+      const flowParcial = await tx.partialRelease.findFirst({
         where: {
           work_order_flow_id: flow?.id,
+          validated: false,
         },
+        select: { id: true },
       });
-      if (!areaResponse || (areaResponse && flowParcial)) {
-        if (flowParcial) {
-          await tx.partialRelease.deleteMany({
-            where: {
-              work_order_flow_id: flow?.id,
-              validated: false,
-            },
-          });
-          await tx.areasResponse.deleteMany({
-            where: {
-              work_order_flow_id: flow?.id,
-            },
-          });
-          await tx.workOrderFlow.update({
-            where: {
-              id: flow?.id,
-            },
-            data: {
-              status: 'Listo',
-            },
-          });
-        }
-        return { message: 'Respuesta guardada con exito' };
+
+      // CASO 1: No hay respuesta de área pero hay parciales inválidos
+      if ((!areaResponse && flowParcial) || (areaResponse && flowParcial)) {
+        await tx.inconformities.updateMany({
+          where: {
+            partial_release_id: flowParcial.id,
+            OR: [{ reviewed: false }, { reviewed: null }],
+          },
+          data: { reviewed: true },
+        });
+        await tx.partialRelease.deleteMany({
+          where: { work_order_flow_id: flow?.id, validated: false },
+        });
+
+        await tx.areasResponse.deleteMany({
+          where: { work_order_flow_id: flow?.id },
+        });
+
+        await tx.workOrderFlow.update({
+          where: { id: flow?.id },
+          data: { status: 'Listo' },
+        });
+        return { message: 'Liberación parcial reiniciada con éxito' };
       }
-      const colorEdgeResponse = await tx.colorEdgeResponse.findUnique({
-        where: {
-          areas_response_id: areaResponse.id,
-        },
-      });
-      if (colorEdgeResponse) {
-        // Si existe un form_auditory_id, eliminar el FormAuditory
-        if (colorEdgeResponse.form_auditory_id) {
+
+      if (areaResponse) {
+        // ✔️ Marcar inconformidades como revisadas
+        await tx.inconformities.updateMany({
+          where: {
+            areas_response_id: areaResponse.id,
+            OR: [{ reviewed: false }, { reviewed: null }],
+          },
+          data: { reviewed: true },
+        });
+        const colorEdgeResponse = await tx.colorEdgeResponse.findUnique({
+          where: { areas_response_id: areaResponse.id },
+        });
+        if (colorEdgeResponse?.form_auditory_id) {
           await tx.formAuditory.deleteMany({
-            where: {
-              id: colorEdgeResponse.form_auditory_id,
-            },
+            where: { id: colorEdgeResponse.form_auditory_id },
           });
         }
-        // Eliminar el registro empalme asociado a ese AreasResponse
+        await tx.colorEdgeResponse.deleteMany({
+          where: { areas_response_id: areaResponse.id },
+        });
         await tx.areasResponse.deleteMany({
           where: {
             id: areaResponse.id,
           },
         });
-        await tx.colorEdgeResponse.deleteMany({
-          where: {
-            areas_response_id: areaResponse.id,
-          },
+        await tx.workOrderFlow.update({
+          where: { id: flow?.id },
+          data: { status: 'Listo' },
         });
+        return {
+          message: 'Corte limpiado y la inconformidad marcada como revisada',
+        };
       }
-      await tx.workOrderFlow.update({
-        where: {
-          id: flow?.id,
-        },
-        data: {
-          status: 'Listo',
-        },
-      });
       return { message: 'Respuesta guardada con exito' };
     });
   }
@@ -555,7 +633,6 @@ export class InconformitiesService {
           id: Number(workOrderFlowId),
         },
       });
-
       if (!flow) {
         throw new Error('No se encontró el flujo');
       }
@@ -582,6 +659,13 @@ export class InconformitiesService {
               },
             },
           },
+        });
+        await tx.inconformities.updateMany({
+          where: {
+            form_answer_id: colorEdgeResponse?.form_auditory_id,
+            OR: [{ reviewed: false }, { reviewed: null }],
+          },
+          data: { reviewed: true },
         });
 
         // Desvincular solo si NO hay inconformidades registradas
@@ -610,6 +694,20 @@ export class InconformitiesService {
         });
 
         if (lastValidatedPartial) {
+          const inconformity = await tx.inconformities.findFirst({
+            where: {
+              form_auditory_id: lastValidatedPartial.form_auditory_id,
+              OR: [{ reviewed: false }, { reviewed: null }],
+            },
+            select: { id: true },
+          });
+
+          if (inconformity) {
+            await tx.inconformities.update({
+              where: { id: inconformity.id },
+              data: { reviewed: true },
+            });
+          }
           await tx.partialRelease.update({
             where: { id: lastValidatedPartial.id },
             data: {
@@ -643,80 +741,82 @@ export class InconformitiesService {
 
   async inconformityHotStamping(areaResponseId: number) {
     return this.prisma.$transaction(async (tx) => {
-      const areaResponse = await tx.areasResponse.findFirst({
-        where: {
-          work_order_flow_id: Number(areaResponseId),
-        },
-      });
       const flow = await tx.workOrderFlow.findUnique({
-        where: {
-          id: Number(areaResponseId),
-        },
+        where: { id: Number(areaResponseId) },
       });
-      const flowParcial = await tx.partialRelease.findMany({
-        where: {
-          work_order_flow_id: flow?.id,
-        },
+      if (!flow) throw new Error('Flujo no encontrado');
+
+      const areaResponse = await tx.areasResponse.findFirst({
+        where: { work_order_flow_id: flow.id },
+        include: { inconformities: true },
       });
-      if (!areaResponse || (areaResponse && flowParcial)) {
-        if (flowParcial) {
-          await tx.partialRelease.deleteMany({
-            where: {
-              work_order_flow_id: flow?.id,
-              validated: false,
-            },
-          });
-          await tx.areasResponse.deleteMany({
-            where: {
-              work_order_flow_id: flow?.id,
-            },
-          });
-          await tx.workOrderFlow.update({
-            where: {
-              id: flow?.id,
-            },
-            data: {
-              status: 'Listo',
-            },
-          });
-        }
-        return { message: 'Respuesta guardada con exito' };
+
+      const flowParcial = await tx.partialRelease.findFirst({
+        where: {
+          work_order_flow_id: flow.id,
+          validated: false,
+        },
+        select: { id: true },
+      });
+
+      if ((!areaResponse && flowParcial) || (areaResponse && flowParcial)) {
+        await tx.inconformities.updateMany({
+          where: {
+            partial_release_id: flowParcial.id,
+            OR: [{ reviewed: false }, { reviewed: null }],
+          },
+          data: { reviewed: true },
+        });
+        await tx.partialRelease.deleteMany({
+          where: { work_order_flow_id: flow.id, validated: false },
+        });
+
+        await tx.areasResponse.deleteMany({
+          where: { work_order_flow_id: flow.id },
+        });
+        await tx.workOrderFlow.update({
+          where: { id: flow.id },
+          data: { status: 'Listo' },
+        });
+
+        return { message: 'Liberación parcial reiniciada con éxito' };
       }
-      const hotStampingResponse = await tx.hotStampingResponse.findUnique({
-        where: {
-          areas_response_id: areaResponse.id,
-        },
-      });
-      if (hotStampingResponse) {
+
+      if (areaResponse) {
+        // ✔️ Marcar inconformidades como revisadas
+        await tx.inconformities.updateMany({
+          where: {
+            areas_response_id: areaResponse.id,
+            OR: [{ reviewed: false }, { reviewed: null }],
+          },
+          data: { reviewed: true },
+        });
+        const hotStampingResponse = await tx.hotStampingResponse.findUnique({
+          where: { areas_response_id: areaResponse.id },
+        });
         // Si existe un form_auditory_id, eliminar el FormAuditory
-        if (hotStampingResponse.form_auditory_id) {
+        if (hotStampingResponse?.form_auditory_id) {
           await tx.formAuditory.deleteMany({
-            where: {
-              id: hotStampingResponse.form_auditory_id,
-            },
+            where: { id: hotStampingResponse.form_auditory_id },
           });
         }
         // Eliminar el registro empalme asociado a ese AreasResponse
         await tx.hotStampingResponse.deleteMany({
-          where: {
-            areas_response_id: areaResponse.id,
-          },
+          where: { areas_response_id: areaResponse.id },
         });
+        await tx.areasResponse.deleteMany({
+          where: { id: areaResponse.id },
+        });
+        await tx.workOrderFlow.update({
+          where: { id: flow.id },
+          data: { status: 'Listo' },
+        });
+        return {
+          message:
+            'Hot Stamping limpiado y la inconformidad marcada como revisada',
+        };
       }
-      await tx.areasResponse.deleteMany({
-        where: {
-          id: areaResponse.id,
-        },
-      });
-      await tx.workOrderFlow.update({
-        where: {
-          id: flow?.id,
-        },
-        data: {
-          status: 'Listo',
-        },
-      });
-      return { message: 'Respuesta guardada con exito' };
+      return { message: 'No se encontró información para procesar' };
     });
   }
 
@@ -728,7 +828,6 @@ export class InconformitiesService {
           id: Number(workOrderFlowId),
         },
       });
-
       if (!flow) {
         throw new Error('No se encontró el flujo');
       }
@@ -755,6 +854,13 @@ export class InconformitiesService {
               },
             },
           },
+        });
+        await tx.inconformities.updateMany({
+          where: {
+            form_answer_id: hotStampingResponse?.form_auditory_id,
+            OR: [{ reviewed: false }, { reviewed: null }],
+          },
+          data: { reviewed: true },
         });
 
         // Desvincular solo si NO hay inconformidades registradas
@@ -783,6 +889,20 @@ export class InconformitiesService {
         });
 
         if (lastValidatedPartial) {
+          const inconformity = await tx.inconformities.findFirst({
+            where: {
+              form_auditory_id: lastValidatedPartial.form_auditory_id,
+              OR: [{ reviewed: false }, { reviewed: null }],
+            },
+            select: { id: true },
+          });
+
+          if (inconformity) {
+            await tx.inconformities.update({
+              where: { id: inconformity.id },
+              data: { reviewed: true },
+            });
+          }
           await tx.partialRelease.update({
             where: { id: lastValidatedPartial.id },
             data: {
@@ -816,80 +936,79 @@ export class InconformitiesService {
 
   async inconformityMillingChip(areaResponseId: number) {
     return this.prisma.$transaction(async (tx) => {
-      const areaResponse = await tx.areasResponse.findFirst({
-        where: {
-          work_order_flow_id: Number(areaResponseId),
-        },
-      });
       const flow = await tx.workOrderFlow.findUnique({
-        where: {
-          id: Number(areaResponseId),
-        },
+        where: { id: Number(areaResponseId) },
       });
-      const flowParcial = await tx.partialRelease.findMany({
+      if (!flow) throw new Error('Flujo no encontrado');
+
+      const areaResponse = await tx.areasResponse.findFirst({
+        where: { work_order_flow_id: flow.id },
+        include: { inconformities: true },
+      });
+
+      const flowParcial = await tx.partialRelease.findFirst({
         where: {
           work_order_flow_id: flow?.id,
+          validated: false,
         },
+        select: { id: true },
       });
-      if (!areaResponse || (areaResponse && flowParcial)) {
-        if (flowParcial) {
-          await tx.partialRelease.deleteMany({
-            where: {
-              work_order_flow_id: flow?.id,
-              validated: false,
-            },
-          });
-          await tx.areasResponse.deleteMany({
-            where: {
-              work_order_flow_id: flow?.id,
-            },
-          });
-          await tx.workOrderFlow.update({
-            where: {
-              id: flow?.id,
-            },
-            data: {
-              status: 'Listo',
-            },
-          });
-        }
-        return { message: 'Respuesta guardada con exito' };
+
+      if ((!areaResponse && flowParcial) || (areaResponse && flowParcial)) {
+        await tx.inconformities.updateMany({
+          where: {
+            partial_release_id: flowParcial.id,
+            OR: [{ reviewed: false }, { reviewed: null }],
+          },
+          data: { reviewed: true },
+        });
+        await tx.partialRelease.deleteMany({
+          where: { work_order_flow_id: flow.id, validated: false },
+        });
+
+        await tx.areasResponse.deleteMany({
+          where: { work_order_flow_id: flow.id },
+        });
+        await tx.workOrderFlow.update({
+          where: { id: flow?.id },
+          data: { status: 'Listo' },
+        });
+
+        return { message: 'Liberación parcial reiniciada con éxito' };
       }
-      const millingChipResponse = await tx.millingChipResponse.findUnique({
-        where: {
-          areas_response_id: areaResponse.id,
-        },
-      });
-      if (millingChipResponse) {
-        // Si existe un form_auditory_id, eliminar el FormAuditory
-        if (millingChipResponse.form_auditory_id) {
-          await tx.formAuditory.deleteMany({
-            where: {
-              id: millingChipResponse.form_auditory_id,
-            },
-          });
-        }
-        // Eliminar el registro empalme asociado a ese AreasResponse
-        await tx.millingChipResponse.deleteMany({
+
+      if (areaResponse) {
+        // ✔️ Marcar inconformidades como revisadas
+        await tx.inconformities.updateMany({
           where: {
             areas_response_id: areaResponse.id,
+            OR: [{ reviewed: false }, { reviewed: null }],
           },
+          data: { reviewed: true },
         });
+        const millingChipResponse = await tx.millingChipResponse.findUnique({
+          where: { areas_response_id: areaResponse.id },
+        });
+        if (millingChipResponse?.form_auditory_id) {
+          await tx.formAuditory.deleteMany({
+            where: { id: millingChipResponse.form_auditory_id },
+          });
+        }
+        await tx.millingChipResponse.deleteMany({
+          where: { areas_response_id: areaResponse.id },
+        });
+        await tx.areasResponse.deleteMany({
+          where: { id: areaResponse.id },
+        });
+        await tx.workOrderFlow.update({
+          where: { id: flow.id },
+          data: { status: 'Listo' },
+        });
+        return {
+          message: 'Corte limpiado y la inconformidad marcada como revisada',
+        };
       }
-      await tx.areasResponse.deleteMany({
-        where: {
-          id: areaResponse.id,
-        },
-      });
-      await tx.workOrderFlow.update({
-        where: {
-          id: flow?.id,
-        },
-        data: {
-          status: 'Listo',
-        },
-      });
-      return { message: 'Respuesta guardada con exito' };
+      return { message: 'No se encontró información para procesar' };
     });
   }
 
@@ -901,7 +1020,6 @@ export class InconformitiesService {
           id: Number(workOrderFlowId),
         },
       });
-
       if (!flow) {
         throw new Error('No se encontró el flujo');
       }
@@ -928,6 +1046,13 @@ export class InconformitiesService {
               },
             },
           },
+        });
+        await tx.inconformities.updateMany({
+          where: {
+            form_answer_id: millingChipResponse?.form_auditory_id,
+            OR: [{ reviewed: false }, { reviewed: null }],
+          },
+          data: { reviewed: true },
         });
 
         // Desvincular solo si NO hay inconformidades registradas
@@ -956,6 +1081,20 @@ export class InconformitiesService {
         });
 
         if (lastValidatedPartial) {
+          const inconformity = await tx.inconformities.findFirst({
+            where: {
+              form_auditory_id: lastValidatedPartial.form_auditory_id,
+              OR: [{ reviewed: false }, { reviewed: null }],
+            },
+            select: { id: true },
+          });
+
+          if (inconformity) {
+            await tx.inconformities.update({
+              where: { id: inconformity.id },
+              data: { reviewed: true },
+            });
+          }
           await tx.partialRelease.update({
             where: { id: lastValidatedPartial.id },
             data: {
@@ -989,81 +1128,81 @@ export class InconformitiesService {
 
   async inconformityPersonalizacion(areaResponseId: number) {
     return this.prisma.$transaction(async (tx) => {
-      const areaResponse = await tx.areasResponse.findFirst({
-        where: {
-          work_order_flow_id: Number(areaResponseId),
-        },
-      });
       const flow = await tx.workOrderFlow.findUnique({
-        where: {
-          id: Number(areaResponseId),
-        },
+        where: { id: Number(areaResponseId) },
       });
-      const flowParcial = await tx.partialRelease.findMany({
+      if (!flow) throw new Error('Flujo no encontrado');
+
+      const areaResponse = await tx.areasResponse.findFirst({
+        where: { work_order_flow_id: flow.id },
+        include: { inconformities: true },
+      });
+
+      const flowParcial = await tx.partialRelease.findFirst({
         where: {
           work_order_flow_id: flow?.id,
+          validated: false,
         },
+        select: { id: true },
       });
-      if (!areaResponse || (areaResponse && flowParcial)) {
-        if (flowParcial) {
-          await tx.partialRelease.deleteMany({
-            where: {
-              work_order_flow_id: flow?.id,
-              validated: false,
-            },
-          });
-          await tx.areasResponse.deleteMany({
-            where: {
-              work_order_flow_id: flow?.id,
-            },
-          });
-          await tx.workOrderFlow.update({
-            where: {
-              id: flow?.id,
-            },
-            data: {
-              status: 'Listo',
-            },
-          });
-        }
+
+      if ((!areaResponse && flowParcial) || (areaResponse && flowParcial)) {
+        await tx.inconformities.updateMany({
+          where: {
+            partial_release_id: flowParcial.id,
+            OR: [{ reviewed: false }, { reviewed: null }],
+          },
+          data: { reviewed: true },
+        });
+        await tx.partialRelease.deleteMany({
+          where: { work_order_flow_id: flow?.id, validated: false },
+        });
+
+        await tx.areasResponse.deleteMany({
+          where: { work_order_flow_id: flow.id },
+        });
+        await tx.workOrderFlow.update({
+          where: { id: flow.id },
+          data: { status: 'Listo' },
+        });
+
         return { message: 'Respuesta guardada con exito' };
       }
-      const personalizacionResponse =
-        await tx.personalizacionResponse.findUnique({
+
+      if (areaResponse) {
+        await tx.inconformities.updateMany({
           where: {
             areas_response_id: areaResponse.id,
+            OR: [{ reviewed: false }, { reviewed: null }],
           },
+          data: { reviewed: true },
         });
-      if (personalizacionResponse) {
+        const personalizacionResponse =
+          await tx.personalizacionResponse.findUnique({
+            where: { areas_response_id: areaResponse.id },
+          });
         // Si existe un form_auditory_id, eliminar el FormAuditory
-        if (personalizacionResponse.form_auditory_id) {
+        if (personalizacionResponse?.form_auditory_id) {
           await tx.formAuditory.deleteMany({
-            where: {
-              id: personalizacionResponse.form_auditory_id,
-            },
+            where: { id: personalizacionResponse.form_auditory_id },
           });
         }
-        // Eliminar el registro empalme asociado a ese AreasResponse
         await tx.personalizacionResponse.deleteMany({
-          where: {
-            areas_response_id: areaResponse.id,
-          },
+          where: { areas_response_id: areaResponse.id },
         });
         await tx.areasResponse.deleteMany({
-          where: {
-            id: areaResponse.id,
-          },
+          where: { id: areaResponse.id },
         });
+        await tx.workOrderFlow.update({
+          where: { id: flow.id },
+          data: { status: 'Listo' },
+        });
+        return {
+          message:
+            'Hot Stamping limpiado y la inconformidad marcada como revisada',
+        };
       }
-      await tx.workOrderFlow.update({
-        where: {
-          id: flow?.id,
-        },
-        data: {
-          status: 'Listo',
-        },
-      });
-      return { message: 'Respuesta guardada con exito' };
+      return { message: 'No se encontró información para procesar' };
     });
   }
 
@@ -1073,6 +1212,16 @@ export class InconformitiesService {
         where: {
           id: Number(areaResponseId),
         },
+      });
+      if (!answer) {
+        throw new Error('No se encontró las respuestas del formulario');
+      }
+      await tx.inconformities.updateMany({
+        where: {
+          form_answer_id: answer.id,
+          OR: [{ reviewed: false }, { reviewed: null }],
+        },
+        data: { reviewed: true },
       });
       const flow = await tx.workOrderFlow.findUnique({
         where: {
@@ -1092,6 +1241,7 @@ export class InconformitiesService {
           id: answer?.id,
         },
       });
+
       await tx.workOrderFlow.update({
         where: {
           id: flow?.id,
@@ -1112,7 +1262,6 @@ export class InconformitiesService {
           id: Number(workOrderFlowId),
         },
       });
-
       if (!flow) {
         throw new Error('No se encontró el flujo');
       }
@@ -1128,17 +1277,32 @@ export class InconformitiesService {
 
       if (areaResponse) {
         // Buscar personalizacionResponse asociado
-        const personalizacionResponse = await tx.personalizacionResponse.findUnique({
+        await tx.inconformities.updateMany({
           where: {
             areas_response_id: areaResponse.id,
+            OR: [{ reviewed: false }, { reviewed: null }],
           },
-          include: {
-            formAuditory: {
-              include: {
-                inconformities: true,
+          data: { reviewed: true },
+        });
+        const personalizacionResponse =
+          await tx.personalizacionResponse.findUnique({
+            where: {
+              areas_response_id: areaResponse.id,
+            },
+            include: {
+              formAuditory: {
+                include: {
+                  inconformities: true,
+                },
               },
             },
+          });
+        await tx.inconformities.updateMany({
+          where: {
+            form_auditory_id: personalizacionResponse?.form_auditory_id,
+            OR: [{ reviewed: false }, { reviewed: null }],
           },
+          data: { reviewed: true },
         });
 
         // Desvincular solo si NO hay inconformidades registradas
@@ -1165,8 +1329,21 @@ export class InconformitiesService {
             },
           },
         });
-
         if (lastValidatedPartial) {
+          const inconformity = await tx.inconformities.findFirst({
+            where: {
+              form_auditory_id: lastValidatedPartial.form_auditory_id,
+              OR: [{ reviewed: false }, { reviewed: null }],
+            },
+            select: { id: true },
+          });
+
+          if (inconformity) {
+            await tx.inconformities.update({
+              where: { id: inconformity.id },
+              data: { reviewed: true },
+            });
+          }
           await tx.partialRelease.update({
             where: { id: lastValidatedPartial.id },
             data: {

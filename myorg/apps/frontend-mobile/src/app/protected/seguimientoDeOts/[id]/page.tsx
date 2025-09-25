@@ -26,6 +26,7 @@ import { InconformityData } from '../../../../components/SeguimientoDeOts/Inconf
 import ProgressBarAreas from '../../../../components/SeguimientoDeOts/ProgressBarAreas';
 import BadQuantityModal from '../../../../components/SeguimientoDeOts/BadQuantityModal';
 import { VistosBuenosHistory } from '../../../../components/SeguimientoDeOts/VistosBuenosHistory';
+import PartialHistory from '../../../../components/SeguimientoDeOts/PartialHistory';
 import * as FileSystem from 'expo-file-system';
 import { Buffer } from 'buffer';
 import FileViewer from 'react-native-file-viewer';
@@ -84,6 +85,7 @@ export type AreaData = {
     bad_quantity: number;
     excess_quantity: number;
     noprocess_quantity: number;
+    release_quantity?: number;
     material_quantity: number;
     user_id: number | null; // 👈 puede venir null
     validated: boolean;
@@ -156,14 +158,20 @@ function getPerPartialValues(
   if (hasRem) {
     const block = (area.response as any)?.[getAreaKey(area)];
     const remIndex = cols - 1;
-    const remAns =
-      answersSorted[parc] ?? answersSorted[answersSorted.length - 1];
-
-    if (field === 'cqm') values[remIndex] = remAns?.sample_quantity ?? 0;
-    else if (field === 'muestras')
-      values[remIndex] = (remAns as any)?.sample_auditory ?? '—';
-    else if (field === 'defectuoso')
-      values[remIndex] = block?.material_quantity ?? block?.bad_quantity ?? 0;
+    if (field === 'defectuoso') {
+      const totalDefectuoso = block?.material_quantity ?? 0;
+      const sumParcialDefectuoso = (area.partials ?? []).reduce(
+        (acc, p) => acc + (p?.material_quantity ?? 0),
+        0
+      );
+      values[remIndex] = Math.max(totalDefectuoso - sumParcialDefectuoso, 0);
+    } else {
+      const remAns =
+        answersSorted[parc] ?? answersSorted[answersSorted.length - 1];
+      if (field === 'cqm') values[remIndex] = remAns?.sample_quantity ?? 0;
+      else if (field === 'muestras')
+        values[remIndex] = (remAns as any)?.sample_auditory ?? '—';
+    }
   }
   return values;
 }
@@ -419,6 +427,8 @@ const WorkOrderDetailScreen: React.FC = () => {
         return 'Ver SKU';
       case 'OP':
         return 'Ver OP';
+      case 'CARD_IMAGE':
+        return 'Ver TARJETA';
       default:
         return 'Adjunto';
     }
@@ -1329,6 +1339,32 @@ const WorkOrderDetailScreen: React.FC = () => {
             ))}
           </View>
 
+          <View style={[styles.row, { backgroundColor: '#eef2ff' }]}>
+            <Text style={styles.cellLabel}>🔍 Auditoría</Text>
+            {areas.map((area, index) => {
+              const partials = area.partials ?? [];
+              const totalQty = partials.reduce(
+                (sum, p) => sum + (Number(p?.quantity) || 0),
+                0
+              );
+              const totalRel = partials.reduce(
+                (sum, p) => sum + (Number(p?.release_quantity) || 0),
+                0
+              );
+              const restante = totalQty - totalRel;
+              return (
+                <Text
+                  key={`${area.id}-auditoria-${index}`}
+                  style={styles.cellUser}
+                >
+                  {index === areas.length - 1 && area.parciales > 0
+                    ? restante
+                    : ''}
+                </Text>
+              );
+            })}
+          </View>
+
           {/* Buenas + Excedente */}
           <View style={[styles.row, { backgroundColor: '#d7e6d1' }]}>
             <Text style={styles.cellLabel}>BUENAS + EXCEDENTE</Text>
@@ -1383,6 +1419,8 @@ const WorkOrderDetailScreen: React.FC = () => {
           </View>
         </>
       )}
+
+      {workOrder && <PartialHistory workOrder={workOrder} />}
 
       <VistosBuenosHistory
         history={vistosBuenosHistory}

@@ -3,10 +3,11 @@ import styled from 'styled-components';
 import { useRouter } from 'next/navigation';
 import { useState, useEffect } from 'react';
 import { acceptPersonalizacionInconformityAuditory } from '@/api/rechazos';
+import { InconformityData } from './CorteComponent';
 
 interface Props {
-  workOrder: any; // toda la OT con .flow
-  currentFlow: any; // flujo actual (ej: corte)
+  workOrder: any;
+  currentFlow: any;
 }
 interface PartialRelease {
   quantity: string;
@@ -15,15 +16,6 @@ interface PartialRelease {
   work_order_flow_id: number;
   inconformities: any[];
 }
-type InconformityData = {
-  quantity: number | string;
-  excess: number | string;
-  sample: number | string;
-  comments: string;
-  user: string;
-  inconformity: string;
-};
-
 export default function PersonalizacionComponent({
   workOrder,
   currentFlow,
@@ -44,6 +36,7 @@ export default function PersonalizacionComponent({
     useState<InconformityData>({
       quantity: '',
       excess: '',
+      noprocess: '',
       sample: '',
       comments: '',
       user: '',
@@ -92,6 +85,7 @@ export default function PersonalizacionComponent({
       setInconformityValues({
         quantity: personalizacion.good_quantity || '',
         excess: personalizacion.excess_quantity || '',
+        noprocess: personalizacion.noprocess_quantity || '',
         sample: personalizacion.formAuditory?.sample_auditory || '',
         comments: personalizacion.comments || '',
         user:
@@ -110,11 +104,19 @@ export default function PersonalizacionComponent({
         (acc: any, p: any) => acc + (p.excess_quantity || 0),
         0
       );
+      const totalNoProcess = partials.reduce(
+        (acc: any, p: any) => acc + (p.noprocess_quantity || 0),
+        0
+      );
 
       setInconformityValues({
         quantity: Math.max((personalizacion.good_quantity || 0) - totalGood, 0),
         excess: Math.max(
           (personalizacion.excess_quantity || 0) - totalExcess,
+          0
+        ),
+        noprocess: Math.max(
+          (personalizacion.noprocess_quantity || 0) - totalNoProcess,
           0
         ),
         sample: personalizacion.formAuditory?.sample_auditory || '',
@@ -132,6 +134,7 @@ export default function PersonalizacionComponent({
       setInconformityValues({
         quantity: firstUnvalidated?.quantity || '',
         excess: firstUnvalidated?.excess_quantity || '',
+        noprocess: firstUnvalidated?.noprocess_quantity || '',
         sample: firstUnvalidated?.formAuditory?.sample_auditory || '',
         comments: firstUnvalidated?.observation || '',
         user:
@@ -296,6 +299,13 @@ export default function PersonalizacionComponent({
                   value={sumaBadQuantity}
                   onClick={handleOpenBadQuantityModal}
                   readOnly
+                />
+                <Label>Sin procesar:</Label>
+                <Input
+                  type="number"
+                  name="excess_quantity"
+                  value={inconformityValues.noprocess}
+                  disabled
                 />
                 <Label>Excedente:</Label>
                 <Input

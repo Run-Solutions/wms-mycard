@@ -13,6 +13,7 @@ interface User {
   sub: number;
   username: String,
   role: String,
+  profile_image?: String,
   role_id: number,
   modules: Array<String>,
 }

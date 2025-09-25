@@ -79,9 +79,15 @@ const CerrarOrdenDeTrabajoScreen: React.FC = () => {
     }, [])
   );
 
-  const filteredOrders = orders.filter(order =>
-    order.flow.some(flowItem => flowItem.status === 'En auditoria')
-  );
+  const allowedStatuses = ['en auditoria', 'parcial'];
+  const filteredOrders = orders.filter((order) => {
+    const orderStatus = order.status?.toLowerCase?.() ?? '';
+    if (allowedStatuses.includes(orderStatus)) return true;
+
+    return order.flow.some((flowItem) =>
+      allowedStatuses.includes(flowItem.status?.toLowerCase?.() ?? '')
+    );
+  });
 
   const StatusLegend = () => {
     const legendItems = [

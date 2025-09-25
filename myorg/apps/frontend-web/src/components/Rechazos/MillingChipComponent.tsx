@@ -3,10 +3,11 @@ import styled from 'styled-components';
 import { useRouter } from 'next/navigation';
 import { useState, useEffect } from 'react';
 import { acceptMillingChipInconformityAuditory } from '@/api/rechazos';
+import { InconformityData } from './CorteComponent';
 
 interface Props {
-  workOrder: any; // toda la OT con .flow
-  currentFlow: any; // flujo actual (ej: corte)
+  workOrder: any;
+  currentFlow: any;
 }
 interface PartialRelease {
   quantity: string;
@@ -15,14 +16,6 @@ interface PartialRelease {
   work_order_flow_id: number;
   inconformities: any[];
 }
-type InconformityData = {
-  quantity: number | string;
-  excess: number | string;
-  sample: number | string;
-  comments: string;
-  user: string;
-  inconformity: string;
-};
 
 export default function MillingChipComponent({
   workOrder,
@@ -44,6 +37,7 @@ export default function MillingChipComponent({
     useState<InconformityData>({
       quantity: '',
       excess: '',
+      noprocess: '',
       sample: '',
       comments: '',
       user: '',
@@ -92,6 +86,7 @@ export default function MillingChipComponent({
       setInconformityValues({
         quantity: millingChip.good_quantity || '',
         excess: millingChip.excess_quantity || '',
+        noprocess: millingChip.noprocess_quantity || '',
         sample: millingChip.formAuditory?.sample_auditory || '',
         comments: millingChip.comments || '',
         user:
@@ -109,10 +104,18 @@ export default function MillingChipComponent({
         (acc: any, p: any) => acc + (p.excess_quantity || 0),
         0
       );
+      const totalNoProcess = partials.reduce(
+        (acc: any, p: any) => acc + (p.noprocess_quantity || 0),
+        0
+      );
 
       setInconformityValues({
         quantity: Math.max((millingChip.good_quantity || 0) - totalGood, 0),
         excess: Math.max((millingChip.excess_quantity || 0) - totalExcess, 0),
+        noprocess: Math.max(
+          (millingChip.noprocess_quantity || 0) - totalNoProcess,
+          0
+        ),
         sample: millingChip.formAuditory?.sample_auditory || '',
         comments: millingChip.comments || '',
         user:
@@ -128,6 +131,7 @@ export default function MillingChipComponent({
       setInconformityValues({
         quantity: firstUnvalidated?.quantity || '',
         excess: firstUnvalidated?.excess_quantity || '',
+        noprocess: firstUnvalidated?.noprocess_quantity || '',
         sample: firstUnvalidated?.formAuditory?.sample_auditory || '',
         comments: firstUnvalidated?.observation || '',
         user:
@@ -283,6 +287,13 @@ export default function MillingChipComponent({
                   value={sumaBadQuantity}
                   onClick={handleOpenBadQuantityModal}
                   readOnly
+                />
+                <Label>Sin procesar:</Label>
+                <Input
+                  type="number"
+                  name="excess_quantity"
+                  value={inconformityValues.noprocess}
+                  disabled
                 />
                 <Label>Excedente:</Label>
                 <Input

@@ -5,6 +5,7 @@ import React, { useEffect, useState } from 'react';
 import styled, { useTheme } from 'styled-components';
 import WorkOrderTable from '@/components/CerrarOrdenDeTrabajo/WorkOrderTable';
 import { fetchWorkOrdersInProgress } from '@/api/cerrarOrdenDeTrabajo';
+
 // Se define el tipo de datos
 interface WorkOrder {
   id: number;
@@ -43,9 +44,6 @@ const CloseWorkOrderPage: React.FC = () => {
     async function fetchWorkOrdersInAuditory() {
       try {
         const data = await fetchWorkOrdersInProgress();
-        console.log('Datos obtenidos de las Ordenes en Proceso: ', data);
-        const orders = data.map((item: any) => item.workOrder);
-        console.log('Datos obtenidos de las Ordenes en Proceso: ', data);
         setWorkOrders(data);
       } catch (error) {
         console.error(error);
@@ -62,7 +60,7 @@ const CloseWorkOrderPage: React.FC = () => {
         <WorkOrderTable
           orders={WorkOrders}
           title="Órdenes en Auditoria"
-          statusFilter="En auditoria"
+          statusFilter={['En Auditoria', 'Parcial' ]}
         />
       </TitleWrapper>
     </PageContainer>
