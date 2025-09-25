@@ -90,7 +90,6 @@ export class AcceptAuditoryWorkOrderService {
         data: {
           validated: true,
           form_auditory_id: formAuditory.id,
-          release_quantity: dto.release_quantity || 0,
         },
       });
       
