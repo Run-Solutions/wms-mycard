@@ -1,7 +1,7 @@
 // myorg/apps/frontend-mobile/src/components/CerrarOrdenDeTrabajo/WorkOrderList.tsx
 'use client';
 
-import React from 'react';
+import React, { useState } from 'react';
 import { TouchableOpacity } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
 import { NavigationProp } from '@react-navigation/native';
@@ -11,6 +11,7 @@ import { Buffer } from 'buffer';
 import FileViewer from 'react-native-file-viewer';
 import styled from 'styled-components/native';
 import { TextInput } from 'react-native-paper';
+import { WorkOrder } from '../SeguimientoDeOts/WorkOrderList';
 
 type Navigation = NavigationProp<
   InternalStackParamList,
@@ -27,45 +28,51 @@ import {
 } from 'react-native';
 import { getFileByName } from '../../api/finalizacion';
 
-interface File {
-  id: number;
-  type: string;
-  file_path: string;
-}
-
-interface WorkOrder {
-  id: number;
-  ot_id: string;
-  mycard_id: string;
-  quantity: number;
-  status: string;
-  validated: boolean;
-  createdAt: string;
-  user: {
-    username: string;
-  };
-  flow: {
-    area_id: number;
-    status: string;
-    area?: { name?: string };
-  }[];
-  files: File[];
-}
-
 interface Props {
   orders: WorkOrder[];
+  statusFilter: string[];
   onSelectOrder?: (id: number) => void;
   isTouchable?: boolean;
 }
 
-const WorkOrderList: React.FC<Props> = ({ orders, onSelectOrder }) => {
+const WorkOrderList: React.FC<Props> = ({
+  orders,
+  onSelectOrder,
+  statusFilter,
+}) => {
   const navigation = useNavigation<any>();
   const [searchValue, setSearchValue] = React.useState('');
+  const [activeArea, setActiveArea] = useState<string>('');
+  const [startDate, setStartDate] = useState<string>('');
+  const [endDate, setEndDate] = useState<string>('');
 
   const validOrders = Array.isArray(orders) ? orders : [];
-  const filteredOrders = validOrders.filter((order) =>
-    order.ot_id.toLowerCase().includes(searchValue.toLowerCase())
-  );
+  const filteredOrders = validOrders.filter((order) => {
+    const statusMatch =
+      statusFilter.some((sf) =>
+        order.status.toLowerCase().includes(sf.toLowerCase())
+      ) ||
+      order.flow.some((f) =>
+        statusFilter.some((sf) =>
+          f.status.toLowerCase().includes(sf.toLowerCase())
+        )
+      );
+    const searchMatch = order.ot_id
+      .toLowerCase()
+      .includes(searchValue.toLowerCase());
+    const areaMatch =
+      !activeArea ||
+      order.flow.some((f) =>
+        f.area?.name?.toLowerCase().includes(activeArea.toLowerCase())
+      );
+    const createdDate = new Date(order.createdAt);
+    const fromDate = startDate ? new Date(startDate) : null;
+    const toDate = endDate ? new Date(endDate) : null;
+    const dateMatch =
+      (!fromDate || createdDate >= fromDate) &&
+      (!toDate || createdDate <= toDate);
+    return statusMatch && searchMatch && areaMatch && dateMatch;
+  });
   const downloadFile = async (filename: string) => {
     try {
       const res = await getFileByName(filename);
@@ -112,20 +119,22 @@ const WorkOrderList: React.FC<Props> = ({ orders, onSelectOrder }) => {
             <View style={styles.filesBlock}>
               {item.files && item.files.length > 0 ? (
                 item.files
-                  .filter((file) => ['OT', 'SKU', 'OP'].includes(file.type))
+                  .filter((file) =>
+                    ['ot', 'sku', 'op'].some((key) =>
+                      file.file_path.toLowerCase().startsWith(key)
+                    )
+                  )
                   .map((file) => {
-                    const label = file.file_path.toLowerCase().includes('ot')
+                    const lowerPath = file.file_path.toLowerCase();
+                    const label = lowerPath.startsWith('ot')
                       ? 'Ver OT'
-                      : file.file_path.toLowerCase().includes('sku')
+                      : lowerPath.startsWith('sku')
                       ? 'Ver SKU'
-                      : file.file_path.toLowerCase().includes('op')
-                      ? 'Ver OP'
-                      : file.file_path.toLowerCase().includes('image')
-                      ? 'Ver TARJETA'
-                      : 'Ver Archivo';
+                      : 'Ver OP';
+
                     return (
                       <TouchableOpacity
-                        key={file.id}
+                        key={file.file_path}
                         onPress={() => downloadFile(file.file_path)}
                         style={styles.fileButton}
                       >

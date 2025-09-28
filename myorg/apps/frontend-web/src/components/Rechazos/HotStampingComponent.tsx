@@ -73,9 +73,13 @@ export default function HotStampingComponent({
     const hotStamping = currentFlow.areaResponse?.hotStamping;
     const partials = currentFlow.partialReleases || [];
     console.log('hotStamping:', hotStamping);
-    const lastPartialRelease = currentFlow.partialReleases.find(
-      (release: PartialRelease) => release.validated
-    );
+    const lastPartialRelease = currentFlow.partialReleases
+      .filter((r: PartialRelease) => r.validated)
+      .sort(
+        (a: any, b: any) =>
+          new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
+      )[0];
+
     console.log('Ultima parcialidad validar:', lastPartialRelease);
 
     const allValidated =
@@ -126,7 +130,12 @@ export default function HotStampingComponent({
       });
     } else {
       // Primer parcial no validado
-      const firstUnvalidated = partials.find((p: any) => p.validated);
+      const firstUnvalidated = partials
+        .filter((r: PartialRelease) => r.validated)
+        .sort(
+          (a: any, b: any) =>
+            new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
+        )[0];
 
       setInconformityValues({
         quantity: firstUnvalidated?.quantity || '',
@@ -135,10 +144,10 @@ export default function HotStampingComponent({
         sample: firstUnvalidated?.formAuditory?.sample_auditory || '',
         comments: firstUnvalidated?.observation || '',
         user:
-          lastPartialRelease.formAuditory.inconformities.at(-1)?.user
-            .username || '',
+          firstUnvalidated.formAuditory.inconformities.at(-1)?.user.username ||
+          '',
         inconformity:
-          lastPartialRelease.formAuditory.inconformities.at(-1)?.comments || '',
+          firstUnvalidated.formAuditory.inconformities.at(-1)?.comments || '',
       });
     }
   }, [currentFlow]);
@@ -220,25 +229,7 @@ export default function HotStampingComponent({
   const sumaBadQuantity = previousFlows.reduce((sum, flow) => {
     let bad = 0;
 
-    if (flow.areaResponse?.impression) {
-      bad = flow.areaResponse.impression.bad_quantity || 0;
-    } else if (flow.areaResponse?.serigrafia) {
-      bad = flow.areaResponse.serigrafia.bad_quantity || 0;
-    } else if (flow.areaResponse?.empalme) {
-      bad = flow.areaResponse.empalme.bad_quantity || 0;
-    } else if (flow.areaResponse?.laminacion) {
-      bad = flow.areaResponse.laminacion.bad_quantity || 0;
-    } else if (flow.areaResponse?.corte) {
-      const corte = flow.areaResponse.corte;
-      const corteBad = corte.bad_quantity || 0;
-      const corteMaterial = corte.material_quantity || 0; // ← suma también este
-      bad = corteBad + corteMaterial;
-    } else if (flow.areaResponse?.colorEdge) {
-      const colorEdge = flow.areaResponse.colorEdge;
-      const colorEdgeBad = colorEdge.bad_quantity || 0;
-      const colorEdgeMaterial = colorEdge.material_quantity || 0; // ← suma también este
-      bad = colorEdgeBad + colorEdgeMaterial;
-    } else if (flow.areaResponse?.hotStamping) {
+    if (flow.areaResponse?.hotStamping) {
       const hotStamping = flow.areaResponse.hotStamping;
       const hotStampingBad = hotStamping.bad_quantity || 0;
       const hotStampingMaterial = hotStamping.material_quantity || 0; // ← suma también este
@@ -364,7 +355,7 @@ export default function HotStampingComponent({
                     </div>
                     {flow.area_id >= 6 && (
                       <div>
-                        <Label>Malo de fábrica</Label>
+                        <Label>Materia Prima Defectuosa</Label>
                         <InputBad
                           type="number"
                           min="0"

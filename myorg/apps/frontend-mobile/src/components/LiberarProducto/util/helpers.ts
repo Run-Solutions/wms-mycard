@@ -1,5 +1,6 @@
-// 📁 myorg/apps/frontend-mobile/src/components/LiberarProducto/util/helpers.ts
+// myorg/apps/frontend-mobile/src/components/LiberarProducto/util/helpers.ts
 import { WorkOrder } from './types';
+import { toNum } from '../../AceptarAuditoria/util/quantityWorkOrder';
 
 interface FilterParams {
   searchValue: string;
@@ -13,7 +14,9 @@ export const filterOrders = (
   { searchValue, activeArea, startDate, endDate }: FilterParams
 ): WorkOrder[] => {
   return orders.filter((order) => {
-    const otMatch = order.ot_id.toLowerCase().includes(searchValue.toLowerCase());
+    const otMatch = order.ot_id
+      .toLowerCase()
+      .includes(searchValue.toLowerCase());
     const areaMatch =
       !activeArea ||
       order.flow.some((f) =>
@@ -84,3 +87,96 @@ export const getFlowStateStyles = (status: string) => {
     isInconforme: s.includes('inconformidad'),
   };
 };
+
+export type NumericLike = number | string | null | undefined;
+
+const sumBy = (arr: any[], key: string) =>
+  arr.reduce((acc, x) => acc + toNum(x?.[key]), 0);
+
+const sumMany = (arr: any[], keys: string[]) =>
+  keys.reduce((acc, k) => acc + sumBy(arr, k), 0);
+
+/**
+ * Suma de los parciales del FLOW actual.
+ * Por defecto cuenta solo validados; cambia includeUnvalidated si necesitas incluir todos.
+ */
+export function getCurrentFlowPartialsTotal(
+  currentFlow: any,
+  opts?: { includeUnvalidated?: boolean }
+): number {
+  const { includeUnvalidated = false } = opts ?? {};
+  const arr = (currentFlow?.partialReleases ?? []).filter(
+    (p: any) => includeUnvalidated || p?.validated
+  );
+
+  const base = sumMany(arr, [
+    'quantity',
+    'bad_quantity',
+    'excess_quantity',
+    'noprocess_quantity',
+    'material_quantity',
+  ]);
+
+  // sumar formAuditory.sample_auditory (si existe)
+  const samples = arr.reduce(
+    (acc: number, p: any) => acc + toNum(p?.formAuditory?.sample_auditory),
+    0
+  );
+
+  return base + samples;
+}
+
+/** Total “digitado” actualmente en el formulario */
+export function getCurrentInputTotal(inputs: {
+  cqm_quantity?: NumericLike;
+  goodQuantity?: NumericLike;
+  lastAreaBadQuantity?: NumericLike;
+  materialBadQuantity?: NumericLike;
+  excessQuantity?: NumericLike;
+  noProcessQuantity?: NumericLike;
+}): number {
+  const {
+    cqm_quantity,
+    goodQuantity,
+    lastAreaBadQuantity,
+    materialBadQuantity,
+    excessQuantity,
+    noProcessQuantity,
+  } = inputs;
+
+  return (
+    toNum(cqm_quantity) +
+    toNum(goodQuantity) +
+    toNum(lastAreaBadQuantity) +
+    toNum(materialBadQuantity) +
+    toNum(excessQuantity) +
+    toNum(noProcessQuantity)
+  );
+}
+
+/**
+ * ¿La suma (inputs actuales + parciales del flow) excede la suma del área previa?
+ */
+export function exceedsPrevAreaSum(params: {
+  prevAreaSum: NumericLike;
+  currentFlow: any;
+  inputs: {
+    cqm_quantity?: NumericLike;
+    goodQuantity?: NumericLike;
+    lastAreaBadQuantity?: NumericLike;
+    materialBadQuantity?: NumericLike;
+    excessQuantity?: NumericLike;
+    noProcessQuantity?: NumericLike;
+  };
+  includeUnvalidatedPartials?: boolean;
+}) {
+  const { prevAreaSum, currentFlow, inputs, includeUnvalidatedPartials } =
+    params;
+
+  const totalActual = getCurrentInputTotal(inputs);
+  const totalParciales = getCurrentFlowPartialsTotal(currentFlow, {
+    includeUnvalidated: !!includeUnvalidatedPartials,
+  });
+
+  return totalActual + totalParciales > toNum(prevAreaSum);
+}

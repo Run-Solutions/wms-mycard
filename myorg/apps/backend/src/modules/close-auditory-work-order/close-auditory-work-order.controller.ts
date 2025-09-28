@@ -11,7 +11,7 @@ import {
 } from '@nestjs/common';
 import { CloseAuditoryWorkOrderService } from './close-auditory-work-order.service';
 import { JwtAuthGuard } from 'src/auth/jwt-auth.guard';
-import { UpdateWorkFlowAuditoryDto } from './dto/response.dto';
+import { UpdateWorkFlowAuditoryDto, UpdateWorkFlowAuditoryParcialDto } from './dto/response.dto';
 
 interface AuthenticatedUser {
   id: number;
@@ -81,7 +81,13 @@ export class CloseAuditoryWorkOrderController {
   }
 
   @Patch('cerrar-auditoria-parcial')
-  async updateWorkFlowAuditoryParcial(@Body() partialReleaseId: number, quantityRelease: number) {
-    return await this.CloseAuditoryWorkOrderService.updateWorkFlowAuditoryParcial(partialReleaseId, quantityRelease);
+  async updateWorkFlowAuditoryParcial(
+    @Body() dto: UpdateWorkFlowAuditoryParcialDto,
+  ) {
+    const { partialReleaseId, quantityRelease } = dto; // ya son number
+    return this.CloseAuditoryWorkOrderService.updateWorkFlowAuditoryParcial(
+      partialReleaseId,
+      quantityRelease,
+    );
   }
 }

@@ -18,6 +18,7 @@ import SelectionQuestionTable from './util/FormQuestionTable';
 import WorkOrderInfo from './util/WorkOrderInfo';
 import { usePartialReleaseControls } from './util/disablePartialTime';
 import { AreaData } from './PersonalizacionComponent';
+import { getPrevAreaGoodPlusExcess } from '../AceptarAuditoria/util/lastWorkOrder';
 
 interface Props {
   workOrder: any;
@@ -66,7 +67,6 @@ const NEXT_INVALID_FOR_PARTIAL = [
   'Pendiente parcial',
   'En inconformidad CQM',
 ] as const;
-
 
 const NEXT_CORTE_STATUSES = ['Enviado a auditoria parcial'] as const;
 
@@ -363,10 +363,40 @@ export default function MillingChipComponent({ workOrder }: Props) {
     }
   };
 
+  const prevAreaSum = useMemo(
+    () => getPrevAreaGoodPlusExcess(workOrder),
+    [workOrder]
+  );
+  console.log('prevAreaSum', prevAreaSum);
+
+  const cqm_quantity = (workOrder?.answers ?? []).reduce(
+    (total: number, answer: { sample_quantity?: number | string }) =>
+      total + (Number(answer?.sample_quantity) || 0),
+    0
+  );
+  console.log('cqm', cqm_quantity);
+
   const handleLiberarClick = () => {
     const numValue = Number(goodQuantity);
-    if (isNaN(numValue) || !Number.isInteger(numValue) || numValue <= 0) {
-      alert('Por favor, ingresa una cantidad de muestra válida.');
+    if (
+      Number.isNaN(numValue) ||
+      !Number.isInteger(numValue) ||
+      numValue <= 0
+    ) {
+      alert('Por favor, ingresa una cantidad válida para Buenas.');
+      return;
+    } else if (
+      cqm_quantity +
+        Number(goodQuantity) +
+        Number(lastAreaBadQuantity) +
+        Number(materialBadQuantity) +
+        Number(excessQuantity) +
+        Number(noProcessQuantity) >
+      prevAreaSum
+    ) {
+      alert(
+        'La cantidad total a liberar el mayor a la entregada por parte del área previa.'
+      );
       return;
     }
 
@@ -492,6 +522,10 @@ export default function MillingChipComponent({ workOrder }: Props) {
   );
 
   const handleSaveChanges = async () => {
+    const toInt = (v: any) => {
+      const n = parseInt(String(v ?? '0').trim(), 10);
+      return Number.isFinite(n) ? n : 0;
+    };
     const payload = {
       areas: previousFlows.flatMap((flow) => {
         const areaKey = flow.area.name.toLowerCase().replace(/\s/g, '');
@@ -502,39 +536,36 @@ export default function MillingChipComponent({ workOrder }: Props) {
           empalme: 'empalme',
           laminacion: 'laminacion',
           corte: 'corte',
-          coloredge: 'colorEdge',
-          hotstamping: 'hotStamping',
-          milingchip: 'millingChip',
+          'color edge': 'colorEdge',
+          'hot stamping': 'hotStamping',
         };
 
-        const block = blockMap[areaKey] || 'otros';
-        if (block === 'otros') return [] as any;
+        const block = blockMap[flow.area.name.toLowerCase()] || 'otros';
+        if (block === 'otros' || areaKey === 'millingChip') return [];
 
         const blockData = flow.areaResponse?.[block];
-        const blockId = blockData?.id ?? null;
-        const formId = blockData?.form_auditory_id ?? null;
-        const cqmId = blockData?.form_answer_id ?? null;
+        if (!blockData?.id) return [];
 
         const badKey = `${areaKey}_bad`;
         const materialKey = `${areaKey}_material`;
 
-        const bad_quantity = Number(areaBadQuantities[badKey] || 0);
+        const bad_quantity = toInt(areaBadQuantities[badKey]);
         const material_quantity =
-          flow.area.id > 6
-            ? Number(areaBadQuantities[materialKey] || 0)
-            : undefined;
+          flow.area.id > 6 ? toInt(areaBadQuantities[materialKey]) : undefined;
 
-        return {
-          areaId: flow.area_id,
-          block,
-          blockId,
-          formId,
-          cqmId,
-          data: {
-            bad_quantity,
-            ...(material_quantity !== undefined && { material_quantity }),
+        return [
+          {
+            areaId: flow.area_id,
+            block,
+            blockId: blockData.id,
+            formId: blockData.form_auditory_id ?? null,
+            cqmId: blockData.form_answer_id ?? null,
+            data: {
+              bad_quantity,
+              ...(material_quantity !== undefined && { material_quantity }),
+            },
           },
-        };
+        ];
       }),
     };
 
@@ -570,7 +601,8 @@ export default function MillingChipComponent({ workOrder }: Props) {
 
   const sumaBadQuantity = useMemo(() => {
     const bad = Number(lastAreaBadQuantity) || 0;
-    const mat = (currentFlow?.area?.id ?? 0) >= 6 ? Number(materialBadQuantity) || 0 : 0;
+    const mat =
+      (currentFlow?.area?.id ?? 0) >= 6 ? Number(materialBadQuantity) || 0 : 0;
     return bad + mat;
   }, [lastAreaBadQuantity, materialBadQuantity, currentFlow?.area?.id]);
 
@@ -582,6 +614,7 @@ export default function MillingChipComponent({ workOrder }: Props) {
         <WorkOrderInfo
           workOrder={workOrder}
           lastCompletedOrPartial={lastCompletedOrPartial}
+          cantidadporliberar={cantidadporliberar}
         />
         <NewData>
           <SectionTitle>Datos de Producción</SectionTitle>

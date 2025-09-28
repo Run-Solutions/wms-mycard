@@ -3,58 +3,51 @@
 
 import WorkOrderTable from '@/components/Rechazos/WorkOrderTable';
 import React, { useEffect, useState } from 'react';
-import styled, { useTheme } from 'styled-components';
+import styled from 'styled-components';
 import { getWorkOrdersWithInconformidadAuditory } from '@/api/rechazos';
 
-// Se define el tipo de datos
 interface WorkOrder {
   id: number;
   ot_id: string;
   mycard_id: string;
   quantity: number;
   created_by: number;
-  status: string; // Cambiado a string genérico
+  status: string;
   validated: boolean;
   createdAt: string;
   updatedAt: string;
-  user: {
-    username: string;
-  };
-  files: {
-    id: number;
-    type: string;
-    file_path: string;
-  }[];
+  user: { username: string };
+  files: { id: number; type: string; file_path: string }[];
   flow: {
     id: number;
-    area_id: number; // Cambiado de area.name a area_id
-    status: string; // Cambiado a string genérico
+    area_id: number;
+    status: string;
     assigned_user?: number;
-    area?: {
-      name?: string;
-    };
-    // otros campos que necesites
+    area?: { name?: string };
   }[];
-  formAnswers?: any[]; // Añadir si es necesario
+  formAnswers?: any[];
 }
 
-const InconformidadesPage: React.FC = () => {
-  const [WorkOrders, setWorkOrders] = useState<WorkOrder[]>([]);
+const RechazosPage: React.FC = () => {
+  const [workOrders, setWorkOrders] = useState<WorkOrder[]>([]);
+
   useEffect(() => {
     async function fetchAllWorkOrders() {
       try {
-        const { pendingOrdersAuditory } =
-          await getWorkOrdersWithInconformidadAuditory();
-        console.log('Datos de Ordenes: ', pendingOrdersAuditory);
+        const res = await getWorkOrdersWithInconformidadAuditory();
+        const flowsAuditory = Array.isArray(res?.pendingOrdersAuditory) ? res.pendingOrdersAuditory : [];
+        const flowsAuditoryPartial = Array.isArray(res?.pendingOrdersAuditoryPartial) ? res.pendingOrdersAuditoryPartial : [];
 
-        // Extrae los workOrders de cada elemento
-        if (pendingOrdersAuditory && Array.isArray(pendingOrdersAuditory)) {
-          const workOrders = pendingOrdersAuditory.map((item: any) => item.workOrder);
-          setWorkOrders(workOrders);
-        } else {
-          console.warn('pendingOrdersAuditory no está definido o no es un arreglo', pendingOrdersAuditory);
-        }
+        // Une ambas fuentes
+        const allFlows = [...flowsAuditory, ...flowsAuditoryPartial];
 
+        // Aplana a WorkOrder y filtra nulos
+        const allWorkOrders = allFlows.map((f: any) => f?.workOrder).filter(Boolean);
+
+        // Desduplica por id
+        const deduped = dedupeBy(allWorkOrders, (wo: WorkOrder) => wo.id);
+
+        setWorkOrders(deduped);
       } catch (err) {
         console.error('Error en fetchAllWorkOrders', err);
       }
@@ -67,8 +60,9 @@ const InconformidadesPage: React.FC = () => {
       <TitleWrapper>
         <Title>Rechazos</Title>
       </TitleWrapper>
+
       <WorkOrderTable
-        orders={WorkOrders}
+        orders={workOrders}
         title="Ordenes Devueltas por Inconformidad"
         statusFilter="En inconformidad auditoria"
       />
@@ -76,22 +70,33 @@ const InconformidadesPage: React.FC = () => {
   );
 };
 
-export default InconformidadesPage;
+export default RechazosPage;
+
+// =================== utils ===================
+function dedupeBy<T>(arr: T[], keyFn: (x: T) => string | number): T[] {
+  const seen = new Set<string | number>();
+  const out: T[] = [];
+  for (const item of arr) {
+    const k = keyFn(item);
+    if (!seen.has(k)) {
+      seen.add(k);
+      out.push(item);
+    }
+  }
+  return out;
+}
 
 // =================== Styled Components ===================
-
 const PageContainer = styled.div`
   padding: 1rem 2rem;
   margin-top: -70px;
 `;
-
 const TitleWrapper = styled.div`
   text-align: center;
   margin-bottom: 2rem;
   filter: drop-shadow(4px 4px 5px rgba(0, 0, 0, 0.4));
 `;
-
-const Title = styled.h1<{ theme: any }>`
+const Title = styled.h1`
   font-size: 2rem;
   font-weight: 500;
   color: ${({ theme }) => theme.palette.text.primary};

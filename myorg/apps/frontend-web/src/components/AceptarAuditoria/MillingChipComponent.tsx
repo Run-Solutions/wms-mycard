@@ -11,10 +11,18 @@ import {
 
 import WorkOrderInfo from './util/WorkOrderInfo';
 import { AfterCorteData } from './CorteComponent';
+import {
+  buildDefaultValuesByArea,
+  AreaBlock,
+  DefaultValues,
+  toNum
+} from './util/quantityWorkOrder';
+import { getPrevAreaGoodPlusExcess } from './util/lastWorkOrder';
 
 interface Props {
   workOrder: any;
 }
+
 
 export default function MillingChipComponentAcceptAuditory({
   workOrder,
@@ -27,16 +35,45 @@ export default function MillingChipComponentAcceptAuditory({
   const [showInconformidad, setShowInconformidad] = useState(false);
   const [inconformidad, setInconformidad] = useState<string>('');
 
-  const isDisabled = true;
-
   const [defaultValues, setDefaultValues] = useState<AfterCorteData>({
     good_quantity: '',
     bad_quantity: '',
     excess_quantity: '',
     noprocess_quantity: '',
-    cqm_quantity: '',
+    cqm_quantity: '',     // <- puede ser '' o número
     comments: '',
+    total_quantity: 0,
+    total_execbuen: 0,
   });
+
+  const isDisabled = true;
+
+  const asStrNum = (v: unknown): string | number => {
+    if (v === null || v === undefined) return '';
+    if (typeof v === 'boolean') return v ? 1 : 0;
+    return v as string | number; // ya restringimos los otros casos
+  };
+  
+  const toAfterCorteData = (
+    d: DefaultValues,
+    prev?: AfterCorteData
+  ): AfterCorteData => {
+    return {
+      ...(prev ?? ({} as AfterCorteData)),
+  
+      good_quantity: asStrNum(d.good_quantity),
+      bad_quantity: asStrNum(d.bad_quantity),
+      excess_quantity: asStrNum(d.excess_quantity),
+      noprocess_quantity: asStrNum(d.noprocess_quantity),
+      cqm_quantity: asStrNum(d.cqm_quantity),
+  
+      comments: (d.comments ?? '') as string,
+      total_quantity: d.total_quantity ?? 0,
+  
+      // Si quieres otro criterio, cámbialo aquí
+      total_execbuen: toNum(d.good_quantity),
+    };
+  };
 
   const [sampleAuditory, setSampleQuantity] = useState('');
 
@@ -129,90 +166,54 @@ export default function MillingChipComponentAcceptAuditory({
     setAreaBadQuantities(initialValues);
   }, [isValidArea, previousFlows]);
 
+  const areaKey: AreaBlock = 'millingChip';
+
   useEffect(() => {
-    if (!isValidArea) return;
-
-    const millingChip = workOrder?.areaResponse?.millingChip;
-    const partials = workOrder?.partialReleases ?? [];
-
-    const cqm_quantity = (workOrder?.answers ?? []).reduce(
-      (total: number, answer: { sample_quantity?: number | string }) =>
-        total + (Number(answer?.sample_quantity) || 0),
-      0
-    );
-
-    const allValidated =
-      partials.length > 0 && partials.every((p: any) => p.validated);
-
-    if (millingChip && partials.length === 0) {
-      // Caso base: hay respuesta final de Color Edge sin parciales
-      setDefaultValues({
-        good_quantity: millingChip.good_quantity || '',
-        bad_quantity: millingChip.bad_quantity || '',
-        excess_quantity: millingChip.excess_quantity || '',
-        noprocess_quantity: millingChip.noprocess_quantity || '',
-        cqm_quantity: cqm_quantity || '',
-        comments: millingChip.comments || '',
-      });
-      return;
-    }
-
-    if (millingChip && allValidated) {
-      // Todos los parciales validados -> mostrar remanente
-      const totalParciales = partials.reduce(
-        (acc: number, curr: any) => acc + (curr.quantity || 0),
-        0
-      );
-      const totalParcialesBad = partials.reduce(
-        (acc: number, curr: any) => acc + (curr.bad_quantity || 0),
-        0
-      );
-      const totalParcialesExc = partials.reduce(
-        (acc: number, curr: any) => acc + (curr.excess_quantity || 0),
-        0
-      );
-      const totalParcialesNoPro = partials.reduce(
-        (acc: number, curr: any) => acc + (curr.noprocess_quantity || 0),
-        0
-      );
-
-      const restante = (millingChip.good_quantity || 0) - totalParciales;
-      const restanteBad = (millingChip.bad_quantity || 0) - totalParcialesBad;
-      const restanteExc =
-        (millingChip.excess_quantity || 0) - totalParcialesExc;
-      const restanteNoPro =
-        (millingChip.noprocess_quantity || 0) - totalParcialesNoPro;
-
-      setDefaultValues({
-        good_quantity: restante > 0 ? restante : 0,
-        bad_quantity: restanteBad > 0 ? restanteBad : 0,
-        excess_quantity: restanteExc > 0 ? restanteExc : 0,
-        noprocess_quantity: restanteNoPro > 0 ? restanteNoPro : 0,
-        cqm_quantity: cqm_quantity || '',
-        comments: millingChip.comments || '',
-      });
-      return;
-    }
-
-    const firstUnvalidated = partials.find((p: any) => !p.validated) || {};
-    setDefaultValues({
-      good_quantity: firstUnvalidated.quantity || '',
-      bad_quantity: firstUnvalidated.bad_quantity || '',
-      excess_quantity: firstUnvalidated.excess_quantity || '',
-      noprocess_quantity: firstUnvalidated.noprocess_quantity || '',
-      cqm_quantity: cqm_quantity || '',
-      comments: firstUnvalidated.observation || '',
+    const result = buildDefaultValuesByArea(areaKey, workOrder, sumaBadQuantity, {
+      // filterPartialsByArea: (p) => p.area === areaKey
     });
-  }, [isValidArea, workOrder]);
+  
+    if (result) {
+      setDefaultValues(prev => toAfterCorteData(result, prev)); // 
+    }
+  }, [workOrder, sumaBadQuantity]);
+
 
   const handleOpenBadQuantityModal = () => setShowBadQuantity(true);
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
+  const prevAreaSum = useMemo(() => getPrevAreaGoodPlusExcess(workOrder), [workOrder]);
+  console.log('prevAreaSum', prevAreaSum);
+
+  const handleOpenModal = async (e: React.FormEvent) => {
     if (!sampleAuditory) {
       alert('Por favor, asegurate de ingresar muestras.');
       return;
+    } else if (
+      ((defaultValues.total_quantity ?? 0) + Number(sampleAuditory) >
+        prevAreaSum &&
+        workOrder?.areaResponse?.millingChip) ||
+      (defaultValues.total_quantity ?? 0) + Number(sampleAuditory) > prevAreaSum
+    ) {
+      alert(
+        'La cantidad total a liberar es mayor a la entregada por parte del área previa.'
+      );
+      return;
+    } else if (
+      (defaultValues.total_quantity ?? 0) + Number(sampleAuditory) !==
+        prevAreaSum &&
+      workOrder?.areaResponse?.millingChip
+    ) {
+      alert(
+        'La cantidad total a liberar es mayor a la entregada por parte del área previa.'
+      );
+      return;
     }
+    setShowConfirm(true);
+
+  }
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
     const MillingChipId =
       workOrder?.areaResponse?.millingChip?.id ?? workOrder.id;
     try {
@@ -259,16 +260,16 @@ export default function MillingChipComponentAcceptAuditory({
           <InputGroup>
             <Label>Buenas:</Label>
             <Input
-              type='number'
-              name='good_quantity'
+              type="number"
+              name="good_quantity"
               value={defaultValues.good_quantity}
               disabled
             />
 
             <Label>Malas:</Label>
             <Input
-              type='number'
-              name='bad_quantity'
+              type="number"
+              name="bad_quantity"
               value={sumaBadQuantity}
               onClick={handleOpenBadQuantityModal}
               readOnly
@@ -276,31 +277,31 @@ export default function MillingChipComponentAcceptAuditory({
 
             <Label>Excedente:</Label>
             <Input
-              type='number'
-              name='excess_quantity'
+              type="number"
+              name="excess_quantity"
               value={defaultValues.excess_quantity}
               disabled
             />
 
             <Label>Sin procesar:</Label>
             <Input
-              type='number'
-              name='noprocess_quantity'
+              type="number"
+              name="noprocess_quantity"
               value={defaultValues.noprocess_quantity}
               disabled
             />
 
             <Label>Muestras en CQM:</Label>
             <Input
-              type='number'
-              name='cqm_quantity'
+              type="number"
+              name="cqm_quantity"
               value={defaultValues.cqm_quantity}
               disabled
             />
 
             <Label>Muestras:</Label>
             <Input
-              type='number'
+              type="number"
               min={0}
               value={sampleAuditory}
               onChange={(e) => setSampleQuantity(e.target.value)}
@@ -317,7 +318,7 @@ export default function MillingChipComponentAcceptAuditory({
           <Textarea value={defaultValues.comments} disabled={isDisabled} />
         </InputGroup>
       </NewData>
-      <AceptarButton onClick={() => setShowConfirm(true)}>
+      <AceptarButton onClick={handleOpenModal}>
         Aceptar recepción del producto
       </AceptarButton>
       {/* Modal: Malas por áreas previas */}
@@ -348,8 +349,8 @@ export default function MillingChipComponentAcceptAuditory({
                     <div>
                       <Label>Malas</Label>
                       <InputBad
-                        type='number'
-                        min='0'
+                        type="number"
+                        min="0"
                         readOnly
                         value={areaBadQuantities[`${areaKey}_bad`] || '0'}
                         onChange={(e) =>
@@ -362,10 +363,10 @@ export default function MillingChipComponentAcceptAuditory({
                     </div>
                     {flow.area_id >= 6 && (
                       <div>
-                        <Label>Malo de fábrica</Label>
+                        <Label>Materia Prima Defectuosa</Label>
                         <InputBad
-                          type='number'
-                          min='0'
+                          type="number"
+                          min="0"
                           readOnly
                           value={
                             areaBadQuantities[`${areaKey}_material`] || '0'
@@ -431,7 +432,7 @@ export default function MillingChipComponentAcceptAuditory({
             <Textarea
               value={inconformidad}
               onChange={(e) => setInconformidad(e.target.value)}
-              placeholder='Escribe aquí la inconformidad...'
+              placeholder="Escribe aquí la inconformidad..."
             />
             <div
               style={{

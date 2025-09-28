@@ -105,7 +105,7 @@ const BadQuantityModal: React.FC<Props> = ({
                   {/* Defectuoso */}
                   {area.id >= 6 && (
                     <>
-                      <Text style={styles.label}>Malo de fábrica</Text>
+                      <Text style={styles.label}>Materia Prima Defectuosa</Text>
                       <TextInput
                         style={styles.input}
                         keyboardType="numeric"

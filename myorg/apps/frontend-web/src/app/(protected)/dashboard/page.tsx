@@ -32,17 +32,20 @@ type PendingObj = { pendingOrders: any[] };
 
 // Helper seguro (acepta arreglo o objeto con pendingOrders)
 const getPendingCount = (data: unknown): number => {
-  if (Array.isArray(data)) return data.length;                  
+  if (Array.isArray(data)) return data.length;
   if (data && typeof data === 'object' && 'pendingOrders' in data) {
     const po = (data as PendingObj).pendingOrders;
-    return Array.isArray(po) ? po.length : 0;                      
+    return Array.isArray(po) ? po.length : 0;
   }
   return 0;
 };
 
 // 🔹 Normaliza nombres por si cambian mayúsculas/acentos
 const normalize = (s: string) =>
-  s.normalize('NFD').replace(/\p{Diacritic}/gu, '').toLowerCase();
+  s
+    .normalize('NFD')
+    .replace(/\p{Diacritic}/gu, '')
+    .toLowerCase();
 
 // 🔹 Resolvers que devuelven el conteo por módulo
 const COUNT_RESOLVERS: Partial<Record<string, () => Promise<number>>> = {
@@ -120,13 +123,20 @@ const COUNT_RESOLVERS: Partial<Record<string, () => Promise<number>>> = {
   },
   rechazos: async (): Promise<number> => {
     try {
-      const { pendingOrdersAuditory } = await getWorkOrdersWithInconformidadAuditory();
-  
-      const workOrders = Array.isArray(pendingOrdersAuditory)
-        ? pendingOrdersAuditory.map((item: any) => item.workOrder)
+      const res = await getWorkOrdersWithInconformidadAuditory();
+      const flowsAuditory = Array.isArray(res?.pendingOrdersAuditory)
+        ? res.pendingOrdersAuditory
         : [];
-  
-      const count = getPendingCount(workOrders);
+      const flowsAuditoryPartial = Array.isArray(
+        res?.pendingOrdersAuditoryPartial
+      )
+        ? res.pendingOrdersAuditoryPartial
+        : [];
+
+      // Une ambas fuentes
+      const allFlows = [...flowsAuditory, ...flowsAuditoryPartial];
+
+      const count = getPendingCount(allFlows);
       return typeof count === 'number' ? count : 0; // siempre número
     } catch (err) {
       console.warn('rechazos error:', err);
@@ -197,21 +207,37 @@ const DashboardPage: React.FC = () => {
   }, []);
 
   return (
-    <Box sx={{ width: '100%', maxWidth: '1200px', mx: 'auto', px: { xs: 2, sm: 4, md: 6 }, mt: -5 }}>
+    <Box
+      sx={{
+        width: '100%',
+        maxWidth: '1200px',
+        mx: 'auto',
+        px: { xs: 2, sm: 4, md: 6 },
+        mt: -5,
+      }}
+    >
       {loading ? (
         <Box display="flex" justifyContent="center" mt={4}>
           <CircularProgress />
         </Box>
       ) : (
-        <MuiGrid container rowSpacing={3} columnSpacing={2} justifyContent="center">
+        <MuiGrid
+          container
+          rowSpacing={3}
+          columnSpacing={2}
+          justifyContent="center"
+        >
           {modules.map((module) => (
             <MuiGrid item xs={12} sm={6} md={4} key={module.id}>
-              <Box onClick={() => handleCardClick(module.name)} sx={{ cursor: 'pointer' }}>
+              <Box
+                onClick={() => handleCardClick(module.name)}
+                sx={{ cursor: 'pointer' }}
+              >
                 <MotionCard
                   title={module.name}
                   imageName={module.imageName}
                   logoName={module.logoName}
-                  badgeCount={counts[module.name] ?? 0}  // <- badge dentro del FlipCard
+                  badgeCount={counts[module.name] ?? 0} // <- badge dentro del FlipCard
                 />
               </Box>
             </MuiGrid>

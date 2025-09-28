@@ -25,43 +25,149 @@ import { AreaData } from './PersonalizacionComponent';
 import SelectionQuestionTable from './util/FormQuestionTable';
 import WorkOrderInfo from './util/WorkOrderInfo';
 import { usePartialReleaseControls } from './util/disablePartialTime';
+import { getPrevAreaGoodPlusExcess } from '../AceptarAuditoria/util/lastWorkOrder';
+import { getCurrentFlowPartialsTotal } from './util/helpers';
 
 interface PartialRelease {
   validated: boolean;
   quantity: number;
 }
+
+const CQM_BLOCKED_STATUSES = [
+  'Enviado a CQM',
+  'En Calidad',
+  'Listo',
+  'Pendiente parcial',
+] as const;
+
+const AFTER_CORTE_BLOCKED_STATUSES = [
+  'Enviado a CQM',
+  'En Calidad',
+  'Listo',
+  'Pendiente',
+  'Pendiente parcial',
+  'Enviado a auditoria parcial',
+  'En inconformidad CQM',
+  'Enviado a Auditoria',
+] as const;
+
+const CURRENT_INVALID_FOR_PARTIAL = [
+  'Enviado a CQM',
+  'En Calidad',
+  'Parcial',
+  'Enviado a auditoria parcial',
+  'Pendiente',
+  'Pendiente parcial',
+  'En proceso',
+] as const;
+
+const NEXT_INVALID_FOR_PARTIAL = [
+  'Enviado a CQM',
+  'Listo',
+  'En Calidad',
+  'Enviado a auditoria parcial',
+  'Pendiente',
+  'Pendiente parcial',
+  'En inconformidad CQM',
+] as const;
+
+const NEXT_CORTE_STATUSES = ['Enviado a auditoria parcial'] as const;
+
 const ColorEdgeComponent = ({ workOrder }: { workOrder: any }) => {
   console.log('Order', workOrder);
   const navigation =
     useNavigation<NativeStackNavigationProp<RootStackParamList>>();
-  const [sampleQuantity, setSampleQuantity] = useState('');
-  const [colorEdge, setColorEdge] = useState('');
-  const [goodQuantity, setGoodQuantity] = useState('');
-  const [badQuantity, setBadQuantity] = useState('');
-  const [excessQuantity, setExcessQuantity] = useState('');
-  const [noProcessQuantity, setNoProcessQuantity] = useState('');
-  const [comments, setComments] = useState('');
-  const [showCqmModal, setShowCqmModal] = useState(false);
-  const [showConfirm, setShowConfirm] = useState(false);
-  const [showQuality, setShowQuality] = useState<boolean>(false);
+  const { user } = useAuth();
+  const currentUserId = user?.sub;
+
+  const isDisabled = workOrder.status === 'En proceso';
+
   const [showBadQuantity, setShowBadQuantity] = useState(false);
+  const [showConfirm, setShowConfirm] = useState(false);
+
   const [areaBadQuantities, setAreaBadQuantities] = useState<{
     [areaName: string]: string;
   }>({});
+
+  const [goodQuantity, setGoodQuantity] = useState('');
+  const [excessQuantity, setExcessQuantity] = useState('');
+  const [noProcessQuantity, setNoProcessQuantity] = useState('');
   const [materialBadQuantity, setMaterialBadQuantity] = useState<string>('0');
   const [lastAreaBadQuantity, setLastBadQuantity] = useState<string>('0');
 
-  const isDisabled = workOrder.status === 'En proceso';
-  // Una sola fuente de verdad: por pregunta guarda true (OK), false (NG) o undefined (sin respuesta)
-  const [answersByQuestion, setAnswersByQuestion] = useState<
-    Record<number, boolean | undefined>
-  >({});
+  const [responses, setResponses] = useState<
+    { questionId: number; answer: boolean }[]
+  >([]);
+  const [sampleQuantity, setSampleQuantity] = useState('');
+  const [colorEdge, setColorEdge] = useState('');
+  const [comments, setComments] = useState('');
 
-  // Preguntas visibles en la tabla (mismo filtro que pasas al child con roleId=null)
-  const visibleQuestions =
-    workOrder.area.formQuestions?.filter((q: any) => q.role_id === null) ?? [];
+  const [showCqmModal, setShowCqmModal] = useState(false);
+  const [showQuality, setShowQuality] = useState<boolean>(false);
 
-  // Listas derivadas para el componente de tabla (no se guardan aparte)
+  const [flowListState, setFlowListState] = useState<any[]>(() => [
+    ...(workOrder?.workOrder?.flow ?? []),
+  ]);
+  const flowList: any[] = useMemo(() => flowListState, [flowListState]);
+  const currentFlow = useMemo(
+    () =>
+      workOrder?.workOrder?.flow?.find(
+        (f: any) =>
+          f.area_id === workOrder?.area?.id &&
+          [
+            'Pendiente',
+            'En proceso',
+            'Parcial',
+            'Pendiente parcial',
+            'Listo',
+            'Enviado a CQM',
+            'En Calidad',
+            'Enviado a auditoria parcial',
+          ].includes(f.status) &&
+          f.user?.id === currentUserId
+      ),
+    [workOrder, currentUserId]
+  );
+  if (!currentFlow) {
+    alert('No tienes una orden activa para esta área.');
+    return;
+  }
+
+  const currentIndex = useMemo(
+    () => flowList.findIndex((item) => item?.id === currentFlow?.id),
+    [flowList, currentFlow]
+  );
+
+  const lastCompletedOrPartial = useMemo(
+    () => (currentIndex > 0 ? flowList[currentIndex - 1] : null),
+    [flowList, currentIndex]
+  );
+
+  const nextFlow = useMemo(
+    () =>
+      currentIndex !== -1 && currentIndex < flowList.length - 1
+        ? flowList[currentIndex + 1]
+        : null,
+    [flowList, currentIndex]
+  );
+
+  const cantidadporliberar = useMemo(
+    () => calcularCantidadPorLiberar(currentFlow, lastCompletedOrPartial),
+    [currentFlow, lastCompletedOrPartial]
+  );
+
+  const visibleQuestions: any[] = useMemo(
+    () =>
+      workOrder?.area?.formQuestions?.filter((q: any) => q.role_id === null) ??
+      [],
+    [workOrder]
+  );
+  const answersByQuestion = useMemo(() => {
+    const map: Record<number, boolean | undefined> = {};
+    for (const r of responses) map[r.questionId] = r.answer;
+    return map;
+  }, [responses]);
+
   const checkedRespuestaOK = useMemo(
     () =>
       visibleQuestions
@@ -77,94 +183,37 @@ const ColorEdgeComponent = ({ workOrder }: { workOrder: any }) => {
         .map((q: any) => q.id),
     [visibleQuestions, answersByQuestion]
   );
-  const { user } = useAuth();
-  const currentUserId = user?.sub;
-  const flowList = [...workOrder.workOrder.flow];
-  const currentFlow = workOrder.workOrder.flow.find(
-    (f: any) =>
-      f.area_id === workOrder.area.id &&
-      [
-        'Pendiente',
-        'En proceso',
-        'Parcial',
-        'Pendiente parcial',
-        'Listo',
-        'Enviado a CQM',
-        'En Calidad',
-        'Enviado a auditoria parcial',
-      ].includes(f.status) &&
-      f.user?.id === currentUserId
+
+  const statusesToCheck = useMemo(
+    () => [
+      currentFlow?.status,
+      nextFlow?.status,
+      lastCompletedOrPartial?.status,
+    ],
+    [currentFlow, nextFlow, lastCompletedOrPartial]
   );
-  if (!currentFlow) {
-    alert('No tienes una orden activa para esta área.');
-    return;
-  }
-  const allParcialsValidated = currentFlow.partialReleases?.every(
-    (r: PartialRelease) => r.validated
-  );
-  const currentIndex = flowList.findIndex(
-    (item) => item.id === currentFlow?.id
-  );
-  console.log('el currentIndex', currentIndex);
-  // Anterior (si hay)
-  const lastCompletedOrPartial =
-    currentIndex > 0 ? flowList[currentIndex - 1] : null;
-  // Siguiente (si hay)
-  const nextFlow =
-    currentIndex !== -1 && currentIndex < flowList.length - 1
-      ? flowList[currentIndex + 1]
-      : null;
-  const cantidadporliberar = calcularCantidadPorLiberar(
-    currentFlow,
-    lastCompletedOrPartial
-  );
-  console.log('Cantidad final por liberar:', cantidadporliberar);
-  const statusesToCheck = [
-    currentFlow?.status,
-    nextFlow?.status,
-    lastCompletedOrPartial?.status,
-  ];
 
   const { disableAfterCorteCQM, disablePartial, cooldown } =
     usePartialReleaseControls({
       flow: currentFlow,
       cantidadPorLiberar: cantidadporliberar,
       withCountdown: true,
-
-      // 🔎 acá decides contra qué comparar:
-      statusesToCheck, // revisa current + next + last
-      blockedForCQM: [
-        'Enviado a CQM',
-        'En Calidad',
-        'Listo',
-        'Pendiente parcial',
-      ],
-      blockedForCQM_AfterCorte: [
-        'Enviado a CQM',
-        'En Calidad',
-        'Listo',
-        'Pendiente',
-        'Pendiente parcial',
-        'Enviado a auditoria parcial',
-        'En inconformidad CQM',
-        'Enviado a Auditoria',
-      ],
+      statusesToCheck,
+      blockedForCQM: [...CQM_BLOCKED_STATUSES],
+      blockedForCQM_AfterCorte: [...AFTER_CORTE_BLOCKED_STATUSES],
     });
-  const shouldDisableCQM = () => disableAfterCorteCQM;
-  const shouldDisableLiberar = () => {
-    // 0) Helpers locales con las MISMAS listas que pasaste al hook
-    const blockedAfterCorte = [
-      'Enviado a CQM',
-      'En Calidad',
-      'Listo',
-      'Pendiente',
-      'Pendiente parcial',
-      'Enviado a auditoria parcial',
-      'En inconformidad CQM',
-      'Enviado a Auditoria',
-    ];
 
-    const cleaned = [
+  const allParcialsValidated = useMemo(
+    () =>
+      currentFlow?.partialReleases?.every((r: PartialRelease) => r.validated) ??
+      false,
+    [currentFlow]
+  );
+
+  const shouldDisableCQM = () => disableAfterCorteCQM;
+
+  const shouldDisableLiberar = () => {
+    const cleanedStatuses = [
       currentFlow?.status,
       nextFlow?.status,
       lastCompletedOrPartial?.status,
@@ -172,62 +221,40 @@ const ColorEdgeComponent = ({ workOrder }: { workOrder: any }) => {
       .map((s) => s?.trim?.() ?? '')
       .filter(Boolean);
 
-    const hasBlockedStatus = cleaned.some((s) => blockedAfterCorte.includes(s));
     const byCantidad = Number(cantidadporliberar) === 0;
-    const byCooldown = !currentFlow.areaResponse && !!cooldown?.isLocked;
-
-    // 1) Si CQM está bloqueado SOLO por cooldown (no por estados ni cantidad) => habilitar parcial
-    const cqmBloqueadoSoloPorTiempo =
-      byCooldown && !hasBlockedStatus && !byCantidad;
-    if (cqmBloqueadoSoloPorTiempo) {
-      return false; // NO deshabilitar botón de Liberación Parcial
-    }
-
-    // 2) Si no es el caso anterior, aplicar base del hook para parciales + tus reglas extra
-    const currentInvalidStatuses = [
-      'Enviado a CQM',
-      'En Calidad',
-      'Parcial',
-      'Enviado a auditoria parcial',
-      'Pendiente',
-      'Pendiente parcial',
-      'En proceso',
-    ];
-    const nextInvalidStatuses = [
-      'Enviado a CQM',
-      'Listo',
-      'En Calidad',
-      'Enviado a auditoria parcial',
-      'Pendiente',
-      'Parcial',
-      'Pendiente parcial',
-      'En inconformidad CQM',
-    ];
-    const nextCorteStatuses = ['Enviado a auditoria parcial'];
-
-    const isCurrentInvalid = currentInvalidStatuses.includes(
-      currentFlow.status?.trim?.() ?? ''
+    const byCooldown = !currentFlow?.areaResponse && !!cooldown?.isLocked;
+    const hasBlockedStatus = cleanedStatuses.some((s) =>
+      AFTER_CORTE_BLOCKED_STATUSES.includes(s as any)
     );
-    const isNextInvalid = nextInvalidStatuses.includes(
-      nextFlow?.status?.trim?.() ?? ''
+
+    // Caso especial: CQM bloqueado solo por tiempo -> permitir liberación parcial
+    if (byCooldown && !hasBlockedStatus && !byCantidad) return false;
+
+    const isCurrentInvalid = CURRENT_INVALID_FOR_PARTIAL.includes(
+      (currentFlow?.status ?? '').trim()
+    );
+    const isNextInvalid = NEXT_INVALID_FOR_PARTIAL.includes(
+      (nextFlow?.status ?? '').trim()
     );
     const afterCorte =
-      nextCorteStatuses.includes(currentFlow?.status?.trim?.() ?? '') &&
+      NEXT_CORTE_STATUSES.includes((currentFlow?.status ?? '').trim() as any) &&
       (nextFlow?.area?.id ?? 0) >= 6;
     const isNextInvalidAndNotValidated =
-      nextInvalidStatuses.includes(nextFlow?.status?.trim?.() ?? '') &&
+      NEXT_INVALID_FOR_PARTIAL.includes((nextFlow?.status ?? '').trim()) &&
       !allParcialsValidated;
 
     return (
-      disablePartial || // base del hook para parciales (cantidad=0, estados finales)
-      isDisabled || // tu flag global
+      disablePartial ||
+      !!isDisabled ||
       isCurrentInvalid ||
       afterCorte ||
       isNextInvalidAndNotValidated ||
       isNextInvalid
     );
   };
-  const enviarACQM = async () => {
+
+  const handleSubmitToCQM = async () => {
+    const flowId = currentFlow.id;
     const numValue = Number(sampleQuantity);
     if (isNaN(numValue) || !Number.isInteger(numValue) || numValue < 0) {
       Alert.alert('Cantidad de muestra inválida');
@@ -236,6 +263,7 @@ const ColorEdgeComponent = ({ workOrder }: { workOrder: any }) => {
     // Construir arrays Alineados según el ORDEN de visibleQuestions
     const question_id: number[] = [];
     const response: boolean[] = [];
+
     visibleQuestions.forEach((q: any) => {
       const ans = answersByQuestion[q.id];
       if (ans !== undefined) {
@@ -243,11 +271,6 @@ const ColorEdgeComponent = ({ workOrder }: { workOrder: any }) => {
         response.push(!!ans);
       }
     });
-    // Exigir todas respondidas (o ajusta a tu regla)
-    if (question_id.length !== visibleQuestions.length) {
-      Alert.alert('Completa todas las preguntas y cantidad de muestra.');
-      return;
-    }
     // Exigir todas respondidas (o ajusta a tu regla)
     if (question_id.length !== visibleQuestions.length) {
       Alert.alert('Completa todas las preguntas y cantidad de muestra.');
@@ -278,7 +301,7 @@ const ColorEdgeComponent = ({ workOrder }: { workOrder: any }) => {
 
   const warned = useRef(false);
   const loggedOnce = useRef(false);
-  // 👇 Logs SOLO una vez
+
   useEffect(() => {
     if (loggedOnce.current) return; // evita duplicado del StrictMode
     console.log('workOrder', workOrder);
@@ -291,19 +314,51 @@ const ColorEdgeComponent = ({ workOrder }: { workOrder: any }) => {
     if (!currentFlow && !warned.current) {
       alert('No tienes una orden activa para esta área.');
       warned.current = true;
-      // opcional: router.push('/liberarProducto');
     }
   }, [currentFlow]);
 
-  // 👇 En el render ya no hay alert ni logs
-  if (!currentFlow) {
-    return null; // o mostrar un <p>No tienes una orden activa</p>
-  }
+  if (!currentFlow) return null; // Falla segura en render
 
-  const liberarProducto = async () => {
+  const prevAreaSum = useMemo(
+    () => getPrevAreaGoodPlusExcess(workOrder),
+    [workOrder]
+  );
+  console.log('prevAreaSum', prevAreaSum);
+
+  const cqm_quantity = (workOrder?.answers ?? []).reduce(
+    (total: number, answer: { sample_quantity?: number | string }) =>
+      total + (Number(answer?.sample_quantity) || 0),
+    0
+  );
+  console.log('cqm', cqm_quantity);
+
+  // Si quieres loguear los parciales del flow actual
+  const totalParcialesActuales = useMemo(
+    () =>
+      getCurrentFlowPartialsTotal(
+        currentFlow /* , { includeUnvalidated: false } */
+      ),
+    [currentFlow]
+  );
+
+  const handleLiberarClick = async () => {
     const numValue = Number(goodQuantity);
     if (isNaN(numValue) || !Number.isInteger(numValue) || numValue <= 0) {
       Alert.alert('Cantidad de muestra inválida');
+      return;
+    } else if (
+      cqm_quantity +
+        (Number(goodQuantity) +
+          Number(lastAreaBadQuantity) +
+          Number(materialBadQuantity) +
+          Number(excessQuantity) +
+          Number(noProcessQuantity)) +
+        totalParcialesActuales >
+      prevAreaSum
+    ) {
+      Alert.alert(
+        'La cantidad total a liberar el mayor a la entregada por parte del área previa.'
+      );
       return;
     }
     const payload = {
@@ -427,6 +482,10 @@ const ColorEdgeComponent = ({ workOrder }: { workOrder: any }) => {
   }));
 
   const handleSaveChanges = async () => {
+    const toInt = (v: any) => {
+      const n = parseInt(String(v ?? '0').trim(), 10);
+      return Number.isFinite(n) ? n : 0;
+    };
     const payload = {
       areas: previousFlows.flatMap((flow) => {
         const areaKey = flow.area.name.toLowerCase().replace(/\s/g, '');
@@ -439,42 +498,64 @@ const ColorEdgeComponent = ({ workOrder }: { workOrder: any }) => {
           corte: 'corte',
         };
 
-        const block = blockMap[flow.area.name.toLowerCase()] || 'otros';
-        if (block === 'otros') {
-          return []; // Descarta si no es bloque conocido
-        }
+        const block = blockMap[areaKey] || 'otros';
+
+        // ⛔️ No mandes nada si el área no es de las soportadas o si es Corte
+        if (block === 'otros' || areaKey === 'colorEdge') return [];
 
         const blockData = flow.areaResponse?.[block];
-        const blockId = blockData?.id || null;
-        const formId = blockData?.form_auditory_id || null;
-        const cqmId = blockData?.form_answer_id || null;
+        if (!blockData?.id) return [];
 
         const badKey = `${areaKey}_bad`;
         const materialKey = `${areaKey}_material`;
-        const bad_quantity = Number(areaBadQuantities[badKey] || 0);
-        const material_quantity =
-          flow.area.id > 6
-            ? Number(areaBadQuantities[materialKey] || 0)
-            : undefined;
 
-        return {
-          areaId: flow.area_id,
-          block,
-          blockId,
-          formId,
-          cqmId,
-          data: {
-            bad_quantity,
-            ...(material_quantity !== undefined && { material_quantity }),
+        const bad_quantity = toInt(areaBadQuantities[badKey]);
+        const material_quantity =
+          flow.area.id > 6 ? toInt(areaBadQuantities[materialKey]) : undefined;
+
+        return [
+          {
+            areaId: flow.area_id,
+            block,
+            blockId: blockData.id,
+            formId: blockData.form_auditory_id ?? null,
+            cqmId: blockData.form_answer_id ?? null,
+            data: {
+              bad_quantity,
+              ...(material_quantity !== undefined && { material_quantity }),
+            },
           },
-        };
+        ];
       }),
     };
 
-    console.log('Payload a enviar:', payload);
-
+    if (!payload.areas.length) {
+      alert('No hay cambios para guardar.');
+      return;
+    }
     try {
       await updateWorkOrderAreas(workOrder.workOrder.ot_id, payload);
+      setFlowListState((prev) => {
+        const byArea = new Map(payload.areas.map((a: any) => [a.areaId, a]));
+        return prev.map((f) => {
+          const upd = byArea.get(f.area_id);
+          if (!upd) return f;
+
+          const newAreaResponse = { ...(f.areaResponse ?? {}) };
+          const existingBlock = newAreaResponse[upd.block] ?? {};
+          newAreaResponse[upd.block] = {
+            ...existingBlock,
+            ...upd.data, // bad_quantity y (opcional) material_quantity
+            // Conserva ids si los tenías
+            id: upd.blockId ?? existingBlock.id ?? null,
+            form_auditory_id:
+              upd.formId ?? existingBlock.form_auditory_id ?? null,
+            form_answer_id: upd.cqmId ?? existingBlock.form_answer_id ?? null,
+          };
+
+          return { ...f, areaResponse: newAreaResponse };
+        });
+      });
       alert('Cambios guardados correctamente');
     } catch (err) {
       console.error(err);
@@ -483,84 +564,41 @@ const ColorEdgeComponent = ({ workOrder }: { workOrder: any }) => {
   };
 
   const sumaBadQuantity = useMemo(() => {
-    return previousFlows.reduce((sum, flow) => {
-      const areaKey = flow.area.name.toLowerCase();
+    const bad = Number(lastAreaBadQuantity) || 0;
+    const mat =
+      (currentFlow?.area?.id ?? 0) >= 6 ? Number(materialBadQuantity) || 0 : 0;
+    return bad + mat;
+  }, [lastAreaBadQuantity, materialBadQuantity, currentFlow?.area?.id]);
 
-      // Leer del input del usuario
-      const userBad = areaBadQuantities[`${areaKey}_bad`];
-      const userMaterial = areaBadQuantities[`${areaKey}_material`];
-
-      // Valores numéricos o null
-      const bad =
-        userBad !== undefined && userBad !== '' ? Number(userBad) : null;
-
-      const material =
-        userMaterial !== undefined && userMaterial !== ''
-          ? Number(userMaterial)
-          : null;
-
-      // Si hay valores del usuario, usarlos
-      if (bad !== null || material !== null) {
-        const safeBad = bad ?? 0;
-        const safeMaterial = flow.area.id >= 6 ? material ?? 0 : 0;
-        return sum + safeBad + safeMaterial;
-      }
-
-      // Si no hay input del usuario, usar partialReleases como fallback
-      if (flow.partialReleases?.length > 0) {
-        const fallbackBad = flow.partialReleases.reduce(
-          (acc: any, release: any) => {
-            const badQty = release.bad_quantity ?? 0;
-            const materialQty =
-              flow.area.id >= 6 ? release.material_quantity ?? 0 : 0;
-            return acc + badQty + materialQty;
-          },
-          0
-        );
-
-        return sum + fallbackBad;
-      }
-
-      // Si no hay nada, suma 0
-      return sum;
-    }, 0);
-  }, [areaBadQuantities, previousFlows]);
   const handleToggleRespuesta = (
     questionId: number,
     _columnIndex: number,
     type: 'ok' | 'ng',
     checked: boolean
   ) => {
-    setAnswersByQuestion((prev) => {
-      const next = { ...prev };
-      if (checked) {
-        // marcar OK => true, NG => false (exclusivo)
-        next[questionId] = type === 'ok';
-      } else {
-        // si desmarcan la opción activa, borramos la respuesta
-        if (
-          (type === 'ok' && next[questionId] === true) ||
-          (type === 'ng' && next[questionId] === false)
-        ) {
-          delete next[questionId];
-        }
+    setResponses((prev) => {
+      const without = prev.filter((r) => r.questionId !== questionId);
+      if (type === 'ok') {
+        return checked ? [...without, { questionId, answer: true }] : without;
       }
-      return next;
+      // type === 'ng'
+      return checked ? [...without, { questionId, answer: false }] : without;
     });
   };
   const disableLiberarButton = shouldDisableLiberar();
   const disableLiberarCQM = shouldDisableCQM();
   const isListo = workOrder.status === 'Listo';
 
-  const toggleCheckbox = (
-    id: number,
-    target: number[],
-    setter: React.Dispatch<React.SetStateAction<number[]>>
-  ) => {
-    setter(
-      target.includes(id) ? target.filter((i) => i !== id) : [...target, id]
-    );
-  };
+  const orderQuantity: number = useMemo(
+    () =>
+      workOrder?.workOrder?.quantity ??
+      workOrder?.workOrder?.quantity_total ??
+      workOrder?.quantity ??
+      0,
+    [workOrder]
+  );
+
+  const hasNextFlow = Boolean(nextFlow);
 
   return (
     <ScrollView style={styles.container}>
@@ -582,7 +620,16 @@ const ColorEdgeComponent = ({ workOrder }: { workOrder: any }) => {
         keyboardType="numeric"
         placeholder="Ej: 100"
         value={goodQuantity}
-        onChangeText={setGoodQuantity}
+        onChangeText={(text) => {
+          if (text === '') return setGoodQuantity('');
+
+          const n = Number(text);
+          if (Number.isNaN(n) || n < 0) return;
+
+          // aplicar clamp como en web
+          const clamped = hasNextFlow ? n : Math.min(n, orderQuantity);
+          setGoodQuantity(String(clamped));
+        }}
       />
       <Text style={styles.label}>Malas:</Text>
       <TouchableOpacity
@@ -596,7 +643,7 @@ const ColorEdgeComponent = ({ workOrder }: { workOrder: any }) => {
           activeOutlineColor="#000"
           keyboardType="numeric"
           placeholder={sumaBadQuantity > 0 ? sumaBadQuantity.toString() : '0'}
-          value={sumaBadQuantity}
+          value={String(sumaBadQuantity)}
           editable={false} // deshabilita edición
           pointerEvents="none" // evita que se abra el teclado
         />
@@ -667,15 +714,10 @@ const ColorEdgeComponent = ({ workOrder }: { workOrder: any }) => {
         areas={normalizedAreas}
         areaBadQuantities={areaBadQuantities}
         setAreaBadQuantities={setAreaBadQuantities}
-        onConfirm={({
-          totalBad,
-          totalMaterial,
-          lastAreaBad,
-        }) => {
+        onConfirm={({ lastAreaBad, lastAreaMaterial }) => {
           setShowBadQuantity(false);
-          handleSaveChanges(); // ✅ sin arg
-          setBadQuantity(String(totalBad));
-          setMaterialBadQuantity(String(totalMaterial));
+          handleSaveChanges();
+          setMaterialBadQuantity(String(lastAreaMaterial));
           setLastBadQuantity(String(lastAreaBad));
         }}
         onClose={() => setShowBadQuantity(false)}
@@ -750,7 +792,7 @@ const ColorEdgeComponent = ({ workOrder }: { workOrder: any }) => {
               </TouchableOpacity>
               <TouchableOpacity
                 style={styles.confirmButton}
-                onPress={enviarACQM}
+                onPress={handleSubmitToCQM}
               >
                 <Text style={styles.modalButtonText}>Enviar Respuestas</Text>
               </TouchableOpacity>
@@ -773,7 +815,7 @@ const ColorEdgeComponent = ({ workOrder }: { workOrder: any }) => {
               </TouchableOpacity>
               <TouchableOpacity
                 style={styles.confirmButton}
-                onPress={liberarProducto}
+                onPress={handleLiberarClick}
               >
                 <Text style={styles.modalButtonText}>Confirmar</Text>
               </TouchableOpacity>

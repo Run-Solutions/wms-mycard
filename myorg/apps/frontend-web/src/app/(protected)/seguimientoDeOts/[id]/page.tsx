@@ -4,139 +4,41 @@
 import { use, useState, Fragment, useEffect, useMemo } from 'react';
 import { useRouter } from 'next/navigation';
 import styled from 'styled-components';
+
 import { Card, CardContent } from '@/components/ui/card';
 import ProgressBarAreas from '@/components/SeguimientoDeOts/ProgressBarAreas';
 import InconformitiesHistory from '@/components/SeguimientoDeOts/InconformitiesHistory';
 import BadQuantityModal from '@/components/SeguimientoDeOts/BadQuantityModal';
+import PartialHistory from '@/components/SeguimientoDeOts/PartialHistory';
+import { VistosBuenosHistory } from '@/components/SeguimientoDeOts/VistosBuenosHistory';
+import { AreaTotalsForPartialHistory } from '@/components/SeguimientoDeOts/PartialHistory';
+
 import {
   fetchWorkOrderById,
   fetchAllUsers,
   updateFlowAssignedUser,
   closeWorkOrder,
   updateWorkOrderAreas,
+  getFileByName,
 } from '@/api/seguimientoDeOts';
-import { VistosBuenosHistory } from '@/components/SeguimientoDeOts/VistosBuenosHistory';
-import { getFileByName } from '@/api/seguimientoDeOts';
+
 import {
   getPerPartialReviewers,
   getLastAnswer,
   getSingleCqm,
   getReviewerNameFromAnswer,
   getPerPartialCqm,
+  getPerPartialAuditors,
+  getLastAuditor,
 } from '@/components/SeguimientoDeOts/util/quality';
-import PartialHistory from '@/components/SeguimientoDeOts/PartialHistory';
 
-type NumericField =
-  | 'buenas'
-  | 'malas'
-  | 'excedente'
-  | 'noprocess'
-  | 'defectuoso'
-  | 'cqm'
-  | 'muestras';
+// ========================================================
+// Types
+// ========================================================
 
-const AREA_KEY_BY_ID: Record<number, string> = {
-  1: 'prepress',
-  2: 'impression',
-  3: 'serigrafia',
-  4: 'empalme',
-  5: 'laminacion',
-  6: 'corte',
-  7: 'colorEdge',
-  8: 'hotStamping',
-  9: 'millingChip',
-  10: 'personalizacion',
-};
-
-const getAreaKey = (area: AreaData) => AREA_KEY_BY_ID[area.id] ?? null;
-
-const getAreaReleaseTotal = (area: AreaData) => {
-  const key = getAreaKey(area);
-  const block: any = key ? (area.response as any)?.[key] : null;
-  if (!block) return 0;
-  return block.release_quantity ?? block.good_quantity ?? block.plates ?? 0;
-};
-
-const getSumParciales = (area: AreaData) =>
-  (area.partials ?? []).reduce((acc, p) => acc + (p?.quantity ?? 0), 0);
-
-const getRemainder = (area: AreaData) =>
-  Math.max(getAreaReleaseTotal(area) - getSumParciales(area), 0);
-
-const getPerPartialValues = (
-  area: AreaData,
-  field: 'cqm' | 'muestras' | 'defectuoso'
-) => {
-  const parc = area.parciales || 0;
-  const hasRem = getRemainder(area) > 0;
-  const cols = parc + (hasRem ? 1 : 0);
-
-  // Ordenamos las answers por fecha (te sigue sirviendo para cqm/muestras)
-  const answersSorted = [...(area.answers ?? [])].sort(
-    (a, b) =>
-      new Date(a.created_at).getTime() - new Date(b.created_at).getTime()
-  );
-
-  // 👇 Para defectuoso leeremos de partials. Para cqm/muestras seguimos con answers.
-  const values: Array<number | string> = Array(cols).fill(0);
-
-  for (let i = 0; i < parc; i++) {
-    if (field === 'defectuoso') {
-      values[i] = area.partials?.[i]?.material_quantity ?? 0; // 👈 aquí el cambio
-    } else if (field === 'cqm') {
-      values[i] = answersSorted[i]?.sample_quantity ?? 0;
-    } else if (field === 'muestras') {
-      values[i] = (answersSorted[i] as any)?.sample_auditory ?? '—';
-    }
-  }
-
-  if (hasRem) {
-    const block = (area.response as any)?.[getAreaKey(area)];
-    const remIndex = cols - 1;
-
-    if (field === 'defectuoso') {
-      // Remanente = total del bloque - suma parcial de material_quantity
-      const totalDefectuoso =
-        block?.material_quantity ?? 0;
-      const sumParcialDefectuoso = (area.partials ?? []).reduce(
-        (acc, p) => acc + (p?.material_quantity ?? 0),
-        0
-      );
-      values[remIndex] = Math.max(totalDefectuoso - sumParcialDefectuoso, 0);
-    } else if (field === 'cqm') {
-      const remAns =
-        answersSorted[parc] ?? answersSorted[answersSorted.length - 1];
-      values[remIndex] = remAns?.sample_quantity ?? 0;
-    } else if (field === 'muestras') {
-      const remAns =
-        answersSorted[parc] ?? answersSorted[answersSorted.length - 1];
-      values[remIndex] = (remAns as any)?.sample_auditory ?? '—';
-    }
-  }
-  return values;
-};
-// último parcial por fecha
-const getLastPartial = (area: AreaData) => {
-  const list = area.partials ?? [];
-  if (!list.length) return null;
-  return [...list].sort(
-    (a, b) =>
-      new Date(a.created_at).getTime() - new Date(b.created_at).getTime()
-  )[list.length - 1];
-};
-
-const getPartialUserName = (
-  p: AreaData['partials'][number] | null | undefined,
-  area: AreaData,
-  operatorByIdMap: Map<number, string>
-) => {
-  return (
-    p?.user?.username ??
-    (p?.user_id != null ? operatorByIdMap.get(p.user_id) : undefined) ??
-    area.usuario ??
-    'No definido'
-  );
-};
+interface Props {
+  params: Promise<{ id: string }>;
+}
 
 export type AreaData = {
   id: number;
@@ -182,8 +84,13 @@ export type AreaData = {
     noprocess_quantity: number;
     user_id: number | null; // 👈 puede venir null
     validated: boolean;
-    release_quantity?: number; // 👈 cantidad liberada 
+    release_quantity?: number; // 👈 cantidad liberada
     user?: { username: string } | null; // 👈 opcional
+    formAuditory?: {
+      created_at: string;
+      sample_auditory: string;
+      user?: { username?: string | null } | null;
+    } | null;
     created_at: string;
   }>;
 };
@@ -196,40 +103,359 @@ export type InconformityData = {
   area: string;
 };
 
-type OperatorUser = {
+export type OperatorUser = {
   id: number;
   username: string;
   areasOperator?: { id: number; name: string };
 };
 
-interface Props {
-  params: Promise<{ id: string }>;
-}
+export type NumericField =
+  | 'buenas'
+  | 'malas'
+  | 'excedente'
+  | 'noprocess'
+  | 'defectuoso'
+  | 'cqm'
+  | 'muestras';
+
+// ========================================================
+// Constants & Utils
+// ========================================================
+
+const AREA_KEY_BY_ID: Record<number, string> = {
+  1: 'prepress',
+  2: 'impression',
+  3: 'serigrafia',
+  4: 'empalme',
+  5: 'laminacion',
+  6: 'corte',
+  7: 'colorEdge',
+  8: 'hotStamping',
+  9: 'millingChip',
+  10: 'personalizacion',
+};
+
+const FALLBACK_FIELDS = [
+  'good_quantity',
+  'excess_quantity',
+  'noprocess_quantity',
+  'material_quantity',
+  'plates',
+];
+
+const getAreaKey = (area: AreaData) => AREA_KEY_BY_ID[area.id] ?? null;
+
+const toNum = (v: any) =>
+  v == null ? 0 : typeof v === 'number' ? v : Number(v) || 0;
+
+const getAreaBlock = (area: any) => {
+  const key = getAreaKey(area);
+  if (!key) return null;
+  const fromResponse =
+    area?.response && typeof area.response === 'object'
+      ? area.response[key]
+      : undefined;
+  // fallback si viene plano (p. ej. area.corte)
+  return fromResponse ?? area?.[key] ?? null;
+};
+
+// ---- Remainders (by field) ----
+
+const buildAreaTotalsByAreaId = (wo: any): Record<number, AreaTotalsForPartialHistory> => {
+  const map: Record<number, AreaTotalsForPartialHistory> = {};
+  const flows = wo?.flow ?? [];
+
+  flows.forEach((item: any) => {
+    const areaId = item?.area_id;
+    if (!areaId) return;
+
+    const areaKey = AREA_KEY_BY_ID[areaId];
+    const block = item?.areaResponse?.[areaKey];
+
+    if (!block) return;
+
+    map[areaId] = {
+      good_or_release_or_plates: toNum(
+        block.release_quantity ?? block.good_quantity ?? block.plates
+      ),
+      bad_quantity: toNum(block.bad_quantity),
+      excess_quantity: toNum(block.excess_quantity),
+      noprocess_quantity: toNum(block.noprocess_quantity),
+      material_quantity: toNum(block.material_quantity),
+    };
+  });
+
+  return map;
+};
+
+const getRemainderByField = (
+  area: AreaData,
+  field: 'buenas' | 'malas' | 'excedente' | 'noprocess' | 'defectuoso'
+) => {
+  const block = getAreaBlock(area) as any;
+  if (!block) return 0;
+
+  let total = 0;
+  let parcialesSum = 0;
+
+  switch (field) {
+    case 'buenas':
+      total = toNum(
+        block.release_quantity ?? block.good_quantity ?? block.plates
+      );
+      parcialesSum = (area.partials ?? []).reduce(
+        (acc, p) => acc + toNum(p?.quantity),
+        0
+      );
+      break;
+    case 'malas':
+      total = toNum(block.bad_quantity);
+      parcialesSum = (area.partials ?? []).reduce(
+        (acc, p) => acc + toNum(p?.bad_quantity),
+        0
+      );
+      break;
+    case 'excedente':
+      total = toNum(block.excess_quantity);
+      parcialesSum = (area.partials ?? []).reduce(
+        (acc, p) => acc + toNum(p?.excess_quantity),
+        0
+      );
+      break;
+    case 'noprocess':
+      total = toNum(block.noprocess_quantity);
+      parcialesSum = (area.partials ?? []).reduce(
+        (acc, p) => acc + toNum(p?.noprocess_quantity),
+        0
+      );
+      break;
+    case 'defectuoso':
+      total = toNum(block.material_quantity);
+      parcialesSum = (area.partials ?? []).reduce(
+        (acc, p) => acc + toNum(p?.material_quantity),
+        0
+      );
+      break;
+  }
+
+  return Math.max(total - parcialesSum, 0);
+};
+
+const getRemainder = (area: AreaData) => getRemainderByField(area, 'buenas');
+
+const getPerPartialValues = (
+  area: AreaData,
+  field: 'cqm' | 'muestras' | 'defectuoso'
+) => {
+  const parc = area.parciales || 0;
+  const hasRem = getRemainder(area) > 0;
+  const cols = parc + (hasRem ? 1 : 0);
+
+  const answersSorted = [...(area.answers ?? [])].sort(
+    (a, b) =>
+      new Date(a.created_at).getTime() - new Date(b.created_at).getTime()
+  );
+
+  const values: Array<number | string> = Array(cols).fill(0);
+
+  for (let i = 0; i < parc; i++) {
+    if (field === 'defectuoso') {
+      values[i] = area.partials?.[i]?.material_quantity ?? 0;
+    } else if (field === 'cqm') {
+      values[i] = answersSorted[i]?.sample_quantity ?? 0;
+    } else if (field === 'muestras') {
+      values[i] = area.partials?.[i]?.formAuditory?.sample_auditory ?? '—';
+    }
+  }
+
+  if (hasRem) {
+    const block = (area.response as any)?.[getAreaKey(area)];
+    const remIndex = cols - 1;
+
+    if (field === 'defectuoso') {
+      const totalDefectuoso = block?.material_quantity ?? 0;
+      const sumParcialDefectuoso = (area.partials ?? []).reduce(
+        (acc, p) => acc + (p?.material_quantity ?? 0),
+        0
+      );
+      values[remIndex] = Math.max(totalDefectuoso - sumParcialDefectuoso, 0);
+    } else if (field === 'cqm') {
+      const remAns =
+        answersSorted[parc] ?? answersSorted[answersSorted.length - 1];
+      values[remIndex] = remAns?.sample_quantity ?? 0;
+    } else if (field === 'muestras') {
+      values[remIndex] = block?.formAuditory?.sample_auditory ?? '—';
+    }
+  }
+  return values;
+};
+
+const getLastPartial = (area: AreaData) => {
+  const list = area.partials ?? [];
+  if (!list.length) return null;
+  return [...list].sort(
+    (a, b) =>
+      new Date(a.created_at).getTime() - new Date(b.created_at).getTime()
+  )[list.length - 1];
+};
+
+const getPartialUserName = (
+  p: AreaData['partials'][number] | null | undefined,
+  area: AreaData,
+  operatorByIdMap: Map<number, string>
+) =>
+  p?.user?.username ??
+  (p?.user_id != null ? operatorByIdMap.get(p.user_id) : undefined) ??
+  area.usuario ??
+  'No definido';
+
+// ---- Area data builder (by areaId) ----
+const getAreaData = (
+  areaId: number,
+  areaResponse: any,
+  partialReleases: any[] = [],
+  flowUser: any = null
+) => {
+  const parciales = partialReleases.length;
+  const parcialesValidados = partialReleases.filter((p) => p?.validated).length;
+
+  const sumFromPartials = () =>
+    partialReleases.reduce(
+      (acc: any, curr: any) => {
+        acc.buenas += curr.quantity || 0;
+        acc.malas += curr.bad_quantity || 0;
+        acc.excedente += curr.excess_quantity || 0;
+        acc.noprocess += curr.noprocess_quantity || 0;
+        acc.defectuoso += curr.material_quantity || 0;
+        return acc;
+      },
+      { buenas: 0, malas: 0, excedente: 0, noprocess: 0, defectuoso: 0 }
+    );
+
+  const getCommonData = (areaKey: string) => {
+    const hasResponse = !!areaResponse?.[areaKey];
+    const usuario = areaResponse?.user?.username || flowUser?.username || '';
+    const auditor = areaResponse?.[areaKey]?.formAuditory?.user?.username || '';
+
+    if (!hasResponse && parciales > 0) {
+      const resumen = sumFromPartials();
+      return {
+        ...resumen,
+        cqm: 0,
+        muestras: 0,
+        usuario,
+        auditor,
+        parciales,
+        parcialesValidados,
+        partials: partialReleases,
+      };
+    }
+
+    return {
+      buenas:
+        areaResponse?.[areaKey]?.good_quantity ||
+        areaResponse?.[areaKey]?.release_quantity ||
+        areaResponse?.[areaKey]?.plates ||
+        0,
+      malas: areaResponse?.[areaKey]?.bad_quantity || 0,
+      excedente: areaResponse?.[areaKey]?.excess_quantity || 0,
+      noprocess: areaResponse?.[areaKey]?.noprocess_quantity || 0,
+      defectuoso: areaResponse?.[areaKey]?.material_quantity || 0,
+      cqm: areaResponse?.[areaKey]?.form_answer?.sample_quantity ?? 0,
+      muestras: areaResponse?.[areaKey]?.formAuditory?.sample_auditory ?? 0,
+      usuario,
+      auditor,
+      parciales,
+      parcialesValidados,
+      partials: partialReleases,
+    };
+  };
+
+  switch (areaId) {
+    case 1:
+      return getCommonData('prepress');
+    case 2:
+      return getCommonData('impression');
+    case 3:
+      return getCommonData('serigrafia');
+    case 4:
+      return getCommonData('empalme');
+    case 5:
+      return getCommonData('laminacion');
+    case 6:
+      return getCommonData('corte');
+    case 7:
+      return getCommonData('colorEdge');
+    case 8:
+      return getCommonData('hotStamping');
+    case 9:
+      return getCommonData('millingChip');
+    case 10:
+      return getCommonData('personalizacion');
+    default:
+      return {
+        buenas: 0,
+        malas: 0,
+        excedente: 0,
+        noprocess: 0,
+        defectuoso: 0,
+        cqm: 0,
+        muestras: 0,
+        usuario: '',
+        auditor: '',
+        parciales: 0,
+        parcialesValidados: 0,
+        partials: [],
+      };
+  }
+};
+
+const guessMimeFromName = (filename: string): string => {
+  const ext = filename.split('.').pop()?.toLowerCase();
+  switch (ext) {
+    case 'pdf':
+      return 'application/pdf';
+    case 'png':
+      return 'image/png';
+    case 'jpg':
+    case 'jpeg':
+      return 'image/jpeg';
+    case 'webp':
+      return 'image/webp';
+    default:
+      return 'application/octet-stream';
+  }
+};
+
+// ========================================================
+// Component
+// ========================================================
 
 export default function SeguimientoDeOtsAuxPage({ params }: Props) {
   const { id } = use(params);
   const router = useRouter();
+
+  // ---- State ----
   const [workOrder, setWorkOrder] = useState<any>(null);
-  const [showConfirm, setShowConfirm] = useState(false);
   const [areas, setAreas] = useState<AreaData[]>([]);
+  const [operatorUsers, setOperatorUsers] = useState<OperatorUser[]>([]);
+  const [vistosBuenosHistory, setVistosBuenosHistory] = useState([]);
+  const [inconformities, setInconformities] = useState<InconformityData[]>([]);
+
+  const [loading, setLoading] = useState(true);
+  const [progressWidth, setProgressWidth] = useState(0);
+
+  const [showConfirm, setShowConfirm] = useState(false);
   const [showBadQuantity, setShowBadQuantity] = useState(false);
   const [areaBadQuantities, setAreaBadQuantities] = useState<{
     [key: string]: string;
   }>({});
-  const [inconformities, setInconformities] = useState<InconformityData[]>([]);
-  const [qualitySectionOpen, setQualitySectionOpen] = useState(false);
-  const [inconformitySectionOpen, setInconformitySectionOpen] = useState(false);
-  const toggleQualitySection = () => {
-    setQualitySectionOpen(!qualitySectionOpen);
-  };
-  const toggleInconformitySection = () => {
-    setInconformitySectionOpen(!inconformitySectionOpen);
-  };
-  const [progressWidth, setProgressWidth] = useState(0);
-  const [loading, setLoading] = useState(true);
-  const [vistosBuenosHistory, setVistosBuenosHistory] = useState([]);
-  const [operatorUsers, setOperatorUsers] = useState<OperatorUser[]>([]);
 
+  const [qualitySectionOpen, setQualitySectionOpen] = useState(false);
+  const [partialSectionOpen, setPartialSectionOpen] = useState(false);
+  const [inconformitySectionOpen, setInconformitySectionOpen] = useState(false);
+
+  // ---- Operators maps ----
   const operatorOptionsByAreaId = useMemo(() => {
     const map = new Map<number, Array<{ id: number; username: string }>>();
     operatorUsers.forEach((u) => {
@@ -238,7 +464,6 @@ export default function SeguimientoDeOtsAuxPage({ params }: Props) {
       if (!map.has(aId)) map.set(aId, []);
       map.get(aId)!.push({ id: u.id, username: u.username });
     });
-    // orden opcional
     for (const [k, arr] of map.entries()) {
       arr.sort((a, b) => a.username.localeCompare(b.username));
       map.set(k, arr);
@@ -255,9 +480,8 @@ export default function SeguimientoDeOtsAuxPage({ params }: Props) {
   const getUserOptionsForArea = (areaId: number) =>
     operatorOptionsByAreaId.get(areaId) ?? [];
 
-  // --- MODAL ASIGNACIÓN DE OPERADOR ---
+  // ---- Operator modal ----
   type PartialType = AreaData['partials'][number] | null;
-
   const [opModal, setOpModal] = useState<{
     open: boolean;
     area: AreaData | null;
@@ -288,17 +512,11 @@ export default function SeguimientoDeOtsAuxPage({ params }: Props) {
 
   const closeOperatorModal = () => setOpModal((s) => ({ ...s, open: false }));
 
-  const confirmOperatorModal = async () => {
-    if (!opModal.area || opModal.selectedUserId == null) return;
-    if (!canEditUser(opModal.area, opModal.partial)) return; // 🔒 bloqueo extra
-    await handleChangeUser(
-      opModal.area,
-      opModal.partial,
-      opModal.selectedUserId
-    );
-    closeOperatorModal();
-  };
-  // Opciones filtradas para el modal (por área + búsqueda)
+  const areaTotalsByAreaId = useMemo(
+    () => buildAreaTotalsByAreaId(workOrder),
+    [workOrder]
+  );
+
   const modalOptions = useMemo(() => {
     if (!opModal.areaId) return [];
     const base = getUserOptionsForArea(opModal.areaId);
@@ -306,6 +524,18 @@ export default function SeguimientoDeOtsAuxPage({ params }: Props) {
     return q ? base.filter((u) => u.username.toLowerCase().includes(q)) : base;
   }, [opModal.areaId, opModal.search, operatorOptionsByAreaId]);
 
+  const confirmOperatorModal = async () => {
+    if (!opModal.area || opModal.selectedUserId == null) return;
+    if (!canEditUser(opModal.area, opModal.partial)) return;
+    await handleChangeUser(
+      opModal.area,
+      opModal.partial,
+      opModal.selectedUserId
+    );
+    closeOperatorModal();
+  };
+
+  // ---- First-load reload workaround ----
   useEffect(() => {
     const alreadyReloaded = sessionStorage.getItem('alreadyReloaded');
     if (!alreadyReloaded) {
@@ -313,73 +543,77 @@ export default function SeguimientoDeOtsAuxPage({ params }: Props) {
       window.location.reload();
     }
   }, []);
-  console.log(vistosBuenosHistory);
+
+  // ---- Load data ----
   useEffect(() => {
     if (!id) return;
+
     const loadData = async () => {
       try {
-        // Iniciamos el estado de carga
         setLoading(true);
 
-        // Tu llamada original a la API
         const data = await fetchWorkOrderById(id);
         const users = await fetchAllUsers();
+
         setOperatorUsers(users || []);
         setWorkOrder(data);
 
-        const historyData = data.flow
-          .filter((item: any) => item.answers?.length > 0)
-          .map((item: any) => {
-            const areaName = item.area?.name?.toLowerCase() || '';
-            const mode = ['impresion'].includes(areaName) ? 'doble' : 'simple';
-            return {
-              areaName: item.area?.name || 'Sin nombre',
-              username: item.user?.username || '',
-              questions: item.area?.formQuestions || [],
-              formAnswers: item.answers.map((a: any) => ({
-                accepted: a.accepted,
-                altura_chip: a.altura_chip,
-                apariencia_quemado: a.apariencia_quemado,
-                carga_aplicacion: a.carga_aplicacion,
-                codigo_barras: a.codigo_barras,
-                color: a.color,
-                color_edge: a.color_edge,
-                color_foil: a.color_foil,
-                color_personalizacion: a.color_personalizacion,
-                finish_validation: a.finish_validation,
-                holographic_type: a.holographic_type,
-                imagen_holograma: a.imagen_holograma,
-                localizacion_contactos: a.localizacion_contactos,
-                magnetic_band: a.magnetic_band,
-                revisar_posicion: a.revisar_posicion,
-                revisar_tecnologia: a.revisar_tecnologia,
-                sample_quantity: a.sample_quantity,
-                testtype_cqm: a.testtype_cqm,
-                prueba_over: a.prueba_over,
-                prueba_cinta_magnetica: a.prueba_cinta_magnetica,
-                prueba_centro: a.prueba_centro,
-                tipo_personalizacion: a.tipo_personalizacion,
-                track_type: a.track_type,
-                validar_inlays: a.validar_inlays,
-                validar_kvc: a.validar_kvc,
-                validar_kvc_perso: a.validar_kvc_perso,
-                valor_anclaje: a.valor_anclaje,
-                verificar_etiqueta: a.verificar_etiqueta,
-                verificar_script: a.verificar_script,
-                created_at: a.created_at,
-
-                reviewer: a.reviewer || [],
-                FormAnswerResponse: a.FormAnswerResponse || [],
-              })),
-              mode,
-            };
-          });
+        // Vistos Buenos history
+        const historyData =
+          data.flow
+            .filter((item: any) => item.answers?.length > 0)
+            .map((item: any) => {
+              const areaName = item.area?.name?.toLowerCase() || '';
+              const mode = ['impresion'].includes(areaName)
+                ? 'doble'
+                : 'simple';
+              return {
+                areaName: item.area?.name || 'Sin nombre',
+                username: item.user?.username || '',
+                questions: item.area?.formQuestions || [],
+                formAnswers: item.answers.map((a: any) => ({
+                  accepted: a.accepted,
+                  altura_chip: a.altura_chip,
+                  apariencia_quemado: a.apariencia_quemado,
+                  carga_aplicacion: a.carga_aplicacion,
+                  codigo_barras: a.codigo_barras,
+                  color: a.color,
+                  color_edge: a.color_edge,
+                  color_foil: a.color_foil,
+                  color_personalizacion: a.color_personalizacion,
+                  finish_validation: a.finish_validation,
+                  holographic_type: a.holographic_type,
+                  imagen_holograma: a.imagen_holograma,
+                  localizacion_contactos: a.localizacion_contactos,
+                  magnetic_band: a.magnetic_band,
+                  revisar_posicion: a.revisar_posicion,
+                  revisar_tecnologia: a.revisar_tecnologia,
+                  sample_quantity: a.sample_quantity,
+                  testtype_cqm: a.testtype_cqm,
+                  prueba_over: a.prueba_over,
+                  prueba_cinta_magnetica: a.prueba_cinta_magnetica,
+                  prueba_centro: a.prueba_centro,
+                  tipo_personalizacion: a.tipo_personalizacion,
+                  track_type: a.track_type,
+                  validar_inlays: a.validar_inlays,
+                  validar_kvc: a.validar_kvc,
+                  validar_kvc_perso: a.validar_kvc_perso,
+                  valor_anclaje: a.valor_anclaje,
+                  verificar_etiqueta: a.verificar_etiqueta,
+                  verificar_script: a.verificar_script,
+                  created_at: a.created_at,
+                  reviewer: a.reviewer || [],
+                  FormAnswerResponse: a.FormAnswerResponse || [],
+                })),
+                mode,
+              };
+            }) || [];
 
         setVistosBuenosHistory(historyData);
 
-        // Procesamiento de áreas
+        // Áreas
         const areaData =
-          data?.flow?.map((item: any, index: number) => ({
+          data?.flow?.map((item: any) => ({
             id: item.area_id,
             name: item.area?.name || 'Sin nombre',
             status: item.status || 'Desconocido',
@@ -392,14 +626,14 @@ export default function SeguimientoDeOtsAuxPage({ params }: Props) {
               item.area_id,
               item.areaResponse,
               item.partialReleases,
-              item.user,
-              index
+              item.user
             ),
           })) || [];
+
         setAreas(areaData);
 
-        // Procesamiento de inconformidades
-        const allInconformities =
+        // Inconformidades (directas + parciales + auditorías)
+        const allInconformities: InconformityData[] =
           data?.flow?.flatMap((flowItem: any) => {
             const areaName = flowItem.area?.name || 'Área desconocida';
 
@@ -407,21 +641,36 @@ export default function SeguimientoDeOtsAuxPage({ params }: Props) {
               flowItem?.areaResponse?.inconformities?.map((inc: any) => ({
                 id: inc.id,
                 comments: inc.comments,
-                createdAt: inc.created_at,
-                createdBy: inc.user?.username || 'Desconocido',
+                createdAt: inc.created_at ?? inc.createdAt,
+                createdBy:
+                  inc.user?.username || inc.created_by || 'Desconocido',
                 area: areaName,
               })) || [];
 
             const partials =
-              flowItem?.partialReleases?.flatMap(
-                (release: any) =>
-                  release.inconformities?.map((inc: any) => ({
+              flowItem?.partialReleases?.flatMap((release: any) =>
+                (release?.inconformities || []).map((inc: any) => ({
+                  id: inc.id,
+                  comments: inc.comments,
+                  createdAt: inc.created_at ?? inc.createdAt,
+                  createdBy:
+                    inc.user?.username || inc.created_by || 'Desconocido',
+                  area: areaName,
+                }))
+              ) || [];
+
+            const partialsAuditory =
+              flowItem?.partialReleases?.flatMap((release: any) =>
+                (release?.formAuditory?.inconformities || []).map(
+                  (inc: any) => ({
                     id: inc.id,
                     comments: inc.comments,
-                    createdAt: inc.createdAt,
-                    createdBy: inc.createdBy,
+                    createdAt: inc.created_at ?? inc.createdAt,
+                    createdBy:
+                      inc.user?.username || inc.created_by || 'Desconocido',
                     area: areaName,
-                  })) || []
+                  })
+                )
               ) || [];
 
             const audits: InconformityData[] = [];
@@ -441,18 +690,18 @@ export default function SeguimientoDeOtsAuxPage({ params }: Props) {
               });
             }
 
-            return [...direct, ...partials, ...audits];
+            return [...direct, ...partials, ...partialsAuditory, ...audits];
           }) || [];
+
         setInconformities(allInconformities);
 
-        // Cálculo del progreso de áreas completadas
+        // Progreso
         const completedCount = areaData.filter(
           (a: any) => a.status === 'Completado'
         ).length;
         const percentage = (completedCount / areaData.length) * 100;
         setTimeout(() => setProgressWidth(percentage), 100);
       } finally {
-        // Terminamos el estado de carga
         setLoading(false);
       }
     };
@@ -460,339 +709,72 @@ export default function SeguimientoDeOtsAuxPage({ params }: Props) {
     loadData();
   }, [id]);
 
+  // ======================================================
+  // Derived totals / helpers
+  // ======================================================
+
   const areaColSpan = (area: AreaData) => {
     const base = Math.max(1, area.parciales || 0);
     const rem = area.parciales > 0 && getRemainder(area) > 0 ? 1 : 0;
     return area.parciales > 0 ? base + rem : 1;
   };
-  const handleChangeUser = async (
-    area: AreaData,
-    _partial: AreaData['partials'][number] | null,
-    newUserId: number
-  ) => {
-    const prevAreas = areas;
 
-    setAreas((prev) =>
-      prev.map((a) =>
-        a.id === area.id
-          ? {
-            ...a,
-            assigned_user_id: newUserId,
-            usuario: operatorById.get(newUserId) ?? a.usuario,
-          }
-          : a
-      )
-    );
-
-    try {
-      if (!area.flowId) throw new Error('Falta flowId del área');
-      await updateFlowAssignedUser(area.flowId, newUserId);
-    } catch (e) {
-      console.error(e);
-      setAreas(prevAreas);
-      alert('No se pudo actualizar el encargado. Se revirtieron los cambios.');
-    }
-  };
-
-  // Helpers
-  const getAnswerValue = (
-    ans: any,
-    field: 'defectuoso' | 'cqm' | 'muestras',
-    area: any
-  ) => {
-    switch (field) {
-      case 'cqm':
-        return ans?.sample_quantity ?? 0;
-      case 'muestras':
-        return ans?.sample_auditory ?? '—';
-      case 'defectuoso':
-        return (
-          area?.areaResponse?.impression?.bad_quantity ??
-          area?.areaResponse?.prepress?.bad_quantity ??
-          0
-        );
-      default:
-        return 0;
-    }
-  };
-
-  const handleCloseOrder = async () => {
-    try {
-      await closeWorkOrder(workOrder?.ot_id);
-      router.push('/seguimientoDeOts');
-    } catch (error) {
-      console.log('Error al enviar datos:', error);
-    }
-  };
-
-  const renderCell = (area: AreaData, field: NumericField) => {
-    // 1. Si la orden está cerrada, todo es lectura
-    if (workOrder?.status === 'Cerrado') {
-      return <span>{Number(area[field] ?? 0)}</span>;
-    }
-
-    // 2. Si el área no está en Completado, todo es lectura
-    if (area.status !== 'Completado') {
-      return <span>{Number(area[field] ?? 0)}</span>;
-    }
-
-    // 3. Preprensa: solo 'buenas' editable
-    if (area.id === 1) {
-      if (field === 'buenas') {
-        return (
-          <input
-            type="number"
-            value={Number(area[field] ?? 0)}
-            min={0}
-            onChange={(e) =>
-              handleValueChange(area.id, field as NumericField, e.target.value)
-            }
-            style={{
-              width: '80px',
-              padding: '4px',
-              textAlign: 'center',
-            }}
-          />
-        );
-      } else {
-        return <span>{Number(area[field] ?? 0)}</span>;
-      }
-    }
-
-    // 4. CQM solo editable de Impresión en adelante (id >=2)
-    if (field === 'cqm') {
-      if (area.id >= 2) {
-        return (
-          <input
-            type="number"
-            value={Number(area[field] ?? 0)}
-            min={0}
-            onChange={(e) =>
-              handleValueChange(area.id, field as NumericField, e.target.value)
-            }
-            style={{
-              width: '80px',
-              padding: '4px',
-              textAlign: 'center',
-            }}
-          />
-        );
-      } else {
-        return <span>{Number(area[field] ?? 0)}</span>;
-      }
-    }
-
-    // 5. Muestras solo editable de Corte en adelante (id >=6)
-    if (field === 'muestras' || field === 'defectuoso') {
-      if (area.id >= 6) {
-        return (
-          <input
-            type="number"
-            value={Number(area[field] ?? 0)}
-            min={0}
-            onChange={(e) =>
-              handleValueChange(area.id, field as NumericField, e.target.value)
-            }
-            style={{
-              width: '80px',
-              padding: '4px',
-              textAlign: 'center',
-            }}
-          />
-        );
-      } else {
-        return <span>{Number(area[field] ?? 0)}</span>;
-      }
-    }
-    if (field === 'malas') {
-      if (area.id >= 6) {
-        return (
-          <input
-            type="number"
-            value={getSumaMalasHasta(area.id)}
-            min={0}
-            onClick={handleOpenBadQuantityModal}
-            readOnly
-            style={{
-              width: '80px',
-              padding: '4px',
-              textAlign: 'center',
-              cursor: 'pointer',
-              backgroundColor: '#f9f9f9',
-            }}
-          />
-        );
-      } else {
-        return (
-          <input
-            type="number"
-            value={area[field]}
-            min={0}
-            onChange={(e) =>
-              handleValueChange(area.id, field as NumericField, e.target.value)
-            }
-            style={{
-              width: '80px',
-              padding: '4px',
-              textAlign: 'center',
-            }}
-          />
-        );
-      }
-    }
-
-    // 6. El resto de campos (buenas, malas, noprocess) editables si el área está en Completado
-    return (
-      <input
-        type="number"
-        value={area[field]}
-        min={0}
-        onChange={(e) =>
-          handleValueChange(area.id, field as NumericField, e.target.value)
-        }
-        style={{
-          width: '80px',
-          padding: '4px',
-          textAlign: 'center',
-        }}
-      />
-    );
-  };
-
-  const getSumaMalasHasta = (areaId: number): number => {
-    return areas
+  const getSumaMalasHasta = (areaId: number): number =>
+    areas
       .filter((a) => a.id <= areaId)
       .reduce((sum, a) => sum + (a.malas || 0), 0);
-  };
 
   const handleOpenBadQuantityModal = () => {
     const initialValues: { [key: string]: string } = {};
-
     areas.forEach((area) => {
       const areaKey = area.name.toLowerCase().replace(/\s/g, '');
-
       initialValues[`${areaKey}_bad`] = area.malas?.toString() || '0';
-      if (area.id >= 6) {
+      if (area.id >= 6)
         initialValues[`${areaKey}_material`] =
           area.defectuoso?.toString() || '0';
-      }
     });
-
     setAreaBadQuantities(initialValues);
     setShowBadQuantity(true);
   };
 
-  // Función para obtener los datos específicos de cada área
-  // Ahora acepta partialReleases como argumento externo
-  const getAreaData = (
-    areaId: number,
-    areaResponse: any,
-    partialReleases: any[] = [],
-    flowUser: any = null,
-    index: number = -1
-  ) => {
-    const parciales = partialReleases.length;
-    const parcialesValidados = partialReleases.filter(
-      (p) => p?.validated
-    ).length;
+  const getAreaSumaTotal = (area: AreaData) => {
+    let buenas = Number(area.buenas ?? 0);
+    let malas = Number(area.malas ?? 0);
+    let excedente = Number(area.excedente ?? 0);
+    let noprocess = Number(area.noprocess ?? 0);
+    let defectuoso = Number(area.defectuoso ?? 0);
+    let cqm = Number(area.cqm ?? 0);
+    let muestras = Number(area.muestras ?? 0);
 
-    const sumFromPartials = () => {
-      return partialReleases.reduce(
-        (acc: any, curr: any) => {
-          acc.buenas += curr.quantity || 0;
-          acc.malas += curr.bad_quantity || 0;
-          acc.excedente += curr.excess_quantity || 0;
-          acc.noprocess += curr.noprocess_quantity || 0;
-          acc.defectuoso += curr.material_quantity || 0;
+    if (area.partials?.length) {
+      const sums = area.partials.reduce(
+        (acc, p) => {
+          acc.buenas += Number(p?.quantity ?? 0);
+          acc.muestras += Number(p?.formAuditory?.sample_auditory ?? 0);
           return acc;
         },
-        { buenas: 0, malas: 0, excedente: 0, noprocess: 0, defectuoso: 0 }
+        { buenas: 0, muestras: 0 }
       );
-    };
 
-    const getCommonData = (areaKey: string) => {
-      const hasResponse = !!areaResponse?.[areaKey];
-      const usuario = areaResponse?.user?.username || flowUser?.username || '';
-      const auditor =
-        areaResponse?.[areaKey]?.formAuditory?.user?.username || '';
+      const rem = getRemainder(area);
+      buenas = sums.buenas + rem;
 
-      if (!hasResponse && parciales > 0) {
-        const resumen = sumFromPartials();
-        console.log('[PARCIAL DETECTADO]', areaKey, resumen);
-        return {
-          ...resumen,
-          cqm: 0,
-          muestras: 0,
-          usuario,
-          auditor,
-          parciales,
-          parcialesValidados,
-          partials: partialReleases,
-        };
-      }
+      const answersCqm = (area.answers ?? []).reduce(
+        (s, a) => s + Number(a?.sample_quantity ?? 0),
+        0
+      );
+      cqm = answersCqm;
 
-      return {
-        buenas:
-          areaResponse?.[areaKey]?.good_quantity ||
-          areaResponse?.[areaKey]?.release_quantity ||
-          areaResponse?.[areaKey]?.plates ||
-          0,
-        malas: areaResponse?.[areaKey]?.bad_quantity || 0,
-        excedente: areaResponse?.[areaKey]?.excess_quantity || 0,
-        noprocess: areaResponse?.[areaKey]?.noprocess_quantity || 0,
-        defectuoso: areaResponse?.[areaKey]?.material_quantity || 0,
-        cqm: areaResponse?.[areaKey]?.form_answer?.sample_quantity ?? 0,
-        muestras: areaResponse?.[areaKey]?.formAuditory?.sample_auditory ?? 0,
-        usuario,
-        auditor,
-        parciales,
-        parcialesValidados,
-        partials: partialReleases,
-      };
-    };
-
-    switch (areaId) {
-      case 1:
-        return getCommonData('prepress');
-      case 2:
-        return getCommonData('impression');
-      case 3:
-        return getCommonData('serigrafia');
-      case 4:
-        return getCommonData('empalme');
-      case 5:
-        return getCommonData('laminacion');
-      case 6:
-        return getCommonData('corte');
-      case 7:
-        return getCommonData('colorEdge');
-      case 8:
-        return getCommonData('hotStamping');
-      case 9:
-        return getCommonData('millingChip');
-      case 10:
-        return getCommonData('personalizacion');
-      default:
-        return {
-          buenas: 0,
-          malas: 0,
-          excedente: 0,
-          noprocess: 0,
-          defectuoso: 0,
-          cqm: 0,
-          muestras: 0,
-          usuario: '',
-          auditor: '',
-          parciales: 0,
-          parcialesValidados: 0,
-          partials: [],
-        };
+      muestras = Number(area.muestras ?? 0) + sums.muestras;
     }
+
+    return buenas + malas + excedente + noprocess + defectuoso + cqm + muestras;
   };
 
   const cantidadHojasRaw = Number(workOrder?.quantity) / 24;
   const cantidadHojas = cantidadHojasRaw > 0 ? Math.ceil(cantidadHojasRaw) : 0;
   const totalSheetsEffective = workOrder?.total_sheets ?? cantidadHojas;
+
   const ultimaArea = areas[areas.length - 1];
   const totalMalas = areas.reduce((acc, area) => acc + (area.malas || 0), 0);
   const totalDefectuoso = areas.reduce(
@@ -818,6 +800,177 @@ export default function SeguimientoDeOtsAuxPage({ params }: Props) {
     totalDefectuoso +
     totalCqm +
     totalMuestras;
+
+  const getAnswerValue = (
+    ans: any,
+    field: 'defectuoso' | 'cqm' | 'muestras',
+    area: any
+  ) => {
+    switch (field) {
+      case 'cqm':
+        return ans?.sample_quantity ?? 0;
+      case 'muestras':
+        return ans?.sample_auditory ?? '—';
+      case 'defectuoso':
+        return (
+          area?.areaResponse?.impression?.bad_quantity ??
+          area?.areaResponse?.prepress?.bad_quantity ??
+          0
+        );
+      default:
+        return 0;
+    }
+  };
+
+  // ======================================================
+  // Actions
+  // ======================================================
+
+  useEffect(() => {
+    const alreadyReloaded = sessionStorage.getItem('alreadyReloaded');
+    if (!alreadyReloaded) {
+      sessionStorage.setItem('alreadyReloaded', 'true');
+      window.location.reload();
+    }
+  }, []);
+  console.log(vistosBuenosHistory);
+
+  const handleChangeUser = async (
+    area: AreaData,
+    _partial: AreaData['partials'][number] | null,
+    newUserId: number
+  ) => {
+    const prevAreas = areas;
+
+    setAreas((prev) =>
+      prev.map((a) =>
+        a.id === area.id
+          ? {
+              ...a,
+              assigned_user_id: newUserId,
+              usuario: operatorById.get(newUserId) ?? a.usuario,
+            }
+          : a
+      )
+    );
+
+    try {
+      if (!area.flowId) throw new Error('Falta flowId del área');
+      await updateFlowAssignedUser(area.flowId, newUserId);
+    } catch (e) {
+      setAreas(prevAreas);
+      alert('No se pudo actualizar el encargado. Se revirtieron los cambios.');
+    }
+  };
+
+  const handleCloseOrder = async () => {
+    try {
+      await closeWorkOrder(workOrder?.ot_id);
+      router.push('/seguimientoDeOts');
+    } catch (error) {
+      console.log('Error al enviar datos:', error);
+    }
+  };
+
+  const renderCell = (area: AreaData, field: NumericField) => {
+    // 1. OT cerrada → lectura
+    if (workOrder?.status === 'Cerrado')
+      return <span>{Number(area[field] ?? 0)}</span>;
+
+    // 2. Área no completada → lectura
+    if (area.status !== 'Completado')
+      return <span>{Number(area[field] ?? 0)}</span>;
+
+    // 3. Preprensa → solo 'buenas' editable
+    if (area.id === 1) {
+      if (field === 'buenas') {
+        return (
+          <input
+            type="number"
+            value={Number(area[field] ?? 0)}
+            min={0}
+            onChange={(e) => handleValueChange(area.id, field, e.target.value)}
+            style={{ width: '80px', padding: '4px', textAlign: 'center' }}
+          />
+        );
+      }
+      return <span>{Number(area[field] ?? 0)}</span>;
+    }
+
+    // 4. CQM editable desde Impresión (id >= 2)
+    if (field === 'cqm') {
+      if (area.id >= 2) {
+        return (
+          <input
+            type="number"
+            value={Number(area[field] ?? 0)}
+            min={0}
+            onChange={(e) => handleValueChange(area.id, field, e.target.value)}
+            style={{ width: '80px', padding: '4px', textAlign: 'center' }}
+          />
+        );
+      }
+      return <span>{Number(area[field] ?? 0)}</span>;
+    }
+
+    // 5. Muestras y Defectuoso editables desde Corte (id >= 6)
+    if (field === 'muestras' || field === 'defectuoso') {
+      if (area.id >= 6) {
+        return (
+          <input
+            type="number"
+            value={Number(area[field] ?? 0)}
+            min={0}
+            onChange={(e) => handleValueChange(area.id, field, e.target.value)}
+            style={{ width: '80px', padding: '4px', textAlign: 'center' }}
+          />
+        );
+      }
+      return <span>{Number(area[field] ?? 0)}</span>;
+    }
+
+    // 6. Malas: desde Corte en adelante se gestiona via modal acumulado
+    if (field === 'malas') {
+      if (area.id >= 6) {
+        return (
+          <input
+            type="number"
+            value={getSumaMalasHasta(area.id)}
+            min={0}
+            onClick={handleOpenBadQuantityModal}
+            readOnly
+            style={{
+              width: '80px',
+              padding: '4px',
+              textAlign: 'center',
+              cursor: 'pointer',
+              backgroundColor: '#f9f9f9',
+            }}
+          />
+        );
+      }
+      return (
+        <input
+          type="number"
+          value={area[field]}
+          min={0}
+          onChange={(e) => handleValueChange(area.id, field, e.target.value)}
+          style={{ width: '80px', padding: '4px', textAlign: 'center' }}
+        />
+      );
+    }
+
+    // 7. Resto de campos editables si área = Completado
+    return (
+      <input
+        type="number"
+        value={area[field]}
+        min={0}
+        onChange={(e) => handleValueChange(area.id, field, e.target.value)}
+        style={{ width: '80px', padding: '4px', textAlign: 'center' }}
+      />
+    );
+  };
 
   const handleValueChange = (
     areaId: number,
@@ -853,6 +1006,7 @@ export default function SeguimientoDeOtsAuxPage({ params }: Props) {
 
           const normalizedName = updated.name.toLowerCase().replace(/\s/g, '');
           const block = blockMap[normalizedName] || 'otros';
+
           const blockId = (updated.response as any)?.[block]?.id;
           const formId = (updated.response as any)?.[block]?.form_auditory_id;
           const cqmId = (updated.response as any)?.[block]?.form_answer_id;
@@ -913,33 +1067,49 @@ export default function SeguimientoDeOtsAuxPage({ params }: Props) {
     }
   };
 
-  const getStatusStyle = (status: string) => {
-    switch (status) {
-      case 'Completado':
-        return 'bg-green-100 text-green-800';
-      case 'Pendiente':
-        return 'bg-yellow-100 text-yellow-800';
-      case 'En proceso':
-        return 'bg-blue-100 text-blue-800';
-      case 'Listo':
-      case 'En calidad':
-      case 'Enviado a CQM':
-        return 'bg-yellow-100 text-yellow-800';
-      case 'Enviado a Auditoria':
-        return 'bg-purple-100 text-purple-800';
-      case 'Parcial':
-        return 'bg-orange-100 text-orange-800';
-      default:
-        return 'bg-gray-100 text-gray-800';
+  const downloadFile = async (filename: string) => {
+    try {
+      const arrayBuffer = await getFileByName(filename);
+      const mime = guessMimeFromName(filename);
+      const blob = new Blob([arrayBuffer], { type: mime });
+      const url = window.URL.createObjectURL(blob);
+      window.open(url, '_blank');
+      setTimeout(() => window.URL.revokeObjectURL(url), 5000);
+    } catch (error) {
+      console.error('Error al abrir el archivo:', error);
     }
   };
 
-  const filteredAreas = areas.filter(
-    (area) =>
-      area.status === 'Completado' && area.name.toLowerCase() !== 'preprensa'
-  );
+  const canEditUser = (
+    area: AreaData,
+    partial?: AreaData['partials'][number] | null
+  ) => {
+    if (workOrder?.status === 'Cerrado') return false;
 
-  // justo antes de tu return principal
+    const editableStatuses = [
+      'En proceso',
+      'Parcial',
+      'Enviado a CQM',
+      'Listo',
+      'En inconformidad',
+      'En inconformidad CQM',
+    ];
+
+    if (partial)
+      return !partial.validated && editableStatuses.includes(area.status);
+    return editableStatuses.includes(area.status);
+  };
+
+  const fieldLabels: Record<string, string> = {
+    buenas: 'Buenas',
+    malas: 'Malas',
+    excedente: 'Excedente',
+    noprocess: 'Sin procesar',
+  };
+
+  // ======================================================
+  // UI Guards
+  // ======================================================
 
   if (loading) {
     return (
@@ -952,7 +1122,6 @@ export default function SeguimientoDeOtsAuxPage({ params }: Props) {
     );
   }
 
-  // sólo comprobamos workOrder, no areas
   if (!workOrder) {
     return (
       <Container>
@@ -960,69 +1129,19 @@ export default function SeguimientoDeOtsAuxPage({ params }: Props) {
       </Container>
     );
   }
-  const guessMimeFromName = (filename: string): string => {
-    const ext = filename.split('.').pop()?.toLowerCase();
-    switch (ext) {
-      case 'pdf':
-        return 'application/pdf';
-      case 'png':
-        return 'image/png';
-      case 'jpg':
-      case 'jpeg':
-        return 'image/jpeg';
-      case 'webp':
-        return 'image/webp';
-      default:
-        return 'application/octet-stream';
-    }
-  };
 
-  const downloadFile = async (filename: string) => {
-    try {
-      const arrayBuffer = await getFileByName(filename); // <- ya la tienes
-      const mime = guessMimeFromName(filename);
-      const blob = new Blob([arrayBuffer], { type: mime });
-      const url = window.URL.createObjectURL(blob);
+  const totalCols = areas.reduce(
+    (sum, area) => sum + (area.parciales > 0 ? area.parciales : 1),
+    0
+  );
+  const filteredAreas = areas.filter(
+    (area) =>
+      area.status === 'Completado' && area.name.toLowerCase() !== 'preprensa'
+  );
 
-      // abre en nueva pestaña (sirve para PDF e imágenes)
-      window.open(url, '_blank');
-
-      // liberar URL luego
-      setTimeout(() => window.URL.revokeObjectURL(url), 5000);
-    } catch (error) {
-      console.error('Error al abrir el archivo:', error);
-    }
-  };
-
-  // pasar al return normal sin más guards globales
-  const totalCols = areas.reduce((sum, area) => {
-    return sum + (area.parciales > 0 ? area.parciales : 1);
-  }, 0);
-
-  const canEditUser = (
-    area: AreaData,
-    partial?: AreaData['partials'][number] | null
-  ) => {
-    // bloquea si la OT completa está cerrada
-    if (workOrder?.status === 'Cerrado') return false;
-
-    // con parciales: solo si el parcial NO está validado y el área está "En proceso"
-    if (partial)
-      return (
-        !partial.validated &&
-        ['En proceso', 'Parcial', 'Enviado a CQM', 'Listo', 'En inconformidad', 'En inconformidad CQM' /*, 'Otro estado'*/].includes(area.status)
-      );
-
-    // sin parciales: solo si el área está "En proceso"
-    return ['En proceso', 'Parcial', 'Enviado a CQM', 'Listo', 'En inconformidad', 'En inconformidad CQM'/*, 'Otro estado'*/].includes(area.status);
-  };
-
-  const fieldLabels: Record<string, string> = {
-    buenas: "Buenas",
-    malas: "Malas",
-    excedente: "Excedente",
-    noprocess: "Sin procesar",
-  };
+  // ======================================================
+  // Render
+  // ======================================================
 
   return (
     <>
@@ -1139,6 +1258,41 @@ export default function SeguimientoDeOtsAuxPage({ params }: Props) {
               )}
             </CardContent>
           </Card>
+          <Card>
+            <CardContent>
+              <p className="text-sm text-muted-foreground text-black">
+                Evidencias de destrucción
+              </p>
+
+              {workOrder?.files?.some(
+                (f: any) => f.type === 'DESTRUCTION_EVIDENCE'
+              ) ? (
+                <div className="flex gap-3 m-2">
+                  {workOrder.files
+                    .filter((file: any) => file.type === 'DESTRUCTION_EVIDENCE')
+                    .map((file: any, idx: number) => (
+                      <button
+                        key={file.id ?? `evidence-${idx}`}
+                        onClick={() => downloadFile(file.file_path)}
+                        className="flex-row items-center
+                        rounded-xl border border-gray-200
+                        bg-white px-4 py-2 text-sm font-medium text-gray-700
+                        shadow-sm transition
+                        hover:bg-gray-50 hover:shadow-md
+                        focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-1
+                        active:scale-[0.98]"
+                      >
+                        {`Ver Evidencia ${idx + 1}`}
+                      </button>
+                    ))}
+                </div>
+              ) : (
+                <p className="text-xl font-semibold text-black">
+                  No hay evidencias adjuntas
+                </p>
+              )}
+            </CardContent>
+          </Card>
         </div>
         {areas.length > 0 && (
           <ProgressBarAreas areas={areas} progressWidth={progressWidth} />
@@ -1160,7 +1314,8 @@ export default function SeguimientoDeOtsAuxPage({ params }: Props) {
                         className="p-3 text-center font-semibold align-bottom"
                         colSpan={areaColSpan(area)} // antes: Math.max(1, area.parciales)
                       >
-                        {area.name}{' '}{area.isCollator && area.id === 4 ? '(C)' : ''}
+                        {area.name}{' '}
+                        {area.isCollator && area.id === 4 ? '(C)' : ''}
                         <div className="text-[0.65rem] text-gray-400 mt-1">
                           {area.status}
                         </div>
@@ -1223,12 +1378,12 @@ export default function SeguimientoDeOtsAuxPage({ params }: Props) {
                         <td
                           key={`${area.id}-encargado-${index}`}
                           className="text-center"
-                          colSpan={areaColSpan(area)} // 👈 cubre todos los parciales de esa área
+                          colSpan={areaColSpan(area)}
                         >
                           {editable ? (
                             <button
                               className="border rounded px-2 py-1 hover:bg-gray-50"
-                              onClick={() => openOperatorModal(area, null)} // 👈 SOLO reasigna el flow
+                              onClick={() => openOperatorModal(area, null)}
                               title="Cambiar encargado del remanente"
                             >
                               {currentAssignedName}
@@ -1320,10 +1475,11 @@ export default function SeguimientoDeOtsAuxPage({ params }: Props) {
                             }
                           >
                             <span
-                              className={`px-2 py-1 rounded-lg text-sm font-medium ${name && name !== '—'
-                                ? 'bg-yellow-100 text-yellow-800' // badge “Calidad”
-                                : '' // badge vacío
-                                }`}
+                              className={`px-2 py-1 rounded-lg text-sm font-medium ${
+                                name && name !== '—'
+                                  ? 'bg-yellow-100 text-yellow-800' // badge “Calidad”
+                                  : '' // badge vacío
+                              }`}
                             >
                               {name || '—'}
                             </span>
@@ -1341,10 +1497,11 @@ export default function SeguimientoDeOtsAuxPage({ params }: Props) {
                           className="text-center"
                         >
                           <span
-                            className={`px-2 py-1 rounded-lg text-sm font-medium ${reviewerName && reviewerName !== '—'
-                              ? 'bg-yellow-100 text-yellow-800'
-                              : ''
-                              }`}
+                            className={`px-2 py-1 rounded-lg text-sm font-medium ${
+                              reviewerName && reviewerName !== '—'
+                                ? 'bg-yellow-100 text-yellow-800'
+                                : ''
+                            }`}
                           >
                             {reviewerName || '—'}
                           </span>
@@ -1356,15 +1513,53 @@ export default function SeguimientoDeOtsAuxPage({ params }: Props) {
                   {/* Auditor */}
                   <tr>
                     <td className="p-3 font-semibold">Auditor</td>
-                    {areas.map((area, index) => (
-                      <td
-                        key={`${area.id}-auditor-${index}`}
-                        className="text-center"
-                        colSpan={areaColSpan(area)} // 👈 clave
-                      >
-                        {area.auditor}
-                      </td>
-                    ))}
+                    {areas.flatMap((area, aIdx) => {
+                      if (area.parciales > 0) {
+                        const reviewers = getPerPartialAuditors(area);
+                        return reviewers.map((name, i) => (
+                          <td
+                            key={`cell-area-${area.id}-partial-${i}-auditor`}
+                            className="text-center"
+                            title={
+                              i >= area.parciales
+                                ? 'Remanente'
+                                : `Parcial ${i + 1}`
+                            }
+                          >
+                            <span
+                              className={`px-2 py-1 rounded-lg text-sm font-medium ${
+                                name && name !== '—'
+                                  ? 'bg-purple-100 text-purple-800' // badge “Calidad”
+                                  : '' // badge vacío
+                              }`}
+                            >
+                              {name || '-'}
+                            </span>
+                          </td>
+                        ));
+                      }
+
+                      const auditor = getLastAuditor(area); // MiniAud | null
+                      const auditorName = auditor?.username ?? '—'; // <- normalizas a string
+                      console.log('LastNas auditorName', auditorName);
+
+                      return (
+                        <td
+                          key={`cell-area-${area.id}-auditor-${aIdx}`}
+                          className="text-center"
+                        >
+                          <span
+                            className={`px-2 py-1 rounded-lg text-sm font-medium ${
+                              auditorName !== '—'
+                                ? 'bg-purple-100 text-purple-800'
+                                : ''
+                            }`}
+                          >
+                            {auditorName}
+                          </span>
+                        </td>
+                      );
+                    })}
                   </tr>
 
                   {/* Estado con Badge visual */}
@@ -1374,7 +1569,7 @@ export default function SeguimientoDeOtsAuxPage({ params }: Props) {
                       <td
                         key={`${area.id}-status-${index}`}
                         className="text-center"
-                        colSpan={areaColSpan(area)} // 👈 clave
+                        colSpan={areaColSpan(area)}
                       >
                         <span
                           className={`px-2 py-1 rounded-lg text-sm font-medium ${getStatusStyle(
@@ -1396,38 +1591,67 @@ export default function SeguimientoDeOtsAuxPage({ params }: Props) {
                       📥 Producción
                     </td>
                   </tr>
-                  {['buenas', 'malas', 'excedente', 'noprocess'].map(
+                  {(['buenas', 'malas', 'excedente', 'noprocess'] as const).map(
                     (field) => (
                       <tr key={field}>
                         <td className="p-3 capitalize font-semibold">
                           {fieldLabels[field]}
                         </td>
-                        {/* Por cada área, creamos tantas celdas como parciales (o 1 si no hay) */}
-                        {areas.flatMap((area, aIndex) => {
-                          // Si hay parciales, pintamos cada parcial como una columna
-                          if (area.parciales > 0 && area.partials?.length) {
-                            const cells = area.partials.map((p, pIndex) => {
-                              const value =
-                                field === 'buenas'
-                                  ? p.quantity
-                                  : field === 'malas'
-                                    ? p.bad_quantity ?? 0
-                                    : field === 'excedente' ? p.excess_quantity ?? 0
-                                      : p.noprocess_quantity ?? '';
-                              return (
-                                <td
-                                  key={`area-${area.id}-parcial-${p.id}-${field}-${pIndex}`}
-                                  className="text-center"
-                                >
-                                  {value}
-                                </td>
-                              );
-                            });
 
-                            // Columna de REMANENTE solo si hay resto > 0
+                        {areas.flatMap((area, aIndex) => {
+                          if (area.parciales > 0 && area.partials?.length) {
+                            const cells: React.ReactNode[] = area.partials.map(
+                              (p, pIndex) => {
+                                const value =
+                                  field === 'buenas'
+                                    ? toNum(p.quantity)
+                                    : field === 'malas'
+                                    ? toNum(p.bad_quantity)
+                                    : field === 'excedente'
+                                    ? toNum(p.excess_quantity)
+                                    : toNum(p.noprocess_quantity);
+                                return (
+                                  <td
+                                    key={`area-${area.id}-parcial-${
+                                      p.id ?? pIndex
+                                    }-${field}`}
+                                    className="text-center"
+                                  >
+                                    {value}
+                                  </td>
+                                );
+                              }
+                            );
+
                             const rem = getRemainder(area);
                             if (rem > 0) {
-                              const remValue = field === 'buenas' ? rem : 0; // por defecto 0 para malas/excedente
+                              let remValue = 0;
+                              switch (field) {
+                                case 'buenas':
+                                  remValue = getRemainderByField(
+                                    area,
+                                    'buenas'
+                                  );
+                                  break;
+                                case 'excedente':
+                                  remValue = getRemainderByField(
+                                    area,
+                                    'excedente'
+                                  );
+                                  break;
+                                case 'noprocess':
+                                  remValue = getRemainderByField(
+                                    area,
+                                    'noprocess'
+                                  );
+                                  break;
+                                case 'malas':
+                                  remValue = getRemainderByField(area, 'malas');
+                                  break;
+                                default:
+                                  remValue = 0;
+                              }
+
                               cells.push(
                                 <td
                                   key={`area-${area.id}-parcial-rem-${field}`}
@@ -1438,18 +1662,16 @@ export default function SeguimientoDeOtsAuxPage({ params }: Props) {
                                 </td>
                               );
                             }
+
                             return cells;
                           }
 
-                          // Si NO hay parciales, dejamos una sola celda (Total del área)
-                          const totalValue =
-                            renderCell(area, field as NumericField) || 0;
                           return (
                             <td
                               key={`area-${area.id}-no-parciales-${field}-${aIndex}`}
                               className="text-center"
                             >
-                              {totalValue}
+                              {renderCell(area, field)}
                             </td>
                           );
                         })}
@@ -1476,14 +1698,13 @@ export default function SeguimientoDeOtsAuxPage({ params }: Props) {
 
                       {areas.flatMap((area, aIdx) => {
                         if (area.parciales > 0) {
-                          // ✅ AHORA llenamos cada parcial y (si existe) REM con datos reales
                           const vals =
                             field === 'cqm'
-                              ? getPerPartialCqm(area) // ✅ sin fallback para Rem
+                              ? getPerPartialCqm(area)
                               : getPerPartialValues(
-                                area,
-                                field as 'defectuoso' | 'muestras'
-                              );
+                                  area,
+                                  field as 'defectuoso' | 'muestras'
+                                );
                           return vals.map((v, i) => (
                             <td
                               key={`cell-area-${area.id}-parcial-${i}-${field}`}
@@ -1499,12 +1720,11 @@ export default function SeguimientoDeOtsAuxPage({ params }: Props) {
                           ));
                         }
 
-                        // Sin parciales → comportamiento anterior (una sola celda)
                         const totalValue =
                           field === 'cqm'
-                            ? getSingleCqm(area) // ✅ ahora toma el sample_quantity del último answer
+                            ? getSingleCqm(area)
                             : renderCell?.(area, field as any) ??
-                            getAnswerValue(undefined, field as any, area);
+                              getAnswerValue(undefined, field as any, area);
 
                         return (
                           <td
@@ -1527,13 +1747,7 @@ export default function SeguimientoDeOtsAuxPage({ params }: Props) {
                         className="text-center"
                         colSpan={areaColSpan(area)}
                       >
-                        {area.buenas +
-                          area.malas +
-                          area.excedente +
-                          area.noprocess +
-                          area.defectuoso +
-                          area.cqm +
-                          area.muestras}
+                        {getAreaSumaTotal(area)}
                       </td>
                     ))}
                   </tr>
@@ -1558,16 +1772,27 @@ export default function SeguimientoDeOtsAuxPage({ params }: Props) {
                     <td className="p-3">🔍 Auditoría</td>
                     {areas.map((area, index) => {
                       const ps = area.partials ?? [];
-                      const totalQty = ps.reduce((s:any, p:any) => s + (Number(p?.quantity) || 0), 0);
-                      const totalRel = ps.reduce((s:any, p:any) => s + (Number(p?.release_quantity) || 0), 0);
+                      const totalQty = ps.reduce(
+                        (s: any, p: any) => s + (Number(p?.quantity) || 0),
+                        0
+                      );
+                      const totalRel = ps.reduce(
+                        (s: any, p: any) =>
+                          s + (Number(p?.release_quantity) || 0),
+                        0
+                      );
                       const restante = totalQty - totalRel;
-                      return (<td
-                        key={`${area.id}-b+e-${index}`}
-                        className="text-center"
-                        colSpan={areaColSpan(area)} // 👈 clave
-                      >
-                        {(index === (areas.length - 1) && area.parciales > 0) ? restante : ''}
-                      </td>)
+                      return (
+                        <td
+                          key={`${area.id}-b+e-${index}`}
+                          className="text-center"
+                          colSpan={areaColSpan(area)} // 👈 clave
+                        >
+                          {index === areas.length - 1 && area.parciales > 0
+                            ? restante
+                            : ''}
+                        </td>
+                      );
                     })}
                   </tr>
                 </tbody>
@@ -1628,19 +1853,21 @@ export default function SeguimientoDeOtsAuxPage({ params }: Props) {
             </>
           )}
           <PartialHistory
-          workOrder={workOrder}
+            workOrder={workOrder}
+            partialSectionOpen={partialSectionOpen}
+            togglePartialSection={() => setPartialSectionOpen((s) => !s)}
+            areaTotalsByAreaId={areaTotalsByAreaId}
           />
           <VistosBuenosHistory
             history={vistosBuenosHistory}
             qualitySectionOpen={qualitySectionOpen}
-            toggleQualitySection={toggleQualitySection}
+            toggleQualitySection={() => setQualitySectionOpen((s) => !s)}
           />
           <InconformitiesHistory
             inconformities={inconformities}
             qualitySectionOpen={inconformitySectionOpen}
-            toggleQualitySection={toggleInconformitySection}
+            toggleQualitySection={() => setInconformitySectionOpen((s) => !s)}
           />
-
           {opModal.open && (
             <ModalOverlay>
               <ModalBox>
@@ -1676,8 +1903,9 @@ export default function SeguimientoDeOtsAuxPage({ params }: Props) {
                           onClick={() =>
                             setOpModal((s) => ({ ...s, selectedUserId: u.id }))
                           }
-                          className={`w-full text-left px-3 py-2 border-b last:border-b-0 ${selected ? 'bg-blue-100' : 'hover:bg-gray-50'
-                            }`}
+                          className={`w-full text-left px-3 py-2 border-b last:border-b-0 ${
+                            selected ? 'bg-blue-100' : 'hover:bg-gray-50'
+                          }`}
                         >
                           {u.username}
                         </button>
@@ -1700,7 +1928,6 @@ export default function SeguimientoDeOtsAuxPage({ params }: Props) {
               </ModalBox>
             </ModalOverlay>
           )}
-
           {workOrder?.status !== 'Cerrado' && (
             <>
               <SaveButton onClick={() => handleSaveChanges(areas)}>
@@ -1905,3 +2132,27 @@ const CancelButton = styled.button`
     outline: none;
   }
 `;
+// ========================================================
+// Local helpers (non-visual)
+// ========================================================
+
+function getStatusStyle(status: string) {
+  switch (status) {
+    case 'Completado':
+      return 'bg-green-100 text-green-800';
+    case 'Pendiente':
+      return 'bg-yellow-100 text-yellow-800';
+    case 'En proceso':
+      return 'bg-blue-100 text-blue-800';
+    case 'Listo':
+    case 'En calidad':
+    case 'Enviado a CQM':
+      return 'bg-yellow-100 text-yellow-800';
+    case 'Enviado a Auditoria':
+      return 'bg-purple-100 text-purple-800';
+    case 'Parcial':
+      return 'bg-orange-100 text-orange-800';
+    default:
+      return 'bg-gray-100 text-gray-800';
+  }
+}

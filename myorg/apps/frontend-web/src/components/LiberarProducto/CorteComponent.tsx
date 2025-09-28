@@ -475,50 +475,64 @@ export default function CorteComponent({ workOrder }: Props) {
   );
 
   const handleSaveChanges = async () => {
+    const toInt = (v: any) => {
+      const n = parseInt(String(v ?? '0').trim(), 10);
+      return Number.isFinite(n) ? n : 0;
+    };
+  
     const payload = {
       areas: previousFlows.flatMap((flow) => {
         const areaKey = flow.area.name.toLowerCase().replace(/\s/g, '');
-
+  
         const blockMap: Record<string, string> = {
           impresion: 'impression',
           serigrafia: 'serigrafia',
           empalme: 'empalme',
           laminacion: 'laminacion',
+          // corte: 'corte', // 👈 NO lo usamos aquí; corte se manda en handleCorteSubmit
         };
-
+  
         const block = blockMap[areaKey] || 'otros';
-        if (block === 'otros') return [] as any;
-
+  
+        // ⛔️ No mandes nada si el área no es de las soportadas o si es Corte
+        if (block === 'otros' || areaKey === 'corte') return [];
+  
         const blockData = flow.areaResponse?.[block];
-        const blockId = blockData?.id || null;
-        const formId = blockData?.form_auditory_id || null;
-        const cqmId = blockData?.form_answer_id || null;
-
+  
+        // 🔒 Si no existe registro en BD para ese bloque (sin id), NO lo envíes (evita 400)
+        if (!blockData?.id) return [];
+  
         const badKey = `${areaKey}_bad`;
         const materialKey = `${areaKey}_material`;
-
-        const bad_quantity = Number(areaBadQuantities[badKey] || 0);
+  
+        const bad_quantity = toInt(areaBadQuantities[badKey]);
         const material_quantity =
-          flow.area.id > 6
-            ? Number(areaBadQuantities[materialKey] || 0)
-            : undefined;
-
-        return {
+          flow.area.id > 6 ? toInt(areaBadQuantities[materialKey]) : undefined;
+  
+        // ✅ Enviamos aunque los números sean 0; el backend ya tiene el bloque creado (id)
+        return [{
           areaId: flow.area_id,
           block,
-          blockId,
-          formId,
-          cqmId,
+          blockId: blockData.id,
+          formId: blockData.form_auditory_id ?? null,
+          cqmId: blockData.form_answer_id ?? null,
           data: {
             bad_quantity,
             ...(material_quantity !== undefined && { material_quantity }),
           },
-        };
+        }];
       }),
     };
-
+  
+    if (!payload.areas.length) {
+      alert('No hay cambios para guardar.');
+      return;
+    }
+  
     try {
       await updateWorkOrderAreas(workOrder.workOrder.ot_id, payload);
+  
+      // Refresca estado local SOLO con lo enviado
       setFlowListState((prev) => {
         const byArea = new Map(payload.areas.map((a: any) => [a.areaId, a]));
         return prev.map((f) => {
@@ -529,8 +543,7 @@ export default function CorteComponent({ workOrder }: Props) {
           const existingBlock = newAreaResponse[upd.block] ?? {};
           newAreaResponse[upd.block] = {
             ...existingBlock,
-            ...upd.data, // bad_quantity y (opcional) material_quantity
-            // Conserva ids si los tenías
+            ...upd.data,
             id: upd.blockId ?? existingBlock.id ?? null,
             form_auditory_id: upd.formId ?? existingBlock.form_auditory_id ?? null,
             form_answer_id: upd.cqmId ?? existingBlock.form_answer_id ?? null,
@@ -539,6 +552,7 @@ export default function CorteComponent({ workOrder }: Props) {
           return { ...f, areaResponse: newAreaResponse };
         });
       });
+  
       alert('Cambios guardados correctamente');
     } catch (err) {
       console.error(err);
@@ -582,7 +596,7 @@ export default function CorteComponent({ workOrder }: Props) {
                   const clamped = hasNextFlow ? n : Math.min(n, orderQuantity);
                   setGoodQuantity(String(clamped));
                 }}
-                disabled={isDisabled}
+                disabled={shouldDisableLiberar()}
               />
 
               <Label>Malas:</Label>
@@ -601,7 +615,7 @@ export default function CorteComponent({ workOrder }: Props) {
                 placeholder="Ej: 2"
                 value={noProcessQuantity}
                 onChange={(e) => setNoProcessQuantity(e.target.value)}
-                disabled={isDisabled}
+                disabled={shouldDisableLiberar()}
               />
               <Label>Excedente:</Label>
               <Input
@@ -610,7 +624,7 @@ export default function CorteComponent({ workOrder }: Props) {
                 placeholder="Ej: 2"
                 value={excessQuantity}
                 onChange={(e) => setExcessQuantity(e.target.value)}
-                disabled={isDisabled}
+                disabled={shouldDisableLiberar()}
               />
             </InputGroup>
             <CqmButton
@@ -627,7 +641,7 @@ export default function CorteComponent({ workOrder }: Props) {
             <Textarea
               ref={commentsRef}
               placeholder="Agrega un comentario adicional..."
-              disabled={isDisabled}
+              disabled={shouldDisableLiberar()}
             />
           </InputGroup>
         </NewData>

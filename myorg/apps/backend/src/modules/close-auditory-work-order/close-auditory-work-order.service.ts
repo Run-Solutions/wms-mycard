@@ -11,11 +11,78 @@ export class CloseAuditoryWorkOrderService {
     if (!userId) {
       throw new Error('No se proporcionan areas validas');
     }
-    console.log('Estados que se reciben:', statuses);
     // Para obtener las ordenes de trabajo con estado en auditoria o estados solicitados
     const inAuditoryOrders = await this.prisma.formAuditory.findMany({
       where: {
         reviewed_by_id: userId,
+        OR: [
+          {
+            // Si corte_answer_auditory es lista -> some; si NO, cambia a "is"
+            corte_answer_auditory: {
+              areas_response: {
+                is: {
+                  workOrder: {
+                    is: {
+                      flow: { some: { status: statuses[0] } }, // flow sí es lista
+                    },
+                  },
+                },
+              },
+            },
+          },
+          {
+            color_edge_answer_auditory: {
+              areas_response: {
+                is: {
+                  workOrder: {
+                    is: {
+                      flow: { some: { status: statuses[0] } },
+                    },
+                  },
+                },
+              },
+            },
+          },
+          {
+            personalizacion_answer_auditory: {
+              areas_response: {
+                is: {
+                  workOrder: {
+                    is: {
+                      flow: { some: { status: statuses[0] } },
+                    },
+                  },
+                },
+              },
+            },
+          },
+          {
+            hot_stamping_answer_auditory: {
+              areas_response: {
+                is: {
+                  workOrder: {
+                    is: {
+                      flow: { some: { status: statuses[0] } },
+                    },
+                  },
+                },
+              },
+            },
+          },
+          {
+            milling_chip_answer_auditory: {
+              areas_response: {
+                is: {
+                  workOrder: {
+                    is: {
+                      flow: { some: { status: statuses[0] } },
+                    },
+                  },
+                },
+              },
+            },
+          },
+        ],
       },
       include: {
         corte_answer_auditory: {
@@ -26,9 +93,7 @@ export class CloseAuditoryWorkOrderService {
                   include: {
                     flow: {
                       where: {
-                        status: {
-                          in: statuses,
-                        },
+                        status: statuses[0],
                       },
                     },
                   },
@@ -45,9 +110,7 @@ export class CloseAuditoryWorkOrderService {
                   include: {
                     flow: {
                       where: {
-                        status: {
-                          in: statuses,
-                        },
+                        status: statuses[0],
                       },
                     },
                   },
@@ -64,9 +127,7 @@ export class CloseAuditoryWorkOrderService {
                   include: {
                     flow: {
                       where: {
-                        status: {
-                          in: statuses,
-                        },
+                        status: statuses[0],
                       },
                     },
                   },
@@ -83,9 +144,7 @@ export class CloseAuditoryWorkOrderService {
                   include: {
                     flow: {
                       where: {
-                        status: {
-                          in: statuses,
-                        },
+                        status: statuses[0],
                       },
                     },
                   },
@@ -102,9 +161,7 @@ export class CloseAuditoryWorkOrderService {
                   include: {
                     flow: {
                       where: {
-                        status: {
-                          in: statuses,
-                        },
+                        status: statuses[0],
                       },
                     },
                   },
@@ -118,20 +175,19 @@ export class CloseAuditoryWorkOrderService {
 
     const workOrdersRaw = await this.prisma.workOrder.findMany({
       where: {
-        // Filtra OTs que tengan al menos un flow con status en statuses
-        flow: { some: { status: { in: statuses } } },
+        // Ya garantiza que exista al menos un flow 'parcial' (statuses[1])
+        flow: { some: { status: { in: [statuses[1]] } } },
       },
       select: {
         id: true,
         ot_id: true,
         mycard_id: true,
         quantity: true,
-        status: true,          // en tu schema puede ser null
+        status: true,
         created_by: true,
         createdAt: true,
         updatedAt: true,
         user: { select: { username: true } },
-        // ⬇️ Trae TODOS los flows de la OT (sin where aquí)
         flow: {
           select: {
             id: true,
@@ -144,40 +200,85 @@ export class CloseAuditoryWorkOrderService {
             created_at: true,
             updated_at: true,
             area: { select: { name: true } },
-            // para derivar validated a nivel OT
-            partialReleases: { select: { validated: true } },
+            // ⬇️ Traemos quantity y release_quantity para la validación
+            partialReleases: {
+              select: {
+                validated: true,
+                quantity: true,
+                release_quantity: true,
+              },
+            },
           },
-          orderBy: { id: 'asc' }, // opcional
+          orderBy: { created_at: 'asc' }, // "último" = flujo cronológicamente más reciente
         },
         files: { select: { file_path: true } },
       },
     });
 
-    // Mapear al shape y derivar validated (true si algún partialRelease.validated)
-    const workOrders = workOrdersRaw.map((wo) => {
-      const validated =
-        wo.flow?.some(f => f.partialReleases?.some(pr => pr.validated)) ?? false;
+    // Normaliza el valor de "parcial"
+    const STATUS_PARCIAL = String(
+      statuses?.find((s) => String(s).toLowerCase() === 'parcial') ?? 'parcial',
+    ).toLowerCase();
 
-      // quitar partialReleases del flow si no quieres exponerlo
-      const flow = wo.flow.map(({ partialReleases, ...rest }) => rest);
+    // 1) Solo OTs cuyo ÚLTIMO flow sea 'parcial'
+    const onlyLastFlowParcial = workOrdersRaw.filter((wo) => {
+      const flows = Array.isArray(wo.flow) ? wo.flow : [];
+      if (flows.length === 0) return false;
+      const last = flows[flows.length - 1];
+      const lastStatus = String(last?.status ?? '')
+        .trim()
+        .toLowerCase();
+      return lastStatus === STATUS_PARCIAL;
+    });
+
+    // Helper para convertir a número (soporta strings)
+    const toNum = (v: unknown) => (v == null || v === '' ? NaN : Number(v));
+
+    // 2) Excluir OTs si existe algún partialRelease con quantity === release_quantity
+    const withoutFullyReleased = onlyLastFlowParcial.filter((wo) => {
+      const prs = (wo.flow ?? []).flatMap((f) => f.partialReleases ?? []);
+      if (prs.length === 0) return true; // si no hay partialReleases, no excluimos
+      // Excluir si ALGUNO tiene equality exacta (interpretado como "ya liberado totalmente ese parcial")
+      const hasEqual = prs.some((pr) => {
+        const q = toNum(pr?.quantity);
+        const rq = toNum(pr?.release_quantity);
+        return Number.isFinite(q) && Number.isFinite(rq) && q === rq;
+      });
+      return !hasEqual;
+    });
+
+    const workOrders = withoutFullyReleased.map((wo) => {
+      const validated =
+        (wo.flow ?? []).some((f) =>
+          (f.partialReleases ?? []).some((pr) => pr?.validated),
+        ) || false;
+
+      // Si no quieres exponer partialReleases en la respuesta:
+      const flow = (wo.flow ?? []).map(({ partialReleases, ...rest }) => {
+        void partialReleases; // evita @typescript-eslint/no-unused-vars
+        return rest;
+      });
 
       return {
         id: wo.id,
         ot_id: wo.ot_id,
         mycard_id: wo.mycard_id,
         quantity: wo.quantity,
-        status: wo.status ?? '',          // si tu DTO exige string estricto
+        status: wo.status ?? '',
         created_by: wo.created_by,
         validated,
         createdAt: wo.createdAt.toISOString?.() ?? wo.createdAt,
         updatedAt: wo.updatedAt.toISOString?.() ?? wo.updatedAt,
-        user: { username: wo.user.username },
+        user: { username: wo.user?.username ?? '' },
         flow,
         files: wo.files,
       };
     });
 
-    console.log(workOrders, 'Ordenes en auditoria encontradas');
+    console.log(
+      workOrders,
+      'Ordenes en auditoria con último flow=parcial y sin partialRelease q==rq',
+    );
 
     // Extraer los IDs de las workOrders que estan en los flujos
     const workOrderIds = inAuditoryOrders.flatMap((order) => {
@@ -210,37 +311,17 @@ export class CloseAuditoryWorkOrderService {
     );
     console.log(filteredWorkOrderIds, 'Ordenes pendientes filtradas');
     // Traer las workOrders asociadas a los IDs
-    // helper: construye el where para flow.status
-    // Dedup de IDs por si llegan repetidos
-    const uniqueIds = Array.from(new Set(filteredWorkOrderIds));
-
-    const allowedStatuses =
-      statuses && statuses.length ? statuses : ['En auditoria', 'Parcial'];
-
-    // Construye un OR de equals (case-sensitive)
-    const flowStatusOr = allowedStatuses.map((s) => ({
-      status: { equals: s }, // sin mode
-    }));
-
-    // Filtro para flow.status: alguno de los estados permitidos Y que NO contenga "inconformidad"
-    const flowWhere = {
-      AND: [
-        { OR: flowStatusOr },
-        { NOT: { status: { contains: 'inconformidad' } } }, // sin mode => respeta el casing exacto
-      ],
-    };
-
     const allRelatedWorkOrders = await this.prisma.workOrder.findMany({
       where: {
-        id: { in: uniqueIds },
-        status: { notIn: ['Cerrado'] }, // si status es nullable, incluye null
-        flow: { some: flowWhere }, // ⬅️ esto sí filtra la orden
+        id: { in: filteredWorkOrderIds },
       },
       include: {
         user: true,
         flow: {
-          where: flowWhere, // devuelves solo los pasos relevantes
-          include: { user: true, area: true },
+          include: {
+            user: true,
+            area: true,
+          },
         },
         files: true,
       },
@@ -256,7 +337,6 @@ export class CloseAuditoryWorkOrderService {
     );
     return [...allRelatedWorkOrders, ...workOrders];
   }
-
   // Para obtener los WorkOrderFlowEnAuditoria
   async getInAuditoryWorkOrderById(id: string) {
     const workOrderFlow = await this.prisma.workOrderFlow.findFirst({
@@ -266,7 +346,7 @@ export class CloseAuditoryWorkOrderService {
             ot_id: id,
           },
         },
-        status: { in: ['En auditoria', 'Parcial']},
+        status: { in: ['En auditoria', 'Parcial'] },
       },
       include: {
         workOrder: {
@@ -391,17 +471,24 @@ export class CloseAuditoryWorkOrderService {
     });
   }
 
-  async updateWorkFlowAuditoryParcial(partialReleaseId: number, quantityRelease: number) {
+  async updateWorkFlowAuditoryParcial(
+    partialReleaseId: number,
+    quantityRelease: number,
+  ) {
     return this.prisma.$transaction(async (tx) => {
-      await tx.partialRelease.update({
-        where: {
-          id: partialReleaseId,
-        },
+      const partial = await tx.partialRelease.findUnique({
+        where: { id: partialReleaseId },
+        select: { release_quantity: true },
+      });
+
+      const current = partial?.release_quantity ?? 0;
+
+      return tx.partialRelease.update({
+        where: { id: partialReleaseId },
         data: {
-          release_quantity: quantityRelease,
+          release_quantity: current + quantityRelease,
         },
       });
     });
   }
-
 }

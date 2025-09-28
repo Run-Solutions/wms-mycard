@@ -1,5 +1,5 @@
 // myorg/apps/frontend-mobile/src/components/AceptarAuditoria/ColorEdgeComponents.tsx
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useMemo, useCallback } from 'react';
 import {
   View,
   Text,
@@ -19,109 +19,134 @@ import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { RootStackParamList } from '../../navigation/types';
 import { TextInput } from 'react-native-paper';
 import { AfterCorteData } from './CorteComponents';
+import {
+  buildDefaultValuesByArea,
+  AreaBlock,
+  DefaultValues,
+  toNum,
+} from './util/quantityWorkOrder';
+import { getPrevAreaGoodPlusExcess } from './util/lastWorkOrder';
+
 
 const ColorEdgeComponentAcceptAuditory: React.FC<{ workOrder: any }> = ({
   workOrder,
 }) => {
+  const [defaultValues, setDefaultValues] = useState<AfterCorteData>({
+    good_quantity: '',
+    bad_quantity: '',
+    excess_quantity: '',
+    noprocess_quantity: '',
+    cqm_quantity: '', // <- puede ser '' o número
+    comments: '',
+    total_quantity: 0,
+    total_execbuen: 0,
+  });
   const navigation =
     useNavigation<NativeStackNavigationProp<RootStackParamList>>();
   const [showConfirm, setShowConfirm] = useState(false);
   const [showInconformidad, setShowInconformidad] = useState(false);
   const [inconformidad, setInconformidad] = useState('');
   const [sampleAuditory, setSampleAuditory] = useState('');
-  const [defaultValues, setDefaultValues] = useState<AfterCorteData>({
-    good_quantity: 0,
-    bad_quantity: 0,
-    excess_quantity: 0,
-    noprocess_quantity: 0,
-    cqm_quantity: '',
-    comments: '',
-  });
+  const isValidArea = (workOrder?.area_id ?? 0) >= 2;
+  const asStrNum = (v: unknown): string | number => {
+    if (v === null || v === undefined) return '';
+    if (typeof v === 'boolean') return v ? 1 : 0;
+    return v as string | number; // ya restringimos los otros casos
+  };
+
+  const toAfterCorteData = (
+    d: DefaultValues,
+    prev?: AfterCorteData
+  ): AfterCorteData => {
+    return {
+      ...(prev ?? ({} as AfterCorteData)),
+
+      good_quantity: asStrNum(d.good_quantity),
+      bad_quantity: asStrNum(d.bad_quantity),
+      excess_quantity: asStrNum(d.excess_quantity),
+      noprocess_quantity: asStrNum(d.noprocess_quantity),
+      cqm_quantity: asStrNum(d.cqm_quantity),
+
+      comments: (d.comments ?? '') as string,
+      total_quantity: d.total_quantity ?? 0,
+
+      // Si quieres otro criterio, cámbialo aquí
+      total_execbuen: toNum(d.good_quantity),
+    };
+  };
   const [showBadQuantity, setShowBadQuantity] = useState(false);
   const [areaBadQuantities, setAreaBadQuantities] = useState<{
     [areaName: string]: string;
   }>({});
 
-  const cqm_quantity = workOrder.answers.reduce(
-    (total: number, answer: { sample_quantity?: number | string }) => {
-      return total + (Number(answer.sample_quantity) || 0);
-    },
-    0
-  );
+  const makeAreaKey = (name?: string) =>
+    (name ?? '').toLowerCase().replace(/\s/g, '');
+
+  const areaKeyActual = useMemo(() => {
+    return makeAreaKey(workOrder?.area?.name);
+  }, [workOrder?.area?.name]);
+
+  const sumaBadQuantity = useMemo(() => {
+    const bad = Number(areaBadQuantities[`${areaKeyActual}_bad`] || 0);
+    const mat =
+      (workOrder?.area?.id ?? 0) >= 6
+        ? Number(areaBadQuantities[`${areaKeyActual}_material`] || 0)
+        : 0;
+    return bad + mat;
+  }, [areaBadQuantities, areaKeyActual, workOrder?.area?.id]);
+
+  const areaKey: AreaBlock = 'colorEdge';
 
   useEffect(() => {
-    if (!workOrder) return;
+    const result = buildDefaultValuesByArea(
+      areaKey,
+      workOrder,
+      sumaBadQuantity,
+      {
+        // filterPartialsByArea: (p) => p.area === areaKey
+      }
+    );
 
-    const colorEdge = workOrder.areaResponse?.colorEdge;
-    const partials = workOrder.partialReleases;
-
-    const allValidated =
-      partials.length > 0 && partials.every((p: any) => p.validated);
-
-    if (colorEdge && partials.length === 0) {
-      // Caso original: hay empalme pero no hay parciales
-      const vals: AfterCorteData = {
-        good_quantity: colorEdge.good_quantity || '',
-        bad_quantity: colorEdge.bad_quantity || '',
-        excess_quantity: colorEdge.excess_quantity || '',
-        noprocess_quantity: colorEdge.noprocess_quantity || '',
-        cqm_quantity: cqm_quantity || '',
-        comments: colorEdge.comments || '',
-      };
-      setDefaultValues(vals);
-    } else if (colorEdge && allValidated) {
-      // Nuevo caso: todos los parciales están validados y hay empalme
-      const totalParciales = partials.reduce(
-        (acc: any, curr: any) => acc + (curr.quantity || 0),
-        0
-      );
-      const totalParcialesbad = partials.reduce(
-        (acc: any, curr: any) => acc + (curr.bad_quantity || 0),
-        0
-      );
-      const totalParcialesexec = partials.reduce(
-        (acc: any, curr: any) => acc + (curr.excess_quantity || 0),
-        0
-      );
-      const totalParcialesnopro = partials.reduce(
-        (acc: any, curr: any) => acc + (curr.noprocess_quantity || 0),
-        0
-      );
-      const restante = (colorEdge.good_quantity || 0) - totalParciales;
-      const restantebad = (colorEdge.bad_quantity || 0) - totalParcialesbad;
-      const restanteexc = (colorEdge.excess_quantity || 0) - totalParcialesexec;
-      const restantenopro =
-        (colorEdge.noprocess_quantity || 0) - totalParcialesnopro;
-      const vals: AfterCorteData = {
-        good_quantity: restante > 0 ? restante : 0,
-        bad_quantity: restantebad > 0 ? restantebad : 0,
-        excess_quantity: restanteexc > 0 ? restanteexc : 0,
-        noprocess_quantity: restantenopro > 0 ? restantenopro : 0,
-        cqm_quantity: cqm_quantity || '',
-        comments: colorEdge.comments || '',
-      };
-      setDefaultValues(vals);
-    } else {
-      // Caso original: se busca el primer parcial sin validar
-      const firstUnvalidatedPartial = partials.find((p: any) => !p.validated);
-
-      const vals: AfterCorteData = {
-        good_quantity: firstUnvalidatedPartial.quantity || '',
-        bad_quantity: firstUnvalidatedPartial.bad_quantity || '',
-        excess_quantity: firstUnvalidatedPartial.excess_quantity || '',
-        noprocess_quantity: firstUnvalidatedPartial.noprocess_quantity || '',
-        cqm_quantity: cqm_quantity || '',
-        comments: firstUnvalidatedPartial.observation || '',
-      };
-      setDefaultValues(vals);
+    if (result) {
+      setDefaultValues((prev) => toAfterCorteData(result, prev)); // 
     }
-  }, [workOrder]);
+  }, [workOrder, sumaBadQuantity]);
 
-  const handleAceptar = async () => {
+  const handleOpenModal = async () => {
     if (!sampleAuditory) {
-      Alert.alert('Error', 'Por favor, asegurate de ingresar muestras.');
+      alert('Por favor, asegurate de ingresar muestras.');
+      return;
+    } else if (
+      ((defaultValues.total_quantity ?? 0) + Number(sampleAuditory) >
+        prevAreaSum &&
+        workOrder?.areaResponse?.colorEdge) ||
+      (defaultValues.total_quantity ?? 0) + Number(sampleAuditory) > prevAreaSum
+    ) {
+      alert(
+        'La cantidad total a liberar es mayor a la entregada por parte del área previa.'
+      );
+      return;
+    } else if (
+      (defaultValues.total_quantity ?? 0) + Number(sampleAuditory) !==
+        prevAreaSum &&
+      workOrder?.areaResponse?.colorEdge
+    ) {
+      alert(
+        'La cantidad total a liberar es mayor a la entregada por parte del área previa.'
+      );
       return;
     }
+
+    setShowConfirm(true);
+  };
+
+  const prevAreaSum = useMemo(
+    () => getPrevAreaGoodPlusExcess(workOrder),
+    [workOrder]
+  );
+  console.log('prevAreaSum', prevAreaSum);
+
+  const handleSubmit = async () => {
     const ColorEdgeId = workOrder?.areaResponse?.colorEdge?.id ?? workOrder.id;
     try {
       await acceptWorkOrderFlowColorEdgeAuditory(ColorEdgeId, sampleAuditory);
@@ -162,16 +187,18 @@ const ColorEdgeComponentAcceptAuditory: React.FC<{ workOrder: any }> = ({
     .filter((flow) => flow.area_id !== 1);
 
   console.log('Áreas anteriores sin Preprensa:', previousFlows);
-  const handleOpenBadQuantityModal = () => {
-    const initialValues: { [areaName: string]: string } = {};
 
-    previousFlows.forEach((flow) => {
-      const areaName = flow.area.name;
+  const handleOpenBadQuantityModal = useCallback(() => {
+    if (!isValidArea) return;
+
+    const initialValues: Record<string, string> = {};
+
+    (previousFlows ?? []).forEach((flow) => {
+      const areaKey = makeAreaKey(flow?.area?.name);
 
       let badQuantity: number | null | undefined = null;
       let materialBadQuantity: number | null | undefined = null;
 
-      // Primero, busca en areaResponse
       if (flow.areaResponse?.impression) {
         badQuantity = flow.areaResponse.impression.bad_quantity;
       } else if (flow.areaResponse?.serigrafia) {
@@ -186,94 +213,30 @@ const ColorEdgeComponentAcceptAuditory: React.FC<{ workOrder: any }> = ({
       } else if (flow.areaResponse?.colorEdge) {
         badQuantity = flow.areaResponse.colorEdge.bad_quantity;
         materialBadQuantity = flow.areaResponse.colorEdge.material_quantity;
-      } else if (flow.areaResponse?.hotStamping) {
-        badQuantity = flow.areaResponse.hotStamping.bad_quantity;
-        materialBadQuantity = flow.areaResponse.hotStamping.material_quantity;
-      } else if (flow.areaResponse?.millingChip) {
-        badQuantity = flow.areaResponse.millingChip.bad_quantity;
-        materialBadQuantity = flow.areaResponse.millingChip.material_quantity;
       }
 
-      // Si sigue sin valor, busca en partialReleases
-      if (
-        (badQuantity === null || badQuantity === undefined) &&
-        flow.partialReleases?.length > 0
-      ) {
+      // Fallback: sumar parciales
+      if (badQuantity == null && flow.partialReleases?.length > 0) {
         badQuantity = flow.partialReleases.reduce(
-          (sum: number, release: any) => {
-            return sum + (release.bad_quantity ?? 0);
-          },
+          (sum: number, r: any) => sum + (r.bad_quantity ?? 0),
           0
         );
         materialBadQuantity = flow.partialReleases.reduce(
-          (sum: number, release: any) => {
-            return sum + (release.material_quantity ?? 0);
-          },
+          (sum: number, r: any) => sum + (r.material_quantity ?? 0),
           0
         );
       }
 
-      // Guardar valores por separado
-      initialValues[`${areaName}_bad`] =
-        badQuantity !== null && badQuantity !== undefined
-          ? String(badQuantity)
-          : '';
-
-      initialValues[`${areaName}_material`] =
-        materialBadQuantity !== null && materialBadQuantity !== undefined
-          ? String(materialBadQuantity)
-          : '';
+      initialValues[`${areaKey}_bad`] =
+        badQuantity != null ? String(badQuantity) : '';
+      initialValues[`${areaKey}_material`] =
+        materialBadQuantity != null ? String(materialBadQuantity) : '';
     });
 
     setAreaBadQuantities(initialValues);
     setShowBadQuantity(true);
     console.log('Valores iniciales para malas por área:', initialValues);
-  };
-
-  const sumaBadQuantity = previousFlows.reduce((sum, flow) => {
-    let bad = 0;
-
-    if (flow.areaResponse?.impression) {
-      bad = flow.areaResponse.impression.bad_quantity || 0;
-    } else if (flow.areaResponse?.serigrafia) {
-      bad = flow.areaResponse.serigrafia.bad_quantity || 0;
-    } else if (flow.areaResponse?.empalme) {
-      bad = flow.areaResponse.empalme.bad_quantity || 0;
-    } else if (flow.areaResponse?.laminacion) {
-      bad = flow.areaResponse.laminacion.bad_quantity || 0;
-    } else if (flow.areaResponse?.corte) {
-      const corte = flow.areaResponse.corte;
-      const corteBad = corte.bad_quantity || 0;
-      const corteMaterial = corte.material_quantity || 0; // ← suma también este
-      bad = corteBad + corteMaterial;
-    } else if (flow.areaResponse?.colorEdge) {
-      const colorEdge = flow.areaResponse.colorEdge;
-      const colorEdgeBad = colorEdge.bad_quantity || 0;
-      const colorEdgeMaterial = colorEdge.material_quantity || 0; // ← suma también este
-      bad = colorEdgeBad + colorEdgeMaterial;
-    } else if (flow.areaResponse?.hotStamping) {
-      const hotStamping = flow.areaResponse.hotStamping;
-      const hotStampingBad = hotStamping.bad_quantity || 0;
-      const hotStampingMaterial = hotStamping.material_quantity || 0; // ← suma también este
-      bad = hotStampingBad + hotStampingMaterial;
-    } else if (flow.areaResponse?.millingChip) {
-      const millingChip = flow.areaResponse.millingChip;
-      const millingChipBad = millingChip.bad_quantity || 0;
-      const millingChipMaterial = millingChip.material_quantity || 0; // ← suma también este
-      bad = millingChipBad + millingChipMaterial;
-    }
-
-    // Si no hay respuesta y sí hay parciales
-    if (bad === 0 && flow.partialReleases?.length > 0) {
-      bad = flow.partialReleases.reduce((partialSum: number, release: any) => {
-        const badQty = release.bad_quantity ?? 0;
-        const materialQty = release.material_quantity ?? 0;
-        return partialSum + badQty + materialQty; // ← también suma material aquí
-      }, 0);
-    }
-
-    return sum + bad;
-  }, 0);
+  }, [isValidArea, previousFlows]);
 
   return (
     <ScrollView contentContainerStyle={styles.container}>
@@ -297,10 +260,8 @@ const ColorEdgeComponentAcceptAuditory: React.FC<{ workOrder: any }> = ({
           mode="outlined"
           activeOutlineColor="#000"
           keyboardType="numeric"
-          placeholder={sumaBadQuantity > 0 ? sumaBadQuantity.toString() : '0'}
           value={String(sumaBadQuantity)}
-          editable={false} // deshabilita edición
-          pointerEvents="none" // evita que se abra el teclado
+          editable={false}
         />
       </TouchableOpacity>{' '}
       <Text style={styles.subtitle}>Excedente:</Text>
@@ -357,10 +318,7 @@ const ColorEdgeComponentAcceptAuditory: React.FC<{ workOrder: any }> = ({
         >
           <Text style={styles.buttonText}>Inconformidad</Text>
         </TouchableOpacity>
-        <TouchableOpacity
-          style={styles.acceptButton}
-          onPress={() => setShowConfirm(true)}
-        >
+        <TouchableOpacity style={styles.acceptButton} onPress={handleOpenModal}>
           <Text style={styles.buttonText}>Aceptar recepción de producto</Text>
         </TouchableOpacity>
       </View>
@@ -400,7 +358,9 @@ const ColorEdgeComponentAcceptAuditory: React.FC<{ workOrder: any }> = ({
 
                       {flow.area_id >= 6 && (
                         <View style={[styles.inputGroup, { maxWidth: '40%' }]}>
-                          <Text style={styles.inputLabel}>Malo de fábrica</Text>
+                          <Text style={styles.inputLabel}>
+                            Materia Prima Defectuosa
+                          </Text>
                           <TextInput
                             style={styles.input}
                             theme={{ roundness: 30 }}
@@ -452,7 +412,7 @@ const ColorEdgeComponentAcceptAuditory: React.FC<{ workOrder: any }> = ({
               </TouchableOpacity>
               <TouchableOpacity
                 style={styles.confirmButton}
-                onPress={handleAceptar}
+                onPress={handleSubmit}
               >
                 <Text style={styles.modalButtonText}>Confirmar</Text>
               </TouchableOpacity>

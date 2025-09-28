@@ -71,7 +71,7 @@ const PrePrensaComponent: React.FC<{ workOrder: any }> = ({ workOrder }) => {
     try {
       await submitPrepressForm(payload);
       Alert.alert('Producto liberado con éxito');
-      navigation.navigate('liberarProducto');
+      navigation.goBack();
     } catch (error) {
       Alert.alert('Error al liberar el producto.');
     } finally {

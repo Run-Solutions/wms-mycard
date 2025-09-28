@@ -1,40 +1,72 @@
-// myorg/apps/frontend-web/src/app/(protected)/seguimientoDeOts/[id]/page.tsx
+// myorg/apps/frontend-web/src/app/(protected)/cerrarOrdenDeTrabajo/[id]/page.tsx
 'use client';
 
-import { use, useState, Fragment, useEffect, useMemo } from 'react';
+import {
+  use,
+  useState,
+  Fragment,
+  useEffect,
+  useMemo,
+  ChangeEvent,
+} from 'react';
 import { useRouter } from 'next/navigation';
 import styled from 'styled-components';
+
 import { Card, CardContent } from '@/components/ui/card';
 import ProgressBarAreas from '@/components/SeguimientoDeOts/ProgressBarAreas';
 import InconformitiesHistory from '@/components/SeguimientoDeOts/InconformitiesHistory';
 import BadQuantityModal from '@/components/SeguimientoDeOts/BadQuantityModal';
+import PartialHistory from '@/components/SeguimientoDeOts/PartialHistory';
+import { AreaTotalsForPartialHistory } from '@/components/SeguimientoDeOts/PartialHistory';
+
 import {
   fetchWorkOrderById,
   fetchAllUsers,
   updateFlowAssignedUser,
-  closeWorkOrder,
   updateWorkOrderAreas,
+  getFileByName,
 } from '@/api/seguimientoDeOts';
-import { VistosBuenosHistory } from '@/components/SeguimientoDeOts/VistosBuenosHistory';
-import { getFileByName } from '@/api/seguimientoDeOts';
+import {
+  cerrarParcialWorkOrderAuditory,
+  liberarWorkOrderAuditory,
+} from '@/api/cerrarOrdenDeTrabajo';
+import { subirArchivoOrden } from '@/api/subirArchivoOrden';
+
 import {
   getPerPartialReviewers,
   getLastAnswer,
   getSingleCqm,
   getReviewerNameFromAnswer,
   getPerPartialCqm,
+  getPerPartialAuditors,
+  getLastAuditor,
 } from '@/components/SeguimientoDeOts/util/quality';
-import PartialHistory from '@/components/SeguimientoDeOts/PartialHistory';
-import { cerrarParcialWorkOrderAuditory } from '@/api/cerrarOrdenDeTrabajo';
 
-type NumericField =
-  | 'buenas'
-  | 'malas'
-  | 'excedente'
-  | 'noprocess'
-  | 'defectuoso'
-  | 'cqm'
-  | 'muestras';
+import {
+  AreaData,
+  OperatorUser,
+  NumericField,
+} from '../../seguimientoDeOts/[id]/page';
+
+// ========================================================
+// Types
+// ========================================================
+
+export type InconformityData = {
+  id: number;
+  comments: string;
+  createdAt: string;
+  createdBy: string;
+  area: string;
+};
+
+interface Props {
+  params: Promise<{ id: string }>;
+}
+
+// ========================================================
+// Constants & Utils
+// ========================================================
 
 const AREA_KEY_BY_ID: Record<number, string> = {
   1: 'prepress',
@@ -49,20 +81,115 @@ const AREA_KEY_BY_ID: Record<number, string> = {
   10: 'personalizacion',
 };
 
+const FALLBACK_FIELDS = [
+  'good_quantity',
+  'excess_quantity',
+  'noprocess_quantity',
+  'material_quantity',
+  'plates',
+];
+
 const getAreaKey = (area: AreaData) => AREA_KEY_BY_ID[area.id] ?? null;
 
-const getAreaReleaseTotal = (area: AreaData) => {
+const toNum = (v: any) =>
+  v == null ? 0 : typeof v === 'number' ? v : Number(v) || 0;
+
+const getAreaBlock = (area: any) => {
   const key = getAreaKey(area);
-  const block: any = key ? (area.response as any)?.[key] : null;
-  if (!block) return 0;
-  return block.release_quantity ?? block.good_quantity ?? block.plates ?? 0;
+  if (!key) return null;
+  const fromResponse =
+    area?.response && typeof area.response === 'object'
+      ? area.response[key]
+      : undefined;
+  // fallback si viene plano (p. ej. area.corte)
+  return fromResponse ?? area?.[key] ?? null;
 };
 
-const getSumParciales = (area: AreaData) =>
-  (area.partials ?? []).reduce((acc, p) => acc + (p?.quantity ?? 0), 0);
+// ---- Remainders (by field) ----
 
-const getRemainder = (area: AreaData) =>
-  Math.max(getAreaReleaseTotal(area) - getSumParciales(area), 0);
+const buildAreaTotalsByAreaId = (
+  wo: any
+): Record<number, AreaTotalsForPartialHistory> => {
+  const map: Record<number, AreaTotalsForPartialHistory> = {};
+  const flows = wo?.flow ?? [];
+
+  flows.forEach((item: any) => {
+    const areaId = item?.area_id;
+    if (!areaId) return;
+
+    const areaKey = AREA_KEY_BY_ID[areaId];
+    const block = item?.areaResponse?.[areaKey];
+
+    if (!block) return;
+
+    map[areaId] = {
+      good_or_release_or_plates: toNum(
+        block.release_quantity ?? block.good_quantity ?? block.plates
+      ),
+      bad_quantity: toNum(block.bad_quantity),
+      excess_quantity: toNum(block.excess_quantity),
+      noprocess_quantity: toNum(block.noprocess_quantity),
+      material_quantity: toNum(block.material_quantity),
+    };
+  });
+
+  return map;
+};
+
+const getRemainderByField = (
+  area: AreaData,
+  field: 'buenas' | 'malas' | 'excedente' | 'noprocess' | 'defectuoso'
+) => {
+  const block = getAreaBlock(area) as any;
+  if (!block) return 0;
+
+  let total = 0;
+  let parcialesSum = 0;
+
+  switch (field) {
+    case 'buenas':
+      total = toNum(
+        block.release_quantity ?? block.good_quantity ?? block.plates
+      );
+      parcialesSum = (area.partials ?? []).reduce(
+        (acc, p) => acc + toNum(p?.quantity),
+        0
+      );
+      break;
+    case 'malas':
+      total = toNum(block.bad_quantity);
+      parcialesSum = (area.partials ?? []).reduce(
+        (acc, p) => acc + toNum(p?.bad_quantity),
+        0
+      );
+      break;
+    case 'excedente':
+      total = toNum(block.excess_quantity);
+      parcialesSum = (area.partials ?? []).reduce(
+        (acc, p) => acc + toNum(p?.excess_quantity),
+        0
+      );
+      break;
+    case 'noprocess':
+      total = toNum(block.noprocess_quantity);
+      parcialesSum = (area.partials ?? []).reduce(
+        (acc, p) => acc + toNum(p?.noprocess_quantity),
+        0
+      );
+      break;
+    case 'defectuoso':
+      total = toNum(block.material_quantity);
+      parcialesSum = (area.partials ?? []).reduce(
+        (acc, p) => acc + toNum(p?.material_quantity),
+        0
+      );
+      break;
+  }
+
+  return Math.max(total - parcialesSum, 0);
+};
+
+const getRemainder = (area: AreaData) => getRemainderByField(area, 'buenas');
 
 const getPerPartialValues = (
   area: AreaData,
@@ -72,22 +199,20 @@ const getPerPartialValues = (
   const hasRem = getRemainder(area) > 0;
   const cols = parc + (hasRem ? 1 : 0);
 
-  // Ordenamos las answers por fecha (te sigue sirviendo para cqm/muestras)
   const answersSorted = [...(area.answers ?? [])].sort(
     (a, b) =>
       new Date(a.created_at).getTime() - new Date(b.created_at).getTime()
   );
 
-  // 👇 Para defectuoso leeremos de partials. Para cqm/muestras seguimos con answers.
   const values: Array<number | string> = Array(cols).fill(0);
 
   for (let i = 0; i < parc; i++) {
     if (field === 'defectuoso') {
-      values[i] = area.partials?.[i]?.material_quantity ?? 0; // 👈 aquí el cambio
+      values[i] = area.partials?.[i]?.material_quantity ?? 0;
     } else if (field === 'cqm') {
       values[i] = answersSorted[i]?.sample_quantity ?? 0;
     } else if (field === 'muestras') {
-      values[i] = (answersSorted[i] as any)?.sample_auditory ?? '—';
+      values[i] = area.partials?.[i]?.formAuditory?.sample_auditory ?? '—';
     }
   }
 
@@ -96,9 +221,7 @@ const getPerPartialValues = (
     const remIndex = cols - 1;
 
     if (field === 'defectuoso') {
-      // Remanente = total del bloque - suma parcial de material_quantity
-      const totalDefectuoso =
-        block?.material_quantity ?? 0;
+      const totalDefectuoso = block?.material_quantity ?? 0;
       const sumParcialDefectuoso = (area.partials ?? []).reduce(
         (acc, p) => acc + (p?.material_quantity ?? 0),
         0
@@ -109,14 +232,12 @@ const getPerPartialValues = (
         answersSorted[parc] ?? answersSorted[answersSorted.length - 1];
       values[remIndex] = remAns?.sample_quantity ?? 0;
     } else if (field === 'muestras') {
-      const remAns =
-        answersSorted[parc] ?? answersSorted[answersSorted.length - 1];
-      values[remIndex] = (remAns as any)?.sample_auditory ?? '—';
+      values[remIndex] = block?.formAuditory?.sample_auditory ?? '—';
     }
   }
   return values;
 };
-// último parcial por fecha
+
 const getLastPartial = (area: AreaData) => {
   const list = area.partials ?? [];
   if (!list.length) return null;
@@ -130,151 +251,172 @@ const getPartialUserName = (
   p: AreaData['partials'][number] | null | undefined,
   area: AreaData,
   operatorByIdMap: Map<number, string>
-) => {
-  return (
-    p?.user?.username ??
-    (p?.user_id != null ? operatorByIdMap.get(p.user_id) : undefined) ??
-    area.usuario ??
-    'No definido'
-  );
-};
+) =>
+  p?.user?.username ??
+  (p?.user_id != null ? operatorByIdMap.get(p.user_id) : undefined) ??
+  area.usuario ??
+  'No definido';
 
-export type AreaData = {
-  id: number;
-  name: string;
-  status: string;
-  isCollator: boolean;
-  response: {
-    prepress: { id: number };
-    impression: { id: number };
-    serigrafia: { id: number };
-    empalme: { id: number };
-    laminacion: { id: number };
-    corte: { id: number };
-    colorEdge: { id: number };
-    millingChip: { id: number };
-    hotStamping: { id: number };
-    personalizacion: { id: number };
-    user: {
-      username: string;
+// ---- Area data builder (by areaId) ----
+const getAreaData = (
+  areaId: number,
+  areaResponse: any,
+  partialReleases: any[] = [],
+  flowUser: any = null
+) => {
+  const parciales = partialReleases.length;
+  const parcialesValidados = partialReleases.filter((p) => p?.validated).length;
+
+  const sumFromPartials = () =>
+    partialReleases.reduce(
+      (acc: any, curr: any) => {
+        acc.buenas += curr.quantity || 0;
+        acc.malas += curr.bad_quantity || 0;
+        acc.excedente += curr.excess_quantity || 0;
+        acc.noprocess += curr.noprocess_quantity || 0;
+        acc.defectuoso += curr.material_quantity || 0;
+        return acc;
+      },
+      { buenas: 0, malas: 0, excedente: 0, noprocess: 0, defectuoso: 0 }
+    );
+
+  const getCommonData = (areaKey: string) => {
+    const hasResponse = !!areaResponse?.[areaKey];
+    const usuario = areaResponse?.user?.username || flowUser?.username || '';
+    const auditor = areaResponse?.[areaKey]?.formAuditory?.user?.username || '';
+
+    if (!hasResponse && parciales > 0) {
+      const resumen = sumFromPartials();
+      return {
+        ...resumen,
+        cqm: 0,
+        muestras: 0,
+        usuario,
+        auditor,
+        parciales,
+        parcialesValidados,
+        partials: partialReleases,
+      };
+    }
+
+    return {
+      buenas:
+        areaResponse?.[areaKey]?.good_quantity ||
+        areaResponse?.[areaKey]?.release_quantity ||
+        areaResponse?.[areaKey]?.plates ||
+        0,
+      malas: areaResponse?.[areaKey]?.bad_quantity || 0,
+      excedente: areaResponse?.[areaKey]?.excess_quantity || 0,
+      noprocess: areaResponse?.[areaKey]?.noprocess_quantity || 0,
+      defectuoso: areaResponse?.[areaKey]?.material_quantity || 0,
+      cqm: areaResponse?.[areaKey]?.form_answer?.sample_quantity ?? 0,
+      muestras: areaResponse?.[areaKey]?.formAuditory?.sample_auditory ?? 0,
+      usuario,
+      auditor,
+      parciales,
+      parcialesValidados,
+      partials: partialReleases,
     };
   };
-  answers: any[];
-  usuario: string;
-  auditor: string;
-  buenas: number;
-  malas: number;
-  cqm: number;
-  excedente: number;
-  noprocess: number;
-  defectuoso: number;
-  muestras: number;
-  flowId?: number;
-  assigned_user_id?: number | null;
 
-  parciales: number; // total de parciales creados
-  parcialesValidados: number;
-  partials: Array<{
-    id: number;
-    quantity: number;
-    bad_quantity: number;
-    excess_quantity: number;
-    material_quantity: number;
-    noprocess_quantity: number;
-    user_id: number | null; // 👈 puede venir null
-    validated: boolean;
-    release_quantity?: number; // 👈 cantidad liberada 
-    user?: { username: string } | null; // 👈 opcional
-    created_at: string;
-  }>;
+  switch (areaId) {
+    case 1:
+      return getCommonData('prepress');
+    case 2:
+      return getCommonData('impression');
+    case 3:
+      return getCommonData('serigrafia');
+    case 4:
+      return getCommonData('empalme');
+    case 5:
+      return getCommonData('laminacion');
+    case 6:
+      return getCommonData('corte');
+    case 7:
+      return getCommonData('colorEdge');
+    case 8:
+      return getCommonData('hotStamping');
+    case 9:
+      return getCommonData('millingChip');
+    case 10:
+      return getCommonData('personalizacion');
+    default:
+      return {
+        buenas: 0,
+        malas: 0,
+        excedente: 0,
+        noprocess: 0,
+        defectuoso: 0,
+        cqm: 0,
+        muestras: 0,
+        usuario: '',
+        auditor: '',
+        parciales: 0,
+        parcialesValidados: 0,
+        partials: [],
+      };
+  }
 };
 
-export type InconformityData = {
-  id: number;
-  comments: string;
-  createdAt: string;
-  createdBy: string;
-  area: string;
+const guessMimeFromName = (filename: string): string => {
+  const ext = filename.split('.').pop()?.toLowerCase();
+  switch (ext) {
+    case 'pdf':
+      return 'application/pdf';
+    case 'png':
+      return 'image/png';
+    case 'jpg':
+    case 'jpeg':
+      return 'image/jpeg';
+    case 'webp':
+      return 'image/webp';
+    default:
+      return 'application/octet-stream';
+  }
 };
 
-type OperatorUser = {
-  id: number;
-  username: string;
-  areasOperator?: { id: number; name: string };
-};
-
-interface Props {
-  params: Promise<{ id: string }>;
-}
+// ========================================================
+// Component
+// ========================================================
 
 export default function CloseWorkOrderAuxPage({ params }: Props) {
   const { id } = use(params);
   const router = useRouter();
+
+  // ---- State ----
   const [workOrder, setWorkOrder] = useState<any>(null);
-  const [showConfirm, setShowConfirm] = useState(false);
   const [areas, setAreas] = useState<AreaData[]>([]);
+  const [operatorUsers, setOperatorUsers] = useState<OperatorUser[]>([]);
+  const [vistosBuenosHistory, setVistosBuenosHistory] = useState<any[]>([]);
+  const [inconformities, setInconformities] = useState<InconformityData[]>([]);
+
+  const [loading, setLoading] = useState(true);
+  const [progressWidth, setProgressWidth] = useState(0);
+
+  const [showConfirm, setShowConfirm] = useState(false);
   const [showBadQuantity, setShowBadQuantity] = useState(false);
   const [areaBadQuantities, setAreaBadQuantities] = useState<{
     [key: string]: string;
   }>({});
-  const [inconformities, setInconformities] = useState<InconformityData[]>([]);
+
   const [qualitySectionOpen, setQualitySectionOpen] = useState(false);
+  const [partialSectionOpen, setPartialSectionOpen] = useState(false);
   const [inconformitySectionOpen, setInconformitySectionOpen] = useState(false);
-  const toggleQualitySection = () => {
-    setQualitySectionOpen(!qualitySectionOpen);
-  };
-  const toggleInconformitySection = () => {
-    setInconformitySectionOpen(!inconformitySectionOpen);
-  };
-  const [progressWidth, setProgressWidth] = useState(0);
-  const [loading, setLoading] = useState(true);
-  const [vistosBuenosHistory, setVistosBuenosHistory] = useState([]);
-  const [operatorUsers, setOperatorUsers] = useState<OperatorUser[]>([]);
 
   const [showQtyModal, setShowQtyModal] = useState(false);
   const [qtyToClient, setQtyToClient] = useState<number | ''>('');
   const [qtyError, setQtyError] = useState<string>('');
 
-  // Helpers
-const lastStatus =
-  workOrder?.flow?.[workOrder.flow.length - 1]?.status?.toLowerCase() ?? '';
+  const [evidenceFile, setEvidenceFile] = useState<File | null>(null);
 
-const onConfirmClick = () => {
-  // Si el último estado del flow es "Parcial", pedimos cantidad
-  if (lastStatus === 'parcial') {
-    setShowConfirm(false);
-    setShowQtyModal(true);
-  } else {
-    // Si no, cerramos directo
-    handleCloseOrder();
-  }
-};
+  // ---- Derived ----
+  const lastStatus =
+    workOrder?.flow?.[workOrder.flow.length - 1]?.status?.toLowerCase() ?? '';
+  const needsEvidence =
+    workOrder?.flow?.[workOrder.flow.length - 1].status.toLowerCase() ===
+    'en auditoria';
 
-const onConfirmQty = async () => {
-  const indexPartial = workOrder?.flow?.[workOrder.flow.length - 1]?.partialReleases?.length - 1;
-  const n = Number(qtyToClient);
-  if (!Number.isFinite(n) || n <= 0) {
-    setQtyError('Ingresa una cantidad válida mayor que 0.');
-    return;
-  }
-  if (workOrder?.flow?.[workOrder.flow.length - 1]?.partialReleases?.[indexPartial]?.quantity < n) {
-    setQtyError('La cantidad no puede ser mayor a la del parcial.');
-    return;
-  }
-  
-  setQtyError('');
-  // Llama tu acción con la cantidad
-  await  cerrarParcialWorkOrderAuditory(workOrder?.flow?.[workOrder.flow.length - 1]?.partialReleases?.[indexPartial]?.id, n)
-  setShowQtyModal(false);
-  setQtyToClient('');
-};
-
-const onCancelQty = () => {
-  setShowQtyModal(false);
-};
-
-
-
+  // ---- Operators maps ----
   const operatorOptionsByAreaId = useMemo(() => {
     const map = new Map<number, Array<{ id: number; username: string }>>();
     operatorUsers.forEach((u) => {
@@ -283,7 +425,6 @@ const onCancelQty = () => {
       if (!map.has(aId)) map.set(aId, []);
       map.get(aId)!.push({ id: u.id, username: u.username });
     });
-    // orden opcional
     for (const [k, arr] of map.entries()) {
       arr.sort((a, b) => a.username.localeCompare(b.username));
       map.set(k, arr);
@@ -300,9 +441,8 @@ const onCancelQty = () => {
   const getUserOptionsForArea = (areaId: number) =>
     operatorOptionsByAreaId.get(areaId) ?? [];
 
-  // --- MODAL ASIGNACIÓN DE OPERADOR ---
+  // ---- Operator modal ----
   type PartialType = AreaData['partials'][number] | null;
-
   const [opModal, setOpModal] = useState<{
     open: boolean;
     area: AreaData | null;
@@ -333,17 +473,11 @@ const onCancelQty = () => {
 
   const closeOperatorModal = () => setOpModal((s) => ({ ...s, open: false }));
 
-  const confirmOperatorModal = async () => {
-    if (!opModal.area || opModal.selectedUserId == null) return;
-    if (!canEditUser(opModal.area, opModal.partial)) return; // 🔒 bloqueo extra
-    await handleChangeUser(
-      opModal.area,
-      opModal.partial,
-      opModal.selectedUserId
-    );
-    closeOperatorModal();
-  };
-  // Opciones filtradas para el modal (por área + búsqueda)
+  const areaTotalsByAreaId = useMemo(
+    () => buildAreaTotalsByAreaId(workOrder),
+    [workOrder]
+  );
+
   const modalOptions = useMemo(() => {
     if (!opModal.areaId) return [];
     const base = getUserOptionsForArea(opModal.areaId);
@@ -351,6 +485,18 @@ const onCancelQty = () => {
     return q ? base.filter((u) => u.username.toLowerCase().includes(q)) : base;
   }, [opModal.areaId, opModal.search, operatorOptionsByAreaId]);
 
+  const confirmOperatorModal = async () => {
+    if (!opModal.area || opModal.selectedUserId == null) return;
+    if (!canEditUser(opModal.area, opModal.partial)) return;
+    await handleChangeUser(
+      opModal.area,
+      opModal.partial,
+      opModal.selectedUserId
+    );
+    closeOperatorModal();
+  };
+
+  // ---- First-load reload workaround ----
   useEffect(() => {
     const alreadyReloaded = sessionStorage.getItem('alreadyReloaded');
     if (!alreadyReloaded) {
@@ -358,75 +504,84 @@ const onCancelQty = () => {
       window.location.reload();
     }
   }, []);
-  console.log(vistosBuenosHistory);
+
+  // ---- Evidence change ----
+  const handleEvidenceChange = (e: ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setEvidenceFile(file);
+  };
+
+  // ---- Load data ----
   useEffect(() => {
     if (!id) return;
+
     const loadData = async () => {
       try {
-        // Iniciamos el estado de carga
         setLoading(true);
 
-        // Tu llamada original a la API
         const data = await fetchWorkOrderById(id);
         const users = await fetchAllUsers();
+
         setOperatorUsers(users || []);
         setWorkOrder(data);
-        console.log("data", data);
 
-
-        const historyData = data.flow
-          .filter((item: any) => item.answers?.length > 0)
-          .map((item: any) => {
-            const areaName = item.area?.name?.toLowerCase() || '';
-            const mode = ['impresion'].includes(areaName) ? 'doble' : 'simple';
-            return {
-              areaName: item.area?.name || 'Sin nombre',
-              username: item.user?.username || '',
-              questions: item.area?.formQuestions || [],
-              formAnswers: item.answers.map((a: any) => ({
-                accepted: a.accepted,
-                altura_chip: a.altura_chip,
-                apariencia_quemado: a.apariencia_quemado,
-                carga_aplicacion: a.carga_aplicacion,
-                codigo_barras: a.codigo_barras,
-                color: a.color,
-                color_edge: a.color_edge,
-                color_foil: a.color_foil,
-                color_personalizacion: a.color_personalizacion,
-                finish_validation: a.finish_validation,
-                holographic_type: a.holographic_type,
-                imagen_holograma: a.imagen_holograma,
-                localizacion_contactos: a.localizacion_contactos,
-                magnetic_band: a.magnetic_band,
-                revisar_posicion: a.revisar_posicion,
-                revisar_tecnologia: a.revisar_tecnologia,
-                sample_quantity: a.sample_quantity,
-                testtype_cqm: a.testtype_cqm,
-                prueba_over: a.prueba_over,
-                prueba_cinta_magnetica: a.prueba_cinta_magnetica,
-                prueba_centro: a.prueba_centro,
-                tipo_personalizacion: a.tipo_personalizacion,
-                track_type: a.track_type,
-                validar_inlays: a.validar_inlays,
-                validar_kvc: a.validar_kvc,
-                validar_kvc_perso: a.validar_kvc_perso,
-                valor_anclaje: a.valor_anclaje,
-                verificar_etiqueta: a.verificar_etiqueta,
-                verificar_script: a.verificar_script,
-                created_at: a.created_at,
-
-                reviewer: a.reviewer || [],
-                FormAnswerResponse: a.FormAnswerResponse || [],
-              })),
-              mode,
-            };
-          });
+        // Vistos Buenos history
+        const historyData =
+          data.flow
+            .filter((item: any) => item.answers?.length > 0)
+            .map((item: any) => {
+              const areaName = item.area?.name?.toLowerCase() || '';
+              const mode = ['impresion'].includes(areaName)
+                ? 'doble'
+                : 'simple';
+              return {
+                areaName: item.area?.name || 'Sin nombre',
+                username: item.user?.username || '',
+                questions: item.area?.formQuestions || [],
+                formAnswers: item.answers.map((a: any) => ({
+                  accepted: a.accepted,
+                  altura_chip: a.altura_chip,
+                  apariencia_quemado: a.apariencia_quemado,
+                  carga_aplicacion: a.carga_aplicacion,
+                  codigo_barras: a.codigo_barras,
+                  color: a.color,
+                  color_edge: a.color_edge,
+                  color_foil: a.color_foil,
+                  color_personalizacion: a.color_personalizacion,
+                  finish_validation: a.finish_validation,
+                  holographic_type: a.holographic_type,
+                  imagen_holograma: a.imagen_holograma,
+                  localizacion_contactos: a.localizacion_contactos,
+                  magnetic_band: a.magnetic_band,
+                  revisar_posicion: a.revisar_posicion,
+                  revisar_tecnologia: a.revisar_tecnologia,
+                  sample_quantity: a.sample_quantity,
+                  testtype_cqm: a.testtype_cqm,
+                  prueba_over: a.prueba_over,
+                  prueba_cinta_magnetica: a.prueba_cinta_magnetica,
+                  prueba_centro: a.prueba_centro,
+                  tipo_personalizacion: a.tipo_personalizacion,
+                  track_type: a.track_type,
+                  validar_inlays: a.validar_inlays,
+                  validar_kvc: a.validar_kvc,
+                  validar_kvc_perso: a.validar_kvc_perso,
+                  valor_anclaje: a.valor_anclaje,
+                  verificar_etiqueta: a.verificar_etiqueta,
+                  verificar_script: a.verificar_script,
+                  created_at: a.created_at,
+                  reviewer: a.reviewer || [],
+                  FormAnswerResponse: a.FormAnswerResponse || [],
+                })),
+                mode,
+              };
+            }) || [];
 
         setVistosBuenosHistory(historyData);
 
-        // Procesamiento de áreas
+        // Áreas
         const areaData =
-          data?.flow?.map((item: any, index: number) => ({
+          data?.flow?.map((item: any) => ({
             id: item.area_id,
             name: item.area?.name || 'Sin nombre',
             status: item.status || 'Desconocido',
@@ -439,14 +594,14 @@ const onCancelQty = () => {
               item.area_id,
               item.areaResponse,
               item.partialReleases,
-              item.user,
-              index
+              item.user
             ),
           })) || [];
+
         setAreas(areaData);
 
-        // Procesamiento de inconformidades
-        const allInconformities =
+        // Inconformidades (directas + parciales + auditorías)
+        const allInconformities: InconformityData[] =
           data?.flow?.flatMap((flowItem: any) => {
             const areaName = flowItem.area?.name || 'Área desconocida';
 
@@ -454,21 +609,36 @@ const onCancelQty = () => {
               flowItem?.areaResponse?.inconformities?.map((inc: any) => ({
                 id: inc.id,
                 comments: inc.comments,
-                createdAt: inc.created_at,
-                createdBy: inc.user?.username || 'Desconocido',
+                createdAt: inc.created_at ?? inc.createdAt,
+                createdBy:
+                  inc.user?.username || inc.created_by || 'Desconocido',
                 area: areaName,
               })) || [];
 
             const partials =
-              flowItem?.partialReleases?.flatMap(
-                (release: any) =>
-                  release.inconformities?.map((inc: any) => ({
+              flowItem?.partialReleases?.flatMap((release: any) =>
+                (release?.inconformities || []).map((inc: any) => ({
+                  id: inc.id,
+                  comments: inc.comments,
+                  createdAt: inc.created_at ?? inc.createdAt,
+                  createdBy:
+                    inc.user?.username || inc.created_by || 'Desconocido',
+                  area: areaName,
+                }))
+              ) || [];
+
+            const partialsAuditory =
+              flowItem?.partialReleases?.flatMap((release: any) =>
+                (release?.formAuditory?.inconformities || []).map(
+                  (inc: any) => ({
                     id: inc.id,
                     comments: inc.comments,
-                    createdAt: inc.createdAt,
-                    createdBy: inc.createdBy,
+                    createdAt: inc.created_at ?? inc.createdAt,
+                    createdBy:
+                      inc.user?.username || inc.created_by || 'Desconocido',
                     area: areaName,
-                  })) || []
+                  })
+                )
               ) || [];
 
             const audits: InconformityData[] = [];
@@ -488,18 +658,18 @@ const onCancelQty = () => {
               });
             }
 
-            return [...direct, ...partials, ...audits];
+            return [...direct, ...partials, ...partialsAuditory, ...audits];
           }) || [];
+
         setInconformities(allInconformities);
 
-        // Cálculo del progreso de áreas completadas
+        // Progreso
         const completedCount = areaData.filter(
           (a: any) => a.status === 'Completado'
         ).length;
         const percentage = (completedCount / areaData.length) * 100;
         setTimeout(() => setProgressWidth(percentage), 100);
       } finally {
-        // Terminamos el estado de carga
         setLoading(false);
       }
     };
@@ -507,339 +677,72 @@ const onCancelQty = () => {
     loadData();
   }, [id]);
 
+  // ======================================================
+  // Derived totals / helpers
+  // ======================================================
+
   const areaColSpan = (area: AreaData) => {
     const base = Math.max(1, area.parciales || 0);
     const rem = area.parciales > 0 && getRemainder(area) > 0 ? 1 : 0;
     return area.parciales > 0 ? base + rem : 1;
   };
-  const handleChangeUser = async (
-    area: AreaData,
-    _partial: AreaData['partials'][number] | null,
-    newUserId: number
-  ) => {
-    const prevAreas = areas;
 
-    setAreas((prev) =>
-      prev.map((a) =>
-        a.id === area.id
-          ? {
-            ...a,
-            assigned_user_id: newUserId,
-            usuario: operatorById.get(newUserId) ?? a.usuario,
-          }
-          : a
-      )
-    );
-
-    try {
-      if (!area.flowId) throw new Error('Falta flowId del área');
-      await updateFlowAssignedUser(area.flowId, newUserId);
-    } catch (e) {
-      console.error(e);
-      setAreas(prevAreas);
-      alert('No se pudo actualizar el encargado. Se revirtieron los cambios.');
-    }
-  };
-
-  // Helpers
-  const getAnswerValue = (
-    ans: any,
-    field: 'defectuoso' | 'cqm' | 'muestras',
-    area: any
-  ) => {
-    switch (field) {
-      case 'cqm':
-        return ans?.sample_quantity ?? 0;
-      case 'muestras':
-        return ans?.sample_auditory ?? '—';
-      case 'defectuoso':
-        return (
-          area?.areaResponse?.impression?.bad_quantity ??
-          area?.areaResponse?.prepress?.bad_quantity ??
-          0
-        );
-      default:
-        return 0;
-    }
-  };
-
-  const handleCloseOrder = async () => {
-    try {
-      await closeWorkOrder(workOrder?.ot_id);
-      router.push('/seguimientoDeOts');
-    } catch (error) {
-      console.log('Error al enviar datos:', error);
-    }
-  };
-
-  const renderCell = (area: AreaData, field: NumericField) => {
-    // 1. Si la orden está cerrada, todo es lectura
-    if (workOrder?.status === 'Cerrado') {
-      return <span>{Number(area[field] ?? 0)}</span>;
-    }
-
-    // 2. Si el área no está en Completado, todo es lectura
-    if (area.status !== 'Completado') {
-      return <span>{Number(area[field] ?? 0)}</span>;
-    }
-
-    // 3. Preprensa: solo 'buenas' editable
-    if (area.id === 1) {
-      if (field === 'buenas') {
-        return (
-          <input
-            type="number"
-            value={Number(area[field] ?? 0)}
-            min={0}
-            onChange={(e) =>
-              handleValueChange(area.id, field as NumericField, e.target.value)
-            }
-            style={{
-              width: '80px',
-              padding: '4px',
-              textAlign: 'center',
-            }}
-          />
-        );
-      } else {
-        return <span>{Number(area[field] ?? 0)}</span>;
-      }
-    }
-
-    // 4. CQM solo editable de Impresión en adelante (id >=2)
-    if (field === 'cqm') {
-      if (area.id >= 2) {
-        return (
-          <input
-            type="number"
-            value={Number(area[field] ?? 0)}
-            min={0}
-            onChange={(e) =>
-              handleValueChange(area.id, field as NumericField, e.target.value)
-            }
-            style={{
-              width: '80px',
-              padding: '4px',
-              textAlign: 'center',
-            }}
-          />
-        );
-      } else {
-        return <span>{Number(area[field] ?? 0)}</span>;
-      }
-    }
-
-    // 5. Muestras solo editable de Corte en adelante (id >=6)
-    if (field === 'muestras' || field === 'defectuoso') {
-      if (area.id >= 6) {
-        return (
-          <input
-            type="number"
-            value={Number(area[field] ?? 0)}
-            min={0}
-            onChange={(e) =>
-              handleValueChange(area.id, field as NumericField, e.target.value)
-            }
-            style={{
-              width: '80px',
-              padding: '4px',
-              textAlign: 'center',
-            }}
-          />
-        );
-      } else {
-        return <span>{Number(area[field] ?? 0)}</span>;
-      }
-    }
-    if (field === 'malas') {
-      if (area.id >= 6) {
-        return (
-          <input
-            type="number"
-            value={getSumaMalasHasta(area.id)}
-            min={0}
-            onClick={handleOpenBadQuantityModal}
-            readOnly
-            style={{
-              width: '80px',
-              padding: '4px',
-              textAlign: 'center',
-              cursor: 'pointer',
-              backgroundColor: '#f9f9f9',
-            }}
-          />
-        );
-      } else {
-        return (
-          <input
-            type="number"
-            value={area[field]}
-            min={0}
-            onChange={(e) =>
-              handleValueChange(area.id, field as NumericField, e.target.value)
-            }
-            style={{
-              width: '80px',
-              padding: '4px',
-              textAlign: 'center',
-            }}
-          />
-        );
-      }
-    }
-
-    // 6. El resto de campos (buenas, malas, noprocess) editables si el área está en Completado
-    return (
-      <input
-        type="number"
-        value={area[field]}
-        min={0}
-        onChange={(e) =>
-          handleValueChange(area.id, field as NumericField, e.target.value)
-        }
-        style={{
-          width: '80px',
-          padding: '4px',
-          textAlign: 'center',
-        }}
-      />
-    );
-  };
-
-  const getSumaMalasHasta = (areaId: number): number => {
-    return areas
+  const getSumaMalasHasta = (areaId: number): number =>
+    areas
       .filter((a) => a.id <= areaId)
       .reduce((sum, a) => sum + (a.malas || 0), 0);
-  };
 
   const handleOpenBadQuantityModal = () => {
     const initialValues: { [key: string]: string } = {};
-
     areas.forEach((area) => {
       const areaKey = area.name.toLowerCase().replace(/\s/g, '');
-
       initialValues[`${areaKey}_bad`] = area.malas?.toString() || '0';
-      if (area.id >= 6) {
+      if (area.id >= 6)
         initialValues[`${areaKey}_material`] =
           area.defectuoso?.toString() || '0';
-      }
     });
-
     setAreaBadQuantities(initialValues);
     setShowBadQuantity(true);
   };
 
-  // Función para obtener los datos específicos de cada área
-  // Ahora acepta partialReleases como argumento externo
-  const getAreaData = (
-    areaId: number,
-    areaResponse: any,
-    partialReleases: any[] = [],
-    flowUser: any = null,
-    index: number = -1
-  ) => {
-    const parciales = partialReleases.length;
-    const parcialesValidados = partialReleases.filter(
-      (p) => p?.validated
-    ).length;
+  const getAreaSumaTotal = (area: AreaData) => {
+    let buenas = Number(area.buenas ?? 0);
+    let malas = Number(area.malas ?? 0);
+    let excedente = Number(area.excedente ?? 0);
+    let noprocess = Number(area.noprocess ?? 0);
+    let defectuoso = Number(area.defectuoso ?? 0);
+    let cqm = Number(area.cqm ?? 0);
+    let muestras = Number(area.muestras ?? 0);
 
-    const sumFromPartials = () => {
-      return partialReleases.reduce(
-        (acc: any, curr: any) => {
-          acc.buenas += curr.quantity || 0;
-          acc.malas += curr.bad_quantity || 0;
-          acc.excedente += curr.excess_quantity || 0;
-          acc.noprocess += curr.noprocess_quantity || 0;
-          acc.defectuoso += curr.material_quantity || 0;
+    if (area.partials?.length) {
+      const sums = area.partials.reduce(
+        (acc, p) => {
+          acc.buenas += Number(p?.quantity ?? 0);
+          acc.muestras += Number(p?.formAuditory?.sample_auditory ?? 0);
           return acc;
         },
-        { buenas: 0, malas: 0, excedente: 0, noprocess: 0, defectuoso: 0 }
+        { buenas: 0, muestras: 0 }
       );
-    };
 
-    const getCommonData = (areaKey: string) => {
-      const hasResponse = !!areaResponse?.[areaKey];
-      const usuario = areaResponse?.user?.username || flowUser?.username || '';
-      const auditor =
-        areaResponse?.[areaKey]?.formAuditory?.user?.username || '';
+      const rem = getRemainder(area);
+      buenas = sums.buenas + rem;
 
-      if (!hasResponse && parciales > 0) {
-        const resumen = sumFromPartials();
-        console.log('[PARCIAL DETECTADO]', areaKey, resumen);
-        return {
-          ...resumen,
-          cqm: 0,
-          muestras: 0,
-          usuario,
-          auditor,
-          parciales,
-          parcialesValidados,
-          partials: partialReleases,
-        };
-      }
+      const answersCqm = (area.answers ?? []).reduce(
+        (s, a) => s + Number(a?.sample_quantity ?? 0),
+        0
+      );
+      cqm = answersCqm;
 
-      return {
-        buenas:
-          areaResponse?.[areaKey]?.good_quantity ||
-          areaResponse?.[areaKey]?.release_quantity ||
-          areaResponse?.[areaKey]?.plates ||
-          0,
-        malas: areaResponse?.[areaKey]?.bad_quantity || 0,
-        excedente: areaResponse?.[areaKey]?.excess_quantity || 0,
-        noprocess: areaResponse?.[areaKey]?.noprocess_quantity || 0,
-        defectuoso: areaResponse?.[areaKey]?.material_quantity || 0,
-        cqm: areaResponse?.[areaKey]?.form_answer?.sample_quantity ?? 0,
-        muestras: areaResponse?.[areaKey]?.formAuditory?.sample_auditory ?? 0,
-        usuario,
-        auditor,
-        parciales,
-        parcialesValidados,
-        partials: partialReleases,
-      };
-    };
-
-    switch (areaId) {
-      case 1:
-        return getCommonData('prepress');
-      case 2:
-        return getCommonData('impression');
-      case 3:
-        return getCommonData('serigrafia');
-      case 4:
-        return getCommonData('empalme');
-      case 5:
-        return getCommonData('laminacion');
-      case 6:
-        return getCommonData('corte');
-      case 7:
-        return getCommonData('colorEdge');
-      case 8:
-        return getCommonData('hotStamping');
-      case 9:
-        return getCommonData('millingChip');
-      case 10:
-        return getCommonData('personalizacion');
-      default:
-        return {
-          buenas: 0,
-          malas: 0,
-          excedente: 0,
-          noprocess: 0,
-          defectuoso: 0,
-          cqm: 0,
-          muestras: 0,
-          usuario: '',
-          auditor: '',
-          parciales: 0,
-          parcialesValidados: 0,
-          partials: [],
-        };
+      muestras = Number(area.muestras ?? 0) + sums.muestras;
     }
+
+    return buenas + malas + excedente + noprocess + defectuoso + cqm + muestras;
   };
 
   const cantidadHojasRaw = Number(workOrder?.quantity) / 24;
   const cantidadHojas = cantidadHojasRaw > 0 ? Math.ceil(cantidadHojasRaw) : 0;
   const totalSheetsEffective = workOrder?.total_sheets ?? cantidadHojas;
+
   const ultimaArea = areas[areas.length - 1];
   const totalMalas = areas.reduce((acc, area) => acc + (area.malas || 0), 0);
   const totalDefectuoso = areas.reduce(
@@ -865,6 +768,206 @@ const onCancelQty = () => {
     totalDefectuoso +
     totalCqm +
     totalMuestras;
+
+  const getAnswerValue = (
+    ans: any,
+    field: 'defectuoso' | 'cqm' | 'muestras',
+    area: any
+  ) => {
+    switch (field) {
+      case 'cqm':
+        return ans?.sample_quantity ?? 0;
+      case 'muestras':
+        return ans?.sample_auditory ?? '—';
+      case 'defectuoso':
+        return (
+          area?.areaResponse?.impression?.bad_quantity ??
+          area?.areaResponse?.prepress?.bad_quantity ??
+          0
+        );
+      default:
+        return 0;
+    }
+  };
+
+  // ======================================================
+  // Actions
+  // ======================================================
+
+  const handleChangeUser = async (
+    area: AreaData,
+    _partial: AreaData['partials'][number] | null,
+    newUserId: number
+  ) => {
+    const prevAreas = areas;
+
+    setAreas((prev) =>
+      prev.map((a) =>
+        a.id === area.id
+          ? {
+              ...a,
+              assigned_user_id: newUserId,
+              usuario: operatorById.get(newUserId) ?? a.usuario,
+            }
+          : a
+      )
+    );
+
+    try {
+      if (!area.flowId) throw new Error('Falta flowId del área');
+      await updateFlowAssignedUser(area.flowId, newUserId);
+    } catch (e) {
+      setAreas(prevAreas);
+      alert('No se pudo actualizar el encargado. Se revirtieron los cambios.');
+    }
+  };
+  console.log('workOrder', workOrder);
+  const getFlowIdInAudit = (workOrder: any): number | null => {
+    const flows = workOrder?.flow ?? [];
+    const norm = (s?: string | null) => (s ?? '').toLowerCase();
+
+    const found = flows.find((f: any) => norm(f.status).includes('auditoria'));
+    return found?.id ?? null;
+  };
+
+  // Uso
+  const flowId = getFlowIdInAudit(workOrder);
+  console.log(flowId); // 👉 785
+
+  const handleCloseOrder = async () => {
+    try {
+      if (
+        workOrder?.flow[workOrder?.flow.length - 1].status.toLowerCase() ===
+        'en auditoria'
+      ) {
+        if (!evidenceFile)
+          throw new Error('Adjunta la evidencia (imagen o PDF).');
+        await subirArchivoOrden(
+          workOrder.id,
+          evidenceFile,
+          'DESTRUCTION_EVIDENCE'
+        );
+      }
+
+      // 2) Hacer narrowing del flowId antes de usarlo
+      const flowId = getFlowIdInAudit(workOrder);
+      if (flowId == null) {
+        throw new Error('No se encontró un flujo con estado de auditoría.');
+      }
+
+      // 3) Tipar y asegurar que ambos sean number
+      const payload: { workOrderFlowId: number; workOrderId: number } = {
+        workOrderFlowId: flowId,
+        workOrderId: Number(workOrder.id),
+      };
+
+      console.log('Payload to send:', payload);
+      await liberarWorkOrderAuditory(payload);
+      router.push('/cerrarOrdenDeTrabajo');
+    } catch (error) {
+      console.error('Error al enviar datos:', error);
+    }
+  };
+
+  const renderCell = (area: AreaData, field: NumericField) => {
+    // 1. OT cerrada → lectura
+    if (workOrder?.status === 'Cerrado')
+      return <span>{Number(area[field] ?? 0)}</span>;
+
+    // 2. Área no completada → lectura
+    if (area.status !== 'Completado')
+      return <span>{Number(area[field] ?? 0)}</span>;
+
+    // 3. Preprensa → solo 'buenas' editable
+    if (area.id === 1) {
+      if (field === 'buenas') {
+        return (
+          <input
+            type="number"
+            value={Number(area[field] ?? 0)}
+            min={0}
+            onChange={(e) => handleValueChange(area.id, field, e.target.value)}
+            style={{ width: '80px', padding: '4px', textAlign: 'center' }}
+          />
+        );
+      }
+      return <span>{Number(area[field] ?? 0)}</span>;
+    }
+
+    // 4. CQM editable desde Impresión (id >= 2)
+    if (field === 'cqm') {
+      if (area.id >= 2) {
+        return (
+          <input
+            type="number"
+            value={Number(area[field] ?? 0)}
+            min={0}
+            onChange={(e) => handleValueChange(area.id, field, e.target.value)}
+            style={{ width: '80px', padding: '4px', textAlign: 'center' }}
+          />
+        );
+      }
+      return <span>{Number(area[field] ?? 0)}</span>;
+    }
+
+    // 5. Muestras y Defectuoso editables desde Corte (id >= 6)
+    if (field === 'muestras' || field === 'defectuoso') {
+      if (area.id >= 6) {
+        return (
+          <input
+            type="number"
+            value={Number(area[field] ?? 0)}
+            min={0}
+            onChange={(e) => handleValueChange(area.id, field, e.target.value)}
+            style={{ width: '80px', padding: '4px', textAlign: 'center' }}
+          />
+        );
+      }
+      return <span>{Number(area[field] ?? 0)}</span>;
+    }
+
+    // 6. Malas: desde Corte en adelante se gestiona via modal acumulado
+    if (field === 'malas') {
+      if (area.id >= 6) {
+        return (
+          <input
+            type="number"
+            value={getSumaMalasHasta(area.id)}
+            min={0}
+            onClick={handleOpenBadQuantityModal}
+            readOnly
+            style={{
+              width: '80px',
+              padding: '4px',
+              textAlign: 'center',
+              cursor: 'pointer',
+              backgroundColor: '#f9f9f9',
+            }}
+          />
+        );
+      }
+      return (
+        <input
+          type="number"
+          value={area[field]}
+          min={0}
+          onChange={(e) => handleValueChange(area.id, field, e.target.value)}
+          style={{ width: '80px', padding: '4px', textAlign: 'center' }}
+        />
+      );
+    }
+
+    // 7. Resto de campos editables si área = Completado
+    return (
+      <input
+        type="number"
+        value={area[field]}
+        min={0}
+        onChange={(e) => handleValueChange(area.id, field, e.target.value)}
+        style={{ width: '80px', padding: '4px', textAlign: 'center' }}
+      />
+    );
+  };
 
   const handleValueChange = (
     areaId: number,
@@ -900,6 +1003,7 @@ const onCancelQty = () => {
 
           const normalizedName = updated.name.toLowerCase().replace(/\s/g, '');
           const block = blockMap[normalizedName] || 'otros';
+
           const blockId = (updated.response as any)?.[block]?.id;
           const formId = (updated.response as any)?.[block]?.form_auditory_id;
           const cqmId = (updated.response as any)?.[block]?.form_answer_id;
@@ -911,16 +1015,16 @@ const onCancelQty = () => {
             noprocess_quantity: updated.noprocess,
             material_quantity: updated.defectuoso,
           };
+
           let sample_data: Record<string, number> = {
             sample_quantity: updated.cqm,
             sample_auditory: updated.muestras,
           };
 
           if (block === 'prepress') {
-            data = {
-              plates: updated.buenas,
-            };
+            data = { plates: updated.buenas };
           }
+
           if (
             ['impression', 'serigrafia', 'laminacion', 'empalme'].includes(
               block
@@ -931,9 +1035,7 @@ const onCancelQty = () => {
               bad_quantity: updated.malas,
               excess_quantity: updated.excedente,
             };
-            sample_data = {
-              sample_quantity: updated.cqm,
-            };
+            sample_data = { sample_quantity: updated.cqm };
           }
 
           return {
@@ -948,45 +1050,58 @@ const onCancelQty = () => {
         }),
     };
 
-    console.log('Payload a enviar:', payload);
-
     try {
       await updateWorkOrderAreas(workOrder.ot_id, payload);
       alert('Cambios guardados correctamente');
       window.location.reload();
     } catch (err) {
-      console.error(err);
       alert('Error al guardar los cambios');
     }
   };
 
-  const getStatusStyle = (status: string) => {
-    switch (status) {
-      case 'Completado':
-        return 'bg-green-100 text-green-800';
-      case 'Pendiente':
-        return 'bg-yellow-100 text-yellow-800';
-      case 'En proceso':
-        return 'bg-blue-100 text-blue-800';
-      case 'Listo':
-      case 'En calidad':
-      case 'Enviado a CQM':
-        return 'bg-yellow-100 text-yellow-800';
-      case 'Enviado a Auditoria':
-        return 'bg-purple-100 text-purple-800';
-      case 'Parcial':
-        return 'bg-orange-100 text-orange-800';
-      default:
-        return 'bg-gray-100 text-gray-800';
+  const downloadFile = async (filename: string) => {
+    try {
+      const arrayBuffer = await getFileByName(filename);
+      const mime = guessMimeFromName(filename);
+      const blob = new Blob([arrayBuffer], { type: mime });
+      const url = window.URL.createObjectURL(blob);
+      window.open(url, '_blank');
+      setTimeout(() => window.URL.revokeObjectURL(url), 5000);
+    } catch (error) {
+      console.error('Error al abrir el archivo:', error);
     }
   };
 
-  const filteredAreas = areas.filter(
-    (area) =>
-      area.status === 'Completado' && area.name.toLowerCase() !== 'preprensa'
-  );
+  const canEditUser = (
+    area: AreaData,
+    partial?: AreaData['partials'][number] | null
+  ) => {
+    if (workOrder?.status === 'Cerrado') return false;
 
-  // justo antes de tu return principal
+    const editableStatuses = [
+      'En proceso',
+      'Parcial',
+      'Enviado a CQM',
+      'Listo',
+      'En inconformidad',
+      'En inconformidad CQM',
+    ];
+
+    if (partial)
+      return !partial.validated && editableStatuses.includes(area.status);
+    return editableStatuses.includes(area.status);
+  };
+
+  const fieldLabels: Record<string, string> = {
+    buenas: 'Buenas',
+    malas: 'Malas',
+    excedente: 'Excedente',
+    noprocess: 'Sin procesar',
+  };
+
+  // ======================================================
+  // UI Guards
+  // ======================================================
 
   if (loading) {
     return (
@@ -999,7 +1114,6 @@ const onCancelQty = () => {
     );
   }
 
-  // sólo comprobamos workOrder, no areas
   if (!workOrder) {
     return (
       <Container>
@@ -1007,69 +1121,19 @@ const onCancelQty = () => {
       </Container>
     );
   }
-  const guessMimeFromName = (filename: string): string => {
-    const ext = filename.split('.').pop()?.toLowerCase();
-    switch (ext) {
-      case 'pdf':
-        return 'application/pdf';
-      case 'png':
-        return 'image/png';
-      case 'jpg':
-      case 'jpeg':
-        return 'image/jpeg';
-      case 'webp':
-        return 'image/webp';
-      default:
-        return 'application/octet-stream';
-    }
-  };
 
-  const downloadFile = async (filename: string) => {
-    try {
-      const arrayBuffer = await getFileByName(filename); // <- ya la tienes
-      const mime = guessMimeFromName(filename);
-      const blob = new Blob([arrayBuffer], { type: mime });
-      const url = window.URL.createObjectURL(blob);
+  const totalCols = areas.reduce(
+    (sum, area) => sum + (area.parciales > 0 ? area.parciales : 1),
+    0
+  );
+  const filteredAreas = areas.filter(
+    (area) =>
+      area.status === 'Completado' && area.name.toLowerCase() !== 'preprensa'
+  );
 
-      // abre en nueva pestaña (sirve para PDF e imágenes)
-      window.open(url, '_blank');
-
-      // liberar URL luego
-      setTimeout(() => window.URL.revokeObjectURL(url), 5000);
-    } catch (error) {
-      console.error('Error al abrir el archivo:', error);
-    }
-  };
-
-  // pasar al return normal sin más guards globales
-  const totalCols = areas.reduce((sum, area) => {
-    return sum + (area.parciales > 0 ? area.parciales : 1);
-  }, 0);
-
-  const canEditUser = (
-    area: AreaData,
-    partial?: AreaData['partials'][number] | null
-  ) => {
-    // bloquea si la OT completa está cerrada
-    if (workOrder?.status === 'Cerrado') return false;
-
-    // con parciales: solo si el parcial NO está validado y el área está "En proceso"
-    if (partial)
-      return (
-        !partial.validated &&
-        ['En proceso', 'Parcial' /*, 'Otro estado'*/].includes(area.status)
-      );
-
-    // sin parciales: solo si el área está "En proceso"
-    return ['En proceso', 'Parcial' /*, 'Otro estado'*/].includes(area.status);
-  };
-
-  const fieldLabels: Record<string, string> = {
-    buenas: "Buenas",
-    malas: "Malas",
-    excedente: "Excedente",
-    noprocess: "Sin procesar",
-  };
+  // ======================================================
+  // Render
+  // ======================================================
 
   return (
     <>
@@ -1144,35 +1208,30 @@ const onCancelQty = () => {
               </p>
             </CardContent>
           </Card>
+
           <Card>
             <CardContent>
               <p className="text-sm text-muted-foreground text-black">
                 Archivos de la Orden de Trabajo
               </p>
               {workOrder?.files && workOrder.files.length > 0 ? (
-                <div className=" flex gap-3 m-2">
+                <div className="flex gap-3 m-2">
                   {workOrder.files.map((file: any) => {
                     const label =
-                    file.type === 'OT'
-                      ? 'Ver OT'
-                      : file.type === 'SKU'
-                      ? 'Ver SKU'
-                      : file.type === 'OP'
-                      ? 'Ver OP'
-                      : file.type === 'CARD_IMAGE'
-                      ? 'Ver TARJETA'
-                      : 'Adjunto';
+                      file.type === 'OT'
+                        ? 'Ver OT'
+                        : file.type === 'SKU'
+                        ? 'Ver SKU'
+                        : file.type === 'OP'
+                        ? 'Ver OP'
+                        : file.type === 'CARD_IMAGE'
+                        ? 'Ver TARJETA'
+                        : 'Adjunto';
                     return (
                       <button
                         key={file.id}
                         onClick={() => downloadFile(file.file_path)}
-                        className="flex-row items-center
-                                 rounded-xl border border-gray-200
-                                 bg-white px-4 py-2 text-sm font-medium text-gray-700
-                                 shadow-sm transition
-                                 hover:bg-gray-50 hover:shadow-md
-                                 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-1
-                                 active:scale-[0.98]"
+                        className="flex-row items-center rounded-xl border border-gray-200 bg-white px-4 py-2 text-sm font-medium text-gray-700 shadow-sm transition hover:bg-gray-50 hover:shadow-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-1 active:scale-[0.98]"
                       >
                         {label}
                       </button>
@@ -1187,12 +1246,14 @@ const onCancelQty = () => {
             </CardContent>
           </Card>
         </div>
+
         {areas.length > 0 && (
           <ProgressBarAreas areas={areas} progressWidth={progressWidth} />
         )}
 
         <Section>
           <SectionTitle>Datos de Producción</SectionTitle>
+
           <TableWrapper>
             <div className="overflow-x-auto">
               <table className="min-w-full border-collapse bg-white rounded-xl shadow text-sm">
@@ -1205,9 +1266,10 @@ const onCancelQty = () => {
                       <th
                         key={`${area.id}-${index}-header-area`}
                         className="p-3 text-center font-semibold align-bottom"
-                        colSpan={areaColSpan(area)} // antes: Math.max(1, area.parciales)
+                        colSpan={areaColSpan(area)}
                       >
-                        {area.name}{' '}{area.isCollator && area.id === 4 ? '(C)' : ''}
+                        {area.name}{' '}
+                        {area.isCollator && area.id === 4 ? '(C)' : ''}
                         <div className="text-[0.65rem] text-gray-400 mt-1">
                           {area.status}
                         </div>
@@ -1270,12 +1332,12 @@ const onCancelQty = () => {
                         <td
                           key={`${area.id}-encargado-${index}`}
                           className="text-center"
-                          colSpan={areaColSpan(area)} // 👈 cubre todos los parciales de esa área
+                          colSpan={areaColSpan(area)}
                         >
                           {editable ? (
                             <button
                               className="border rounded px-2 py-1 hover:bg-gray-50"
-                              onClick={() => openOperatorModal(area, null)} // 👈 SOLO reasigna el flow
+                              onClick={() => openOperatorModal(area, null)}
                               title="Cambiar encargado del remanente"
                             >
                               {currentAssignedName}
@@ -1287,6 +1349,7 @@ const onCancelQty = () => {
                       );
                     })}
                   </tr>
+
                   {/* Usuario */}
                   <tr>
                     <td className="p-3 font-semibold">Usuario</td>
@@ -1310,7 +1373,6 @@ const onCancelQty = () => {
                           );
                         });
 
-                        // si hay remanente, añade columna Rem con el usuario del último parcial
                         const rem = getRemainder(area) > 0;
                         if (rem) {
                           const lastP = getLastPartial(area);
@@ -1332,7 +1394,6 @@ const onCancelQty = () => {
                         return cells;
                       }
 
-                      // Sin parciales: mostrar encargado actual como texto (edición se hace en fila Encargado)
                       const currentNameNoPartial =
                         (area.assigned_user_id != null
                           ? operatorById.get(area.assigned_user_id)
@@ -1350,7 +1411,8 @@ const onCancelQty = () => {
                       );
                     })}
                   </tr>
-                  {/* ✅ Calidad (reviewer por answer, alineado por parciales y Rem) */}
+
+                  {/* Calidad */}
                   <tr>
                     <td className="p-3 font-semibold">Calidad</td>
                     {areas.flatMap((area, aIdx) => {
@@ -1367,10 +1429,11 @@ const onCancelQty = () => {
                             }
                           >
                             <span
-                              className={`px-2 py-1 rounded-lg text-sm font-medium ${name && name !== '—'
-                                ? 'bg-yellow-100 text-yellow-800' // badge “Calidad”
-                                : '' // badge vacío
-                                }`}
+                              className={`px-2 py-1 rounded-lg text-sm font-medium ${
+                                name && name !== '—'
+                                  ? 'bg-yellow-100 text-yellow-800'
+                                  : ''
+                              }`}
                             >
                               {name || '—'}
                             </span>
@@ -1378,7 +1441,6 @@ const onCancelQty = () => {
                         ));
                       }
 
-                      // Sin parciales → último answer
                       const lastAns = getLastAnswer(area);
                       const reviewerName = getReviewerNameFromAnswer(lastAns);
 
@@ -1388,10 +1450,11 @@ const onCancelQty = () => {
                           className="text-center"
                         >
                           <span
-                            className={`px-2 py-1 rounded-lg text-sm font-medium ${reviewerName && reviewerName !== '—'
-                              ? 'bg-yellow-100 text-yellow-800'
-                              : ''
-                              }`}
+                            className={`px-2 py-1 rounded-lg text-sm font-medium ${
+                              reviewerName && reviewerName !== '—'
+                                ? 'bg-yellow-100 text-yellow-800'
+                                : ''
+                            }`}
                           >
                             {reviewerName || '—'}
                           </span>
@@ -1403,25 +1466,62 @@ const onCancelQty = () => {
                   {/* Auditor */}
                   <tr>
                     <td className="p-3 font-semibold">Auditor</td>
-                    {areas.map((area, index) => (
-                      <td
-                        key={`${area.id}-auditor-${index}`}
-                        className="text-center"
-                        colSpan={areaColSpan(area)} // 👈 clave
-                      >
-                        {area.auditor}
-                      </td>
-                    ))}
+                    {areas.flatMap((area, aIdx) => {
+                      if (area.parciales > 0) {
+                        const reviewers = getPerPartialAuditors(area);
+                        return reviewers.map((name, i) => (
+                          <td
+                            key={`cell-area-${area.id}-partial-${i}-auditor`}
+                            className="text-center"
+                            title={
+                              i >= area.parciales
+                                ? 'Remanente'
+                                : `Parcial ${i + 1}`
+                            }
+                          >
+                            <span
+                              className={`px-2 py-1 rounded-lg text-sm font-medium ${
+                                name && name !== '—'
+                                  ? 'bg-purple-100 text-purple-800'
+                                  : ''
+                              }`}
+                            >
+                              {name || '-'}
+                            </span>
+                          </td>
+                        ));
+                      }
+
+                      const auditor = getLastAuditor(area);
+                      const auditorName = auditor?.username ?? '—';
+
+                      return (
+                        <td
+                          key={`cell-area-${area.id}-auditor-${aIdx}`}
+                          className="text-center"
+                        >
+                          <span
+                            className={`px-2 py-1 rounded-lg text-sm font-medium ${
+                              auditorName !== '—'
+                                ? 'bg-purple-100 text-purple-800'
+                                : ''
+                            }`}
+                          >
+                            {auditorName}
+                          </span>
+                        </td>
+                      );
+                    })}
                   </tr>
 
-                  {/* Estado con Badge visual */}
+                  {/* Estado */}
                   <tr>
                     <td className="p-3 font-semibold">Estado</td>
                     {areas.map((area, index) => (
                       <td
                         key={`${area.id}-status-${index}`}
                         className="text-center"
-                        colSpan={areaColSpan(area)} // 👈 clave
+                        colSpan={areaColSpan(area)}
                       >
                         <span
                           className={`px-2 py-1 rounded-lg text-sm font-medium ${getStatusStyle(
@@ -1434,47 +1534,77 @@ const onCancelQty = () => {
                     ))}
                   </tr>
 
-                  {/* Entradas */}
+                  {/* Producción */}
                   <tr>
                     <td
-                      colSpan={1 + totalCols} // 1 extra por la primera columna "Dato"
+                      colSpan={1 + totalCols}
                       className="bg-gray-50 px-3 py-2 font-bold text-gray-500"
                     >
                       📥 Producción
                     </td>
                   </tr>
-                  {['buenas', 'malas', 'excedente', 'noprocess'].map(
+
+                  {(['buenas', 'malas', 'excedente', 'noprocess'] as const).map(
                     (field) => (
                       <tr key={field}>
                         <td className="p-3 capitalize font-semibold">
                           {fieldLabels[field]}
                         </td>
-                        {/* Por cada área, creamos tantas celdas como parciales (o 1 si no hay) */}
-                        {areas.flatMap((area, aIndex) => {
-                          // Si hay parciales, pintamos cada parcial como una columna
-                          if (area.parciales > 0 && area.partials?.length) {
-                            const cells = area.partials.map((p, pIndex) => {
-                              const value =
-                                field === 'buenas'
-                                  ? p.quantity
-                                  : field === 'malas'
-                                    ? p.bad_quantity ?? 0
-                                    : field === 'excedente' ? p.excess_quantity ?? 0
-                                      : p.noprocess_quantity ?? '';
-                              return (
-                                <td
-                                  key={`area-${area.id}-parcial-${p.id}-${field}-${pIndex}`}
-                                  className="text-center"
-                                >
-                                  {value}
-                                </td>
-                              );
-                            });
 
-                            // Columna de REMANENTE solo si hay resto > 0
+                        {areas.flatMap((area, aIndex) => {
+                          if (area.parciales > 0 && area.partials?.length) {
+                            const cells: React.ReactNode[] = area.partials.map(
+                              (p, pIndex) => {
+                                const value =
+                                  field === 'buenas'
+                                    ? toNum(p.quantity)
+                                    : field === 'malas'
+                                    ? toNum(p.bad_quantity)
+                                    : field === 'excedente'
+                                    ? toNum(p.excess_quantity)
+                                    : toNum(p.noprocess_quantity);
+                                return (
+                                  <td
+                                    key={`area-${area.id}-parcial-${
+                                      p.id ?? pIndex
+                                    }-${field}`}
+                                    className="text-center"
+                                  >
+                                    {value}
+                                  </td>
+                                );
+                              }
+                            );
+
                             const rem = getRemainder(area);
                             if (rem > 0) {
-                              const remValue = field === 'buenas' ? rem : 0; // por defecto 0 para malas/excedente
+                              let remValue = 0;
+                              switch (field) {
+                                case 'buenas':
+                                  remValue = getRemainderByField(
+                                    area,
+                                    'buenas'
+                                  );
+                                  break;
+                                case 'excedente':
+                                  remValue = getRemainderByField(
+                                    area,
+                                    'excedente'
+                                  );
+                                  break;
+                                case 'noprocess':
+                                  remValue = getRemainderByField(
+                                    area,
+                                    'noprocess'
+                                  );
+                                  break;
+                                case 'malas':
+                                  remValue = getRemainderByField(area, 'malas');
+                                  break;
+                                default:
+                                  remValue = 0;
+                              }
+
                               cells.push(
                                 <td
                                   key={`area-${area.id}-parcial-rem-${field}`}
@@ -1485,18 +1615,16 @@ const onCancelQty = () => {
                                 </td>
                               );
                             }
+
                             return cells;
                           }
 
-                          // Si NO hay parciales, dejamos una sola celda (Total del área)
-                          const totalValue =
-                            renderCell(area, field as NumericField) || 0;
                           return (
                             <td
                               key={`area-${area.id}-no-parciales-${field}-${aIndex}`}
                               className="text-center"
                             >
-                              {totalValue}
+                              {renderCell(area, field)}
                             </td>
                           );
                         })}
@@ -1504,15 +1632,16 @@ const onCancelQty = () => {
                     )
                   )}
 
-                  {/* Control de calidad */}
+                  {/* Calidad */}
                   <tr>
                     <td
-                      colSpan={1 + totalCols} // 1 extra por la primera columna "Dato"
+                      colSpan={1 + totalCols}
                       className="bg-gray-50 px-3 py-2 font-bold text-gray-500"
                     >
                       🔍 Calidad
                     </td>
                   </tr>
+
                   {['defectuoso', 'cqm', 'muestras'].map((field) => (
                     <tr key={field}>
                       <td className="p-3 capitalize font-semibold">
@@ -1523,14 +1652,13 @@ const onCancelQty = () => {
 
                       {areas.flatMap((area, aIdx) => {
                         if (area.parciales > 0) {
-                          // ✅ AHORA llenamos cada parcial y (si existe) REM con datos reales
                           const vals =
                             field === 'cqm'
-                              ? getPerPartialCqm(area) // ✅ sin fallback para Rem
+                              ? getPerPartialCqm(area)
                               : getPerPartialValues(
-                                area,
-                                field as 'defectuoso' | 'muestras'
-                              );
+                                  area,
+                                  field as 'defectuoso' | 'muestras'
+                                );
                           return vals.map((v, i) => (
                             <td
                               key={`cell-area-${area.id}-parcial-${i}-${field}`}
@@ -1546,12 +1674,11 @@ const onCancelQty = () => {
                           ));
                         }
 
-                        // Sin parciales → comportamiento anterior (una sola celda)
                         const totalValue =
                           field === 'cqm'
-                            ? getSingleCqm(area) // ✅ ahora toma el sample_quantity del último answer
+                            ? getSingleCqm(area)
                             : renderCell?.(area, field as any) ??
-                            getAnswerValue(undefined, field as any, area);
+                              getAnswerValue(undefined, field as any, area);
 
                         return (
                           <td
@@ -1565,7 +1692,7 @@ const onCancelQty = () => {
                     </tr>
                   ))}
 
-                  {/* SUMA TOTAL */}
+                  {/* Suma total */}
                   <tr className="bg-slate-100 font-semibold text-sm">
                     <td className="p-3">📊 Suma Total</td>
                     {areas.map((area, index) => (
@@ -1574,13 +1701,7 @@ const onCancelQty = () => {
                         className="text-center"
                         colSpan={areaColSpan(area)}
                       >
-                        {area.buenas +
-                          area.malas +
-                          area.excedente +
-                          area.noprocess +
-                          area.defectuoso +
-                          area.cqm +
-                          area.muestras}
+                        {getAreaSumaTotal(area)}
                       </td>
                     ))}
                   </tr>
@@ -1592,35 +1713,46 @@ const onCancelQty = () => {
                       <td
                         key={`${area.id}-b+e-${index}`}
                         className="text-center"
-                        colSpan={areaColSpan(area)} // 👈 clave
+                        colSpan={areaColSpan(area)}
                       >
                         {area.id >= 6 ? area.buenas + area.excedente : ''}
                       </td>
                     ))}
                   </tr>
 
-                  {/* Control de Auditoria */}
-
+                  {/* Auditoría */}
                   <tr className="font-semibold">
                     <td className="p-3">🔍 Auditoría</td>
                     {areas.map((area, index) => {
                       const ps = area.partials ?? [];
-                      const totalQty = ps.reduce((s: any, p: any) => s + (Number(p?.quantity) || 0), 0);
-                      const totalRel = ps.reduce((s: any, p: any) => s + (Number(p?.release_quantity) || 0), 0);
+                      const totalQty = ps.reduce(
+                        (s: any, p: any) => s + (Number(p?.quantity) || 0),
+                        0
+                      );
+                      const totalRel = ps.reduce(
+                        (s: any, p: any) =>
+                          s + (Number(p?.release_quantity) || 0),
+                        0
+                      );
                       const restante = totalQty - totalRel;
-                      return (<td
-                        key={`${area.id}-b+e-${index}`}
-                        className="text-center"
-                        colSpan={areaColSpan(area)} // 👈 clave
-                      >
-                        {(index === (areas.length - 1) && area.parciales > 0) ? restante : ''}
-                      </td>)
+                      return (
+                        <td
+                          key={`${area.id}-b+e-${index}`}
+                          className="text-center"
+                          colSpan={areaColSpan(area)}
+                        >
+                          {index === areas.length - 1 && area.parciales > 0
+                            ? restante
+                            : ''}
+                        </td>
+                      );
                     })}
                   </tr>
                 </tbody>
               </table>
             </div>
           </TableWrapper>
+
           {workOrder?.status !== 'En proceso' && (
             <>
               <SectionTitle>Cuadres</SectionTitle>
@@ -1674,19 +1806,19 @@ const onCancelQty = () => {
               </TableWrapper>
             </>
           )}
+
           <PartialHistory
             workOrder={workOrder}
+            partialSectionOpen={partialSectionOpen}
+            togglePartialSection={() => setPartialSectionOpen((s) => !s)}
+            areaTotalsByAreaId={areaTotalsByAreaId}
           />
-          <VistosBuenosHistory
-            history={vistosBuenosHistory}
-            qualitySectionOpen={qualitySectionOpen}
-            toggleQualitySection={toggleQualitySection}
-          />
-          <InconformitiesHistory
-            inconformities={inconformities}
-            qualitySectionOpen={inconformitySectionOpen}
-            toggleQualitySection={toggleInconformitySection}
-          />
+          {/*
+            
+            <VistosBuenosHistory history={vistosBuenosHistory} qualitySectionOpen={qualitySectionOpen} toggleQualitySection={() => setQualitySectionOpen((s) => !s)} />
+            <InconformitiesHistory inconformities={inconformities} qualitySectionOpen={inconformitySectionOpen} toggleQualitySection={() => setInconformitySectionOpen((s) => !s)} />
+            
+            */}
 
           {opModal.open && (
             <ModalOverlay>
@@ -1697,7 +1829,6 @@ const onCancelQty = () => {
                   {opModal.partial ? ' (Parcial abierto)' : ''}
                 </h4>
 
-                {/* Buscador */}
                 <input
                   type="text"
                   value={opModal.search}
@@ -1708,7 +1839,6 @@ const onCancelQty = () => {
                   className="w-full border rounded px-3 py-2 mb-3"
                 />
 
-                {/* Lista de operadores */}
                 <div className="max-h-64 overflow-y-auto border rounded">
                   {modalOptions.length === 0 ? (
                     <div className="p-3 text-sm text-gray-500">
@@ -1723,8 +1853,9 @@ const onCancelQty = () => {
                           onClick={() =>
                             setOpModal((s) => ({ ...s, selectedUserId: u.id }))
                           }
-                          className={`w-full text-left px-3 py-2 border-b last:border-b-0 ${selected ? 'bg-blue-100' : 'hover:bg-gray-50'
-                            }`}
+                          className={`w-full text-left px-3 py-2 border-b last:border-b-0 ${
+                            selected ? 'bg-blue-100' : 'hover:bg-gray-50'
+                          }`}
                         >
                           {u.username}
                         </button>
@@ -1753,14 +1884,22 @@ const onCancelQty = () => {
               <SaveButton onClick={() => handleSaveChanges(areas)}>
                 Guardar Cambios
               </SaveButton>
-              <CloseButton onClick={() => {
-                if (lastStatus === 'parcial'){ setShowQtyModal(true)}else{ setShowConfirm(true) }}}>
+              <CloseButton
+                onClick={() => {
+                  if (lastStatus === 'parcial') {
+                    setShowQtyModal(true);
+                  } else {
+                    setShowConfirm(true);
+                  }
+                }}
+              >
                 Cerrar Orden de Trabajo
               </CloseButton>
             </>
           )}
         </Section>
       </Container>
+
       {showBadQuantity && (
         <BadQuantityModal
           areas={filteredAreas}
@@ -1768,35 +1907,51 @@ const onCancelQty = () => {
           setAreaBadQuantities={setAreaBadQuantities}
           onConfirm={(updatedAreas) => {
             setShowBadQuantity(false);
-            // Aquí puedes guardar cambios también
-            console.log('updatedAreas:', updatedAreas);
             handleSaveChanges(updatedAreas);
           }}
           onClose={() => setShowBadQuantity(false)}
         />
       )}
+
       {showConfirm && (
         <ModalOverlay>
           <ModalBox>
             <h4>¿Estás segura/o que deseas cerrar esta Orden de Trabajo?</h4>
-            <div
-              style={{
-                display: 'flex',
-                justifyContent: 'flex-end',
-                gap: '1rem',
-                marginTop: '1rem',
-              }}
-            >
+
+            {workOrder?.flow[
+              workOrder?.flow.length - 1
+            ].status.toLowerCase() === 'en auditoria' ? (
+              <FileUploadWrapper>
+                <FileLabel htmlFor="fileUpload">
+                  Subir evidencia de destrucción de piezas malas (imagen o PDF)
+                  (Requerido)
+                </FileLabel>
+                <FileRow>
+                  <VisibleFileInput
+                    onChange={handleEvidenceChange}
+                    type="file"
+                    id="fileUpload"
+                    accept="image/*,application/pdf"
+                  />
+                </FileRow>
+              </FileUploadWrapper>
+            ) : null}
+
+            <ModalActions>
               <CancelButton onClick={() => setShowConfirm(false)}>
                 Cancelar
               </CancelButton>
-              <ConfirmButton onClick={handleCloseOrder}>
+              <ConfirmButton
+                onClick={handleCloseOrder}
+                disabled={needsEvidence && !evidenceFile}
+              >
                 Confirmar
               </ConfirmButton>
-            </div>
+            </ModalActions>
           </ModalBox>
         </ModalOverlay>
       )}
+
       {showQtyModal && (
         <ModalOverlay>
           <ModalBox>
@@ -1811,7 +1966,11 @@ const onCancelQty = () => {
                 min={1}
                 step={1}
                 value={qtyToClient}
-                onChange={(e) => setQtyToClient(e.target.value === '' ? '' : Number(e.target.value))}
+                onChange={(e) =>
+                  setQtyToClient(
+                    e.target.value === '' ? '' : Number(e.target.value)
+                  )
+                }
                 placeholder="Ej: 1000"
                 style={{
                   width: '100%',
@@ -1821,7 +1980,9 @@ const onCancelQty = () => {
                 }}
               />
               {qtyError && (
-                <div style={{ color: '#b91c1c', fontSize: 12, marginTop: 6 }}>{qtyError}</div>
+                <div style={{ color: '#b91c1c', fontSize: 12, marginTop: 6 }}>
+                  {qtyError}
+                </div>
               )}
             </div>
 
@@ -1833,18 +1994,55 @@ const onCancelQty = () => {
                 marginTop: '1rem',
               }}
             >
-              <CancelButton onClick={onCancelQty}>Cancelar</CancelButton>
-              <ConfirmButton onClick={onConfirmQty}>Confirmar</ConfirmButton>
+              <CancelButton onClick={() => setShowQtyModal(false)}>
+                Cancelar
+              </CancelButton>
+              <ConfirmButton
+                onClick={async () => {
+                  const indexPartial =
+                    workOrder?.flow?.[workOrder.flow.length - 1]
+                      ?.partialReleases?.length - 1;
+                  const n = Number(qtyToClient);
+                  if (!Number.isFinite(n) || n <= 0) {
+                    setQtyError('Ingresa una cantidad válida mayor que 0.');
+                    return;
+                  }
+                  if (
+                    workOrder?.flow?.[workOrder.flow.length - 1]
+                      ?.partialReleases?.[indexPartial]?.quantity <
+                    n +
+                      workOrder?.flow?.[workOrder.flow.length - 1]
+                        ?.partialReleases?.[indexPartial]?.release_quantity
+                  ) {
+                    setQtyError(
+                      'La cantidad no puede ser mayor a la del parcial.'
+                    );
+                    return;
+                  }
+                  setQtyError('');
+                  await cerrarParcialWorkOrderAuditory(
+                    workOrder?.flow?.[workOrder.flow.length - 1]
+                      ?.partialReleases?.[indexPartial]?.id,
+                    n
+                  );
+                  setShowQtyModal(false);
+                  setQtyToClient('');
+                  router.push('/cerrarOrdenDeTrabajo');
+                }}
+              >
+                Confirmar
+              </ConfirmButton>
             </div>
           </ModalBox>
         </ModalOverlay>
       )}
-
     </>
   );
 }
 
-// =================== Styled Components ===================
+// ========================================================
+// Styled Components
+// ========================================================
 
 const Container = styled.div`
   padding: 20px 20px 20px 50px;
@@ -1965,10 +2163,8 @@ const ConfirmButton = styled.button`
   padding: 0.5rem 1.5rem;
   border-radius: 0.5rem;
   font-weight: 600;
-
   border: none;
   cursor: pointer;
-
   transition: background-color 0.3s ease, color 0.3s ease;
 
   &:hover,
@@ -1984,10 +2180,8 @@ const CancelButton = styled.button`
   padding: 0.5rem 1.5rem;
   border-radius: 0.5rem;
   font-weight: 600;
-
   border: none;
   cursor: pointer;
-
   transition: background-color 0.3s ease, color 0.3s ease;
 
   &:hover,
@@ -1996,3 +2190,69 @@ const CancelButton = styled.button`
     outline: none;
   }
 `;
+
+const ModalActions = styled.div`
+  display: flex;
+  justify-content: flex-end;
+  gap: 1rem;
+  margin-top: 1rem;
+`;
+
+const FileUploadWrapper = styled.div`
+  margin-top: 1rem;
+`;
+
+const FileLabel = styled.label`
+  display: block;
+  font-size: 14px;
+  font-weight: 500;
+  color: #333;
+  margin-bottom: 8px;
+`;
+
+const VisibleFileInput = styled.input`
+  padding: 0.4rem;
+  font-size: 14px;
+  color: #444;
+  border-radius: 0.5rem;
+  border: 1px solid #ccc;
+  background-color: #f9f9f9;
+  cursor: pointer;
+  transition: border-color 0.2s ease;
+
+  &:hover,
+  &:focus {
+    border-color: #999;
+    outline: none;
+  }
+`;
+
+const FileRow = styled.div`
+  display: flex;
+  align-items: center;
+`;
+
+// ========================================================
+// Local helpers (non-visual)
+// ========================================================
+
+function getStatusStyle(status: string) {
+  switch (status) {
+    case 'Completado':
+      return 'bg-green-100 text-green-800';
+    case 'Pendiente':
+      return 'bg-yellow-100 text-yellow-800';
+    case 'En proceso':
+      return 'bg-blue-100 text-blue-800';
+    case 'Listo':
+    case 'En calidad':
+    case 'Enviado a CQM':
+      return 'bg-yellow-100 text-yellow-800';
+    case 'Enviado a Auditoria':
+      return 'bg-purple-100 text-purple-800';
+    case 'Parcial':
+      return 'bg-orange-100 text-orange-800';
+    default:
+      return 'bg-gray-100 text-gray-800';
+  }
+}

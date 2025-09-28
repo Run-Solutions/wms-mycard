@@ -17,6 +17,7 @@ import { FreeWorkOrderModule } from './modules/free-work-order/free-work-order.m
 import { InconformitiesModule } from './modules/inconformities/inconformities.module';
 import { AcceptReviewsModule } from './modules/accept-reviews/accept-reviews.module';
 import { PermissionsModule } from './modules/permissions/permissions.module';
+import { WorkOrderFileModule } from './modules/work-order-file/work-order-file.module';
 import { PrismaService } from 'prisma/prisma.service';
 
 @Module({
@@ -34,7 +35,9 @@ import { PrismaService } from 'prisma/prisma.service';
     FreeWorkOrderModule,
     InconformitiesModule,
     AcceptReviewsModule,
-    PermissionsModule,
+    WorkOrderFileModule,
+    PermissionsModule
+
   ],
   controllers: [AppController],
   providers: [AppService, PrismaService, RolesGuard],

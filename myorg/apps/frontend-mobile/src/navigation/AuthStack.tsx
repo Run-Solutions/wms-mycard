@@ -1,5 +1,4 @@
 // myorg/apps/frontend-mobile/src/navigation/AuthStack.tsx
-"use client";
 
 import React from 'react';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';

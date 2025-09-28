@@ -19,6 +19,7 @@ import {
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { RootStackParamList } from '../../navigation/types';
 import WorkOrderInfo from './util/WorkOrderInfo';
+import { computeAreaDefaults, areaKeyById } from './util/helper';
 
 type CorteData = {
   good_quantity: number | string;
@@ -80,69 +81,16 @@ const CorteComponentAccept: React.FC<{ workOrder: any }> = ({ workOrder }) => {
     lastCompletedOrPartial.status === 'Enviado a Auditoria' ||
     lastCompletedOrPartial.status === 'En auditoria' ||
     lastCompletedOrPartial.status === 'En Calidad';
+
   useEffect(() => {
-    if (!lastCompletedOrPartial) return;
-
-    const corte = lastCompletedOrPartial.areaResponse?.corte;
-    const partials = lastCompletedOrPartial.partialReleases;
-
-    const allValidated =
-      partials.length > 0 && partials.every((p: any) => p.validated);
-
-    if (corte && partials.length === 0) {
-      // Caso original: hay laminacion pero no hay parciales
-      const vals: CorteData = {
-        good_quantity: corte.good_quantity || '',
-        bad_quantity: corte.bad_quantity || '',
-        excess_quantity: corte.excess_quantity || '',
-        comments: corte.comments || '',
-        sample_quantity: corte.formAuditory.sample_auditory || '',
-        auditor: corte.formAuditory.user.username || '',
-      };
-      setDefaultValues(vals);
-    } else if (corte && allValidated) {
-      // Nuevo caso: todos los parciales están validados y hay laminacion
-      const totalParciales = partials.reduce(
-        (acc: any, curr: any) => acc + (curr.quantity || 0),
-        0
-      );
-      const totalParcialesbad = partials.reduce(
-        (acc: any, curr: any) => acc + (curr.bad_quantity || 0),
-        0
-      );
-      const totalParcialesexec = partials.reduce(
-        (acc: any, curr: any) => acc + (curr.excess_quantity || 0),
-        0
-      );
-      const restante = (corte.good_quantity || 0) - totalParciales;
-      const restantebad = (corte.bad_quantity || 0) - totalParcialesbad;
-      const restanteexc = (corte.excess_quantity || 0) - totalParcialesexec;
-
-      const vals: CorteData = {
-        good_quantity: restante > 0 ? restante : 0,
-        bad_quantity: restantebad > 0 ? restantebad : 0,
-        excess_quantity: restanteexc > 0 ? restanteexc : 0,
-        comments: corte.comments || '',
-        sample_quantity: corte.formAuditory.sample_auditory || '',
-        auditor: corte.formAuditory.user.username || '',
-      };
-      setDefaultValues(vals);
-    } else {
-      // Caso original: se busca el primer parcial sin validar
-      const firstUnvalidatedPartial = partials.find((p: any) => p.validated);
-
-      const vals: CorteData = {
-        good_quantity: firstUnvalidatedPartial.quantity || '',
-        bad_quantity: firstUnvalidatedPartial.bad_quantity || '',
-        excess_quantity: firstUnvalidatedPartial.excess_quantity || '',
-        comments: firstUnvalidatedPartial.observation || '',
-        sample_quantity:
-          firstUnvalidatedPartial.formAuditory.sample_auditory || '',
-        auditor: firstUnvalidatedPartial.formAuditory.user.username || '',
-      };
-      setDefaultValues(vals);
-    }
-  }, [workOrder]);
+    const areaKey = areaKeyById[6];
+    const vals = computeAreaDefaults<CorteData>(
+      areaKey,
+      lastCompletedOrPartial
+    );
+    console.log('Vals', vals);
+    if (vals) setDefaultValues(vals);
+  }, [workOrder, lastCompletedOrPartial]);
 
   const handleAceptar = async () => {
     try {

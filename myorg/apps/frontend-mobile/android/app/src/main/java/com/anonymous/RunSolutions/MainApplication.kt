@@ -47,7 +47,14 @@ class MainApplication : Application(), ReactApplication {
       // If you opted-in for the New Architecture, we load the native entry point for this app.
       load()
     }
-    ApplicationLifecycleDispatcher.onApplicationCreate(this)
+    try {
+      ApplicationLifecycleDispatcher.onApplicationCreate(this)
+    } catch (e: IllegalStateException) {
+      // Ignore if already initialized
+      if (e.message?.contains("DevelopmentClientController was initialized") != true) {
+        throw e
+      }
+    }
   }
 
   override fun onConfigurationChanged(newConfig: Configuration) {

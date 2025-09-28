@@ -29,8 +29,11 @@ export const createWorkOrder = async (
   formData: any,
   files: { ot: FileLike; sku: FileLike; op: FileLike; attachments?: FileLike[], cardImage?: FileLike }
 ) => {
+  console.log('🔹 [createWorkOrder] Iniciando...');
   const token = await AsyncStorage.getItem('token');
   if (!token) throw new Error('Token no disponible');
+  
+  console.log('🔹 [createWorkOrder] Token encontrado:', token.substring(0, 20) + '...');
 
   const formDataToSend = new FormData();
 
@@ -38,11 +41,11 @@ export const createWorkOrder = async (
   const appendFile = (key: string, f: FileLike) => {
     const maybeRN = f as any;
     if (maybeRN && typeof maybeRN.uri === 'string') {
-      // React Native
+      // React Native - formato correcto
       formDataToSend.append(key, {
         uri: maybeRN.uri,
-        name: maybeRN.name,
-        type: maybeRN.type,
+        name: maybeRN.name || 'file',
+        type: maybeRN.type || 'application/octet-stream',
       } as any);
     } else {
       // Web (File/Blob con name)
@@ -69,11 +72,31 @@ export const createWorkOrder = async (
   formDataToSend.append('quantity_contacts', formData.quantity_contacts);
   formDataToSend.append('isCollator', formData.tipoSeleccion );
   
-  const response = await API.post('/work-orders', formDataToSend, {
-    headers: {
-      Authorization: `Bearer ${token}`,
-    },
-  });
-
-  return response.data;
+  console.log('🔹 [createWorkOrder] Enviando request a:', 'http://10.0.2.2:3003/work-orders');
+  console.log('🔹 [createWorkOrder] FormData preparado, enviando...');
+  
+  try {
+    const response = await API.post('/work-orders', formDataToSend, {
+      headers: {
+        Authorization: `Bearer ${token}`,
+        'Content-Type': 'multipart/form-data',
+      },
+    });
+    console.log('✅ [createWorkOrder] Response exitosa:', response.status);
+    return response.data;
+  } catch (error: any) {
+    console.log('❌ [createWorkOrder] Error detallado:', {
+      message: error.message,
+      code: error.code,
+      status: error.response?.status,
+      statusText: error.response?.statusText,
+      data: error.response?.data,
+      config: {
+        url: error.config?.url,
+        method: error.config?.method,
+        baseURL: error.config?.baseURL,
+      }
+    });
+    throw error;
+  }
 };

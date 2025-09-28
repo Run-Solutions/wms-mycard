@@ -8,6 +8,7 @@ import {
   registrarInconformidadAuditory,
 } from '@/api/aceptarProducto';
 import WorkOrderInfo from './util/WorkOrderInfo';
+import { computeAreaDefaults, areaKeyById } from './util/helper';
 
 type MillinChipData = {
   good_quantity: number | string;
@@ -72,70 +73,16 @@ export default function MillingChipComponentAccept({ workOrder }: Props) {
     lastCompletedOrPartial.status === 'Enviado a Auditoria' ||
     lastCompletedOrPartial.status === 'En auditoria' ||
     lastCompletedOrPartial.status === 'En Calidad';
+
   useEffect(() => {
-    if (!lastCompletedOrPartial) return;
-
-    const millingChip = lastCompletedOrPartial.areaResponse?.millingChip;
-    const partials = lastCompletedOrPartial.partialReleases;
-
-    const allValidated =
-      partials.length > 0 && partials.every((p: any) => p.validated);
-
-    if (millingChip && partials.length === 0) {
-      // Caso original: hay laminacion pero no hay parciales
-      const vals: MillinChipData = {
-        good_quantity: millingChip.good_quantity || '',
-        bad_quantity: millingChip.bad_quantity || '',
-        excess_quantity: millingChip.excess_quantity || '',
-        comments: millingChip.comments || '',
-        sample_quantity: millingChip.formAuditory.sample_auditory || '',
-        auditor: millingChip.formAuditory.user.username || '',
-      };
-      setDefaultValues(vals);
-    } else if (millingChip && allValidated) {
-      // Nuevo caso: todos los parciales están validados y hay laminacion
-      const totalParciales = partials.reduce(
-        (acc: any, curr: any) => acc + (curr.quantity || 0),
-        0
-      );
-      const totalParcialesbad = partials.reduce(
-        (acc: any, curr: any) => acc + (curr.bad_quantity || 0),
-        0
-      );
-      const totalParcialesexec = partials.reduce(
-        (acc: any, curr: any) => acc + (curr.excess_quantity || 0),
-        0
-      );
-      const restante = (millingChip.good_quantity || 0) - totalParciales;
-      const restantebad = (millingChip.bad_quantity || 0) - totalParcialesbad;
-      const restanteexc =
-        (millingChip.excess_quantity || 0) - totalParcialesexec;
-
-      const vals: MillinChipData = {
-        good_quantity: restante > 0 ? restante : 0,
-        bad_quantity: restantebad > 0 ? restantebad : 0,
-        excess_quantity: restanteexc > 0 ? restanteexc : 0,
-        comments: millingChip.comments || '',
-        sample_quantity: millingChip.formAuditory.sample_auditory || '',
-        auditor: millingChip.formAuditory.user.username || '',
-      };
-      setDefaultValues(vals);
-    } else {
-      // Caso original: se busca el primer parcial sin validar
-      const firstUnvalidatedPartial = partials.find((p: any) => p.validated);
-
-      const vals: MillinChipData = {
-        good_quantity: firstUnvalidatedPartial.quantity || '',
-        bad_quantity: firstUnvalidatedPartial.bad_quantity || '',
-        excess_quantity: firstUnvalidatedPartial.excess_quantity || '',
-        comments: firstUnvalidatedPartial.observation || '',
-        sample_quantity:
-          firstUnvalidatedPartial.formAuditory.sample_auditory || '',
-        auditor: firstUnvalidatedPartial.formAuditory.user.username || '',
-      };
-      setDefaultValues(vals);
-    }
-  }, [workOrder]);
+    const areaKey = areaKeyById[9]; 
+    const vals = computeAreaDefaults<MillinChipData>(
+      areaKey,
+      lastCompletedOrPartial
+    );
+    console.log('Vals', vals);
+    if (vals) setDefaultValues(vals);
+  }, [workOrder, lastCompletedOrPartial]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();

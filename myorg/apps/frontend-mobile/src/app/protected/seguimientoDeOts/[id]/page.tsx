@@ -22,7 +22,6 @@ import {
 import { TextInput } from 'react-native-paper';
 import InfoCard from '../../../../components/SeguimientoDeOts/InfoCard';
 import InconformitiesHistory from '../../../../components/SeguimientoDeOts/InconformitiesHistory';
-import { InconformityData } from '../../../../components/SeguimientoDeOts/InconformitiesHistory';
 import ProgressBarAreas from '../../../../components/SeguimientoDeOts/ProgressBarAreas';
 import BadQuantityModal from '../../../../components/SeguimientoDeOts/BadQuantityModal';
 import { VistosBuenosHistory } from '../../../../components/SeguimientoDeOts/VistosBuenosHistory';
@@ -37,12 +36,23 @@ import {
   getSingleCqm,
   getReviewerNameFromAnswer,
   getPerPartialCqm,
+  getPerPartialAuditors,
+  getLastAuditor,
 } from '../../../../components/SeguimientoDeOts/util/quality';
+import { AreaTotalsForPartialHistory } from '../../../../components/SeguimientoDeOts/PartialHistory';
 
 type WorkOrderDetailRouteProp = RouteProp<
   InternalStackParamList,
   'WorkOrderDetailScreen'
 >;
+
+// ========================================================
+// Types
+// ========================================================
+
+interface Props {
+  params: Promise<{ id: string }>;
+}
 
 export type AreaData = {
   id: number;
@@ -84,21 +94,40 @@ export type AreaData = {
     quantity: number;
     bad_quantity: number;
     excess_quantity: number;
-    noprocess_quantity: number;
-    release_quantity?: number;
     material_quantity: number;
+    noprocess_quantity: number;
     user_id: number | null; // 👈 puede venir null
     validated: boolean;
+    release_quantity?: number; // 👈 cantidad liberada
     user?: { username: string } | null; // 👈 opcional
+    formAuditory?: {
+      created_at: string;
+      sample_auditory: string;
+      user?: { username?: string | null } | null;
+    } | null;
     created_at: string;
   }>;
 };
 
-// ---------- helpers / constantes (compartidos con web) ----------
-type NumericField =
+export type InconformityData = {
+  id: number;
+  comments: string;
+  createdAt: string;
+  createdBy: string;
+  area: string;
+};
+
+export type OperatorUser = {
+  id: number;
+  username: string;
+  areasOperator?: { id: number; name: string };
+};
+
+export type NumericField =
   | 'buenas'
   | 'malas'
   | 'excedente'
+  | 'noprocess'
   | 'defectuoso'
   | 'cqm'
   | 'muestras';
@@ -117,27 +146,112 @@ const AREA_KEY_BY_ID: Record<number, string> = {
 };
 const getAreaKey = (area: AreaData) => AREA_KEY_BY_ID[area.id] ?? null;
 
-const getAreaReleaseTotal = (area: AreaData) => {
+const toNum = (v: any) =>
+  v == null ? 0 : typeof v === 'number' ? v : Number(v) || 0;
+
+const getAreaBlock = (area: any) => {
   const key = getAreaKey(area);
-  const block: any = key ? (area.response as any)?.[key] : null;
-  if (!block) return 0;
-  return block.release_quantity ?? block.good_quantity ?? block.plates ?? 0;
+  if (!key) return null;
+  const fromResponse =
+    area?.response && typeof area.response === 'object'
+      ? area.response[key]
+      : undefined;
+  // fallback si viene plano (p. ej. area.corte)
+  return fromResponse ?? area?.[key] ?? null;
 };
-const getSumParciales = (area: AreaData) =>
-  (area.partials ?? []).reduce((acc, p) => acc + (p?.quantity ?? 0), 0);
 
-const getRemainder = (area: AreaData) =>
-  Math.max(getAreaReleaseTotal(area) - getSumParciales(area), 0);
+const buildAreaTotalsByAreaId = (
+  wo: any
+): Record<number, AreaTotalsForPartialHistory> => {
+  const map: Record<number, AreaTotalsForPartialHistory> = {};
+  const flows = wo?.flow ?? [];
 
-function getPerPartialValues(
+  flows.forEach((item: any) => {
+    const areaId = item?.area_id;
+    if (!areaId) return;
+
+    const areaKey = AREA_KEY_BY_ID[areaId];
+    const block = item?.areaResponse?.[areaKey];
+
+    if (!block) return;
+
+    map[areaId] = {
+      good_or_release_or_plates: toNum(
+        block.release_quantity ?? block.good_quantity ?? block.plates
+      ),
+      bad_quantity: toNum(block.bad_quantity),
+      excess_quantity: toNum(block.excess_quantity),
+      noprocess_quantity: toNum(block.noprocess_quantity),
+      material_quantity: toNum(block.material_quantity),
+    };
+  });
+
+  return map;
+};
+
+const getRemainderByField = (
+  area: AreaData,
+  field: 'buenas' | 'malas' | 'excedente' | 'noprocess' | 'defectuoso'
+) => {
+  const block = getAreaBlock(area) as any;
+  if (!block) return 0;
+
+  let total = 0;
+  let parcialesSum = 0;
+
+  switch (field) {
+    case 'buenas':
+      total = toNum(
+        block.release_quantity ?? block.good_quantity ?? block.plates
+      );
+      parcialesSum = (area.partials ?? []).reduce(
+        (acc, p) => acc + toNum(p?.quantity),
+        0
+      );
+      break;
+    case 'malas':
+      total = toNum(block.bad_quantity);
+      parcialesSum = (area.partials ?? []).reduce(
+        (acc, p) => acc + toNum(p?.bad_quantity),
+        0
+      );
+      break;
+    case 'excedente':
+      total = toNum(block.excess_quantity);
+      parcialesSum = (area.partials ?? []).reduce(
+        (acc, p) => acc + toNum(p?.excess_quantity),
+        0
+      );
+      break;
+    case 'noprocess':
+      total = toNum(block.noprocess_quantity);
+      parcialesSum = (area.partials ?? []).reduce(
+        (acc, p) => acc + toNum(p?.noprocess_quantity),
+        0
+      );
+      break;
+    case 'defectuoso':
+      total = toNum(block.material_quantity);
+      parcialesSum = (area.partials ?? []).reduce(
+        (acc, p) => acc + toNum(p?.material_quantity),
+        0
+      );
+      break;
+  }
+
+  return Math.max(total - parcialesSum, 0);
+};
+
+const getRemainder = (area: AreaData) => getRemainderByField(area, 'buenas');
+
+const getPerPartialValues = (
   area: AreaData,
   field: 'cqm' | 'muestras' | 'defectuoso'
-) {
+) => {
   const parc = area.parciales || 0;
   const hasRem = getRemainder(area) > 0;
   const cols = parc + (hasRem ? 1 : 0);
 
-  // Ordenamos las answers por fecha (te sigue sirviendo para cqm/muestras)
   const answersSorted = [...(area.answers ?? [])].sort(
     (a, b) =>
       new Date(a.created_at).getTime() - new Date(b.created_at).getTime()
@@ -147,17 +261,18 @@ function getPerPartialValues(
 
   for (let i = 0; i < parc; i++) {
     if (field === 'defectuoso') {
-      values[i] = area.partials?.[i]?.material_quantity ?? 0; // 👈 aquí el cambio
+      values[i] = area.partials?.[i]?.material_quantity ?? 0;
     } else if (field === 'cqm') {
       values[i] = answersSorted[i]?.sample_quantity ?? 0;
     } else if (field === 'muestras') {
-      values[i] = (answersSorted[i] as any)?.sample_auditory ?? '—';
+      values[i] = area.partials?.[i]?.formAuditory?.sample_auditory ?? '—';
     }
   }
 
   if (hasRem) {
     const block = (area.response as any)?.[getAreaKey(area)];
     const remIndex = cols - 1;
+
     if (field === 'defectuoso') {
       const totalDefectuoso = block?.material_quantity ?? 0;
       const sumParcialDefectuoso = (area.partials ?? []).reduce(
@@ -165,16 +280,16 @@ function getPerPartialValues(
         0
       );
       values[remIndex] = Math.max(totalDefectuoso - sumParcialDefectuoso, 0);
-    } else {
+    } else if (field === 'cqm') {
       const remAns =
         answersSorted[parc] ?? answersSorted[answersSorted.length - 1];
-      if (field === 'cqm') values[remIndex] = remAns?.sample_quantity ?? 0;
-      else if (field === 'muestras')
-        values[remIndex] = (remAns as any)?.sample_auditory ?? '—';
+      values[remIndex] = remAns?.sample_quantity ?? 0;
+    } else if (field === 'muestras') {
+      values[remIndex] = block?.formAuditory?.sample_auditory ?? '—';
     }
   }
   return values;
-}
+};
 
 const getLastPartial = (area: AreaData) => {
   const list = area.partials ?? [];
@@ -189,38 +304,34 @@ const getPartialUserName = (
   p: AreaData['partials'][number] | null | undefined,
   area: AreaData,
   operatorByIdMap: Map<number, string>
-) => {
-  return (
-    p?.user?.username ??
-    (p?.user_id != null ? operatorByIdMap.get(p.user_id) : undefined) ??
-    area.usuario ??
-    'No definido'
-  );
-};
+) =>
+  p?.user?.username ??
+  (p?.user_id != null ? operatorByIdMap.get(p.user_id) : undefined) ??
+  area.usuario ??
+  'No definido';
 
-// -------- getAreaData (AHORA ES FUNCIÓN DECLARADA Y ARRIBA DE loadData) -----
+// ---- Area data builder (by areaId) ----
 const getAreaData = (
   areaId: number,
   areaResponse: any,
   partialReleases: any[] = [],
-  flowUser: any = null,
-  index: number = -1
+  flowUser: any = null
 ) => {
   const parciales = partialReleases.length;
   const parcialesValidados = partialReleases.filter((p) => p?.validated).length;
 
-  const sumFromPartials = () => {
-    return partialReleases.reduce(
+  const sumFromPartials = () =>
+    partialReleases.reduce(
       (acc: any, curr: any) => {
         acc.buenas += curr.quantity || 0;
         acc.malas += curr.bad_quantity || 0;
         acc.excedente += curr.excess_quantity || 0;
         acc.noprocess += curr.noprocess_quantity || 0;
+        acc.defectuoso += curr.material_quantity || 0;
         return acc;
       },
-      { buenas: 0, malas: 0, excedente: 0, noprocess: 0 }
+      { buenas: 0, malas: 0, excedente: 0, noprocess: 0, defectuoso: 0 }
     );
-  };
 
   const getCommonData = (areaKey: string) => {
     const hasResponse = !!areaResponse?.[areaKey];
@@ -229,7 +340,6 @@ const getAreaData = (
 
     if (!hasResponse && parciales > 0) {
       const resumen = sumFromPartials();
-      console.log('[PARCIAL DETECTADO]', areaKey, resumen);
       return {
         ...resumen,
         cqm: 0,
@@ -301,6 +411,49 @@ const getAreaData = (
   }
 };
 
+const getAreaReleaseTotal = (area: AreaData) => {
+  const key = getAreaKey(area);
+  const block: any = key ? (area.response as any)?.[key] : null;
+  if (!block) return 0;
+  return block.release_quantity ?? block.good_quantity ?? block.plates ?? 0;
+};
+const getSumParciales = (area: AreaData) =>
+  (area.partials ?? []).reduce((acc, p) => acc + (p?.quantity ?? 0), 0);
+
+const getAreaSumaTotal = (area: AreaData) => {
+  let buenas = Number(area.buenas ?? 0);
+  let malas = Number(area.malas ?? 0);
+  let excedente = Number(area.excedente ?? 0);
+  let noprocess = Number(area.noprocess ?? 0);
+  let defectuoso = Number(area.defectuoso ?? 0);
+  let cqm = Number(area.cqm ?? 0);
+  let muestras = Number(area.muestras ?? 0);
+
+  if (area.partials?.length) {
+    const sums = area.partials.reduce(
+      (acc, p) => {
+        acc.buenas += Number(p?.quantity ?? 0);
+        acc.muestras += Number(p?.formAuditory?.sample_auditory ?? 0);
+        return acc;
+      },
+      { buenas: 0, muestras: 0 }
+    );
+
+    const rem = getRemainder(area);
+    buenas = sums.buenas + rem;
+
+    const answersCqm = (area.answers ?? []).reduce(
+      (s, a) => s + Number(a?.sample_quantity ?? 0),
+      0
+    );
+    cqm = answersCqm;
+
+    muestras = Number(area.muestras ?? 0) + sums.muestras;
+  }
+
+  return buenas + malas + excedente + noprocess + defectuoso + cqm + muestras;
+};
+
 const WorkOrderDetailScreen: React.FC = () => {
   const route = useRoute<WorkOrderDetailRouteProp>();
   const { id } = route.params;
@@ -311,6 +464,9 @@ const WorkOrderDetailScreen: React.FC = () => {
   const [areas, setAreas] = useState<AreaData[]>([]);
   const [inconformities, setInconformities] = useState<InconformityData[]>([]);
   const [progressWidth, setProgressWidth] = useState(0);
+  const [partialSectionOpen, setPartialSectionOpen] = useState(false);
+  const [loading, setLoading] = useState(true);
+
   const [qualitySectionOpen, setQualitySectionOpen] = useState(false);
   const [inconformitySectionOpen, setInconformitySectionOpen] = useState(false);
   const [showBadQuantity, setShowBadQuantity] = useState(false);
@@ -383,6 +539,11 @@ const WorkOrderDetailScreen: React.FC = () => {
   };
   const closeOperatorModal = () => setOpModal((s) => ({ ...s, open: false }));
 
+  const areaTotalsByAreaId = useMemo(
+    () => buildAreaTotalsByAreaId(workOrder),
+    [workOrder]
+  );
+
   const modalOptions = useMemo(() => {
     if (!opModal.areaId) return [];
     const base = getUserOptionsForArea(opModal.areaId);
@@ -401,11 +562,25 @@ const WorkOrderDetailScreen: React.FC = () => {
     if (partial)
       return (
         !partial.validated &&
-        ['En proceso', 'Parcial' /*, 'Otro estado'*/].includes(area.status)
+        [
+          'En proceso',
+          'Parcial',
+          'Enviado a CQM',
+          'Listo',
+          'En inconformidad',
+          'En inconformidad CQM' /*, 'Otro estado'*/,
+        ].includes(area.status)
       );
 
     // sin parciales: solo si el área está "En proceso"
-    return ['En proceso', 'Parcial' /*, 'Otro estado'*/].includes(area.status);
+    return [
+      'En proceso',
+      'Parcial',
+      'Enviado a CQM',
+      'Listo',
+      'En inconformidad',
+      'En inconformidad CQM' /*, 'Otro estado'*/,
+    ].includes(area.status);
   };
 
   const confirmOperatorModal = async () => {
@@ -456,72 +631,76 @@ const WorkOrderDetailScreen: React.FC = () => {
   };
 
   // ----------------------- loadData con defensas y logs -----------------------
-  const loadData = async () => {
+  // ✅ función reutilizable para cargar y setear todo
+  const fetchAndSetData = async (workOrderId: string) => {
     try {
-      const data = await fetchWorkOrderById(id);
+      setLoading(true);
+
+      const data = await fetchWorkOrderById(workOrderId);
       const users = await fetchAllUsers();
 
       setOperatorUsers(users || []);
       setWorkOrder(data);
 
-      // Historial de vistos buenos
-      const historyData = (data?.flow ?? [])
-        .filter((item: any) => item?.answers?.length > 0)
-        .map((item: any) => {
-          const areaName = item?.area?.name?.toLowerCase() || '';
-          const mode = ['impresion'].includes(areaName) ? 'doble' : 'simple';
-          return {
-            areaName: item?.area?.name || 'Sin nombre',
-            username: item?.user?.username || '',
-            questions: item?.area?.formQuestions || [],
-            formAnswers: (item?.answers || []).map((a: any) => ({
-              accepted: a.accepted,
-              altura_chip: a.altura_chip,
-              apariencia_quemado: a.apariencia_quemado,
-              carga_aplicacion: a.carga_aplicacion,
-              codigo_barras: a.codigo_barras,
-              color: a.color,
-              color_edge: a.color_edge,
-              color_foil: a.color_foil,
-              color_personalizacion: a.color_personalizacion,
-              finish_validation: a.finish_validation,
-              holographic_type: a.holographic_type,
-              imagen_holograma: a.imagen_holograma,
-              localizacion_contactos: a.localizacion_contactos,
-              magnetic_band: a.magnetic_band,
-              revisar_posicion: a.revisar_posicion,
-              revisar_tecnologia: a.revisar_tecnologia,
-              prueba_over: a.prueba_over,
-              prueba_cinta_magnetica: a.prueba_cinta_magnetica,
-              prueba_centro: a.prueba_centro,
-              sample_quantity: a.sample_quantity,
-              testtype_cqm: a.testtype_cqm,
-              tipo_personalizacion: a.tipo_personalizacion,
-              track_type: a.track_type,
-              validar_inlays: a.validar_inlays,
-              validar_kvc: a.validar_kvc,
-              validar_kvc_perso: a.validar_kvc_perso,
-              valor_anclaje: a.valor_anclaje,
-              verificar_etiqueta: a.verificar_etiqueta,
-              verificar_script: a.verificar_script,
-              created_at: a.created_at,
-              reviewer: a.reviewer || [],
-              FormAnswerResponse: a.FormAnswerResponse || [],
-            })),
-            mode,
-          };
-        });
+      // Vistos Buenos history
+      const historyData =
+        data.flow
+          ?.filter((item: any) => item.answers?.length > 0)
+          ?.map((item: any) => {
+            const areaName = item.area?.name?.toLowerCase() || '';
+            const mode = ['impresion'].includes(areaName) ? 'doble' : 'simple';
+            return {
+              areaName: item.area?.name || 'Sin nombre',
+              username: item.user?.username || '',
+              questions: item.area?.formQuestions || [],
+              formAnswers: (item.answers || []).map((a: any) => ({
+                accepted: a.accepted,
+                altura_chip: a.altura_chip,
+                apariencia_quemado: a.apariencia_quemado,
+                carga_aplicacion: a.carga_aplicacion,
+                codigo_barras: a.codigo_barras,
+                color: a.color,
+                color_edge: a.color_edge,
+                color_foil: a.color_foil,
+                color_personalizacion: a.color_personalizacion,
+                finish_validation: a.finish_validation,
+                holographic_type: a.holographic_type,
+                imagen_holograma: a.imagen_holograma,
+                localizacion_contactos: a.localizacion_contactos,
+                magnetic_band: a.magnetic_band,
+                revisar_posicion: a.revisar_posicion,
+                revisar_tecnologia: a.revisar_tecnologia,
+                sample_quantity: a.sample_quantity,
+                testtype_cqm: a.testtype_cqm,
+                prueba_over: a.prueba_over,
+                prueba_cinta_magnetica: a.prueba_cinta_magnetica,
+                prueba_centro: a.prueba_centro,
+                tipo_personalizacion: a.tipo_personalizacion,
+                track_type: a.track_type,
+                validar_inlays: a.validar_inlays,
+                validar_kvc: a.validar_kvc,
+                validar_kvc_perso: a.validar_kvc_perso,
+                valor_anclaje: a.valor_anclaje,
+                verificar_etiqueta: a.verificar_etiqueta,
+                verificar_script: a.verificar_script,
+                created_at: a.created_at,
+                reviewer: a.reviewer || [],
+                FormAnswerResponse: a.FormAnswerResponse || [],
+              })),
+              mode,
+            };
+          }) || [];
 
-      setVistosBuenosHistory(historyData ?? []);
+      setVistosBuenosHistory(historyData);
 
-      // Áreas (incluye parciales/remanente y answers como array)
+      // Áreas
       const areaData =
-        data?.flow?.map((item: any, index: number) => ({
+        data?.flow?.map((item: any) => ({
           id: item.area_id,
           name: item.area?.name || 'Sin nombre',
           status: item.status || 'Desconocido',
-          response: item.areaResponse || {},
           isCollator: data.isCollator || false,
+          response: item.areaResponse || {},
           answers: item.answers || [],
           flowId: item.id,
           assigned_user_id: item.assigned_user,
@@ -529,14 +708,14 @@ const WorkOrderDetailScreen: React.FC = () => {
             item.area_id,
             item.areaResponse,
             item.partialReleases,
-            item.user,
-            index
+            item.user
           ),
         })) || [];
+
       setAreas(areaData);
 
-      // Inconformidades
-      const allInconformities =
+      // Inconformidades (directas + parciales + auditorías)
+      const allInconformities: InconformityData[] =
         data?.flow?.flatMap((flowItem: any) => {
           const areaName = flowItem.area?.name || 'Área desconocida';
 
@@ -544,21 +723,33 @@ const WorkOrderDetailScreen: React.FC = () => {
             flowItem?.areaResponse?.inconformities?.map((inc: any) => ({
               id: inc.id,
               comments: inc.comments,
-              createdAt: inc.created_at,
-              createdBy: inc.user?.username || 'Desconocido',
+              createdAt: inc.created_at ?? inc.createdAt,
+              createdBy: inc.user?.username || inc.created_by || 'Desconocido',
               area: areaName,
             })) || [];
 
           const partials =
-            flowItem?.partialReleases?.flatMap(
-              (release: any) =>
-                release.inconformities?.map((inc: any) => ({
-                  id: inc.id,
-                  comments: inc.comments,
-                  createdAt: inc.createdAt,
-                  createdBy: inc.createdBy,
-                  area: areaName,
-                })) || []
+            flowItem?.partialReleases?.flatMap((release: any) =>
+              (release?.inconformities || []).map((inc: any) => ({
+                id: inc.id,
+                comments: inc.comments,
+                createdAt: inc.created_at ?? inc.createdAt,
+                createdBy:
+                  inc.user?.username || inc.created_by || 'Desconocido',
+                area: areaName,
+              }))
+            ) || [];
+
+          const partialsAuditory =
+            flowItem?.partialReleases?.flatMap((release: any) =>
+              (release?.formAuditory?.inconformities || []).map((inc: any) => ({
+                id: inc.id,
+                comments: inc.comments,
+                createdAt: inc.created_at ?? inc.createdAt,
+                createdBy:
+                  inc.user?.username || inc.created_by || 'Desconocido',
+                area: areaName,
+              }))
             ) || [];
 
           const audits: InconformityData[] = [];
@@ -578,8 +769,9 @@ const WorkOrderDetailScreen: React.FC = () => {
             });
           }
 
-          return [...direct, ...partials, ...audits];
+          return [...direct, ...partials, ...partialsAuditory, ...audits];
         }) || [];
+
       setInconformities(allInconformities);
 
       // Progreso
@@ -587,17 +779,15 @@ const WorkOrderDetailScreen: React.FC = () => {
         (a: any) => a.status === 'Completado'
       ).length;
       const percentage = (completedCount / areaData.length) * 100;
-
       setTimeout(() => setProgressWidth(percentage), 100);
-    } catch (err) {
-      console.error('loadData error:', err);
-      Alert.alert('Error', 'No se pudo cargar la orden de trabajo.');
+    } finally {
+      setLoading(false);
     }
   };
 
   useEffect(() => {
-    loadData();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+    if (!id) return;
+    fetchAndSetData(String(id)); // 👈 en lugar de loadData()
   }, [id]);
 
   const getSumaMalasHasta = (areaId: number): number => {
@@ -677,6 +867,7 @@ const WorkOrderDetailScreen: React.FC = () => {
     }
   };
 
+  // ---- Remainders (by field) ----
   const getAnswerValue = (
     ans: any,
     field: 'defectuoso' | 'cqm' | 'muestras',
@@ -702,6 +893,54 @@ const WorkOrderDetailScreen: React.FC = () => {
         return 0;
     }
   };
+
+  const getPerPartialValues = (
+    area: AreaData,
+    field: 'cqm' | 'muestras' | 'defectuoso'
+  ) => {
+    const parc = area.parciales || 0;
+    const hasRem = getRemainder(area) > 0;
+    const cols = parc + (hasRem ? 1 : 0);
+
+    const answersSorted = [...(area.answers ?? [])].sort(
+      (a, b) =>
+        new Date(a.created_at).getTime() - new Date(b.created_at).getTime()
+    );
+
+    const values: Array<number | string> = Array(cols).fill(0);
+
+    for (let i = 0; i < parc; i++) {
+      if (field === 'defectuoso') {
+        values[i] = area.partials?.[i]?.material_quantity ?? 0;
+      } else if (field === 'cqm') {
+        values[i] = answersSorted[i]?.sample_quantity ?? 0;
+      } else if (field === 'muestras') {
+        values[i] = area.partials?.[i]?.formAuditory?.sample_auditory ?? '—';
+      }
+    }
+
+    if (hasRem) {
+      const block = (area.response as any)?.[getAreaKey(area)];
+      const remIndex = cols - 1;
+
+      if (field === 'defectuoso') {
+        const totalDefectuoso = block?.material_quantity ?? 0;
+        const sumParcialDefectuoso = (area.partials ?? []).reduce(
+          (acc, p) => acc + (p?.material_quantity ?? 0),
+          0
+        );
+        values[remIndex] = Math.max(totalDefectuoso - sumParcialDefectuoso, 0);
+      } else if (field === 'cqm') {
+        const remAns =
+          answersSorted[parc] ?? answersSorted[answersSorted.length - 1];
+        values[remIndex] = remAns?.sample_quantity ?? 0;
+      } else if (field === 'muestras') {
+        values[remIndex] = block?.formAuditory?.sample_auditory ?? '—';
+      }
+    }
+    return values;
+  };
+
   const handleCloseOrder = async () => {
     try {
       await closeWorkOrder(workOrder?.ot_id);
@@ -713,11 +952,38 @@ const WorkOrderDetailScreen: React.FC = () => {
     }
   };
 
-  const areaColSpan = (area: AreaData) => {
-    const base = Math.max(1, area.parciales || 0);
-    const rem = area.parciales > 0 && getRemainder(area) > 0 ? 1 : 0;
-    return area.parciales > 0 ? base + rem : 1;
+  const ensureElement = (node: React.ReactNode): React.ReactElement => {
+    if (React.isValidElement(node)) return node;
+    if (typeof node === 'string' || typeof node === 'number') {
+      return <Text>{String(node)}</Text>;
+    }
+    // fallback seguro (nunca devolvemos string/number sueltos)
+    return <View />;
   };
+
+  const getAreaColCount = (area: AreaData) =>
+    area.parciales > 0 ? area.parciales + (getRemainder(area) > 0 ? 1 : 0) : 1;
+
+  const renderSpannedCells = (
+    area: AreaData,
+    keyBase: string,
+    renderContent: () => React.ReactNode // 👈 acepta ReactNode
+  ): React.ReactElement[] => {
+    const cols = getAreaColCount(area);
+    const contentEl = ensureElement(renderContent()); // 👈 obligamos a Element
+    const emptyEl = <View />;
+
+    const cells: React.ReactElement[] = [];
+    for (let i = 0; i < cols; i++) {
+      cells.push(
+        <View key={`${keyBase}-${area.id}-${i}`} style={styles.cellUser}>
+          {i === cols - 1 ? contentEl : emptyEl}
+        </View>
+      );
+    }
+    return cells;
+  };
+
   const totalCols = areas.reduce(
     (sum, area) =>
       sum +
@@ -759,6 +1025,7 @@ const WorkOrderDetailScreen: React.FC = () => {
           };
           const normalizedName = updated.name.toLowerCase().replace(/\s/g, '');
           const block = blockMap[normalizedName] || 'otros';
+
           const blockId = (updated.response as any)?.[block]?.id;
           const formId = (updated.response as any)?.[block]?.form_auditory_id;
           const cqmId = (updated.response as any)?.[block]?.form_answer_id;
@@ -767,6 +1034,7 @@ const WorkOrderDetailScreen: React.FC = () => {
             good_quantity: updated.buenas,
             bad_quantity: updated.malas,
             excess_quantity: updated.excedente,
+            noprocess_quantity: updated.noprocess,
             material_quantity: updated.defectuoso,
           };
           let sample_data: Record<string, number> = {
@@ -807,7 +1075,7 @@ const WorkOrderDetailScreen: React.FC = () => {
     try {
       await updateWorkOrderAreas(workOrder.ot_id, payload);
       Alert.alert('Éxito', 'Cambios guardados correctamente');
-      await loadData();
+      fetchAndSetData(String(id));
     } catch (err) {
       console.error(err);
       Alert.alert('Error', 'Error al guardar los cambios');
@@ -838,16 +1106,6 @@ const WorkOrderDetailScreen: React.FC = () => {
         return { backgroundColor: '#E5E7EB', textColor: '#374151' };
     }
   };
-
-  // helpers de render
-  const getPartialUserName = (
-    p: AreaData['partials'][number] | null | undefined,
-    area: AreaData
-  ) =>
-    p?.user?.username ??
-    (p?.user_id != null ? operatorById.get(p.user_id) : undefined) ??
-    area.usuario ??
-    'No definido';
 
   const renderEditableNumber = (value: any, onChange: (t: string) => void) => (
     <TextInput
@@ -989,6 +1247,35 @@ const WorkOrderDetailScreen: React.FC = () => {
             </Text>
           )}
         </InfoCard>
+        <InfoCard label="Evidencias de destrucción">
+          {Array.isArray(workOrder?.files) &&
+          workOrder.files.some(
+            (f: any) => f.type === 'DESTRUCTION_EVIDENCE'
+          ) ? (
+            <ScrollView
+              horizontal
+              showsHorizontalScrollIndicator={false}
+              contentContainerStyle={fileStyles.row}
+            >
+              {workOrder.files
+                .filter((file: any) => file.type === 'DESTRUCTION_EVIDENCE')
+                .map((file: any, idx: number) => (
+                  <TouchableOpacity
+                    key={file.id ?? `evidence-${idx}`}
+                    onPress={() => downloadFile(file.file_path)}
+                    style={fileStyles.button}
+                    activeOpacity={0.8}
+                  >
+                    <Text style={fileStyles.buttonText}>
+                      {`Ver Evidencia ${idx + 1}`}
+                    </Text>
+                  </TouchableOpacity>
+                ))}
+            </ScrollView>
+          ) : (
+            <Text style={fileStyles.empty}>No hay evidencias adjuntas</Text>
+          )}
+        </InfoCard>
       </View>
 
       {areas.length > 0 && <ProgressBarAreas areas={areas} />}
@@ -1011,8 +1298,8 @@ const WorkOrderDetailScreen: React.FC = () => {
                         key={`hdr-${area.id}-p${i + 1}`}
                         style={styles.cellUser}
                       >
-                        {area.name}
-                        {area.isCollator && area.id === 4 ? ' (C)' : ''}
+                        {area.name}{' '}
+                        {area.isCollator && area.id === 4 ? '(C)' : ''}
                         {'\n'}
                         <Text style={{ fontSize: 11, color: '#6b7280' }}>{`P${
                           i + 1
@@ -1049,7 +1336,7 @@ const WorkOrderDetailScreen: React.FC = () => {
           {/* Encargado (remanente) */}
           <View style={styles.row}>
             <Text style={styles.cellLabel}>Encargado (remanente)</Text>
-            {areas.map((area, index) => {
+            {areas.map((area) => {
               const editable = canEditUser(area, null);
               const currentAssignedName =
                 (area.assigned_user_id != null
@@ -1057,28 +1344,29 @@ const WorkOrderDetailScreen: React.FC = () => {
                   : undefined) ??
                 area.usuario ??
                 'No definido';
-              return (
-                <View
-                  key={`enc-${area.id}-${index}`}
-                  style={[styles.cellUser, { flexDirection: 'row' }]}
+
+              const cells = renderSpannedCells(area, 'encargado', () => (
+                <TouchableOpacity
+                  disabled={!editable}
+                  onPress={() => openOperatorModal(area, null)}
+                  style={{
+                    paddingHorizontal: 8,
+                    paddingVertical: 6,
+                    borderRadius: 8,
+                    borderWidth: 1,
+                    borderColor: '#e5e7eb',
+                    backgroundColor: editable ? '#fff' : '#f3f4f6',
+                    alignSelf: 'center',
+                  }}
                 >
-                  <TouchableOpacity
-                    disabled={!editable}
-                    onPress={() => openOperatorModal(area, null)}
-                    style={{
-                      paddingHorizontal: 8,
-                      paddingVertical: 6,
-                      borderRadius: 8,
-                      borderWidth: 1,
-                      borderColor: '#e5e7eb',
-                      backgroundColor: editable ? '#fff' : '#f3f4f6',
-                    }}
-                  >
-                    <Text style={{ color: '#111827' }}>
-                      {currentAssignedName}
-                    </Text>
-                  </TouchableOpacity>
-                </View>
+                  <Text style={{ color: '#111827' }}>
+                    {currentAssignedName}
+                  </Text>
+                </TouchableOpacity>
+              ));
+
+              return (
+                <React.Fragment key={`enc-${area.id}`}>{cells}</React.Fragment>
               );
             })}
           </View>
@@ -1087,38 +1375,58 @@ const WorkOrderDetailScreen: React.FC = () => {
           <View style={styles.row}>
             <Text style={styles.cellLabel}>Usuario</Text>
             {areas.flatMap((area, aIndex) => {
-              const uniq = area.flowId ?? `${area.id}-${aIndex}`;
+              const hasPartials = area.partials?.length > 0;
 
-              if (area.partials?.length > 0) {
-                const cells = area.partials.map((p, pIdx) => (
-                  <Text
-                    key={`usr-${uniq}-${p?.id ?? pIdx}`}
-                    style={styles.cellUser}
-                  >
-                    {getPartialUserName(p, area)}
-                  </Text>
-                ));
-                if (getRemainder(area) > 0) {
+              if (hasPartials) {
+                const cells = area.partials.map((p, pIndex) => {
+                  const releasedByName = getPartialUserName(
+                    p,
+                    area,
+                    operatorById
+                  );
+                  return (
+                    <Text
+                      key={`area-${area.id}-usuario-${p.id ?? pIndex}`}
+                      style={styles.cellUser}
+                    >
+                      {releasedByName}
+                    </Text>
+                  );
+                });
+                const rem = getRemainder(area) > 0;
+                if (rem) {
                   const lastP = getLastPartial(area);
+                  const lastUser = getPartialUserName(
+                    lastP,
+                    area,
+                    operatorById
+                  );
                   cells.push(
                     <Text
-                      key={`usr-${uniq}-rem`}
+                      key={`area-${area.id}-usuario-rem`}
                       style={[styles.cellUser, { fontWeight: '600' }]}
                     >
-                      {getPartialUserName(lastP, area)}
+                      {lastUser}
                     </Text>
                   );
                 }
                 return cells;
               }
 
+              // Sin parciales: mostrar encargado actual como texto (edición se hace en fila Encargado)
+              const currentNameNoPartial =
+                (area.assigned_user_id != null
+                  ? operatorById.get(area.assigned_user_id)
+                  : undefined) ??
+                area.usuario ??
+                'No definido';
+
               return (
-                <Text key={`usr-${uniq}-single`} style={styles.cellUser}>
-                  {(area.assigned_user_id != null
-                    ? operatorById.get(area.assigned_user_id)
-                    : undefined) ??
-                    area.usuario ??
-                    'No definido'}
+                <Text
+                  key={`area-${area.id}-usuario-${aIndex}`}
+                  style={styles.cellUser}
+                >
+                  {currentNameNoPartial}
                 </Text>
               );
             })}
@@ -1127,43 +1435,71 @@ const WorkOrderDetailScreen: React.FC = () => {
           {/* Calidad */}
           <View style={styles.row}>
             <Text style={styles.cellLabel}>Calidad</Text>
+
             {areas.flatMap((area, aIdx) => {
-              if (area.parciales > 0) {
-                const reviewers = getPerPartialReviewers(area);
-                return reviewers.map((name, i) => (
-                  <View
-                    style={{
-                      backgroundColor: '#FEF3C7',
-                      borderRadius: 10,
-                      paddingHorizontal: 6,
-                      paddingVertical: 2,
-                      alignSelf: 'center', 
-                      alignItems: 'center', 
-                    }}
-                  >
-                    <Text
+              if ((area.parciales || 0) > 0) {
+                const reviewers = getPerPartialReviewers(area) || [];
+
+                return reviewers.map((name: string, i: number) => {
+                  const highlighted = !!name && name !== '—';
+                  const isRem = i >= (area.parciales || 0);
+
+                  return (
+                    <View
                       key={`cell-area-${area.id}-parcial-${i}-calidad`}
-                      style={[
-                        styles.cellUser,
-                        { color: '#92400E', textAlign: 'center' },
-                      ]}
+                      style={styles.cellUser}
+                      accessible
+                      accessibilityLabel={
+                        isRem ? 'Remanente' : `Parcial ${i + 1}`
+                      }
                     >
-                      {name || '—'}
-                    </Text>
-                  </View>
-                ));
+                      <View
+                        style={[
+                          pillStyles.pill,
+                          highlighted && pillStyles.pillHighlighted,
+                        ]}
+                      >
+                        <Text
+                          style={[
+                            pillStyles.pillText,
+                            highlighted && pillStyles.pillTextHighlighted,
+                          ]}
+                        >
+                          {name || '—'}
+                        </Text>
+                      </View>
+                    </View>
+                  );
+                });
               }
 
               const lastAns = getLastAnswer(area);
-              const reviewerName = getReviewerNameFromAnswer(lastAns);
+              const reviewerName = getReviewerNameFromAnswer(lastAns) || '—';
+              const highlighted = reviewerName !== '—';
 
               return (
-                <Text
+                <View
                   key={`cell-area-${area.id}-calidad-${aIdx}`}
                   style={styles.cellUser}
+                  accessible
+                  accessibilityLabel="Calidad"
                 >
-                  {reviewerName || '-'}
-                </Text>
+                  <View
+                    style={[
+                      pillStyles.pill,
+                      highlighted && pillStyles.pillHighlighted,
+                    ]}
+                  >
+                    <Text
+                      style={[
+                        pillStyles.pillText,
+                        highlighted && pillStyles.pillTextHighlighted,
+                      ]}
+                    >
+                      {reviewerName}
+                    </Text>
+                  </View>
+                </View>
               );
             })}
           </View>
@@ -1171,45 +1507,66 @@ const WorkOrderDetailScreen: React.FC = () => {
           {/* Auditor */}
           <View style={styles.row}>
             <Text style={styles.cellLabel}>Auditor</Text>
-            {areas.map((area, index) => (
-              <Text key={`${area.id}-auditor-${index}`} style={styles.cellUser}>
-                {area.auditor}
-              </Text>
-            ))}
+            {areas.flatMap((area, aIdx) => {
+              if (area.parciales > 0) {
+                const reviewers = getPerPartialAuditors(area);
+                return reviewers.map((name, i) => (
+                  <Text
+                    key={`cell-area-${area.id}-partial-${i}-auditor`}
+                    style={styles.cellUser}
+                  >
+                    {name || '-'}
+                  </Text>
+                ));
+              }
+              const auditor = getLastAuditor(area); // MiniAud | null
+              const auditorName = auditor?.username ?? '—'; // <- normalizas a string
+              console.log('LastNas auditorName', auditorName);
+              return (
+                <Text
+                  key={`cell-area-${area.id}-auditor-${aIdx}`}
+                  style={styles.cellUser}
+                >
+                  {auditorName}
+                </Text>
+              );
+            })}
           </View>
 
           {/* Estado */}
           <View style={styles.row}>
             <Text style={styles.cellLabel}>Estado</Text>
-            {areas.map((area, index) => {
+            {areas.map((area) => {
               const { backgroundColor, textColor } = getStatusStyleMobile(
                 area.status
               );
-              return (
+
+              const cells = renderSpannedCells(area, 'estado', () => (
                 <View
-                  key={`${area.id}-status-${index}`}
-                  style={styles.cellUser}
+                  style={{
+                    backgroundColor,
+                    borderRadius: 10,
+                    paddingHorizontal: 6,
+                    paddingVertical: 2,
+                    alignSelf: 'center',
+                  }}
                 >
-                  <View
+                  <Text
                     style={{
-                      backgroundColor,
-                      borderRadius: 10,
-                      paddingHorizontal: 6,
-                      paddingVertical: 2,
-                      alignSelf: 'center',
+                      color: textColor,
+                      fontWeight: 'bold',
+                      fontSize: 12,
                     }}
                   >
-                    <Text
-                      style={{
-                        color: textColor,
-                        fontWeight: 'bold',
-                        fontSize: 12,
-                      }}
-                    >
-                      {area.status}
-                    </Text>
-                  </View>
+                    {area.status}
+                  </Text>
                 </View>
+              ));
+
+              return (
+                <React.Fragment key={`estado-${area.id}`}>
+                  {cells}
+                </React.Fragment>
               );
             })}
           </View>
@@ -1239,13 +1596,15 @@ const WorkOrderDetailScreen: React.FC = () => {
                   const cells = area.partials.map((p, pIndex) => {
                     const value =
                       field === 'buenas'
-                        ? p.quantity
+                        ? toNum(p.quantity)
                         : field === 'malas'
-                        ? p.bad_quantity ?? 0
-                        : p.excess_quantity ?? 0;
+                        ? toNum(p.bad_quantity)
+                        : field === 'excedente'
+                        ? toNum(p.excess_quantity)
+                        : toNum(p.noprocess_quantity);
                     return (
                       <Text
-                        key={`prod-${area.id}-${field}-${p.id ?? pIndex}`}
+                        key={`area-${area.id}-parcial-${p.id}-${field}-${pIndex}`}
                         style={styles.cellUser}
                       >
                         {value}
@@ -1254,7 +1613,23 @@ const WorkOrderDetailScreen: React.FC = () => {
                   });
                   const rem = getRemainder(area);
                   if (rem > 0) {
-                    const remValue = field === 'buenas' ? rem : 0;
+                    let remValue = 0;
+                    switch (field) {
+                      case 'buenas':
+                        remValue = getRemainderByField(area, 'buenas');
+                        break;
+                      case 'excedente':
+                        remValue = getRemainderByField(area, 'excedente');
+                        break;
+                      case 'noprocess':
+                        remValue = getRemainderByField(area, 'noprocess');
+                        break;
+                      case 'malas':
+                        remValue = getRemainderByField(area, 'malas');
+                        break;
+                      default:
+                        remValue = 0;
+                    }
                     cells.push(
                       <Text
                         key={`prod-${area.id}-${field}-rem`}
@@ -1294,29 +1669,45 @@ const WorkOrderDetailScreen: React.FC = () => {
           {(['defectuoso', 'cqm', 'muestras'] as const).map((field) => (
             <View key={`row-${field}`} style={styles.row}>
               <Text style={styles.cellLabel}>
-                {field === 'defectuoso'
-                  ? 'Materia prima defectuosa'
-                  : field.toUpperCase()}
+                {field === 'defectuoso' ? 'materia prima defectuosa' : field}
               </Text>
-              {areas.flatMap((area, idx) => {
-                const uniq = area.flowId ?? `${area.id}-${idx}`;
+              {areas.flatMap((area, aIdx) => {
                 if (area.parciales > 0) {
-                  const vals = getPerPartialValues(area, field);
+                  // ✅ AHORA llenamos cada parcial y (si existe) REM con datos reales
+                  const vals =
+                    field === 'cqm'
+                      ? getPerPartialCqm(area) // ✅ sin fallback para Rem
+                      : getPerPartialValues(
+                          area,
+                          field as 'defectuoso' | 'muestras'
+                        );
                   return vals.map((v, i) => (
                     <Text
-                      key={`qual-${uniq}-${field}-${i}`}
+                      key={`cell-area-${area.id}-parcial-${i}-${field}`}
                       style={styles.cellUser}
                     >
                       {v}
                     </Text>
                   ));
                 }
+                // Sin parciales → comportamiento anterior (una sola celda)
+                const totalValue =
+                  field === 'cqm'
+                    ? getSingleCqm(area) // ✅ ahora toma el sample_quantity del último answer
+                    : renderCell?.(area, field as any) ??
+                      getAnswerValue(undefined, field as any, area);
                 return (
                   <View
-                    key={`qual-${uniq}-${field}-single`}
+                    key={`cell-area-${area.id}-no-ans-${field}-${aIdx}`}
                     style={styles.cellUser}
                   >
-                    {renderCell(area, field as NumericField)}
+                    {React.isValidElement(totalValue) ? (
+                      totalValue
+                    ) : (
+                      <Text style={styles.cellUser}>
+                        {String(totalValue ?? 0)}
+                      </Text>
+                    )}
                   </View>
                 );
               })}
@@ -1325,20 +1716,35 @@ const WorkOrderDetailScreen: React.FC = () => {
 
           {/* Suma Total */}
           <View style={styles.row}>
-            <Text style={styles.cellLabel}>SUMA TOTAL</Text>
-            {areas.map((area, index) => (
-              <Text key={`${area.id}-suma-${index}`} style={styles.cellUser}>
-                {Number(area.buenas) +
-                  Number(area.malas) +
-                  Number(area.excedente) +
-                  Number(area.noprocess) +
-                  Number(area.defectuoso) +
-                  Number(area.cqm) +
-                  Number(area.muestras)}
-              </Text>
-            ))}
+            <Text style={styles.cellLabel}>📊 Suma Total</Text>
+            {areas.map((area) => {
+              const cells = renderSpannedCells(area, 'suma-total', () => (
+                <Text style={styles.cellUser}>
+                  {String(getAreaSumaTotal(area))}
+                </Text>
+              ));
+              return (
+                <React.Fragment key={`suma-${area.id}`}>{cells}</React.Fragment>
+              );
+            })}
           </View>
 
+          {/* Buenas + Excedente */}
+          <View style={[styles.row, { backgroundColor: '#d7e6d1' }]}>
+            <Text style={styles.cellLabel}>BUENAS + EXCEDENTE</Text>
+            {areas.map((area) => {
+              const cells = renderSpannedCells(area, 'buenas-excedente', () => (
+                <Text style={styles.cellUser}>
+                  {area.id >= 6 ? String(area.buenas + area.excedente) : ''}
+                </Text>
+              ));
+              return (
+                <React.Fragment key={`bx-${area.id}`}>{cells}</React.Fragment>
+              );
+            })}
+          </View>
+
+          {/* Control de Auditoria */}
           <View style={[styles.row, { backgroundColor: '#eef2ff' }]}>
             <Text style={styles.cellLabel}>🔍 Auditoría</Text>
             {areas.map((area, index) => {
@@ -1352,30 +1758,19 @@ const WorkOrderDetailScreen: React.FC = () => {
                 0
               );
               const restante = totalQty - totalRel;
-              return (
-                <Text
-                  key={`${area.id}-auditoria-${index}`}
-                  style={styles.cellUser}
-                >
+
+              const cells = renderSpannedCells(area, 'auditoria', () => (
+                <Text style={styles.cellUser}>
                   {index === areas.length - 1 && area.parciales > 0
-                    ? restante
+                    ? String(restante)
                     : ''}
                 </Text>
+              ));
+
+              return (
+                <React.Fragment key={`aud-${area.id}`}>{cells}</React.Fragment>
               );
             })}
-          </View>
-
-          {/* Buenas + Excedente */}
-          <View style={[styles.row, { backgroundColor: '#d7e6d1' }]}>
-            <Text style={styles.cellLabel}>BUENAS + EXCEDENTE</Text>
-            {areas.map((area, index) => (
-              <Text
-                key={`${area.id}-buenas-excedente-${index}`}
-                style={styles.cellUser}
-              >
-                {area.id >= 6 ? area.buenas + area.excedente : ''}
-              </Text>
-            ))}
           </View>
         </View>
       </ScrollView>
@@ -1420,7 +1815,14 @@ const WorkOrderDetailScreen: React.FC = () => {
         </>
       )}
 
-      {workOrder && <PartialHistory workOrder={workOrder} />}
+      {workOrder && (
+        <PartialHistory
+          workOrder={workOrder}
+          partialSectionOpen={partialSectionOpen}
+          togglePartialSection={() => setPartialSectionOpen((s) => !s)}
+          areaTotalsByAreaId={areaTotalsByAreaId}
+        />
+      )}
 
       <VistosBuenosHistory
         history={vistosBuenosHistory}
@@ -1754,3 +2156,23 @@ const fileStyles = StyleSheet.create({
   buttonText: { color: '#374151', fontSize: 14, fontWeight: '600' },
   empty: { fontSize: 16, fontWeight: '600', color: '#111827' },
 });
+const pillStyles = {
+  pill: {
+    paddingHorizontal: 8, // px-2
+    paddingVertical: 4,   // py-1
+    borderRadius: 10,     // rounded-lg
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  pillHighlighted: {
+    backgroundColor: '#FEF3C7', // bg-yellow-100
+  },
+  pillText: {
+    fontSize: 12,         // text-sm
+    fontWeight: '500',    // font-medium
+  },
+  pillTextHighlighted: {
+    color: '#92400E',     // text-yellow-800
+    fontWeight: '600',
+  },
+} as const;

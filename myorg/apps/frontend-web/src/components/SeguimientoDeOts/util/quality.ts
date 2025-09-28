@@ -9,8 +9,17 @@ export interface AreaLike {
     reviewer?: { username?: string | null } | null;
   }> | null;
   parciales?: number;
-  partials?: Array<{ quantity?: number | null }> | null;
   response?: Record<string, any> | null;
+
+  // Añadir partialReleases con formAuditory
+  partials?: Array<{
+    created_at: string;
+    quantity?: number | null
+    formAuditory?: {
+      created_at: string;
+      user?: { username?: string | null } | null;
+    } | null;
+  }> | null;
 }
 
 // Mapa local para detectar el bloque del área
@@ -62,6 +71,49 @@ export function getLastAnswer(area: AreaLike) {
   )[0];
 }
 
+type MiniAud = { created_at: string; username: string | null };
+
+export function getLastAuditor(areaOrFlowItem: any): MiniAud | null {
+  const areaId = areaOrFlowItem?.area_id ?? areaOrFlowItem?.id ?? null;
+  const key = AREA_KEY_BY_ID[areaId ?? -1] ?? null;
+  console.log('getLastAuditor',key);
+
+  const candidates: MiniAud[] = [];
+
+  // 1) Auditores en PARCIALES
+  const prs = areaOrFlowItem?.partialReleases ?? [];
+  for (const pr of prs) {
+    const fa = pr?.formAuditory;
+    if (!fa) continue;
+    candidates.push({
+      created_at: fa.created_at ?? pr?.created_at ?? '',
+      username: fa?.user?.username ?? null,
+    });
+  }
+
+  // 2) Auditor en areaResponse.<bloque>.formAuditory (ej: corte, colorEdge, etc.)
+  if (key) {
+    const block = areaOrFlowItem?.response?.[key];
+    const fa = block?.formAuditory;
+    if (fa) {
+      candidates.push({
+        created_at: fa.created_at ?? block?.created_at ?? '',
+        username: fa?.user?.username ?? null,
+      });
+    }
+  }
+  console.log('CANDIDATES', candidates)
+
+  if (!candidates.length) return null;
+
+  candidates.sort(
+    (a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
+  );
+
+  return candidates[0];
+}
+
+
 // Nombre del revisor mostrado en tabla
 export function getReviewerNameFromAnswer(ans: any): string {
   return ans?.reviewer?.username ?? '—';
@@ -94,6 +146,49 @@ export function getPerPartialReviewers(area: AreaLike): string[] {
   if (hasRem) {
     const remIndex = cols - 1;
     const remAns = answersSorted[parc]; // sin fallback
+    values[remIndex] = getReviewerNameFromAnswer(remAns);
+  }
+
+  return values;
+}
+export function getPerPartialAuditors(area: AreaLike): string[] {
+  const parc = area.parciales || 0;
+  console.log(area)
+  const hasRem = getRemainder(area) > 0;
+  const cols = parc + (hasRem ? 1 : 0);
+
+  type MiniAud = { created_at: string; username: string | null };
+  const partialAuditories: MiniAud[] =
+    (area.partials ?? [])
+      .map(pr => {
+        const fa = pr?.formAuditory;
+        if (!fa) return null;
+        return {
+          created_at: fa.created_at ?? pr.created_at,
+          username: fa.user?.username ?? null,
+        } as MiniAud;
+      })
+      .filter(Boolean) as MiniAud[];
+
+      console.log('aud', partialAuditories);
+  // Orden cronológico
+  partialAuditories.sort(
+    (a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime()
+  );
+
+  const values: string[] = Array(cols).fill('—');
+
+  // P1..Pn (match 1:1 con answers[0..parc-1])
+  for (let i = 0; i < parc; i++) {
+    const aud = partialAuditories[i];
+    if (!aud) continue;
+    values[i] = aud.username ?? '—';
+  }
+
+  // ✅ Rem: SOLO si existe answers[parc]; si no, queda '—'
+  if (hasRem) {
+    const remIndex = cols - 1;
+    const remAns = partialAuditories[parc]; // sin fallback
     values[remIndex] = getReviewerNameFromAnswer(remAns);
   }
 

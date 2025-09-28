@@ -11,6 +11,13 @@ import {
 
 import WorkOrderInfo from './util/WorkOrderInfo';
 import { AfterCorteData } from './CorteComponent';
+import {
+  buildDefaultValuesByArea,
+  AreaBlock,
+  DefaultValues,
+  toNum
+} from './util/quantityWorkOrder';
+import { getPrevAreaGoodPlusExcess } from './util/lastWorkOrder';
 
 interface Props {
   workOrder: any;
@@ -25,16 +32,45 @@ export default function ColorEdgeComponentAcceptAuditory({ workOrder }: Props) {
   const [showInconformidad, setShowInconformidad] = useState(false);
   const [inconformidad, setInconformidad] = useState<string>('');
 
-  const isDisabled = true;
-
   const [defaultValues, setDefaultValues] = useState<AfterCorteData>({
     good_quantity: '',
     bad_quantity: '',
     excess_quantity: '',
     noprocess_quantity: '',
-    cqm_quantity: '',
+    cqm_quantity: '',     // <- puede ser '' o número
     comments: '',
+    total_quantity: 0,
+    total_execbuen: 0,
   });
+
+  const isDisabled = true;
+
+  const asStrNum = (v: unknown): string | number => {
+    if (v === null || v === undefined) return '';
+    if (typeof v === 'boolean') return v ? 1 : 0;
+    return v as string | number; // ya restringimos los otros casos
+  };
+  
+  const toAfterCorteData = (
+    d: DefaultValues,
+    prev?: AfterCorteData
+  ): AfterCorteData => {
+    return {
+      ...(prev ?? ({} as AfterCorteData)),
+  
+      good_quantity: asStrNum(d.good_quantity),
+      bad_quantity: asStrNum(d.bad_quantity),
+      excess_quantity: asStrNum(d.excess_quantity),
+      noprocess_quantity: asStrNum(d.noprocess_quantity),
+      cqm_quantity: asStrNum(d.cqm_quantity),
+  
+      comments: (d.comments ?? '') as string,
+      total_quantity: d.total_quantity ?? 0,
+  
+      // Si quieres otro criterio, cámbialo aquí
+      total_execbuen: toNum(d.good_quantity),
+    };
+  };
 
   const [sampleAuditory, setSampleQuantity] = useState('');
 
@@ -121,90 +157,58 @@ export default function ColorEdgeComponentAcceptAuditory({ workOrder }: Props) {
     setAreaBadQuantities(initialValues);
   }, [isValidArea, previousFlows]);
 
+  const areaKey: AreaBlock = 'colorEdge';
+
   useEffect(() => {
-    if (!isValidArea) return;
-
-    const colorEdge = workOrder?.areaResponse?.colorEdge;
-    const partials = workOrder?.partialReleases ?? [];
-
-    const cqm_quantity = (workOrder?.answers ?? []).reduce(
-      (total: number, answer: { sample_quantity?: number | string }) =>
-        total + (Number(answer?.sample_quantity) || 0),
-      0
-    );
-
-    const allValidated =
-      partials.length > 0 && partials.every((p: any) => p.validated);
-
-    if (colorEdge && partials.length === 0) {
-      // Caso base: hay respuesta final de Color Edge sin parciales
-      setDefaultValues({
-        good_quantity: colorEdge.good_quantity || '',
-        bad_quantity: colorEdge.bad_quantity || '',
-        excess_quantity: colorEdge.excess_quantity || '',
-        noprocess_quantity: colorEdge.noprocess_quantity || '',
-        cqm_quantity: cqm_quantity || '',
-        comments: colorEdge.comments || '',
-      });
-      return;
-    }
-
-    if (colorEdge && allValidated) {
-      // Todos los parciales validados -> mostrar remanente
-      const totalParciales = partials.reduce(
-        (acc: number, curr: any) => acc + (curr.quantity || 0),
-        0
-      );
-      const totalParcialesBad = partials.reduce(
-        (acc: number, curr: any) => acc + (curr.bad_quantity || 0),
-        0
-      );
-      const totalParcialesExc = partials.reduce(
-        (acc: number, curr: any) => acc + (curr.excess_quantity || 0),
-        0
-      );
-      const totalParcialesNoPro = partials.reduce(
-        (acc: number, curr: any) => acc + (curr.noprocess_quantity || 0),
-        0
-      );
-
-      const restante = (colorEdge.good_quantity || 0) - totalParciales;
-      const restanteBad = (colorEdge.bad_quantity || 0) - totalParcialesBad;
-      const restanteExc = (colorEdge.excess_quantity || 0) - totalParcialesExc;
-      const restanteNoPro =
-        (colorEdge.noprocess_quantity || 0) - totalParcialesNoPro;
-
-      setDefaultValues({
-        good_quantity: restante > 0 ? restante : 0,
-        bad_quantity: restanteBad > 0 ? restanteBad : 0,
-        excess_quantity: restanteExc > 0 ? restanteExc : 0,
-        noprocess_quantity: restanteNoPro > 0 ? restanteNoPro : 0,
-        cqm_quantity: cqm_quantity || '',
-        comments: colorEdge.comments || '',
-      });
-      return;
-    }
-
-    const firstUnvalidated = partials.find((p: any) => !p.validated) || {};
-    setDefaultValues({
-      good_quantity: firstUnvalidated.quantity || '',
-      bad_quantity: firstUnvalidated.bad_quantity || '',
-      excess_quantity: firstUnvalidated.excess_quantity || '',
-      noprocess_quantity: firstUnvalidated.noprocess_quantity || '',
-      cqm_quantity: cqm_quantity || '',
-      comments: firstUnvalidated.observation || '',
+    const result = buildDefaultValuesByArea(areaKey, workOrder, sumaBadQuantity, {
+      // filterPartialsByArea: (p) => p.area === areaKey
     });
-  }, [isValidArea, workOrder]);
+  
+    if (result) {
+      setDefaultValues(prev => toAfterCorteData(result, prev)); // 
+    }
+  }, [workOrder, sumaBadQuantity]);
 
   const handleOpenBadQuantityModal = () => setShowBadQuantity(true);
 
-  const handleSubmit = async (e: React.FormEvent) => {
+  const handleOpenModal = async (e: React.FormEvent) => {
     e.preventDefault();
+
     if (!sampleAuditory) {
-      alert('Por favor, asegúrate de ingresar muestras.');
+      alert('Por favor, asegurate de ingresar muestras.');
+      return;
+    } else if (
+      ((defaultValues.total_quantity ?? 0) + Number(sampleAuditory) >
+        prevAreaSum &&
+        workOrder?.areaResponse?.colorEdge) ||
+      (defaultValues.total_quantity ?? 0) + Number(sampleAuditory) > prevAreaSum
+    ) {
+      alert(
+        'La cantidad total a liberar es mayor a la entregada por parte del área previa.'
+      );
+      return;
+    } else if (
+      (defaultValues.total_quantity ?? 0) + Number(sampleAuditory) !==
+        prevAreaSum &&
+      workOrder?.areaResponse?.colorEdge
+    ) {
+      alert(
+        'La cantidad total a liberar es mayor a la entregada por parte del área previa.'
+      );
       return;
     }
 
+    setShowConfirm(true);
+  }
+
+  const prevAreaSum = useMemo(
+    () => getPrevAreaGoodPlusExcess(workOrder),
+    [workOrder]
+  );
+  console.log('prevAreaSum', prevAreaSum);
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
     const colorEdgeId = workOrder?.areaResponse?.colorEdge?.id ?? workOrder?.id;
     try {
       await acceptWorkOrderFlowColorEdgeAuditory(colorEdgeId, sampleAuditory);
@@ -307,7 +311,7 @@ export default function ColorEdgeComponentAcceptAuditory({ workOrder }: Props) {
         </InputGroup>
       </NewData>
 
-      <AceptarButton onClick={() => setShowConfirm(true)}>
+      <AceptarButton onClick={handleOpenModal}>
         Aceptar recepción del producto
       </AceptarButton>
 
@@ -353,7 +357,7 @@ export default function ColorEdgeComponentAcceptAuditory({ workOrder }: Props) {
                     </div>
                     {flow.area_id >= 6 && (
                       <div>
-                        <Label>Malo de fábrica</Label>
+                        <Label>Materia Prima Defectuosa</Label>
                         <InputBad
                           type="number"
                           min="0"

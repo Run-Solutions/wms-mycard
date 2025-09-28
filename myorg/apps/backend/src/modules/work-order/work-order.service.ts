@@ -52,6 +52,7 @@ export class WorkOrderService {
       throw new BadRequestException(`Máximo ${MAX_FILES} archivos por orden.`);
     }
     // Para guardar la OT en la BD
+    console.log('LLega')
     const workOrder = await this.prisma.workOrder.create({
       data: {
         ot_id,

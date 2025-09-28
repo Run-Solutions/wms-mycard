@@ -125,6 +125,36 @@ export class AcceptWorkOrderService {
       },
     });
 
+    const pendingOrdersAuditoryPartial = await this.prisma.workOrderFlow.findMany({
+      where: {
+        status: { in: statuses },
+        partialReleases: {
+          some: {
+            formAuditory: {
+              is: { reviewed_by_id: userId }, // relación 1–1 -> usar `is`
+            },
+          },
+        },
+      },
+      include: {
+        workOrder: {
+          include: {
+            user: true,
+            files: true,
+            flow: {
+              include: {
+                area: true,
+                formAuditory: { include: { user: true } },
+              },
+            },
+          },
+        },
+        partialReleases: {
+          include: { formAuditory: { include: { user: true } } },
+        },
+      },
+    });
+
     if (pendingOrders.length === 0 && pendingOrdersAuditory.length === 0) {
       return { message: 'No hay órdenes pendientes para esta área.' };
     }
@@ -134,6 +164,7 @@ export class AcceptWorkOrderService {
     return {
       pendingOrders,
       pendingOrdersAuditory,
+      pendingOrdersAuditoryPartial
     };
   }
 
@@ -574,7 +605,7 @@ export class AcceptWorkOrderService {
       select: { work_order_id: true },
     });
     const otId = await this.prisma.workOrder.findUnique({
-      where: { id: WorkOrderFlow?.work_order_id },
+      where: { id: updated?.work_order_id },
       select: { ot_id: true },
     });
     if (
@@ -622,7 +653,11 @@ export class AcceptWorkOrderService {
         area_id: areasOperatorIds,
       },
       include: {
-        partialReleases: true,
+        partialReleases: {
+          include: {
+            formAuditory: true,
+          }
+        },
         workOrder: {
           include: {
             user: true,

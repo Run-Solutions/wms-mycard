@@ -476,8 +476,18 @@ const OrdenesDeTrabajoScreen: React.FC = () => {
       setFiles({ ot: null, sku: null, op: null, cardImage: null });
       setDropdowns(1);
       setExtraFiles([]);
-    } catch (err) {
-      Alert.alert('Error', 'La OT es duplicada o hubo un problema al enviar.');
+    } catch (err: any) {
+      // Intenta traer metadatos de error propagados desde createWorkOrder
+      const msg = [
+        '❌ Error creando OT:',
+        err?.message ? `\n• message: ${err.message}` : '',
+        err?.status ? `\n• status: ${err.status}` : '',
+        err?.url ? `\n• url: ${err.url}` : '',
+        err?.responseText ? `\n• body: ${err.responseText}` : '',
+      ].join('');
+    
+      console.error('[createWorkOrder] fallo:', err);
+      Alert.alert('Error al enviar', msg || 'Revisa la consola para más detalles.');
     }
   };
 

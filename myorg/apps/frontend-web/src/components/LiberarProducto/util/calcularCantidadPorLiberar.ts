@@ -59,30 +59,30 @@ export function calcularCantidadPorLiberar(
       0
     ) ?? 0;
 
-  //console.log('Total liberado del current:', totalLiberado);
+  console.log('Total liberado del current:', totalLiberado);
 
   // Aquí la diferencia clave:
   const totalValidados = getAreaResponseQuantity();
-  //console.log('Total validados (areaResponse):', totalValidados);
+  console.log('Total validados (areaResponse):', totalValidados);
 
   let cantidadPorLiberar = 0;
 
   if (lastCompletedOrPartial.area?.name === 'preprensa') {
     cantidadPorLiberar = currentFlow.workOrder.quantity - totalLiberado;
-    //console.log('Preprensa: cantidad por liberar calculada.', cantidadPorLiberar);
+    console.log('Preprensa: cantidad por liberar calculada.', cantidadPorLiberar);
   } else if (totalValidados > 0) {
     const resta = totalValidados - totalLiberado;
     cantidadPorLiberar = Math.max(resta, 0);
-    //console.log('Cantidad por liberar (validados - liberados):', cantidadPorLiberar);
+    console.log('Cantidad por liberar (validados - liberados):', cantidadPorLiberar);
   } else if (
     !lastCompletedOrPartial.partialReleases ||
     lastCompletedOrPartial.partialReleases.length === 0
   ) {
     cantidadPorLiberar = getAreaResponseQuantity();
-    //console.log('No hay parciales: usando cantidad entregada:', cantidadPorLiberar);
+    console.log('No hay parciales: usando cantidad entregada:', cantidadPorLiberar);
   } else {
     cantidadPorLiberar = 0;
-    //console.log('Caso por defecto: cantidad por liberar = 0');
+    console.log('Caso por defecto: cantidad por liberar = 0');
   }
 
   return cantidadPorLiberar;
