@@ -82,7 +82,7 @@ const BadQuantityModal: React.FC<Props> = ({
                     {area.id >= 6 && (
                       <div>
                         <label className="block text-sm text-gray-600 font-medium mb-1">
-                          Malo de fábrica
+                          Materia Prima Defectuosa
                         </label>
                         <input
                           type="number"

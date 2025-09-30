@@ -30,6 +30,7 @@ model User {
   inconformitiesCreated Inconformities[]    @relation("UserInconformities")
   biometricKeys         UserBiometricKey[]  
   partialReleases       PartialRelease[]    @relation("UserPartialReleases")
+  badQuantityDetails    BadQuantityDetail[]
 
   // Campos inversos añadidos
   deviceTokens          DeviceToken[]
@@ -112,6 +113,9 @@ model AreasOperator {
   formQuestions         FormQuestion[]      @relation("QuestionsOnAreas")
   answers               FormAnswer[]
 
+  badQuantityDetailsSource BadQuantityDetail[] @relation("BadQuantitySourceArea")
+  badQuantityDetailsTarget BadQuantityDetail[] @relation("BadQuantityTargetArea")
+
   @@map("areas_operator")
 }
 
@@ -166,6 +170,7 @@ model WorkOrder {
   flow                  WorkOrderFlow[]     // Relación con las áreas por las que ha pasado
   areasResponses        AreasResponse[]     @relation("WorkOrderOnResponse")
   formAnswers           FormAnswer[]        @relation("WorkOrderToFormAnswers")
+  badQuantityDetails    BadQuantityDetail[]
 
   createdAt             DateTime            @default(now()) @map("created_at")
   updatedAt             DateTime            @updatedAt @map("updated_at")
@@ -203,6 +208,7 @@ model WorkOrderFlow {
   answers                FormAnswer[]
   partialReleases        PartialRelease[]
   formAuditory           FormAuditory[]
+  badQuantityDetails     BadQuantityDetail[] @relation("BadQuantitySourceFlow")
 
   created_at             DateTime            @default(now()) @map("created_at")
   updated_at             DateTime            @updatedAt @map("updated_at")
@@ -221,6 +227,7 @@ model PartialRelease {
   excess_quantity        Int?
   noprocess_quantity     Int?
   material_quantity      Int?
+  release_quantity       Int?
 
   observation            String?
   validated              Boolean             @default(false)
@@ -234,6 +241,30 @@ model PartialRelease {
   created_at             DateTime            @default(now()) @map("created_at")
 
   @@map("partial_release")
+}
+
+model BadQuantityDetail {
+  id                        Int             @id @default(autoincrement())
+  work_order_id             Int
+  source_work_order_flow_id Int
+  source_area_id            Int
+  target_area_id            Int
+  block                     String
+  bad_quantity              Int?
+  material_quantity         Int?
+  values                    Json?
+  created_by                Int
+  created_at                DateTime        @default(now()) @map("created_at")
+  updated_at                DateTime        @updatedAt @map("updated_at")
+
+  workOrder           WorkOrder     @relation(fields: [work_order_id], references: [id], onDelete: Cascade)
+  sourceWorkOrderFlow WorkOrderFlow @relation("BadQuantitySourceFlow", fields: [source_work_order_flow_id], references: [id], onDelete: Cascade)
+  sourceArea          AreasOperator @relation("BadQuantitySourceArea", fields: [source_area_id], references: [id])
+  targetArea          AreasOperator @relation("BadQuantityTargetArea", fields: [target_area_id], references: [id])
+  user                User          @relation(fields: [created_by], references: [id])
+
+  @@unique([source_work_order_flow_id, target_area_id])
+  @@map("bad_quantity_detail")
 }
 
 model AreasResponse {
@@ -604,11 +635,12 @@ model Inconformities {
   form_answer_id          Int?
   partial_release_id      Int?      
   form_auditory_id        Int?
+  work_order_flow_id      Int?
 
-  partialReleases         PartialRelease?   @relation(fields: [partial_release_id], references: [id], onDelete: Cascade)
-  formAuditory            FormAuditory?     @relation(fields: [form_auditory_id], references: [id], onDelete: Cascade)
-  areaResponse            AreasResponse?    @relation(fields: [areas_response_id], references: [id], onDelete: Cascade)
-  formAnswer              FormAnswer?       @relation(fields: [form_answer_id], references: [id], onDelete: Cascade)
+  partialReleases         PartialRelease?   @relation(fields: [partial_release_id], references: [id])
+  formAuditory            FormAuditory?     @relation(fields: [form_auditory_id], references: [id])
+  areaResponse            AreasResponse?    @relation(fields: [areas_response_id], references: [id])
+  formAnswer              FormAnswer?       @relation(fields: [form_answer_id], references: [id])
   user                    User?             @relation("UserInconformities", fields: [created_by], references: [id])
 
   notifications           Notification[]    @relation("InconformityNotifications")

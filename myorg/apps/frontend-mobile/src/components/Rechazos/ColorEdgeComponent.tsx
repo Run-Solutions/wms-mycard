@@ -17,8 +17,8 @@ import { acceptColorEdgeInconformityAuditory } from '../../api/rechazos';
 import { InconformityData } from './CorteComponent';
 
 interface Props {
-  workOrder: any; 
-  currentFlow: any; 
+  workOrder: any;
+  currentFlow: any;
 }
 interface PartialRelease {
   quantity: string;
@@ -27,7 +27,6 @@ interface PartialRelease {
   work_order_flow_id: number;
   inconformities: any[];
 }
-
 
 const ColorEdgeComponent: React.FC<Props> = ({ workOrder, currentFlow }) => {
   const navigation =
@@ -57,9 +56,13 @@ const ColorEdgeComponent: React.FC<Props> = ({ workOrder, currentFlow }) => {
     const colorEdge = currentFlow.areaResponse?.colorEdge;
     const partials = currentFlow.partialReleases || [];
     console.log('colorEdge:', colorEdge);
-    const lastPartialRelease = currentFlow.partialReleases.find(
-      (release: PartialRelease) => release.validated
-    );
+    const lastPartialRelease = currentFlow.partialReleases
+      .filter((r: PartialRelease) => r.validated)
+      .sort(
+        (a: any, b: any) =>
+          new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
+      )[0];
+
     console.log('Ultima parcialidad validar:', lastPartialRelease);
 
     const allValidated =
@@ -96,7 +99,10 @@ const ColorEdgeComponent: React.FC<Props> = ({ workOrder, currentFlow }) => {
       setInconformityValues({
         quantity: Math.max((colorEdge.good_quantity || 0) - totalGood, 0),
         excess: Math.max((colorEdge.excess_quantity || 0) - totalExcess, 0),
-        noprocess: Math.max((colorEdge.noprocess_quantity || 0) - totalNoProcess, 0),
+        noprocess: Math.max(
+          (colorEdge.noprocess_quantity || 0) - totalNoProcess,
+          0
+        ),
         sample: colorEdge.formAuditory?.sample_auditory || '',
         comments: colorEdge.comments || '',
         user:
@@ -107,7 +113,12 @@ const ColorEdgeComponent: React.FC<Props> = ({ workOrder, currentFlow }) => {
       });
     } else {
       // Primer parcial no validado
-      const firstUnvalidated = partials.find((p: any) => p.validated);
+      const firstUnvalidated = partials
+        .filter((r: PartialRelease) => r.validated)
+        .sort(
+          (a: any, b: any) =>
+            new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
+        )[0];
 
       setInconformityValues({
         quantity: firstUnvalidated?.quantity || '',
@@ -116,10 +127,10 @@ const ColorEdgeComponent: React.FC<Props> = ({ workOrder, currentFlow }) => {
         sample: firstUnvalidated?.formAuditory?.sample_auditory || '',
         comments: firstUnvalidated?.observation || '',
         user:
-          lastPartialRelease.formAuditory.inconformities.at(-1)?.user
-            .username || '',
+          firstUnvalidated.formAuditory.inconformities.at(-1)?.user.username ||
+          '',
         inconformity:
-          lastPartialRelease.formAuditory.inconformities.at(-1)?.comments || '',
+          firstUnvalidated.formAuditory.inconformities.at(-1)?.comments || '',
       });
     }
   }, [currentFlow]);
@@ -154,6 +165,7 @@ const ColorEdgeComponent: React.FC<Props> = ({ workOrder, currentFlow }) => {
     .filter((flow) => flow.area_id !== 1);
 
   console.log('Áreas anteriores sin Preprensa:', previousFlows);
+
   const handleOpenBadQuantityModal = () => {
     const initialValues: { [areaName: string]: string } = {};
 
@@ -225,20 +237,7 @@ const ColorEdgeComponent: React.FC<Props> = ({ workOrder, currentFlow }) => {
   const sumaBadQuantity = previousFlows.reduce((sum, flow) => {
     let bad = 0;
 
-    if (flow.areaResponse?.impression) {
-      bad = flow.areaResponse.impression.bad_quantity || 0;
-    } else if (flow.areaResponse?.serigrafia) {
-      bad = flow.areaResponse.serigrafia.bad_quantity || 0;
-    } else if (flow.areaResponse?.empalme) {
-      bad = flow.areaResponse.empalme.bad_quantity || 0;
-    } else if (flow.areaResponse?.laminacion) {
-      bad = flow.areaResponse.laminacion.bad_quantity || 0;
-    } else if (flow.areaResponse?.corte) {
-      const corte = flow.areaResponse.corte;
-      const corteBad = corte.bad_quantity || 0;
-      const corteMaterial = corte.material_quantity || 0; // ← suma también este
-      bad = corteBad + corteMaterial;
-    } else if (flow.areaResponse?.colorEdge) {
+    if (flow.areaResponse?.colorEdge) {
       const colorEdge = flow.areaResponse.colorEdge;
       const colorEdgeBad = colorEdge.bad_quantity || 0;
       const colorEdgeMaterial = colorEdge.material_quantity || 0; // ← suma también este
@@ -395,7 +394,7 @@ const ColorEdgeComponent: React.FC<Props> = ({ workOrder, currentFlow }) => {
                             style={[styles.inputGroup, { maxWidth: '40%' }]}
                           >
                             <Text style={styles.inputLabel}>
-                              Malo de fábrica
+                              Materia Prima Defectuosa
                             </Text>
                             <TextInput
                               style={styles.input}
@@ -514,12 +513,14 @@ const styles = StyleSheet.create({
     padding: 16,
     borderRadius: 18,
     elevation: 3,
+    marginTop: 8,
   },
   button: {
     backgroundColor: '#0038A8',
     padding: 14,
     borderRadius: 18,
     alignItems: 'center',
+    marginTop: 8,
   },
   buttonText: {
     color: '#fff',

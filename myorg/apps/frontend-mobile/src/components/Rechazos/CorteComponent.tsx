@@ -16,8 +16,8 @@ import { RootStackParamList } from '../../navigation/types';
 import { acceptCorteInconformityAuditory } from '../../api/rechazos';
 
 interface Props {
-  workOrder: any; 
-  currentFlow: any; 
+  workOrder: any;
+  currentFlow: any;
 }
 interface PartialRelease {
   quantity: string;
@@ -65,9 +65,12 @@ const CorteComponent: React.FC<Props> = ({ workOrder, currentFlow }) => {
     const corte = currentFlow.areaResponse?.corte;
     const partials = currentFlow.partialReleases || [];
     console.log('corte:', corte);
-    const lastPartialRelease = currentFlow.partialReleases.find(
-      (release: PartialRelease) => release.validated
-    );
+    const lastPartialRelease = currentFlow.partialReleases
+      .filter((r: PartialRelease) => r.validated)
+      .sort(
+        (a: any, b: any) =>
+          new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
+      )[0];
     console.log('Ultima parcialidad validar:', lastPartialRelease);
 
     const allValidated =
@@ -102,7 +105,10 @@ const CorteComponent: React.FC<Props> = ({ workOrder, currentFlow }) => {
       setInconformityValues({
         quantity: Math.max((corte.good_quantity || 0) - totalGood, 0),
         excess: Math.max((corte.excess_quantity || 0) - totalExcess, 0),
-        noprocess: Math.max((corte.noprocess_quantity || 0) - totalNoProcess, 0),
+        noprocess: Math.max(
+          (corte.noprocess_quantity || 0) - totalNoProcess,
+          0
+        ),
         sample: corte.formAuditory?.sample_auditory || '',
         comments: corte.comments || '',
         user:
@@ -113,7 +119,12 @@ const CorteComponent: React.FC<Props> = ({ workOrder, currentFlow }) => {
       });
     } else {
       // Primer parcial no validado
-      const firstUnvalidated = partials.find((p: any) => p.validated);
+      const firstUnvalidated = partials
+        .filter((r: PartialRelease) => r.validated)
+        .sort(
+          (a: any, b: any) =>
+            new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
+        )[0];
 
       setInconformityValues({
         quantity: firstUnvalidated?.quantity || '',
@@ -122,10 +133,10 @@ const CorteComponent: React.FC<Props> = ({ workOrder, currentFlow }) => {
         sample: firstUnvalidated?.formAuditory?.sample_auditory || '',
         comments: firstUnvalidated?.observation || '',
         user:
-          lastPartialRelease.formAuditory.inconformities.at(-1)?.user
-            .username || '',
+          firstUnvalidated.formAuditory.inconformities.at(-1)?.user.username ||
+          '',
         inconformity:
-          lastPartialRelease.formAuditory.inconformities.at(-1)?.comments || '',
+          firstUnvalidated.formAuditory.inconformities.at(-1)?.comments || '',
       });
     }
   }, [currentFlow]);
@@ -335,6 +346,9 @@ const CorteComponent: React.FC<Props> = ({ workOrder, currentFlow }) => {
             style={styles.input}
             editable={false}
             value={inconformityValues.user}
+            mode="outlined"
+            activeOutlineColor="#000"
+            theme={{ roundness: 30 }}
           />
 
           <Text style={styles.label}>Comentarios</Text>
@@ -343,6 +357,9 @@ const CorteComponent: React.FC<Props> = ({ workOrder, currentFlow }) => {
             multiline
             editable={false}
             value={inconformityValues.inconformity}
+            mode="outlined"
+            activeOutlineColor="#000"
+            theme={{ roundness: 30 }}
           />
         </View>
 
@@ -388,7 +405,7 @@ const CorteComponent: React.FC<Props> = ({ workOrder, currentFlow }) => {
                             style={[styles.inputGroup, { maxWidth: '40%' }]}
                           >
                             <Text style={styles.inputLabel}>
-                              Malo de fábrica
+                              Materia Prima Defectuosa
                             </Text>
                             <TextInput
                               style={styles.input}
@@ -504,12 +521,14 @@ const styles = StyleSheet.create({
     padding: 16,
     borderRadius: 18,
     elevation: 3,
+    marginTop: 8,
   },
   button: {
     backgroundColor: '#0038A8',
     padding: 14,
     borderRadius: 18,
     alignItems: 'center',
+    marginTop: 8,
   },
   buttonText: {
     color: '#fff',

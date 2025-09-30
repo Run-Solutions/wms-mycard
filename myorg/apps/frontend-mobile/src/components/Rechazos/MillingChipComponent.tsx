@@ -56,9 +56,13 @@ const MillingChipComponent: React.FC<Props> = ({ workOrder, currentFlow }) => {
     const millingChip = currentFlow.areaResponse?.millingChip;
     const partials = currentFlow.partialReleases || [];
     console.log('millingChip:', millingChip);
-    const lastPartialRelease = currentFlow.partialReleases.find(
-      (release: PartialRelease) => release.validated
-    );
+    const lastPartialRelease = currentFlow.partialReleases
+      .filter((r: PartialRelease) => r.validated)
+      .sort(
+        (a: any, b: any) =>
+          new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
+      )[0];
+
     console.log('Ultima parcialidad validar:', lastPartialRelease);
 
     const allValidated =
@@ -108,8 +112,12 @@ const MillingChipComponent: React.FC<Props> = ({ workOrder, currentFlow }) => {
           lastPartialRelease.formAuditory.inconformities.at(-1)?.comments || '',
       });
     } else {
-      // Primer parcial no validado
-      const firstUnvalidated = partials.find((p: any) => p.validated);
+      const firstUnvalidated = partials
+        .filter((r: PartialRelease) => r.validated)
+        .sort(
+          (a: any, b: any) =>
+            new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
+        )[0];
 
       setInconformityValues({
         quantity: firstUnvalidated?.quantity || '',
@@ -118,10 +126,10 @@ const MillingChipComponent: React.FC<Props> = ({ workOrder, currentFlow }) => {
         sample: firstUnvalidated?.formAuditory?.sample_auditory || '',
         comments: firstUnvalidated?.observation || '',
         user:
-          lastPartialRelease.formAuditory.inconformities.at(-1)?.user
-            .username || '',
+          firstUnvalidated.formAuditory.inconformities.at(-1)?.user.username ||
+          '',
         inconformity:
-          lastPartialRelease.formAuditory.inconformities.at(-1)?.comments || '',
+          firstUnvalidated.formAuditory.inconformities.at(-1)?.comments || '',
       });
     }
   }, [currentFlow]);
@@ -227,30 +235,7 @@ const MillingChipComponent: React.FC<Props> = ({ workOrder, currentFlow }) => {
   const sumaBadQuantity = previousFlows.reduce((sum, flow) => {
     let bad = 0;
 
-    if (flow.areaResponse?.impression) {
-      bad = flow.areaResponse.impression.bad_quantity || 0;
-    } else if (flow.areaResponse?.serigrafia) {
-      bad = flow.areaResponse.serigrafia.bad_quantity || 0;
-    } else if (flow.areaResponse?.empalme) {
-      bad = flow.areaResponse.empalme.bad_quantity || 0;
-    } else if (flow.areaResponse?.laminacion) {
-      bad = flow.areaResponse.laminacion.bad_quantity || 0;
-    } else if (flow.areaResponse?.corte) {
-      const corte = flow.areaResponse.corte;
-      const corteBad = corte.bad_quantity || 0;
-      const corteMaterial = corte.material_quantity || 0; // ← suma también este
-      bad = corteBad + corteMaterial;
-    } else if (flow.areaResponse?.colorEdge) {
-      const colorEdge = flow.areaResponse.colorEdge;
-      const colorEdgeBad = colorEdge.bad_quantity || 0;
-      const colorEdgeMaterial = colorEdge.material_quantity || 0; // ← suma también este
-      bad = colorEdgeBad + colorEdgeMaterial;
-    } else if (flow.areaResponse?.hotStamping) {
-      const hotStamping = flow.areaResponse.hotStamping;
-      const hotStampingBad = hotStamping.bad_quantity || 0;
-      const hotStampingMaterial = hotStamping.material_quantity || 0; // ← suma también este
-      bad = hotStampingBad + hotStampingMaterial;
-    } else if (flow.areaResponse?.millingChip) {
+    if (flow.areaResponse?.millingChip) {
       const millingChip = flow.areaResponse.millingChip;
       const millingChipBad = millingChip.bad_quantity || 0;
       const millingChipMaterial = millingChip.material_quantity || 0; // ← suma también este
@@ -406,7 +391,7 @@ const MillingChipComponent: React.FC<Props> = ({ workOrder, currentFlow }) => {
                             style={[styles.inputGroup, { maxWidth: '40%' }]}
                           >
                             <Text style={styles.inputLabel}>
-                              Malo de fábrica
+                              Materia Prima Defectuosa
                             </Text>
                             <TextInput
                               style={styles.input}
@@ -522,12 +507,14 @@ const styles = StyleSheet.create({
     padding: 16,
     borderRadius: 18,
     elevation: 3,
+    marginTop: 8,
   },
   button: {
     backgroundColor: '#0038A8',
     padding: 14,
     borderRadius: 18,
     alignItems: 'center',
+    marginTop: 8,
   },
   buttonText: {
     color: '#fff',
@@ -574,6 +561,20 @@ const styles = StyleSheet.create({
     color: '#fff',
     fontWeight: 'bold',
   },
+  inputLabel: {
+    fontSize: 13,
+    marginBottom: 4,
+  },
+  inputGroup: {
+    width: '100%',
+  },
+  modalTitle: {
+    fontSize: 22,
+    fontWeight: 'bold',
+    marginBottom: 16,
+    textAlign: 'center',
+    color: '#1f2937',
+  },
   modalBoxScrollable: {
     backgroundColor: '#fff',
     borderRadius: 10,
@@ -590,19 +591,5 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     gap: 16,
     flexWrap: 'wrap',
-  },
-  inputLabel: {
-    fontSize: 13,
-    marginBottom: 4,
-  },
-  inputGroup: {
-    width: '100%',
-  },
-  modalTitle: {
-    fontSize: 22,
-    fontWeight: 'bold',
-    marginBottom: 16,
-    textAlign: 'center',
-    color: '#1f2937',
   },
 });

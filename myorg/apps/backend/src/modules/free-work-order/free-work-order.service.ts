@@ -59,6 +59,11 @@ export class FreeWorkOrderService {
       },
       include: {
         partialReleases: true,
+        badQuantityDetails: {
+          include: {
+            targetArea: true,
+          },
+        },
         workOrder: {
           include: {
             user: true,
@@ -68,6 +73,11 @@ export class FreeWorkOrderService {
                 user: true,
                 area: true,
                 partialReleases: true,
+                badQuantityDetails: {
+                  include: {
+                    targetArea: true,
+                  },
+                },
               },
             },
           },
@@ -96,7 +106,16 @@ export class FreeWorkOrderService {
         area_id: areasOperatorIds,
       },
       include: {
-        partialReleases: true,
+        partialReleases: {
+          include: {
+            formAuditory: true,
+          },
+        },
+        badQuantityDetails: {
+          include: {
+            targetArea: true,
+          },
+        },
         workOrder: {
           include: {
             user: true,
@@ -106,7 +125,16 @@ export class FreeWorkOrderService {
                 area: true,
                 user: true,
                 workOrder: true,
-                partialReleases: true,
+                partialReleases: {
+                  include: {
+                    formAuditory: true,
+                  },
+                },
+                badQuantityDetails: {
+                  include: {
+                    targetArea: true,
+                  },
+                },
                 areaResponse: {
                   include: {
                     prepress: true,

@@ -130,6 +130,7 @@ const DashboardHeader: React.FC<DashboardHeaderProps> = ({
   const [notifError, setNotifError] = useState<string | null>(null);
   const [specialModalOpen, setSpecialModalOpen] = useState(false);
   const [specialAuditorOpen, setSpecialModalAuditorOpen] = useState(false);
+  const [specialOpersOpen, setSpecialModalOpersOpen] = useState(false);
   const [selectedNotif, setSelectedNotif] = useState<AppNotification | null>(
     null
   );
@@ -204,10 +205,18 @@ const DashboardHeader: React.FC<DashboardHeaderProps> = ({
 
   function shouldShowPlannerAuditorModal(n: AppNotification, user: any): boolean {
     const roles = getUserRoles(user);
-    console.log('Evaluando shouldShowPlannerAuditorModal');
     return (
       roles.includes('planeador') &&
       (n.type ?? '').toLowerCase() === 'inconformidades_auditor_planeador'
+    );
+  }
+  
+  function shouldShowPlannerOpersModal(n: AppNotification, user: any): boolean {
+    const roles = getUserRoles(user);
+    console.log('Evaluando shouldShowPlannerOpersModal');
+    return (
+      roles.includes('planeador') &&
+      (n.type ?? '').toLowerCase() === 'inconformidades_operadores_planeador'
     );
   }
 
@@ -246,6 +255,12 @@ function inferTypeFromTexts(title?: string, body?: string): string | null {
     txt.includes('cqm te ha reportado')
   ) {
     return 'inconformidades_cqm_planeador';
+  }
+
+  if (
+    txt.includes('reporta una inconformidad del area receptora o auditoria a area previa') 
+  ) {
+    return 'inconformidades_operadores_planeador';
   }
 
   // ——— Vistos buenos ———
@@ -498,14 +513,21 @@ function inferTypeFromTexts(title?: string, body?: string): string | null {
                             setSelectedNotif(n as any);
                             setSpecialModalOpen(true);
                             if (!n.isRead) handleMarkAsRead(n.id);
-                            return; // 👈 evita navegar
+                            return; 
                           } else if (shouldShowPlannerAuditorModal(n as any, user)) {
                             console.log('Abriendo modal especial para', n);
                             setNotifAnchorEl(null); // 👈 cerrar popover
                             setSelectedNotif(n as any);
                             setSpecialModalAuditorOpen(true);
                             if (!n.isRead) handleMarkAsRead(n.id);
-                            return; // 👈 evita navegar
+                            return; 
+                          } else if (shouldShowPlannerOpersModal(n as any, user)) {
+                            console.log('Abriendo modal especial para', n);
+                            setNotifAnchorEl(null);
+                            setSelectedNotif(n as any);
+                            setSpecialModalOpersOpen(true);
+                            if (!n.isRead) handleMarkAsRead(n.id);
+                            return; 
                           }
 
                           const route = getNotificationRoute(n as any, user);
@@ -637,6 +659,43 @@ function inferTypeFromTexts(title?: string, body?: string): string | null {
             >
               {/* ✅ Cierra el modal correcto */}
               <RechazarButton onClick={() => setSpecialModalAuditorOpen(false)}>
+                Cerrar
+              </RechazarButton>
+            </div>
+          </ModalContent>
+        </ModalOverlay>
+      )}
+     
+      {specialOpersOpen && selectedNotif && (
+        <ModalOverlay>
+          <ModalContent>
+            <Label style={{ margin: 0 }}>Inconformidad Operaciones</Label>
+            <p style={{ marginTop: 12 }}>{selectedNotif.body}</p>
+
+            <Label>Comentarios</Label>
+            <Input>
+              {selectedNotif.inconformity?.comments ?? 'Sin comentarios'}
+            </Input>
+
+            <Label>Inconformidad aceptada</Label>
+            <Input>
+              {selectedNotif.inconformity
+                ? selectedNotif.inconformity.reviewed
+                  ? 'Si'
+                  : 'En espera de revisión'
+                : 'En espera de revisión'}
+            </Input>
+
+            <div
+              style={{
+                display: 'flex',
+                justifyContent: 'flex-end',
+                gap: 8,
+                marginTop: 20,
+              }}
+            >
+              {/* ✅ Cierra el modal correcto */}
+              <RechazarButton onClick={() => setSpecialModalOpersOpen(false)}>
                 Cerrar
               </RechazarButton>
             </div>

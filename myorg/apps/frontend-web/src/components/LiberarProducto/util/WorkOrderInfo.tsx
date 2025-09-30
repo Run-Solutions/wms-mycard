@@ -151,16 +151,42 @@ export default function WorkOrderInfo({
           </CardContent>
         </Card>
         {workOrder?.partialReleases?.length > 0 && (
-          <Card>
-            <CardContent>
-              <p className="text-sm text-muted-foreground text-black">
-                Cantidad por Liberar:
-              </p>
-              <p className="text-xl font-semibold text-black">
-                {cantidadporliberar}
-              </p>
-            </CardContent>
-          </Card>
+          <>
+            <Card>
+              <CardContent>
+                <p className="text-sm text-muted-foreground text-black">
+                  Cantidad por Liberar:
+                </p>
+                <p className="text-xl font-semibold text-black">
+                  {cantidadporliberar}
+                </p>
+              </CardContent>
+            </Card>
+            <Card className="bg-blue-400">
+              <CardContent>
+                <p className="text-sm text-muted-foreground text-black">
+                  Cantidad restante parcial por liberar:
+                </p>
+                <p className="text-xl font-semibold text-black">
+                  {(() => {
+                    const ps = workOrder.partialReleases ?? [];
+                    console.log(ps);
+
+                    const totalQty = ps.reduce(
+                      (s: any, p: any) => s + (Number(p?.quantity) || 0),
+                      0
+                    );
+                    const totalRel = ps.reduce(
+                      (s: any, p: any) =>
+                        s + (Number(p?.release_quantity) || 0),
+                      0
+                    );
+                    return totalQty - totalRel;
+                  })()}
+                </p>
+              </CardContent>
+            </Card>
+          </>
         )}
       </div>
 
@@ -192,8 +218,6 @@ export default function WorkOrderInfo({
                       ? 'SKU'
                       : file.type === 'OP'
                       ? 'OP'
-                      : file.type === 'CARD_IMAGE'
-                      ? 'Ver TARJETA'
                       : 'Adjunto';
                   return (
                     <button
@@ -388,17 +412,66 @@ export function WorkOrderHojasInfo({
             </p>
           </CardContent>
         </Card>
+
         {workOrder?.partialReleases?.length > 0 && (
-          <Card>
-            <CardContent>
-              <p className="text-sm text-muted-foreground text-black">
-                Cantidad por Liberar:
-              </p>
-              <p className="text-xl font-semibold text-black">
-                {cantidadporliberar}
-              </p>
-            </CardContent>
-          </Card>
+          <>
+            <Card>
+              <CardContent>
+                <p className="text-sm text-muted-foreground text-black">
+                  Cantidad por Liberar:
+                </p>
+                <p className="text-xl font-semibold text-black">
+                  {cantidadporliberar}
+                </p>
+              </CardContent>
+            </Card>
+            <Card className="bg-blue-400">
+              <CardContent>
+                <p className="text-sm text-muted-foreground text-black">
+                  Cantidad restante parcial por liberar:
+                </p>
+                <p className="text-xl font-semibold text-black">
+                  {(() => {
+                    const ps = workOrder.partialReleases ?? [];
+                    console.log(ps);
+
+                    const totalQty = ps.reduce(
+                      (s: any, p: any) => s + (Number(p?.quantity) || 0),
+                      0
+                    );
+                    const totalRel = ps.reduce(
+                      (s: any, p: any) =>
+                        s + (Number(p?.release_quantity) || 0),
+                      0
+                    );
+                    return totalQty - totalRel;
+                  })()}
+                </p>
+              </CardContent>
+            </Card>
+            <Card className="bg-blue-400">
+              <CardContent>
+                <p className="text-sm text-muted-foreground text-black">
+                  Cantidad restante parcial por liberar:
+                </p>
+                <p className="text-xl font-semibold text-black">
+                  {(() => {
+                    const ps = workOrder.partialReleases ?? [];
+                    const totalQty = ps.reduce(
+                      (s: any, p: any) => s + (Number(p?.quantity) || 0),
+                      0
+                    );
+                    const totalRel = ps.reduce(
+                      (s: any, p: any) =>
+                        s + (Number(p?.release_quantity) || 0),
+                      0
+                    );
+                    return totalQty - totalRel;
+                  })()}
+                </p>
+              </CardContent>
+            </Card>
+          </>
         )}
       </div>
       <div className="grid grid-cols-1 md:grid-cols-1 gap-4 mb-6">
@@ -428,8 +501,6 @@ export function WorkOrderHojasInfo({
                       ? 'SKU'
                       : file.type === 'OP'
                       ? 'OP'
-                      : file.type === 'CARD_IMAGE'
-                      ? 'Ver TARJETA'
                       : 'Adjunto';
                   return (
                     <button
@@ -569,8 +640,6 @@ export function WorkOrderPrePressInfo({ workOrder }: Props) {
                       ? 'SKU'
                       : file.type === 'OP'
                       ? 'OP'
-                      : file.type === 'CARD_IMAGE'
-                      ? 'Ver TARJETA'
                       : 'Adjunto';
                   return (
                     <button

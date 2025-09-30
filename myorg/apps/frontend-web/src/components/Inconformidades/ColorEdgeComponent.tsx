@@ -60,6 +60,9 @@ export default function ColorEdgeComponent({ workOrder }: Props) {
   const releaseBad = lastPartialRelease
     ? lastPartialRelease.bad_quantity
     : workOrder.areaResponse?.colorEdge.bad_quantity;
+  const releaseNoProcess = lastPartialRelease
+    ? lastPartialRelease.noprocess_quantity
+    : workOrder.areaResponse?.colorEdge.noprocess_quantity;
   const releaseExcess = lastPartialRelease
     ? lastPartialRelease.excess_quantity
     : workOrder.areaResponse?.colorEdge.excess_quantity;
@@ -99,6 +102,13 @@ export default function ColorEdgeComponent({ workOrder }: Props) {
                   type="number"
                   name="bad_quantity"
                   value={releaseBad}
+                  disabled
+                />
+                <Label>Sin procesar:</Label>
+                <Input
+                  type="number"
+                  name="excess_quantity"
+                  value={releaseNoProcess}
                   disabled
                 />
                 <Label>Excedente:</Label>

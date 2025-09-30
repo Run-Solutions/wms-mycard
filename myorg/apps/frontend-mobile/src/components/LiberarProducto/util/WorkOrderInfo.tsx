@@ -19,6 +19,7 @@ interface Props {
 interface PartialRelease {
   validated: boolean;
   quantity: number;
+  release_quantity?: number;
 }
 
 export default function WorkOrderInfo({
@@ -61,6 +62,18 @@ export default function WorkOrderInfo({
       console.error('Error al abrir el archivo:', error);
     }
   };
+  const partialReleases = workOrder?.partialReleases ?? [];
+  const totalPartialQuantity = partialReleases.reduce(
+    (sum: number, release: PartialRelease) =>
+      sum + (Number(release?.quantity) || 0),
+    0
+  );
+  const totalPartialReleased = partialReleases.reduce(
+    (sum: number, release: PartialRelease) =>
+      sum + (Number(release?.release_quantity) || 0),
+    0
+  );
+  const remainingPartial = totalPartialQuantity - totalPartialReleased;
   return (
     <>
       <View style={styles.card}>
@@ -149,12 +162,20 @@ export default function WorkOrderInfo({
             />
           </View>
           {workOrder?.partialReleases?.length > 0 && (
-            <View style={{ flex: 1 }}>
-              <InfoCard
-                label="Cantidad por Liberar:"
-                value={cantidadporliberar}
-              />
-            </View>
+            <>
+              <View style={{ flex: 1 }}>
+                <InfoCard
+                  label="Cantidad por Liberar:"
+                  value={cantidadporliberar}
+                />
+              </View>
+              <View style={{ flex: 1 }}>
+                <InfoCard
+                  label="Cantidad restante parcial por liberar:"
+                  value={String(remainingPartial)}
+                />
+              </View>
+            </>
           )}
         </View>
         <InfoCard
@@ -201,6 +222,18 @@ export function WorkOrderHojasInfo({
   const cantidadHojas = cantidadHojasRaw > 0 ? Math.ceil(cantidadHojasRaw) : 0;
   const totalSheetsEffective =
     workOrder?.workOrder?.total_sheets ?? cantidadHojas;
+  const partialReleases = workOrder?.partialReleases ?? [];
+  const totalPartialQuantity = partialReleases.reduce(
+    (sum: number, release: PartialRelease) =>
+      sum + (Number(release?.quantity) || 0),
+    0
+  );
+  const totalPartialReleased = partialReleases.reduce(
+    (sum: number, release: PartialRelease) =>
+      sum + (Number(release?.release_quantity) || 0),
+    0
+  );
+  const remainingPartial = totalPartialQuantity - totalPartialReleased;
 
   function getLabelByType(type: string) {
     switch (type) {
@@ -338,12 +371,20 @@ export function WorkOrderHojasInfo({
             />
           </View>
           {workOrder?.partialReleases?.length > 0 && (
-            <View style={{ flex: 1 }}>
-              <InfoCard
-                label="Cantidad por Liberar:"
-                value={cantidadporliberar || 'No definido'}
-              />
-            </View>
+            <>
+              <View style={{ flex: 1 }}>
+                <InfoCard
+                  label="Cantidad por Liberar:"
+                  value={cantidadporliberar || 'No definido'}
+                />
+              </View>
+              <View style={{ flex: 1 }}>
+                <InfoCard
+                  label="Cantidad restante parcial por liberar:"
+                  value={String(remainingPartial)}
+                />
+              </View>
+            </>
           )}
         </View>
         <InfoCard
@@ -386,6 +427,18 @@ export function WorkOrderPrePressInfo({ workOrder }: Props) {
   const cantidadHojas = cantidadHojasRaw > 0 ? Math.ceil(cantidadHojasRaw) : 0;
   const totalSheetsEffective =
     workOrder?.workOrder?.total_sheets ?? cantidadHojas;
+  const partialReleases = workOrder?.partialReleases ?? [];
+  const totalPartialQuantity = partialReleases.reduce(
+    (sum: number, release: PartialRelease) =>
+      sum + (Number(release?.quantity) || 0),
+    0
+  );
+  const totalPartialReleased = partialReleases.reduce(
+    (sum: number, release: PartialRelease) =>
+      sum + (Number(release?.release_quantity) || 0),
+    0
+  );
+  const remainingPartial = totalPartialQuantity - totalPartialReleased;
 
   function getLabelByType(type: string) {
     switch (type) {
@@ -453,6 +506,16 @@ export function WorkOrderPrePressInfo({ workOrder }: Props) {
             />
           </View>
         </View>
+        {workOrder?.partialReleases?.length > 0 && (
+          <View style={{ flexDirection: 'row', gap: 12, marginTop: 12 }}>
+            <View style={{ flex: 1 }}>
+              <InfoCard
+                label="Cantidad restante parcial por liberar:"
+                value={String(remainingPartial)}
+              />
+            </View>
+          </View>
+        )}
         <InfoCard
           label="Comentarios"
           value={String(workOrder?.workOrder.comments ?? '')}

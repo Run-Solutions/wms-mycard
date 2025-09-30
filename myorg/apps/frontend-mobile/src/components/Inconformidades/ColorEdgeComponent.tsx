@@ -43,6 +43,9 @@ const ColorEdgeComponent: React.FC<{ workOrder: any }> = ({ workOrder }) => {
   const releaseBad = lastPartialRelease
     ? lastPartialRelease.bad_quantity
     : workOrder.areaResponse?.colorEdge.bad_quantity;
+  const releaseNoProcess = lastPartialRelease
+    ? lastPartialRelease.noprocess_quantity
+    : workOrder.areaResponse?.colorEdge.noprocess_quantity;
   const releaseExcess = lastPartialRelease
     ? lastPartialRelease.excess_quantity
     : workOrder.areaResponse?.colorEdge.excess_quantity;
@@ -105,6 +108,15 @@ const ColorEdgeComponent: React.FC<{ workOrder: any }> = ({ workOrder }) => {
             style={styles.input}
             editable={false}
             value={String(releaseBad)}
+            mode="outlined"
+            activeOutlineColor="#000"
+            theme={{ roundness: 30 }}
+          />
+          <Text style={styles.subtitle}>Sin procesar:</Text>
+          <TextInput
+            style={styles.input}
+            editable={false}
+            value={String(releaseNoProcess)}
             mode="outlined"
             activeOutlineColor="#000"
             theme={{ roundness: 30 }}

@@ -1,7 +1,7 @@
 'use client';
 
 import { useRouter } from 'next/navigation';
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect, useMemo, useCallback } from 'react';
 import styled from 'styled-components';
 
 import {
@@ -10,13 +10,28 @@ import {
 } from '@/api/aceptarAuditoria';
 
 import WorkOrderInfo from './util/WorkOrderInfo';
+import {
+  buildDefaultValuesByArea,
+  AreaBlock,
+  DefaultValues,
+  toNum,
+} from './util/quantityWorkOrder';
+import BadQuantityModal from './util/BadQuantityModal';
+import { AreaData } from '../LiberarProducto/PersonalizacionComponent';
+import {
+  blockSupportsMaterial,
+  resolveBlockKey,
+} from '../LiberarProducto/util/areaMappings';
+
 export type AfterCorteData = {
   good_quantity: number | string;
   bad_quantity: number | string;
   excess_quantity: number | string;
   noprocess_quantity: number | string;
-  cqm_quantity: string;
+  cqm_quantity: number | string; 
   comments: string;
+  total_quantity: number;
+  total_execbuen: number;
 };
 
 interface Props {
@@ -32,16 +47,45 @@ export default function CorteComponentAcceptAuditory({ workOrder }: Props) {
   const [showInconformidad, setShowInconformidad] = useState(false);
   const [inconformidad, setInconformidad] = useState<string>('');
 
-  const isDisabled = true;
-
   const [defaultValues, setDefaultValues] = useState<AfterCorteData>({
     good_quantity: '',
     bad_quantity: '',
     excess_quantity: '',
     noprocess_quantity: '',
-    cqm_quantity: '',
+    cqm_quantity: '', 
     comments: '',
+    total_quantity: 0,
+    total_execbuen: 0,
   });
+
+  const isDisabled = true;
+
+  const asStrNum = (v: unknown): string | number => {
+    if (v === null || v === undefined) return '';
+    if (typeof v === 'boolean') return v ? 1 : 0;
+    return v as string | number; // ya restringimos los otros casos
+  };
+
+  const toAfterCorteData = (
+    d: DefaultValues,
+    prev?: AfterCorteData
+  ): AfterCorteData => {
+    return {
+      ...(prev ?? ({} as AfterCorteData)),
+
+      good_quantity: asStrNum(d.good_quantity),
+      bad_quantity: asStrNum(d.bad_quantity),
+      excess_quantity: asStrNum(d.excess_quantity),
+      noprocess_quantity: asStrNum(d.noprocess_quantity),
+      cqm_quantity: asStrNum(d.cqm_quantity),
+
+      comments: (d.comments ?? '') as string,
+      total_quantity: d.total_quantity ?? 0,
+
+      // Si quieres otro criterio, cámbialo aquí
+      total_execbuen: toNum(d.good_quantity),
+    };
+  };
 
   const [sampleAuditory, setSampleQuantity] = useState('');
 
@@ -80,135 +124,107 @@ export default function CorteComponentAcceptAuditory({ workOrder }: Props) {
     return bad + mat;
   }, [areaBadQuantities, areaKeyActual, workOrder?.area?.id]);
 
-  useEffect(() => {
-    if (!isValidArea) return;
-
-    const initialValues: Record<string, string> = {};
-
-    previousFlows.forEach((flow) => {
-      const areaKey = (flow?.area?.name ?? '').toLowerCase().replace(/\s/g, '');
-
-      let badQuantity: number | null | undefined = null;
-      let materialBadQuantity: number | null | undefined = null;
-
-      if (flow.areaResponse?.impression) {
-        badQuantity = flow.areaResponse.impression.bad_quantity;
-      } else if (flow.areaResponse?.serigrafia) {
-        badQuantity = flow.areaResponse.serigrafia.bad_quantity;
-      } else if (flow.areaResponse?.empalme) {
-        badQuantity = flow.areaResponse.empalme.bad_quantity;
-      } else if (flow.areaResponse?.laminacion) {
-        badQuantity = flow.areaResponse.laminacion.bad_quantity;
-      } else if (flow.areaResponse?.corte) {
-        badQuantity = flow.areaResponse.corte.bad_quantity;
-        materialBadQuantity = flow.areaResponse.corte.material_quantity;
-      }
-
-      // Fallback: sumar parciales
-      if (badQuantity == null && flow.partialReleases?.length > 0) {
-        badQuantity = flow.partialReleases.reduce(
-          (sum: number, r: any) => sum + (r.bad_quantity ?? 0),
-          0
-        );
-        materialBadQuantity = flow.partialReleases.reduce(
-          (sum: number, r: any) => sum + (r.material_quantity ?? 0),
-          0
-        );
-      }
-
-      initialValues[`${areaKey}_bad`] =
-        badQuantity != null ? String(badQuantity) : '';
-      initialValues[`${areaKey}_material`] =
-        materialBadQuantity != null ? String(materialBadQuantity) : '';
-    });
-
-    setAreaBadQuantities(initialValues);
-  }, [isValidArea, previousFlows]);
+  const areaKey: AreaBlock = 'corte';
 
   useEffect(() => {
-    if (!isValidArea) return;
-
-    const corte = workOrder?.areaResponse?.corte;
-    const partials = workOrder?.partialReleases ?? [];
-
-    const cqm_quantity = (workOrder?.answers ?? []).reduce(
-      (total: number, answer: { sample_quantity?: number | string }) =>
-        total + (Number(answer?.sample_quantity) || 0),
-      0
+    const result = buildDefaultValuesByArea(
+      areaKey,
+      workOrder,
+      sumaBadQuantity,
+      {
+        // filterPartialsByArea: (p) => p.area === areaKey
+      }
     );
 
-    const allValidated =
-      partials.length > 0 && partials.every((p: any) => p.validated);
-
-    if (corte && partials.length === 0) {
-      // Caso base: hay respuesta final de Color Edge sin parciales
-      setDefaultValues({
-        good_quantity: corte.good_quantity || '',
-        bad_quantity: corte.bad_quantity || '',
-        excess_quantity: corte.excess_quantity || '',
-        noprocess_quantity: corte.noprocess_quantity || '',
-        cqm_quantity: cqm_quantity || '',
-        comments: corte.comments || '',
-      });
-      return;
+    if (result) {
+      setDefaultValues((prev) => toAfterCorteData(result, prev)); //
     }
+  }, [workOrder, sumaBadQuantity]);
 
-    if (corte && allValidated) {
-      // Todos los parciales validados -> mostrar remanente
-      const totalParciales = partials.reduce(
-        (acc: number, curr: any) => acc + (curr.quantity || 0),
-        0
-      );
-      const totalParcialesBad = partials.reduce(
-        (acc: number, curr: any) => acc + (curr.bad_quantity || 0),
-        0
-      );
-      const totalParcialesExc = partials.reduce(
-        (acc: number, curr: any) => acc + (curr.excess_quantity || 0),
-        0
-      );
-      const totalParcialesNoPro = partials.reduce(
-        (acc: number, curr: any) => acc + (curr.noprocess_quantity || 0),
-        0
-      );
+  const computeInitialBadQuantities = useCallback(() => {
+    const initialValues: Record<string, string> = {};
+    const makeAreaKey = (name?: string) =>
+      (name ?? '').toLowerCase().replace(/\s/g, '');
 
-      const restante = (corte.good_quantity || 0) - totalParciales;
-      const restanteBad = (corte.bad_quantity || 0) - totalParcialesBad;
-      const restanteExc = (corte.excess_quantity || 0) - totalParcialesExc;
-      const restanteNoPro =
-        (corte.noprocess_quantity || 0) - totalParcialesNoPro;
-
-      setDefaultValues({
-        good_quantity: restante > 0 ? restante : 0,
-        bad_quantity: restanteBad > 0 ? restanteBad : 0,
-        excess_quantity: restanteExc > 0 ? restanteExc : 0,
-        noprocess_quantity: restanteNoPro > 0 ? restanteNoPro : 0,
-        cqm_quantity: cqm_quantity || '',
-        comments: corte.comments || '',
+    previousFlows.forEach((flow) => {
+      (flow?.badQuantityDetails ?? []).forEach((detail: any) => {
+        // OJO: usa siempre el mismo campo para el área actual (consistencia)
+        // Si tu objeto tiene area_id, úsalo; si no, usa workOrder?.area?.id
+        const currentAreaId = workOrder?.area_id ?? workOrder?.area?.id;
+        if (detail?.source_area_id === currentAreaId) {
+          const areaName = makeAreaKey(detail?.targetArea?.name);
+          initialValues[`${areaName}_bad`] = detail?.bad_quantity
+            ? String(detail.bad_quantity)
+            : '0';
+        }
       });
-      return;
-    }
-
-    const firstUnvalidated = partials.find((p: any) => !p.validated) || {};
-    setDefaultValues({
-      good_quantity: firstUnvalidated.quantity || '',
-      bad_quantity: firstUnvalidated.bad_quantity || '',
-      excess_quantity: firstUnvalidated.excess_quantity || '',
-      noprocess_quantity: firstUnvalidated.noprocess_quantity || '',
-      cqm_quantity: cqm_quantity || '',
-      comments: firstUnvalidated.observation || '',
     });
-  }, [isValidArea, workOrder]);
 
-  const handleOpenBadQuantityModal = () => setShowBadQuantity(true);
+    return initialValues;
+  }, [previousFlows, workOrder?.area_id, workOrder?.area?.id]);
 
-  const handleSubmit = async (e: React.FormEvent) => {
+  // 2) Precarga al montar / cambiar workOrder
+  useEffect(() => {
+    const initial = computeInitialBadQuantities();
+    if (Object.keys(initial).length > 0) {
+      setAreaBadQuantities(initial);
+    }
+  }, [computeInitialBadQuantities]);
+
+  // 3) Al abrir el modal, sólo asegúrate que el estado esté al día y abre
+  const handleOpenBadQuantityModal = () => {
+    const initial = computeInitialBadQuantities();
+    if (Object.keys(initial).length > 0) {
+      setAreaBadQuantities(initial);
+    }
+    setShowBadQuantity(true);
+  };
+
+  const normalizedAreas: AreaData[] = useMemo(
+    () =>
+      previousFlows.map((item) => ({
+        supportsMaterial: blockSupportsMaterial(
+          resolveBlockKey(item.area?.name ?? '')
+        ),
+        id: item.area?.id ?? item.id,
+        name: item.area?.name ?? item.name ?? '',
+        malas: item.malas ?? 0,
+        defectuoso: item.defectuoso ?? 0,
+        status: item.status ?? '',
+        response: item.areaResponse ?? {},
+        answers: item.answers ?? [],
+        usuario: item.user?.username ?? '',
+        auditor: '',
+        buenas: 0,
+        cqm: 0,
+        excedente: 0,
+        muestras: 0,
+      })),
+    [previousFlows]
+  );
+  console.log(defaultValues.total_quantity);
+
+  const handleOpenModal = async (e: React.FormEvent) => {
     e.preventDefault();
+    console.log('(defaultValues.total_quantity ?? 0) + Number(sampleAuditory))', (defaultValues.total_quantity ?? 0) + Number(sampleAuditory))
     if (!sampleAuditory) {
       alert('Por favor, asegurate de ingresar muestras.');
       return;
+    } else if (
+      ((defaultValues.total_quantity ?? 0) + Number(sampleAuditory)) % 24 !==
+      0
+    ) {
+      alert(
+        'Por favor, asegurate de ingresar muestras correctas, ya que la cantidad total no es divisible entre 24.'
+      );
+      return;
     }
 
+    setShowConfirm(true);
+  };
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
     const CorteId = workOrder?.areaResponse?.corte?.id ?? workOrder.id;
     try {
       await acceptWorkOrderFlowAuditory(CorteId, sampleAuditory);
@@ -252,44 +268,44 @@ export default function CorteComponentAcceptAuditory({ workOrder }: Props) {
           <InputGroup>
             <Label>Buenas:</Label>
             <Input
-              type='number'
-              name='good_quantity'
+              type="number"
+              name="good_quantity"
               value={defaultValues.good_quantity}
               disabled
             />
             <Label>Malas:</Label>
             <Input
-              type='number'
-              name='bad_quantity'
+              type="number"
+              name="bad_quantity"
               value={sumaBadQuantity}
               onClick={handleOpenBadQuantityModal}
               readOnly
             />
             <Label>Excedente:</Label>
             <Input
-              type='number'
-              name='excess_quantity'
+              type="number"
+              name="excess_quantity"
               value={defaultValues.excess_quantity}
               disabled
             />
             <Label>Sin procesar:</Label>
             <Input
-              type='number'
-              name='excess_quantity'
+              type="number"
+              name="noprocess_quantity"
               value={defaultValues.noprocess_quantity}
               disabled
             />
             <Label>Muestras en CQM:</Label>
             <Input
-              type='number'
-              name='excess_quantity'
+              type="number"
+              name="excess_quantity"
               value={defaultValues.cqm_quantity}
               disabled
             />
             <Label>Muestras:</Label>
             <Input
-              type='number'
-              min='0'
+              type="number"
+              min="0"
               value={sampleAuditory}
               onChange={(e) => setSampleQuantity(e.target.value)}
             />
@@ -303,84 +319,17 @@ export default function CorteComponentAcceptAuditory({ workOrder }: Props) {
           <Textarea value={defaultValues.comments} disabled={isDisabled} />
         </InputGroup>
       </NewData>
-      <AceptarButton onClick={() => setShowConfirm(true)}>
+      <AceptarButton onClick={handleOpenModal}>
         Aceptar recepción del producto
       </AceptarButton>
       {/* Modal para marcar malas por areas previas al liberar */}
       {showBadQuantity && (
-        <ModalOverlay>
-          <ModalBox>
-            <h4>Registrar malas por área</h4>
-            {previousFlows.map((flow, index) => {
-              const areaKey = flow.area.name.toLowerCase(); // para coincidir con las claves
-              return (
-                <div
-                  key={`${flow.id}-${index}`}
-                  style={{
-                    display: 'flex',
-                    flexDirection: 'column',
-                    alignItems: 'flex-start',
-                    gap: '0.5rem',
-                    marginTop: '1rem',
-                  }}
-                >
-                  <Label style={{ fontWeight: 'bold' }}>
-                    {flow.area.name.toUpperCase()}
-                  </Label>
-
-                  <div style={{ display: 'flex', gap: '1rem' }}>
-                    <div>
-                      <Label>Malas</Label>
-                      <InputBad
-                        type='number'
-                        min='0'
-                        readOnly
-                        value={areaBadQuantities[`${areaKey}_bad`] || '0'}
-                        onChange={(e) =>
-                          setAreaBadQuantities({
-                            ...areaBadQuantities,
-                            [`${areaKey}_bad`]: e.target.value,
-                          })
-                        }
-                      />
-                    </div>
-                    {flow.area_id >= 6 && (
-                      <div>
-                        <Label>Malo de fábrica</Label>
-                        <InputBad
-                          type='number'
-                          min='0'
-                          readOnly
-                          value={
-                            areaBadQuantities[`${areaKey}_material`] || '0'
-                          }
-                          onChange={(e) =>
-                            setAreaBadQuantities({
-                              ...areaBadQuantities,
-                              [`${areaKey}_material`]: e.target.value,
-                            })
-                          }
-                        />
-                      </div>
-                    )}
-                  </div>
-                </div>
-              );
-            })}
-            <div
-              style={{
-                display: 'flex',
-                justifyContent: 'flex-end',
-                gap: '1rem',
-                marginTop: '1rem',
-              }}
-            >
-              <CancelButton onClick={() => setShowBadQuantity(false)}>
-                Cerrar
-              </CancelButton>
-            </div>
-          </ModalBox>
-        </ModalOverlay>
+        <BadQuantityModal
+          areas={normalizedAreas}
+          areaBadQuantities={areaBadQuantities}
+          setAreaBadQuantities={setAreaBadQuantities}
+          onClose={() => setShowBadQuantity(false)}
+        />
       )}
       {showConfirm && (
         <ModalOverlay>
@@ -413,7 +362,7 @@ export default function CorteComponentAcceptAuditory({ workOrder }: Props) {
             <Textarea
               value={inconformidad}
               onChange={(e) => setInconformidad(e.target.value)}
-              placeholder='Escribe aquí la inconformidad...'
+              placeholder="Escribe aquí la inconformidad..."
             />
             <div
               style={{

@@ -15,7 +15,7 @@ export class InconformitiesService {
       if (!areaResponse) {
         throw new NotFoundException('No se encontró el registro AreasResponse');
       }
-      // Eliminar el registro serigrafia asociado a ese AreasResponse
+      // Eliminar el registro asociado a ese AreasResponse
       await tx.inconformities.updateMany({
         where: {
           areas_response_id: areaResponse.id,

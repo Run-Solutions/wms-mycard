@@ -252,7 +252,7 @@ const ImpresionComponent = ({ workOrder }: { workOrder: any }) => {
     try {
       await submitToCQMImpression(payload);
       Alert.alert('Formulario enviado a CQM');
-      navigation.navigate('liberarProducto');
+      navigation.goBack();
       setShowCqmModal(false);
     } catch (err) {
       Alert.alert('Error al Enviar a Calidad/CQM.');
@@ -279,7 +279,7 @@ const ImpresionComponent = ({ workOrder }: { workOrder: any }) => {
       await releaseProductFromImpress(payload);
       setShowConfirm(false);
       Alert.alert('Producto liberado correctamente');
-      navigation.navigate('liberarProducto');
+      navigation.goBack();
     } catch (err) {
       Alert.alert('Error del servidor al liberar.');
     }

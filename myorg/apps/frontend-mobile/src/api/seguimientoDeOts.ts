@@ -97,6 +97,19 @@ export const closeWorkOrder = async (ot_id: string) => {
   return response.data;
 };
 
+export const getFileByName = async (filename: string) => {
+  const token = await AsyncStorage.getItem('token');
+  if (!token) throw new Error('Token no encontrado');
+
+  const response = await API.get(`free-order-flow/file/${filename}`, {
+    headers: {
+      Authorization: `Bearer ${token}`,
+    },
+  });
+
+  return response.data;
+};
+
 export const updateWorkOrderAreas = async (ot_id: string, payload: any) => {
   const token = await AsyncStorage.getItem('token');
   if (!token) throw new Error('Token no encontrado');

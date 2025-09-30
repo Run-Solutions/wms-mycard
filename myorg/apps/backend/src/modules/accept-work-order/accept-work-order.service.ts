@@ -125,6 +125,36 @@ export class AcceptWorkOrderService {
       },
     });
 
+    const pendingOrdersAuditoryPartial = await this.prisma.workOrderFlow.findMany({
+      where: {
+        status: { in: statuses },
+        partialReleases: {
+          some: {
+            formAuditory: {
+              is: { reviewed_by_id: userId }, // relación 1–1 -> usar `is`
+            },
+          },
+        },
+      },
+      include: {
+        workOrder: {
+          include: {
+            user: true,
+            files: true,
+            flow: {
+              include: {
+                area: true,
+                formAuditory: { include: { user: true } },
+              },
+            },
+          },
+        },
+        partialReleases: {
+          include: { formAuditory: { include: { user: true } } },
+        },
+      },
+    });
+
     if (pendingOrders.length === 0 && pendingOrdersAuditory.length === 0) {
       return { message: 'No hay órdenes pendientes para esta área.' };
     }
@@ -134,6 +164,7 @@ export class AcceptWorkOrderService {
     return {
       pendingOrders,
       pendingOrdersAuditory,
+      pendingOrdersAuditoryPartial
     };
   }
 
@@ -274,7 +305,8 @@ export class AcceptWorkOrderService {
     if (lastCompletedOrPartial.status === 'Parcial' || partial) {
       createInconformidad = await this.prisma.inconformities.create({
         data: {
-          partial_release_id: partial?.id ?? null, // si la columna acepta null
+          partial_release_id: partial?.id ?? null, 
+          work_order_flow_id: workOrderFlowId,
           comments: inconformidad,
           created_by: userId,
           reviewed: false,
@@ -330,7 +362,7 @@ export class AcceptWorkOrderService {
     await this.notificationService.createAndSendNotificationToRole(
       'planeador',
       'Nueva inconformidad',
-      `La orden ${otId?.ot_id} tiene una inconformidad del área receptora o auditoría a área previa ${lastCompletedOrPartial?.area.name} por parte del usuario ${inconformityUser?.username}.`,
+      `La orden ${otId?.ot_id} reporta una inconformidad del área receptora o auditoría a área previa ${lastCompletedOrPartial?.area.name} por parte del usuario ${inconformityUser?.username}.`,
       { workOrderId: updated.work_order_id },
       createInconformidad.id 
     );
@@ -397,6 +429,7 @@ export class AcceptWorkOrderService {
     const createInconformidad = await this.prisma.inconformities.create({
       data: {
         form_answer_id: formAnswer.id,
+        work_order_flow_id: workOrderFlowId,
         comments: inconformidad,
         created_by: userId,
         reviewed: false,
@@ -553,6 +586,7 @@ export class AcceptWorkOrderService {
     const createInconformidad = await this.prisma.inconformities.create({
       data: {
         form_auditory_id: formAuditoryId,
+        work_order_flow_id: workOrderFlowId,
         comments: inconformidad,
         created_by: userId,
         reviewed: false,
@@ -571,7 +605,7 @@ export class AcceptWorkOrderService {
       select: { work_order_id: true },
     });
     const otId = await this.prisma.workOrder.findUnique({
-      where: { id: WorkOrderFlow?.work_order_id },
+      where: { id: updated?.work_order_id },
       select: { ot_id: true },
     });
     if (
@@ -619,13 +653,27 @@ export class AcceptWorkOrderService {
         area_id: areasOperatorIds,
       },
       include: {
-        partialReleases: true,
+        partialReleases: {
+          include: {
+            formAuditory: true,
+          }
+        },
+        badQuantityDetails: {
+          include: {
+            targetArea: true,
+          },
+        },
         workOrder: {
           include: {
             user: true,
             files: true,
             flow: {
               include: {
+                badQuantityDetails: {
+                  include: {
+                    targetArea: true,
+                  },
+                },
                 area: true,
                 areaResponse: {
                   include: {

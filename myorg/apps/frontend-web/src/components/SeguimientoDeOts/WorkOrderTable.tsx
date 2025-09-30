@@ -19,7 +19,7 @@ import {
 } from '@mui/material';
 import { getFileByName } from '@/api/seguimientoDeOts';
 
-interface WorkOrder {
+export interface WorkOrder {
   id: number;
   ot_id: string;
   mycard_id: string;

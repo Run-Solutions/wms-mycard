@@ -3,3 +3,18 @@ export class UpdateWorkFlowAuditoryDto {
   workOrderFlowId: number;
   workOrderId: number;
 }
+
+import { IsInt, Min } from 'class-validator';
+import { Type } from 'class-transformer';
+
+export class UpdateWorkFlowAuditoryParcialDto {
+  @Type(() => Number)
+  @IsInt()
+  @Min(1)
+  partialReleaseId!: number;
+
+  @Type(() => Number)
+  @IsInt()
+  @Min(1)
+  quantityRelease!: number;
+}

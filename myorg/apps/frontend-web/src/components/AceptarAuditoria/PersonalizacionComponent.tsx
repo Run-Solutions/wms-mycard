@@ -1,28 +1,37 @@
-"use client";
+'use client';
 
-import { useRouter } from "next/navigation";
-import { useEffect, useMemo, useState } from "react";
-import styled from "styled-components";
+import { useRouter } from 'next/navigation';
+import { useEffect, useMemo, useState, useCallback } from 'react';
+import styled from 'styled-components';
 
-// APIs
 import {
   acceptWorkOrderFlowPersonalizacionAuditory,
   registrarInconformidadAuditory,
-} from "@/api/aceptarAuditoria";
+} from '@/api/aceptarAuditoria';
 
-// UI & Utils
-import BadQuantityModal from "./util/BadQuantityModal";
-import WorkOrderInfo from "./util/WorkOrderInfo";
-
-// Tipos
-import { AfterCorteData } from "./CorteComponent";
-import type { AreaData } from "../LiberarProducto/PersonalizacionComponent";
+import WorkOrderInfo from './util/WorkOrderInfo';
+import { AfterCorteData } from './CorteComponent';
+import {
+  buildDefaultValuesByArea,
+  AreaBlock,
+  DefaultValues,
+  toNum,
+} from './util/quantityWorkOrder';
+import { getPrevAreaGoodPlusExcess } from './util/lastWorkOrder';
+import BadQuantityModal from './util/BadQuantityModal';
+import type { AreaData } from '../LiberarProducto/PersonalizacionComponent';
+import {
+  blockSupportsMaterial,
+  resolveBlockKey,
+} from '../LiberarProducto/util/areaMappings';
 
 interface Props {
   workOrder: any;
 }
 
-export default function PersonalizacionComponentAcceptAuditory({ workOrder }: Props) {
+export default function PersonalizacionComponentAcceptAuditory({
+  workOrder,
+}: Props) {
   const router = useRouter();
 
   const isValidArea = (workOrder?.area_id ?? 0) >= 2;
@@ -30,30 +39,63 @@ export default function PersonalizacionComponentAcceptAuditory({ workOrder }: Pr
   // -------- UI State --------
   const [showConfirm, setShowConfirm] = useState(false);
   const [showInconformidad, setShowInconformidad] = useState(false);
-  const [inconformidad, setInconformidad] = useState<string>("");
+  const [inconformidad, setInconformidad] = useState<string>('');
+
+  const [defaultValues, setDefaultValues] = useState<AfterCorteData>({
+    good_quantity: '',
+    bad_quantity: '',
+    excess_quantity: '',
+    noprocess_quantity: '',
+    cqm_quantity: '', 
+    comments: '',
+    total_quantity: 0,
+    total_execbuen: 0,
+  });
 
   // Solo lectura en esta pantalla
   const isDisabled = true;
 
-  // Valores mostrados (derivados de respuesta final/ parciales)
-  const [defaultValues, setDefaultValues] = useState<AfterCorteData>({
-    good_quantity: "",
-    bad_quantity: "",
-    excess_quantity: "",
-    noprocess_quantity: "",
-    cqm_quantity: "",
-    comments: "",
-  });
+  const asStrNum = (v: unknown): string | number => {
+    if (v === null || v === undefined) return '';
+    if (typeof v === 'boolean') return v ? 1 : 0;
+    return v as string | number; // ya restringimos los otros casos
+  };
+
+  const toAfterCorteData = (
+    d: DefaultValues,
+    prev?: AfterCorteData
+  ): AfterCorteData => {
+    return {
+      ...(prev ?? ({} as AfterCorteData)),
+
+      good_quantity: asStrNum(d.good_quantity),
+      bad_quantity: asStrNum(d.bad_quantity),
+      excess_quantity: asStrNum(d.excess_quantity),
+      noprocess_quantity: asStrNum(d.noprocess_quantity),
+      cqm_quantity: asStrNum(d.cqm_quantity),
+
+      comments: (d.comments ?? '') as string,
+      total_quantity: d.total_quantity ?? 0,
+
+      // Si quieres otro criterio, cámbialo aquí
+      total_execbuen: toNum(d.good_quantity),
+    };
+  };
 
   // Muestras del auditor
-  const [sampleAuditory, setSampleQuantity] = useState<string>("");
+  const [sampleAuditory, setSampleQuantity] = useState<string>('');
 
   // Malas por área (modal)
   const [showBadQuantity, setShowBadQuantity] = useState(false);
-  const [areaBadQuantities, setAreaBadQuantities] = useState<Record<string, string>>({});
+  const [areaBadQuantities, setAreaBadQuantities] = useState<
+    Record<string, string>
+  >({});
 
   // ======= Derivados del flujo =======
-  const flowList = useMemo(() => [...(workOrder?.workOrder?.flow ?? [])], [workOrder]);
+  const flowList = useMemo(
+    () => [...(workOrder?.workOrder?.flow ?? [])],
+    [workOrder]
+  );
 
   const currentIndex = useMemo(
     () => flowList.findIndex((item) => item?.id === workOrder?.id),
@@ -61,22 +103,96 @@ export default function PersonalizacionComponentAcceptAuditory({ workOrder }: Pr
   );
 
   const previousFlows = useMemo(
-    () => flowList.slice(0, currentIndex + 1).filter((flow) => flow.area_id !== 1),
+    () =>
+      flowList.slice(0, currentIndex + 1).filter((flow) => flow.area_id !== 1),
     [flowList, currentIndex]
   );
+
+  const areaKeyActual = useMemo(() => {
+    const n = workOrder?.area?.name ?? '';
+    return n.toLowerCase().replace(/\s/g, '');
+  }, [workOrder?.area?.name]);
+
+  const sumaBadQuantity = useMemo(() => {
+    const bad = Number(areaBadQuantities[`${areaKeyActual}_bad`] || 0);
+    const mat =
+      (workOrder?.area?.id ?? 0) >= 6
+        ? Number(areaBadQuantities[`${areaKeyActual}_material`] || 0)
+        : 0;
+    return bad + mat;
+  }, [areaBadQuantities, areaKeyActual, workOrder?.area?.id]);
+
+  const areaKey: AreaBlock = 'personalizacion';
+
+  useEffect(() => {
+    const result = buildDefaultValuesByArea(
+      areaKey,
+      workOrder,
+      sumaBadQuantity,
+      {
+        // filterPartialsByArea: (p) => p.area === areaKey
+      }
+    );
+
+    if (result) {
+      setDefaultValues((prev) => toAfterCorteData(result, prev)); // 
+    }
+  }, [workOrder, sumaBadQuantity]);
+
+  const computeInitialBadQuantities = useCallback(() => {
+    const initialValues: Record<string, string> = {};
+    const makeAreaKey = (name?: string) =>
+      (name ?? '').toLowerCase().replace(/\s/g, '');
+
+    previousFlows.forEach((flow) => {
+      (flow?.badQuantityDetails ?? []).forEach((detail: any) => {
+        // OJO: usa siempre el mismo campo para el área actual (consistencia)
+        // Si tu objeto tiene area_id, úsalo; si no, usa workOrder?.area?.id
+        const currentAreaId = workOrder?.area_id ?? workOrder?.area?.id;
+        if (detail?.source_area_id === currentAreaId) {
+          const areaName = makeAreaKey(detail?.targetArea?.name);
+          initialValues[`${areaName}_bad`] = detail?.bad_quantity
+            ? String(detail.bad_quantity)
+            : '0';
+        }
+      });
+    });
+
+    return initialValues;
+  }, [previousFlows, workOrder?.area_id, workOrder?.area?.id]);
+
+  // 2) Precarga al montar / cambiar workOrder
+  useEffect(() => {
+    const initial = computeInitialBadQuantities();
+    if (Object.keys(initial).length > 0) {
+      setAreaBadQuantities(initial);
+    }
+  }, [computeInitialBadQuantities]);
+
+  // 3) Al abrir el modal, sólo asegúrate que el estado esté al día y abre
+  const handleOpenBadQuantityModal = () => {
+    const initial = computeInitialBadQuantities();
+    if (Object.keys(initial).length > 0) {
+      setAreaBadQuantities(initial);
+    }
+    setShowBadQuantity(true);
+  };
 
   const normalizedAreas: AreaData[] = useMemo(
     () =>
       previousFlows.map((item) => ({
+        supportsMaterial: blockSupportsMaterial(
+          resolveBlockKey(item.area?.name ?? '')
+        ),
         id: item.area?.id ?? item.id,
-        name: item.area?.name ?? item.name ?? "",
+        name: item.area?.name ?? item.name ?? '',
         malas: item.malas ?? 0,
         defectuoso: item.defectuoso ?? 0,
-        status: item.status ?? "",
+        status: item.status ?? '',
         response: item.areaResponse ?? {},
         answers: item.answers ?? [],
-        usuario: item.user?.username ?? "",
-        auditor: "",
+        usuario: item.user?.username ?? '',
+        auditor: '',
         buenas: 0,
         cqm: 0,
         excedente: 0,
@@ -84,156 +200,67 @@ export default function PersonalizacionComponentAcceptAuditory({ workOrder }: Pr
       })),
     [previousFlows]
   );
+  console.log(defaultValues.total_quantity);
 
-  // Clave del área actual en el objeto areaBadQuantities
-  const areaKeyActual = useMemo(() => (workOrder?.area?.name ?? "").toLowerCase().replace(/\s/g, ""), [workOrder?.area?.name]);
-
-  const sumaBadQuantity = useMemo(() => {
-    const bad = Number(areaBadQuantities[`${areaKeyActual}_bad`] || 0);
-    const mat = (workOrder?.area?.id ?? 0) >= 6 ? Number(areaBadQuantities[`${areaKeyActual}_material`] || 0) : 0;
-    return bad + mat;
-  }, [areaBadQuantities, areaKeyActual, workOrder?.area?.id]);
-
-  // ======= Efectos =======
-  // Inicializar malas por área (una vez por cambio de OT)
-  useEffect(() => {
-    if (!isValidArea) return;
-
-    const initialValues: Record<string, string> = {};
-
-    previousFlows.forEach((flow) => {
-      const areaKey = (flow?.area?.name ?? "").toLowerCase().replace(/\s/g, "");
-
-      let badQuantity: number | null | undefined = null;
-      let materialBadQuantity: number | null | undefined = null;
-
-      if (flow.areaResponse?.impression) {
-        badQuantity = flow.areaResponse.impression.bad_quantity;
-      } else if (flow.areaResponse?.serigrafia) {
-        badQuantity = flow.areaResponse.serigrafia.bad_quantity;
-      } else if (flow.areaResponse?.empalme) {
-        badQuantity = flow.areaResponse.empalme.bad_quantity;
-      } else if (flow.areaResponse?.laminacion) {
-        badQuantity = flow.areaResponse.laminacion.bad_quantity;
-      } else if (flow.areaResponse?.corte) {
-        badQuantity = flow.areaResponse.corte.bad_quantity;
-        materialBadQuantity = flow.areaResponse.corte.material_quantity;
-      } else if (flow.areaResponse?.colorEdge) {
-        badQuantity = flow.areaResponse.colorEdge.bad_quantity;
-        materialBadQuantity = flow.areaResponse.colorEdge.material_quantity;
-      } else if (flow.areaResponse?.hotStamping) {
-        badQuantity = flow.areaResponse.hotStamping.bad_quantity;
-        materialBadQuantity = flow.areaResponse.hotStamping.material_quantity;
-      } else if (flow.areaResponse?.millingChip) {
-        badQuantity = flow.areaResponse.millingChip.bad_quantity;
-        materialBadQuantity = flow.areaResponse.millingChip.material_quantity;
-      } else if (flow.areaResponse?.personalizacion) {
-        badQuantity = flow.areaResponse.personalizacion.bad_quantity;
-        materialBadQuantity = flow.areaResponse.personalizacion.material_quantity;
-      }
-
-      // Fallback: sumar parciales
-      if ((badQuantity == null) && flow.partialReleases?.length > 0) {
-        badQuantity = flow.partialReleases.reduce((sum: number, r: any) => sum + (r.bad_quantity ?? 0), 0);
-        materialBadQuantity = flow.partialReleases.reduce((sum: number, r: any) => sum + (r.material_quantity ?? 0), 0);
-      }
-
-      initialValues[`${areaKey}_bad`] = badQuantity != null ? String(badQuantity) : "";
-      initialValues[`${areaKey}_material`] = materialBadQuantity != null ? String(materialBadQuantity) : "";
-    });
-
-    setAreaBadQuantities(initialValues);
-  }, [isValidArea, previousFlows]);
-
-  // Calcular defaultValues en base a respuesta final de Personalización y parciales
-  useEffect(() => {
-    if (!isValidArea) return;
-
-    const personalizacion = workOrder?.areaResponse?.personalizacion;
-    const partials = workOrder?.partialReleases ?? [];
-
-    const cqm_quantity = (workOrder?.answers ?? []).reduce(
-      (total: number, answer: { sample_quantity?: number | string }) => total + (Number(answer?.sample_quantity) || 0),
-      0
-    );
-
-    const allValidated = partials.length > 0 && partials.every((p: any) => p.validated);
-
-    if (personalizacion && partials.length === 0) {
-      setDefaultValues({
-        good_quantity: personalizacion.good_quantity || "",
-        bad_quantity: personalizacion.bad_quantity || "",
-        excess_quantity: personalizacion.excess_quantity || "",
-        noprocess_quantity: personalizacion.noprocess_quantity || "",
-        cqm_quantity: cqm_quantity || "",
-        comments: personalizacion.comments || "",
-      });
+  const prevAreaSum = useMemo(() => getPrevAreaGoodPlusExcess(workOrder), [workOrder]);
+  console.log('prevAreaSum', prevAreaSum);
+  
+  const handleOpenModal = async (e: React.FormEvent) => {
+    console.log((defaultValues.total_quantity ?? 0) + Number(sampleAuditory))
+    e.preventDefault();
+    if (!sampleAuditory) {
+      alert('Por favor, asegurate de ingresar muestras.');
+      return;
+    } else if (
+      ((defaultValues.total_quantity ?? 0) + Number(sampleAuditory) >
+        prevAreaSum &&
+        workOrder?.areaResponse?.personalizacion) ||
+      (defaultValues.total_quantity ?? 0) + Number(sampleAuditory) > prevAreaSum
+    ) {
+      alert(
+        'La cantidad total a liberar es mayor a la entregada por parte del área previa.'
+      );
+      return;
+    } else if (
+      (defaultValues.total_quantity ?? 0) + Number(sampleAuditory) !==
+        prevAreaSum &&
+      workOrder?.areaResponse?.personalizacion
+    ) {
+      alert(
+        'La cantidad total a liberar es mayor a la entregada por parte del área previa.'
+      );
       return;
     }
-
-    if (personalizacion && allValidated) {
-      const totalParciales = partials.reduce((acc: number, curr: any) => acc + (curr.quantity || 0), 0);
-      const totalParcialesBad = partials.reduce((acc: number, curr: any) => acc + (curr.bad_quantity || 0), 0);
-      const totalParcialesExc = partials.reduce((acc: number, curr: any) => acc + (curr.excess_quantity || 0), 0);
-      const totalParcialesNoPro = partials.reduce((acc: number, curr: any) => acc + (curr.noprocess_quantity || 0), 0);
-
-      const restante = (personalizacion.good_quantity || 0) - totalParciales;
-      const restanteBad = (personalizacion.bad_quantity || 0) - totalParcialesBad;
-      const restanteExc = (personalizacion.excess_quantity || 0) - totalParcialesExc;
-      const restanteNoPro = (personalizacion.noprocess_quantity || 0) - totalParcialesNoPro;
-
-      setDefaultValues({
-        good_quantity: restante > 0 ? restante : 0,
-        bad_quantity: restanteBad > 0 ? restanteBad : 0,
-        excess_quantity: restanteExc > 0 ? restanteExc : 0,
-        noprocess_quantity: restanteNoPro > 0 ? restanteNoPro : 0,
-        cqm_quantity: cqm_quantity || "",
-        comments: personalizacion.comments || "",
-      });
-      return;
-    }
-
-    const firstUnvalidated = partials.find((p: any) => !p.validated) || {};
-    setDefaultValues({
-      good_quantity: firstUnvalidated.quantity || "",
-      bad_quantity: firstUnvalidated.bad_quantity || "",
-      excess_quantity: firstUnvalidated.excess_quantity || "",
-      noprocess_quantity: firstUnvalidated.noprocess_quantity || "",
-      cqm_quantity: cqm_quantity || "",
-      comments: firstUnvalidated.observation || "",
-    });
-  }, [isValidArea, workOrder]);
-
-  // ======= Handlers =======
-  const handleOpenBadQuantityModal = () => setShowBadQuantity(true);
+    setShowConfirm(true);
+  }
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!sampleAuditory) {
-      alert("Por favor, asegúrate de que no haya inconformidades con las cantidades entregadas.");
-      return;
-    }
-    const personalizacionId = workOrder?.areaResponse?.personalizacion?.id ?? workOrder?.id;
+    const personalizacionId =
+      workOrder?.areaResponse?.personalizacion?.id ?? workOrder?.id;
     try {
-      await acceptWorkOrderFlowPersonalizacionAuditory(personalizacionId, sampleAuditory);
-      router.push("/aceptarAuditoria");
+      await acceptWorkOrderFlowPersonalizacionAuditory(
+        personalizacionId,
+        sampleAuditory
+      );
+      router.push('/aceptarAuditoria');
     } catch (error) {
       console.error(error);
-      alert("Error al conectar con el servidor");
+      alert('Error al conectar con el servidor');
     }
   };
 
   const handleSubmitInconformidad = async () => {
     if (!inconformidad.trim()) {
-      alert("Debes ingresar una inconformidad antes de continuar.");
+      alert('Debes ingresar una inconformidad antes de continuar.');
       return;
     }
     try {
       await registrarInconformidadAuditory(workOrder?.id, inconformidad.trim());
-      router.push("/aceptarAuditoria");
+      router.push('/aceptarAuditoria');
     } catch (error) {
       console.error(error);
-      alert("Error al conectar con el servidor");
+      alert('Error al conectar con el servidor');
     }
   };
 
@@ -248,7 +275,7 @@ export default function PersonalizacionComponentAcceptAuditory({ workOrder }: Pr
 
   return (
     <Container>
-      <Title>Área: {workOrder?.area?.name || "No definida"}</Title>
+      <Title>Área: {workOrder?.area?.name || 'No definida'}</Title>
       <WorkOrderInfo workOrder={workOrder} />
 
       <NewData>
@@ -256,25 +283,57 @@ export default function PersonalizacionComponentAcceptAuditory({ workOrder }: Pr
         <NewDataWrapper>
           <InputGroup>
             <Label>Buenas:</Label>
-            <Input type="number" name="good_quantity" value={defaultValues.good_quantity} disabled />
+            <Input
+              type="number"
+              name="good_quantity"
+              value={defaultValues.good_quantity}
+              disabled
+            />
 
             <Label>Malas:</Label>
-            <Input type="number" name="bad_quantity" value={sumaBadQuantity} onClick={handleOpenBadQuantityModal} readOnly />
+            <Input
+              type="number"
+              name="bad_quantity"
+              value={sumaBadQuantity}
+              onClick={handleOpenBadQuantityModal}
+              readOnly
+            />
 
             <Label>Excedente:</Label>
-            <Input type="number" name="excess_quantity" value={defaultValues.excess_quantity} disabled />
+            <Input
+              type="number"
+              name="excess_quantity"
+              value={defaultValues.excess_quantity}
+              disabled
+            />
 
             <Label>Sin procesar:</Label>
-            <Input type="number" name="noprocess_quantity" value={defaultValues.noprocess_quantity} disabled />
+            <Input
+              type="number"
+              name="noprocess_quantity"
+              value={defaultValues.noprocess_quantity}
+              disabled
+            />
 
             <Label>Muestras en CQM:</Label>
-            <Input type="number" name="cqm_quantity" value={defaultValues.cqm_quantity} disabled />
+            <Input
+              type="number"
+              name="cqm_quantity"
+              value={defaultValues.cqm_quantity}
+              disabled
+            />
 
             <Label>Muestras:</Label>
-            <Input type="number" value={sampleAuditory} onChange={(e) => setSampleQuantity(e.target.value)} />
+            <Input
+              type="number"
+              value={sampleAuditory}
+              onChange={(e) => setSampleQuantity(e.target.value)}
+            />
           </InputGroup>
 
-          <InconformidadButton onClick={() => setShowInconformidad(true)}>Inconformidad</InconformidadButton>
+          <InconformidadButton onClick={() => setShowInconformidad(true)}>
+            Inconformidad
+          </InconformidadButton>
         </NewDataWrapper>
 
         <InputGroup>
@@ -283,7 +342,9 @@ export default function PersonalizacionComponentAcceptAuditory({ workOrder }: Pr
         </InputGroup>
       </NewData>
 
-      <AceptarButton onClick={() => setShowConfirm(true)}>Aceptar recepción del producto</AceptarButton>
+      <AceptarButton onClick={handleOpenModal}>
+        Aceptar recepción del producto
+      </AceptarButton>
 
       {/* Modal para marcar malas por áreas previas */}
       {showBadQuantity && (
@@ -291,15 +352,6 @@ export default function PersonalizacionComponentAcceptAuditory({ workOrder }: Pr
           areas={normalizedAreas}
           areaBadQuantities={areaBadQuantities}
           setAreaBadQuantities={setAreaBadQuantities}
-          onConfirm={({ lastAreaBad, lastAreaMaterial }) => {
-            // Actualizamos las llaves del área actual para que el total refleje el modal
-            setAreaBadQuantities((prev) => ({
-              ...prev,
-              [`${areaKeyActual}_bad`]: String(lastAreaBad ?? 0),
-              [`${areaKeyActual}_material`]: String(lastAreaMaterial ?? 0),
-            }));
-            setShowBadQuantity(false);
-          }}
           onClose={() => setShowBadQuantity(false)}
         />
       )}
@@ -309,8 +361,17 @@ export default function PersonalizacionComponentAcceptAuditory({ workOrder }: Pr
         <ModalOverlay>
           <ModalBox>
             <h4>¿Estás segura/o que deseas liberar este producto?</h4>
-            <div style={{ display: "flex", justifyContent: "flex-end", gap: "1rem", marginTop: "1rem" }}>
-              <CancelButton onClick={() => setShowConfirm(false)}>Cancelar</CancelButton>
+            <div
+              style={{
+                display: 'flex',
+                justifyContent: 'flex-end',
+                gap: '1rem',
+                marginTop: '1rem',
+              }}
+            >
+              <CancelButton onClick={() => setShowConfirm(false)}>
+                Cancelar
+              </CancelButton>
               <ConfirmButton onClick={handleSubmit}>Confirmar</ConfirmButton>
             </div>
           </ModalBox>
@@ -322,14 +383,32 @@ export default function PersonalizacionComponentAcceptAuditory({ workOrder }: Pr
         <ModalOverlay>
           <ModalBox>
             <h4>Registrar Inconformidad</h4>
-            <h3>Por favor, describe la inconformidad detectada con la cantidad entregada.</h3>
-            <Textarea value={inconformidad} onChange={(e) => setInconformidad(e.target.value)} placeholder="Escribe aquí la inconformidad..." />
-            <div style={{ display: "flex", justifyContent: "flex-end", gap: "1rem", marginTop: "1rem" }}>
-              <CancelButton onClick={() => setShowInconformidad(false)}>Cancelar</CancelButton>
+            <h3>
+              Por favor, describe la inconformidad detectada con la cantidad
+              entregada.
+            </h3>
+            <Textarea
+              value={inconformidad}
+              onChange={(e) => setInconformidad(e.target.value)}
+              placeholder="Escribe aquí la inconformidad..."
+            />
+            <div
+              style={{
+                display: 'flex',
+                justifyContent: 'flex-end',
+                gap: '1rem',
+                marginTop: '1rem',
+              }}
+            >
+              <CancelButton onClick={() => setShowInconformidad(false)}>
+                Cancelar
+              </CancelButton>
               <ConfirmButton
                 onClick={() => {
                   if (!inconformidad.trim()) {
-                    alert("Debes ingresar una inconformidad antes de continuar.");
+                    alert(
+                      'Debes ingresar una inconformidad antes de continuar.'
+                    );
                     return;
                   }
                   handleSubmitInconformidad();
@@ -426,34 +505,34 @@ const Textarea = styled.textarea`
 
 const AceptarButton = styled.button<{ disabled?: boolean }>`
   margin-top: 2rem;
-  background-color: ${({ disabled }) => (disabled ? "#9CA3AF" : "#0038A8")};
+  background-color: ${({ disabled }) => (disabled ? '#9CA3AF' : '#0038A8')};
   color: white;
   padding: 0.75rem 2rem;
   border-radius: 0.5rem;
   font-weight: 600;
   transition: background 0.3s;
-  cursor: ${({ disabled }) => (disabled ? "not-allowed" : "pointer")};
+  cursor: ${({ disabled }) => (disabled ? 'not-allowed' : 'pointer')};
   opacity: ${({ disabled }) => (disabled ? 0.7 : 1)};
 
   &:hover {
-    background-color: ${({ disabled }) => (disabled ? "#9CA3AF" : "#1D4ED8")};
+    background-color: ${({ disabled }) => (disabled ? '#9CA3AF' : '#1D4ED8')};
   }
 `;
 
 const InconformidadButton = styled.button<{ disabled?: boolean }>`
   height: 50px;
-  background-color: ${({ disabled }) => (disabled ? "#D1D5DB" : "#A9A9A9")};
+  background-color: ${({ disabled }) => (disabled ? '#D1D5DB' : '#A9A9A9')};
   color: white;
   padding: 0.75rem 2rem;
   border-radius: 0.5rem;
   font-weight: 600;
   transition: background 0.3s;
   align-self: flex-end;
-  cursor: ${({ disabled }) => (disabled ? "not-allowed" : "pointer")};
+  cursor: ${({ disabled }) => (disabled ? 'not-allowed' : 'pointer')};
   opacity: ${({ disabled }) => (disabled ? 0.7 : 1)};
 
   &:hover {
-    background-color: ${({ disabled }) => (disabled ? "#D1D5DB" : "#8d8d92")};
+    background-color: ${({ disabled }) => (disabled ? '#D1D5DB' : '#8d8d92')};
   }
 `;
 

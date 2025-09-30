@@ -6,8 +6,8 @@ import { acceptColorEdgeInconformityAuditory } from '@/api/rechazos';
 import { InconformityData } from './CorteComponent';
 
 interface Props {
-  workOrder: any; 
-  currentFlow: any; 
+  workOrder: any;
+  currentFlow: any;
 }
 interface PartialRelease {
   quantity: string;
@@ -70,9 +70,13 @@ export default function ColorEdgeComponent({ workOrder, currentFlow }: Props) {
     const colorEdge = currentFlow.areaResponse?.colorEdge;
     const partials = currentFlow.partialReleases || [];
     console.log('ColorEdge:', colorEdge);
-    const lastPartialRelease = currentFlow.partialReleases.find(
-      (release: PartialRelease) => release.validated
-    );
+    const lastPartialRelease = currentFlow.partialReleases
+      .filter((r: PartialRelease) => r.validated)
+      .sort(
+        (a: any, b: any) =>
+          new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
+      )[0];
+
     console.log('Ultima parcialidad validar:', lastPartialRelease);
 
     const allValidated =
@@ -109,7 +113,10 @@ export default function ColorEdgeComponent({ workOrder, currentFlow }: Props) {
       setInconformityValues({
         quantity: Math.max((colorEdge.good_quantity || 0) - totalGood, 0),
         excess: Math.max((colorEdge.excess_quantity || 0) - totalExcess, 0),
-        noprocess: Math.max((colorEdge.noprocess_quantity || 0) - totalNoProcess, 0),
+        noprocess: Math.max(
+          (colorEdge.noprocess_quantity || 0) - totalNoProcess,
+          0
+        ),
         sample: colorEdge.formAuditory?.sample_auditory || '',
         comments: colorEdge.comments || '',
         user:
@@ -120,7 +127,12 @@ export default function ColorEdgeComponent({ workOrder, currentFlow }: Props) {
       });
     } else {
       // Primer parcial no validado
-      const firstUnvalidated = partials.find((p: any) => p.validated);
+      const firstUnvalidated = partials
+        .filter((r: PartialRelease) => r.validated)
+        .sort(
+          (a: any, b: any) =>
+            new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
+        )[0];
 
       setInconformityValues({
         quantity: firstUnvalidated?.quantity || '',
@@ -129,10 +141,10 @@ export default function ColorEdgeComponent({ workOrder, currentFlow }: Props) {
         sample: firstUnvalidated?.formAuditory?.sample_auditory || '',
         comments: firstUnvalidated?.observation || '',
         user:
-          lastPartialRelease.formAuditory.inconformities.at(-1)?.user
+        firstUnvalidated.formAuditory.inconformities.at(-1)?.user
             .username || '',
         inconformity:
-          lastPartialRelease.formAuditory.inconformities.at(-1)?.comments || '',
+        firstUnvalidated.formAuditory.inconformities.at(-1)?.comments || '',
       });
     }
   }, [currentFlow]);
@@ -211,20 +223,7 @@ export default function ColorEdgeComponent({ workOrder, currentFlow }: Props) {
   const sumaBadQuantity = previousFlows.reduce((sum, flow) => {
     let bad = 0;
 
-    if (flow.areaResponse?.impression) {
-      bad = flow.areaResponse.impression.bad_quantity || 0;
-    } else if (flow.areaResponse?.serigrafia) {
-      bad = flow.areaResponse.serigrafia.bad_quantity || 0;
-    } else if (flow.areaResponse?.empalme) {
-      bad = flow.areaResponse.empalme.bad_quantity || 0;
-    } else if (flow.areaResponse?.laminacion) {
-      bad = flow.areaResponse.laminacion.bad_quantity || 0;
-    } else if (flow.areaResponse?.corte) {
-      const corte = flow.areaResponse.corte;
-      const corteBad = corte.bad_quantity || 0;
-      const corteMaterial = corte.material_quantity || 0; // ← suma también este
-      bad = corteBad + corteMaterial;
-    } else if (flow.areaResponse?.colorEdge) {
+    if (flow.areaResponse?.colorEdge) {
       const colorEdge = flow.areaResponse.colorEdge;
       const colorEdgeBad = colorEdge.bad_quantity || 0;
       const colorEdgeMaterial = colorEdge.material_quantity || 0; // ← suma también este
@@ -242,6 +241,7 @@ export default function ColorEdgeComponent({ workOrder, currentFlow }: Props) {
 
     return sum + bad;
   }, 0);
+
   return (
     <>
       <FlexContainer>
@@ -349,7 +349,7 @@ export default function ColorEdgeComponent({ workOrder, currentFlow }: Props) {
                     </div>
                     {flow.area_id >= 6 && (
                       <div>
-                        <Label>Malo de fábrica</Label>
+                        <Label>Materia Prima Defectuosa</Label>
                         <InputBad
                           type="number"
                           min="0"

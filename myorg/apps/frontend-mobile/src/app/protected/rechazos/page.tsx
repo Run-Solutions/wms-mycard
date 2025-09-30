@@ -1,6 +1,6 @@
 import React, { useState, useCallback } from 'react';
 import { View, Text, StyleSheet, ActivityIndicator, Platform } from 'react-native';
-import { useFocusEffect } from '@react-navigation/native'; // ✅ import necesario
+import { useFocusEffect } from '@react-navigation/native';
 import { getWorkOrdersWithInconformidadAuditory } from '../../../api/rechazos';
 import WorkOrderList from '../../../components/Rechazos/WorkOrderList';
 
@@ -14,39 +14,44 @@ interface WorkOrder {
   ot_id: string;
   mycard_id: string;
   quantity: number;
+  created_by: number;
   status: string;
   validated: boolean;
   createdAt: string;
-  user: {
-    username: string;
-  };
+  updatedAt: string;
+  user: { username: string };
+  files: { id: number; type: string; file_path: string }[];
   flow: {
+    id: number;
     area_id: number;
     status: string;
+    assigned_user?: number;
     area?: { name?: string };
   }[];
-  files: File[];
+  formAnswers?: any[];
 }
 
 const RechazosScreen: React.FC = () => {
-  const [orders, setOrders] = useState<WorkOrder[]>([]);
+  const [workOrders, setWorkOrders] = useState<WorkOrder[]>([]);
   const [loading, setLoading] = useState(true);
 
   const fetchAllWorkOrders = async () => {
     try {
       setLoading(true);
-      const { pendingOrdersAuditory } = await getWorkOrdersWithInconformidadAuditory();
-      console.log('Datos de Ordenes: ', pendingOrdersAuditory);
+      const res = await getWorkOrdersWithInconformidadAuditory();
+      const flowsAuditory = Array.isArray(res?.pendingOrdersAuditory) ? res.pendingOrdersAuditory : [];
+      const flowsAuditoryPartial = Array.isArray(res?.pendingOrdersAuditoryPartial) ? res.pendingOrdersAuditoryPartial : [];
 
-      if (pendingOrdersAuditory && Array.isArray(pendingOrdersAuditory)) {
-        const workOrders = pendingOrdersAuditory.map((item: any) => ({
-          ...item.workOrder,
-          status: item.status, // ← status del wrapper externo
-        }));
-        setOrders(workOrders);
-      } else {
-        console.warn('pendingOrdersAuditory no está definido o no es un arreglo', pendingOrdersAuditory);
-      }
+      // Une ambas fuentes
+      const allFlows = [...flowsAuditory, ...flowsAuditoryPartial];
+
+      // Aplana a WorkOrder y filtra nulos
+      const allWorkOrders = allFlows.map((f: any) => f?.workOrder).filter(Boolean);
+
+      // Desduplica por id
+      const deduped = dedupeBy(allWorkOrders, (wo: WorkOrder) => wo.id);
+
+      setWorkOrders(deduped);
     } catch (err) {
       console.error('Error en fetchAllWorkOrders', err);
     } finally {
@@ -54,17 +59,26 @@ const RechazosScreen: React.FC = () => {
     }
   };
 
+  // =================== utils ===================
+function dedupeBy<T>(arr: T[], keyFn: (x: T) => string | number): T[] {
+  const seen = new Set<string | number>();
+  const out: T[] = [];
+  for (const item of arr) {
+    const k = keyFn(item);
+    if (!seen.has(k)) {
+      seen.add(k);
+      out.push(item);
+    }
+  }
+  return out;
+}
+
   // ✅ recarga cada vez que se enfoca esta pantalla
   useFocusEffect(
     useCallback(() => {
       fetchAllWorkOrders();
     }, [])
   );
-
-  const filterOrdersByStatus = (statuses: string[]) => {
-    return orders.filter((o) => statuses.includes(o.status));
-  };
-
   const StatusLegend = () => {
     const legendItems = [
       { label: 'Completado', color: '#22c55e' },
@@ -96,7 +110,7 @@ const RechazosScreen: React.FC = () => {
         <View style={styles.loaderContainer}>
           <ActivityIndicator size="large" color="#0038A8" />
         </View>
-      ) : orders.length === 0 ? (
+      ) : workOrders.length === 0 ? (
         <View style={styles.emptyState}>
           <Text style={styles.emptyText}>No hay órdenes disponibles para esta área.</Text>
         </View>
@@ -104,7 +118,7 @@ const RechazosScreen: React.FC = () => {
         <View style={styles.listWrapper}>
           <StatusLegend />
           <WorkOrderList
-            orders={filterOrdersByStatus(['En inconformidad auditoria'])}
+            orders={workOrders}
             title="Ordenes Devueltas por Inconformidad"
           />
         </View>

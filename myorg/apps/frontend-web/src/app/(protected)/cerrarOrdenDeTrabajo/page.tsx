@@ -5,36 +5,7 @@ import React, { useEffect, useState } from 'react';
 import styled, { useTheme } from 'styled-components';
 import WorkOrderTable from '@/components/CerrarOrdenDeTrabajo/WorkOrderTable';
 import { fetchWorkOrdersInProgress } from '@/api/cerrarOrdenDeTrabajo';
-// Se define el tipo de datos
-interface WorkOrder {
-  id: number;
-  ot_id: string;
-  mycard_id: string;
-  quantity: number;
-  status: string;
-  created_by: number;
-  validated: boolean;
-  createdAt: string;
-  updatedAt: string;
-  user: { username: string };
-  flow: {
-    area: {
-      name: string;
-    };
-    id: number;
-    work_order_id: number;
-    area_id: number;
-    status: string;
-    assigned_user: number | null;
-    assigned_at: string | null;
-    area_response_id: number | null;
-    created_at: string;
-    updated_at: string;
-  }[];
-  files: {
-    file_path: string;
-  }[];
-}
+import { WorkOrder } from '@/components/SeguimientoDeOts/WorkOrderTable';
 
 const CloseWorkOrderPage: React.FC = () => {
   const [WorkOrders, setWorkOrders] = useState<WorkOrder[]>([]);
@@ -42,7 +13,8 @@ const CloseWorkOrderPage: React.FC = () => {
   useEffect(() => {
     async function fetchWorkOrdersInAuditory() {
       try {
-        const data = await fetchWorkOrdersInProgress();
+        const data = await fetchWorkOrdersInProgress()
+        console.log('Data raw', data);
         setWorkOrders(data);
       } catch (error) {
         console.error(error);
@@ -59,7 +31,7 @@ const CloseWorkOrderPage: React.FC = () => {
         <WorkOrderTable
           orders={WorkOrders}
           title="Órdenes en Auditoria"
-          statusFilter="En auditoria"
+          statusFilter={['En Auditoria', 'Parcial' ]}
         />
       </TitleWrapper>
     </PageContainer>

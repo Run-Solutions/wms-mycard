@@ -1,14 +1,17 @@
 // src/hooks/useUnreadNotificationsCount.ts
-import { useCallback, useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 import { AppState } from 'react-native';
 import { useFocusEffect } from '@react-navigation/native';
 // Ajusta la importación a tu capa de API móvil
 import { getNotificationHistory } from '../api/notifications';
-import { useAuth } from '../contexts/AuthContext';
+import { AuthContext } from '../contexts/AuthContext';
 
 export function useUnreadNotificationsCount(pollMs = 0) {
-  const { user } = useAuth(); // asegúrate de tener el id del usuario
   const [count, setCount] = useState(0);
+  
+  // Safe useAuth hook
+  const authContext = React.useContext(AuthContext);
+  const user = authContext?.user;
 
   const load = useCallback(async () => {
     if (!user) return;

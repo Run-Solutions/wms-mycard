@@ -27,13 +27,7 @@ import { getFileByName } from '../../api/finalizacion';
 import styled from 'styled-components/native';
 import { TextInput } from 'react-native-paper';
 
-interface File {
-  id: number;
-  type: string;
-  file_path: string;
-}
-
-interface WorkOrder {
+export interface WorkOrder {
   id: number;
   ot_id: string;
   mycard_id: string;
@@ -41,15 +35,19 @@ interface WorkOrder {
   status: string;
   validated: boolean;
   createdAt: string;
-  user: {
-    username: string;
-  };
+  user: { username: string };
   flow: {
     area_id: number;
     status: string;
     area?: { name?: string };
   }[];
   files: File[];
+}
+
+interface File {
+  id: number;
+  type: string;
+  file_path: string;
 }
 
 interface Props {

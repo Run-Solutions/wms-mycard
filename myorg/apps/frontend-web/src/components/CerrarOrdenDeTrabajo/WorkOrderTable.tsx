@@ -18,41 +18,12 @@ import {
   TableSortLabel,
 } from '@mui/material';
 import { getFileByName } from '@/api/seguimientoDeOts';
-
-interface WorkOrder {
-  id: number;
-  ot_id: string;
-  mycard_id: string;
-  quantity: number;
-  status: string;
-  created_by: number;
-  validated: boolean;
-  createdAt: string;
-  updatedAt: string;
-  user: { username: string };
-  flow: {
-    area: {
-      name: string;
-    };
-    id: number;
-    work_order_id: number;
-    area_id: number;
-    status: string;
-    assigned_user: number | null;
-    assigned_at: string | null;
-    area_response_id: number | null;
-    created_at: string;
-    updated_at: string;
-  }[];
-  files: {
-    file_path: string;
-  }[];
-}
+import { WorkOrder } from '../SeguimientoDeOts/WorkOrderTable';
 
 interface Props {
   orders: WorkOrder[];
   title: string;
-  statusFilter: string;
+  statusFilter: string[];
 }
 type OrderDirection = 'asc' | 'desc';
 type SortableField = 'ot_id' | 'createdAt';
@@ -96,12 +67,15 @@ const WorkOrderTable: React.FC<Props> = ({ orders, title, statusFilter }) => {
     setPage(0);
   };
   const validOrders = Array.isArray(orders) ? orders : [];
-  console.log('Valid Orders:', validOrders);
   const filteredOrders = validOrders.filter((order) => {
     const statusMatch =
-      order.status.toLowerCase().includes(statusFilter.toLowerCase()) ||
+      statusFilter.some((sf) =>
+        order.status.toLowerCase().includes(sf.toLowerCase())
+      ) ||
       order.flow.some((f) =>
-        f.status.toLowerCase().includes(statusFilter.toLowerCase())
+        statusFilter.some((sf) =>
+          f.status.toLowerCase().includes(sf.toLowerCase())
+        )
       );
     const searchMatch = order.ot_id
       .toLowerCase()
@@ -119,7 +93,6 @@ const WorkOrderTable: React.FC<Props> = ({ orders, title, statusFilter }) => {
       (!toDate || createdDate <= toDate);
     return statusMatch && searchMatch && areaMatch && dateMatch;
   });
-  console.log('Filtered Orders:', filteredOrders);
   const sorted = filteredOrders.sort((a, b) => {
     let cmp = 0;
     if (orderBy === 'createdAt') {
@@ -151,6 +124,9 @@ const WorkOrderTable: React.FC<Props> = ({ orders, title, statusFilter }) => {
       console.error('Error al abrir el archivo:', error);
     }
   };
+
+  console.log(paginatedOrders.map((order) => order.ot_id));
+
   return (
     <TableContainer
       component={Paper}
@@ -431,7 +407,7 @@ const WorkOrderTable: React.FC<Props> = ({ orders, title, statusFilter }) => {
                             </Circle>
                             {!isLast && <Line $isLast={isLast} />}
                             <AreaName $isActive={isActive}>
-                              {flowStep.area.name ?? 'Área desconocida'}
+                              {flowStep.area?.name ?? 'Área desconocida'}
                             </AreaName>
                           </TimelineItem>
                         );
@@ -442,53 +418,42 @@ const WorkOrderTable: React.FC<Props> = ({ orders, title, statusFilter }) => {
                     {new Date(orderFlow.createdAt).toLocaleDateString()}
                   </TableCell>
                   <CustomTableCell>
-                    {orderFlow.files.length > 0 ? (
-                      <div
-                        style={{
-                          display: 'flex',
-                          flexDirection: 'column',
-                          flexWrap: 'wrap',
-                          gap: '0.5rem',
-                        }}
-                      >
-                        {orderFlow.files.map((file) => {
-                          const fileName = file.file_path.toLowerCase();
-                          const label = fileName.includes('ot')
-                            ? 'Ver OT'
-                            : fileName.includes('sku')
-                            ? 'Ver SKU'
-                            : fileName.includes('op')
-                            ? 'Ver OP'
-                            : 'Ver Archivo';
-                          return (
-                            <button
-                              key={file.file_path}
-                              onClick={() => downloadFile(file.file_path)}
-                              style={{
-                                border: '1px solid #c2c2c2',
-                                borderRadius: '20px',
-                                padding: '4px 12px',
-                                backgroundColor: '#f7f7f7',
-                                cursor: 'pointer',
-                                fontSize: '0.75rem',
-                                transition: 'all 0.2s ease-in-out',
-                              }}
-                              onMouseOver={(e) => {
-                                (
-                                  e.target as HTMLButtonElement
-                                ).style.backgroundColor = '#e0e0e0';
-                              }}
-                              onMouseOut={(e) => {
-                                (
-                                  e.target as HTMLButtonElement
-                                ).style.backgroundColor = '#f7f7f7';
-                              }}
-                            >
-                              {label}
-                            </button>
-                          );
-                        })}
-                      </div>
+                    {orderFlow.files && orderFlow.files.length > 0 ? (
+                      <Box display="flex" flexDirection="column" gap={0.5}>
+                        {orderFlow.files
+                          .filter((file) =>
+                            ['ot', 'sku', 'op'].some((key) =>
+                              file.file_path.toLowerCase().startsWith(key)
+                            )
+                          )
+                          .map((file) => {
+                            const lowerPath = file.file_path.toLowerCase();
+                            const label = lowerPath.startsWith('ot')
+                              ? 'Ver OT'
+                              : lowerPath.startsWith('sku')
+                              ? 'Ver SKU'
+                              : 'Ver OP';
+
+                            return (
+                              <Box
+                                component="button"
+                                key={file.file_path}
+                                onClick={() => downloadFile(file.file_path)}
+                                sx={{
+                                  border: '1px solid #c2c2c2',
+                                  borderRadius: '20px',
+                                  p: '4px 12px',
+                                  backgroundColor: '#f7f7f7',
+                                  cursor: 'pointer',
+                                  fontSize: '0.75rem',
+                                  '&:hover': { backgroundColor: '#e0e0e0' },
+                                }}
+                              >
+                                {label}
+                              </Box>
+                            );
+                          })}
+                      </Box>
                     ) : (
                       'No hay archivos'
                     )}

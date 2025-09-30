@@ -9,7 +9,7 @@ import {
   Alert,
   Platform,
 } from 'react-native';
-import { TextInput } from "react-native-paper";
+import { TextInput } from 'react-native-paper';
 import { useNavigation } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { RootStackParamList } from '../../navigation/types';
@@ -24,7 +24,8 @@ interface PartialRelease {
 }
 
 const HotStampingComponent: React.FC<{ workOrder: any }> = ({ workOrder }) => {
-  const navigation = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
+  const navigation =
+    useNavigation<NativeStackNavigationProp<RootStackParamList>>();
   const [showModal, setShowModal] = useState(false);
 
   const openModal = () => setShowModal(true);
@@ -42,6 +43,9 @@ const HotStampingComponent: React.FC<{ workOrder: any }> = ({ workOrder }) => {
   const releaseBad = lastPartialRelease
     ? lastPartialRelease.bad_quantity
     : workOrder.areaResponse?.hotStamping.bad_quantity;
+  const releaseNoProcess = lastPartialRelease
+    ? lastPartialRelease.noprocess_quantity
+    : workOrder.areaResponse?.hotStamping.noprocess_quantity;
   const releaseExcess = lastPartialRelease
     ? lastPartialRelease.excess_quantity
     : workOrder.areaResponse?.hotStamping.excess_quantity;
@@ -50,7 +54,7 @@ const HotStampingComponent: React.FC<{ workOrder: any }> = ({ workOrder }) => {
     ? lastPartialRelease.observation
     : workOrder.areaResponse?.hotStamping.comments;
 
-    const inconformityList = lastPartialRelease
+  const inconformityList = lastPartialRelease
     ? lastPartialRelease.inconformities
     : workOrder.areaResponse?.inconformities || [];
 
@@ -71,7 +75,6 @@ const HotStampingComponent: React.FC<{ workOrder: any }> = ({ workOrder }) => {
 
     console.log(areaResponseFlowId);
     try {
-
       await acceptHotStampingInconformity(areaResponseFlowId);
       setShowModal(false);
       Alert.alert('Inconformidad aceptada');
@@ -85,24 +88,44 @@ const HotStampingComponent: React.FC<{ workOrder: any }> = ({ workOrder }) => {
 
   return (
     <View>
-      <ScrollView contentContainerStyle={[styles.container, { paddingBottom: 230 }]}>
+      <ScrollView
+        contentContainerStyle={[styles.container, { paddingBottom: 230 }]}
+      >
         <Text style={styles.title}>Área: Hot Stamping</Text>
 
         <View style={styles.card}>
           <Text style={styles.subtitle}>Buenas:</Text>
-          <TextInput style={styles.input} editable={false} value={String(releaseQuantity)}
+          <TextInput
+            style={styles.input}
+            editable={false}
+            value={String(releaseQuantity)}
             mode="outlined"
             activeOutlineColor="#000"
             theme={{ roundness: 30 }}
           />
           <Text style={styles.subtitle}>Malas:</Text>
-          <TextInput style={styles.input} editable={false} value={String(releaseBad)}
+          <TextInput
+            style={styles.input}
+            editable={false}
+            value={String(releaseBad)}
+            mode="outlined"
+            activeOutlineColor="#000"
+            theme={{ roundness: 30 }}
+          />
+          <Text style={styles.subtitle}>Sin procesar:</Text>
+          <TextInput
+            style={styles.input}
+            editable={false}
+            value={String(releaseNoProcess)}
             mode="outlined"
             activeOutlineColor="#000"
             theme={{ roundness: 30 }}
           />
           <Text style={styles.subtitle}>Excedente:</Text>
-          <TextInput style={styles.input} editable={false} value={String(releaseExcess)}
+          <TextInput
+            style={styles.input}
+            editable={false}
+            value={String(releaseExcess)}
             mode="outlined"
             activeOutlineColor="#000"
             theme={{ roundness: 30 }}
@@ -155,13 +178,20 @@ const HotStampingComponent: React.FC<{ workOrder: any }> = ({ workOrder }) => {
           <View style={styles.modalOverlay}>
             <View style={styles.modalBox}>
               <Text style={styles.modalText}>
-                ¿Estás segura/o que deseas aceptar la inconformidad? Deberás liberar nuevamente.
+                ¿Estás segura/o que deseas aceptar la inconformidad? Deberás
+                liberar nuevamente.
               </Text>
               <View style={styles.modalActions}>
-                <TouchableOpacity style={styles.cancelButton} onPress={closeModal}>
+                <TouchableOpacity
+                  style={styles.cancelButton}
+                  onPress={closeModal}
+                >
                   <Text style={styles.modalButtonText}>Cancelar</Text>
                 </TouchableOpacity>
-                <TouchableOpacity style={styles.confirmButton} onPress={handleSubmit}>
+                <TouchableOpacity
+                  style={styles.confirmButton}
+                  onPress={handleSubmit}
+                >
                   <Text style={styles.modalButtonText}>Confirmar</Text>
                 </TouchableOpacity>
               </View>

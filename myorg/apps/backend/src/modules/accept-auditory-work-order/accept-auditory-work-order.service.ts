@@ -92,6 +92,7 @@ export class AcceptAuditoryWorkOrderService {
           form_auditory_id: formAuditory.id,
         },
       });
+      
       await this.prisma.workOrderFlow.update({
         where: { id: partial.work_order_flow_id },
         data: { status: 'Parcial' },

@@ -60,6 +60,28 @@ export class SampleDataDto {
   sample_auditory?: number;
 }
 
+export class AreaInputValueDto {
+  @IsString()
+  label!: string;
+
+  @Type(() => Number)
+  @IsNumber()
+  value!: number;
+}
+
+export class BadQuantitySummaryDto {
+  @Type(() => Number)
+  @IsInt()
+  areaId!: number;
+
+  @IsString()
+  areaName!: string;
+
+  @ValidateNested({ each: true })
+  @Type(() => AreaInputValueDto)
+  values!: AreaInputValueDto[];
+}
+
 export class UpdateAreaDataDto {
   areaId: number;
   block: string;
@@ -84,7 +106,23 @@ export class UpdateWorkOrderAreasDto {
   @ValidateNested({ each: true })
   @Type(() => UpdateAreaDataDto)
   areas: UpdateAreaDataDto[];
+
+  @IsOptional()
+  @ValidateNested({ each: true })
+  @Type(() => BadQuantitySummaryDto)
+  badQuantitySummary?: BadQuantitySummaryDto[];
+
+  @IsOptional()
+  @Type(() => Number)
+  @IsInt()
+  sourceAreaId?: number;
+
+  @IsOptional()
+  @Type(() => Number)
+  @IsInt()
+  sourceWorkOrderFlowId?: number;
 }
+
 export class UpdateFlowUserDto {
   @Type(() => Number)
   @IsInt()

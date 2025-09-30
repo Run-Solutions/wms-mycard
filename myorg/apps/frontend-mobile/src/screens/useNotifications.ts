@@ -77,6 +77,12 @@ function inferTypeFromTexts(title?: string, body?: string): string | null {
     return 'inconformidades_cqm_planeador';
   }
 
+  if (
+    txt.includes('reporta una inconformidad del area receptora o auditoria a area previa') 
+  ) {
+    return 'inconformidades_operadores_planeador';
+  }
+
   // ——— Vistos buenos ———
   if (txt.includes('pendiente de aceptacion en recepcion de vistos buenos')) {
     return 'recepcion_vistos_buenos';
@@ -255,7 +261,7 @@ export function getNotificationRoute(n: AppNotification, user: any): string | nu
   if (roles.includes('calidad')) {
     switch (t) {
       case 'recepcion_vistos_buenos':
-        return routeFromModuleName('Liberación de Vistos Buenos');
+        return routeFromModuleName('Recepcion de Vistos Buenos');
       case 'workorder_updated':
         return routeFromModuleName('Seguimiento de OTs') ?? 'WorkOrderDetailScreen';
       default:
@@ -303,4 +309,9 @@ export function shouldShowPlannerAuditorModal(n: AppNotification, user: any): bo
   const roles = getUserRoles(user);
   console.log('shouldShowPlannerAuditorModal roles=', roles, ' notif=', n);
   return roles.includes('planeador') && (n.type ?? '').toLowerCase() === 'inconformidades_auditor_planeador';
+}
+export function shouldShowPlannerOpersModal(n: AppNotification, user: any): boolean {
+  const roles = getUserRoles(user);
+  console.log('shouldShowPlannerOpersModal roles=', roles, ' notif=', n);
+  return roles.includes('planeador') && (n.type ?? '').toLowerCase() === 'inconformidades_operadores_planeador';
 }

@@ -1,5 +1,4 @@
 // myorg/apps/frontend-mobile/src/app/auth/RoleSelectionScreen.tsx
-"use client";
 
 import React, { useEffect, useState } from 'react';
 import { View, StyleSheet, Alert, ImageBackground } from 'react-native';

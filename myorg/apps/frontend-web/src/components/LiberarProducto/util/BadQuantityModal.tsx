@@ -1,11 +1,31 @@
 // myorg/apps/frontend-web/src/components/LiberarProducto/util/BadQuantityModal.tsx
 import React from 'react';
+import { normalizeAreaKey } from './areaMappings';
 
 export type AreaForBadQty = {
   id: number;
   name: string;
   malas: number;
   defectuoso: number;
+  supportsMaterial?: boolean;
+};
+
+type AreaInputLabelValue = {
+  label: string;
+  value: number;
+};
+
+export type BadQuantityModalResult = {
+  updatedAreas: AreaForBadQty[];
+  totalBad: number;
+  totalMaterial: number;
+  lastAreaBad: number;
+  lastAreaMaterial: number;
+  inputsByArea: {
+    areaId: number;
+    areaName: string;
+    values: AreaInputLabelValue[];
+  }[];
 };
 
 interface Props {
@@ -14,13 +34,7 @@ interface Props {
   setAreaBadQuantities: React.Dispatch<
     React.SetStateAction<{ [key: string]: string }>
   >;
-  onConfirm: (params: {
-    updatedAreas: AreaForBadQty[]; // ✅ shape mínimo
-    totalBad: number;
-    totalMaterial: number;
-    lastAreaBad: number;
-    lastAreaMaterial: number;
-  }) => void;
+  onConfirm: (params: BadQuantityModalResult) => void;
   onClose: () => void;
 }
 
@@ -31,34 +45,66 @@ const BadQuantityModal: React.FC<Props> = ({
   onConfirm,
   onClose,
 }) => {
+  console.log(areaBadQuantities, "areaBadQuantities");
+  
   const handleConfirm = () => {
     const updatedAreas = areas.map((area) => {
-      const key = area.name.toLowerCase().replace(/\s/g, '');
+      const key = normalizeAreaKey(area.name);
+      const supportsMaterial = area.supportsMaterial ?? false;
       return {
         ...area,
         malas: Number(areaBadQuantities[`${key}_bad`] || 0),
-        defectuoso:
-          area.id >= 6
-            ? Number(areaBadQuantities[`${key}_material`] || 0)
-            : area.defectuoso,
+        defectuoso: supportsMaterial
+          ? Number(areaBadQuantities[`${key}_material`] || 0)
+          : area.defectuoso,
+      };
+    });
+
+    const inputsByArea = areas.map((area) => {
+      const baseKey = normalizeAreaKey(area.name);
+      const supportsMaterial = area.supportsMaterial ?? false;
+
+      const values: AreaInputLabelValue[] = [
+        {
+          label: 'Malas',
+          value: Number(areaBadQuantities[`${baseKey}_bad`] || 0),
+        },
+      ];
+
+      if (supportsMaterial) {
+        values.push({
+          label: 'Malo de fábrica',
+          value: Number(areaBadQuantities[`${baseKey}_material`] || 0),
+        });
+      }
+
+      return {
+        areaId: area.id,
+        areaName: area.name,
+        values,
       };
     });
 
     const lastArea = updatedAreas[updatedAreas.length - 1];
-    const areaKey = lastArea.name.toLowerCase().replace(/\s/g, '');
+    const lastAreaConfig = areas[areas.length - 1];
+    const areaKey = normalizeAreaKey(lastArea.name);
+    const lastSupportsMaterial = lastAreaConfig?.supportsMaterial ?? false;
 
     const lastAreaBad = Number(areaBadQuantities[`${areaKey}_bad`] || 0);
-    const lastAreaMaterial = Number(
-      areaBadQuantities[`${areaKey}_material`] || 0
-    ); 
+    const lastAreaMaterial = lastSupportsMaterial
+      ? Number(areaBadQuantities[`${areaKey}_material`] || 0)
+      : 0;
 
-    const totalBad = Object.keys(areaBadQuantities)
-      .filter((key) => key.endsWith('_bad'))
-      .reduce((sum, key) => sum + Number(areaBadQuantities[key] || 0), 0);
+    const totalBad = areas.reduce((sum, area) => {
+      const key = normalizeAreaKey(area.name);
+      return sum + Number(areaBadQuantities[`${key}_bad`] || 0);
+    }, 0);
 
-    const totalMaterial = Object.keys(areaBadQuantities)
-      .filter((key) => key.endsWith('_material'))
-      .reduce((sum, key) => sum + Number(areaBadQuantities[key] || 0), 0);
+    const totalMaterial = areas.reduce((sum, area) => {
+      if (!area.supportsMaterial) return sum;
+      const key = normalizeAreaKey(area.name);
+      return sum + Number(areaBadQuantities[`${key}_material`] || 0);
+    }, 0);
 
     onConfirm({
       updatedAreas,
@@ -66,9 +112,9 @@ const BadQuantityModal: React.FC<Props> = ({
       totalMaterial,
       lastAreaBad,
       lastAreaMaterial,
+      inputsByArea,
     });
   };
-  console.log('areas desde componente', areas);
 
   return (
     <div className="fixed inset-0 z-50 bg-black/40 flex items-center justify-center p-4">
@@ -84,7 +130,7 @@ const BadQuantityModal: React.FC<Props> = ({
         <div className="overflow-y-auto px-6 py-4 space-y-6">
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             {areas.map((area, index) => {
-              const areaKey = area.name.toLowerCase().replace(/\s/g, '');
+              const areaKey = normalizeAreaKey(area.name);
               return (
                 <div
                   key={`${area.id}-${index}`}
@@ -115,10 +161,10 @@ const BadQuantityModal: React.FC<Props> = ({
                     </div>
 
                     {/* Defectuoso */}
-                    {area.id >= 6 && (
+                    {area.supportsMaterial && (
                       <div>
                         <label className="block text-sm text-gray-600 font-medium mb-1">
-                          Malo de fábrica
+                        Materia Prima Defectuosa
                         </label>
                         <input
                           type="number"

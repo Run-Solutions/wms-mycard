@@ -9,11 +9,31 @@ import {
   StyleSheet,
   ScrollView,
 } from 'react-native';
+import { normalizeAreaKey } from './areaMappings';
+
 export type AreaForBadQty = {
   id: number;
   name: string;
   malas: number;
   defectuoso: number;
+  supportsMaterial?: boolean;
+};
+
+type AreaInputLabelValue = {
+  label: string;
+  value: number;
+};
+export type BadQuantityModalResult = {
+  updatedAreas: AreaForBadQty[];
+  totalBad: number;
+  totalMaterial: number;
+  lastAreaBad: number;
+  lastAreaMaterial: number;
+  inputsByArea: {
+    areaId: number;
+    areaName: string;
+    values: AreaInputLabelValue[];
+  }[];
 };
 
 interface Props {
@@ -23,13 +43,7 @@ interface Props {
   setAreaBadQuantities: React.Dispatch<
     React.SetStateAction<{ [key: string]: string }>
   >;
-  onConfirm: (params: {
-    updatedAreas: AreaForBadQty[];
-    totalBad: number;
-    totalMaterial: number;
-    lastAreaBad: number;
-    lastAreaMaterial: number;
-  }) => void;
+  onConfirm: (params: BadQuantityModalResult) => void;
   onClose: () => void;
 }
 
@@ -41,38 +55,74 @@ const BadQuantityModal: React.FC<Props> = ({
   onConfirm,
   onClose,
 }) => {
+  console.log(areaBadQuantities, 'areaBadQuantities');
+
   const handleConfirm = () => {
     const updatedAreas = areas.map((area) => {
-      const key = area.name.toLowerCase().replace(/\s/g, '');
+      const key = normalizeAreaKey(area.name);
+      const supportsMaterial = area.supportsMaterial ?? false;
       return {
         ...area,
         malas: Number(areaBadQuantities[`${key}_bad`] || 0),
-        defectuoso:
-          area.id >= 6
-            ? Number(areaBadQuantities[`${key}_material`] || 0)
-            : area.defectuoso,
+        defectuoso: supportsMaterial
+          ? Number(areaBadQuantities[`${key}_material`] || 0)
+          : area.defectuoso,
       };
     });
-  
+
+    const inputsByArea = areas.map((area) => {
+      const baseKey = normalizeAreaKey(area.name);
+      const supportsMaterial = area.supportsMaterial ?? false;
+
+      const values: AreaInputLabelValue[] = [
+        {
+          label: 'Malas',
+          value: Number(areaBadQuantities[`${baseKey}_bad`] || 0),
+        },
+      ];
+
+      if (supportsMaterial) {
+        values.push({
+          label: 'Malo de fábrica',
+          value: Number(areaBadQuantities[`${baseKey}_material`] || 0),
+        });
+      }
+
+      return {
+        areaId: area.id,
+        areaName: area.name,
+        values,
+      };
+    });
+
     const lastArea = updatedAreas[updatedAreas.length - 1];
-    const areaKey = lastArea.name.toLowerCase().replace(/\s/g, '');
-  
+    const lastAreaConfig = areas[areas.length - 1];
+    const areaKey = normalizeAreaKey(lastArea.name);
+    const lastSupportsMaterial = lastAreaConfig?.supportsMaterial ?? false;
+
     const lastAreaBad = Number(areaBadQuantities[`${areaKey}_bad`] || 0);
-    const lastAreaMaterial = Number(areaBadQuantities[`${areaKey}_material`] || 0);
-  
-    const totalBad = Object.keys(areaBadQuantities)
-      .filter((key) => key.endsWith('_bad'))
-      .reduce((sum, key) => sum + Number(areaBadQuantities[key] || 0), 0);
-  
-    const totalMaterial = Object.keys(areaBadQuantities)
-      .filter((key) => key.endsWith('_material'))
-      .reduce((sum, key) => sum + Number(areaBadQuantities[key] || 0), 0);
+    const lastAreaMaterial = lastSupportsMaterial
+      ? Number(areaBadQuantities[`${areaKey}_material`] || 0)
+      : 0;
+
+    const totalBad = areas.reduce((sum, area) => {
+      const key = normalizeAreaKey(area.name);
+      return sum + Number(areaBadQuantities[`${key}_bad`] || 0);
+    }, 0);
+
+    const totalMaterial = areas.reduce((sum, area) => {
+      if (!area.supportsMaterial) return sum;
+      const key = normalizeAreaKey(area.name);
+      return sum + Number(areaBadQuantities[`${key}_material`] || 0);
+    }, 0);
+
     onConfirm({
       updatedAreas,
       totalBad,
       totalMaterial,
       lastAreaBad,
       lastAreaMaterial,
+      inputsByArea,
     });
   };
 
@@ -83,10 +133,12 @@ const BadQuantityModal: React.FC<Props> = ({
           <Text style={styles.title}>Registrar cantidades por área</Text>
           <ScrollView style={styles.scroll}>
             {areas.map((area, index) => {
-              const areaKey = area.name.toLowerCase().replace(/\s/g, '');
+              const areaKey = normalizeAreaKey(area.name);
               return (
                 <View key={`${area.id}-${index}`} style={styles.areaCard}>
-                  <Text style={styles.areaTitle}>{area.name.toUpperCase()}</Text>
+                  <Text style={styles.areaTitle}>
+                    {area.name.toUpperCase()}
+                  </Text>
 
                   {/* Malas */}
                   <Text style={styles.label}>Malas</Text>
@@ -103,9 +155,9 @@ const BadQuantityModal: React.FC<Props> = ({
                   />
 
                   {/* Defectuoso */}
-                  {area.id >= 6 && (
+                  {area.supportsMaterial && (
                     <>
-                      <Text style={styles.label}>Malo de fábrica</Text>
+                      <Text style={styles.label}>Materia Prima Defectuosa</Text>
                       <TextInput
                         style={styles.input}
                         keyboardType="numeric"
@@ -128,7 +180,10 @@ const BadQuantityModal: React.FC<Props> = ({
             <TouchableOpacity style={styles.cancelButton} onPress={onClose}>
               <Text style={styles.buttonText}>Cancelar</Text>
             </TouchableOpacity>
-            <TouchableOpacity style={styles.confirmButton} onPress={handleConfirm}>
+            <TouchableOpacity
+              style={styles.confirmButton}
+              onPress={handleConfirm}
+            >
               <Text style={styles.buttonText}>Confirmar</Text>
             </TouchableOpacity>
           </View>

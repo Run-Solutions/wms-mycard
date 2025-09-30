@@ -39,6 +39,7 @@ const WorkOrdersPage: React.FC = () => {
     cardImage: File | null; // NEW
   }>({ ot: null, sku: null, op: null, cardImage: null });
   const [extraFiles, setExtraFiles] = useState<File[]>([]);
+  const [fileInputsKey, setFileInputsKey] = useState(0);
   const MAX_TOTAL_FILES = 9;
   const MAX_ATTACHMENTS = 5;
   const ALLOWED_MIME_TYPES = [
@@ -47,19 +48,23 @@ const WorkOrdersPage: React.FC = () => {
     'image/jpeg',
     'image/webp',
   ];
-  const ALLOWED_IMAGE_TYPES = ['image/png', 'image/jpeg', 'image/webp'] as const;
+  const ALLOWED_IMAGE_TYPES = [
+    'image/png',
+    'image/jpeg',
+    'image/webp',
+  ] as const;
   const ALLOWED_PDF_TYPES = ['application/pdf'] as const;
 
   const hasExt = (name: string, exts: string[]) =>
     exts.some((ext) => name.toLowerCase().endsWith(ext));
-  
+
   const isPdf = (file: File) =>
     ALLOWED_PDF_TYPES.includes(file.type as any) || hasExt(file.name, ['.pdf']);
-  
+
   const isImage = (file: File) =>
     ALLOWED_IMAGE_TYPES.includes(file.type as any) ||
     hasExt(file.name, ['.png', '.jpg', '.jpeg', '.webp']);
-  
+
   const validatePdfFile = (file: File) => {
     if (!isPdf(file)) {
       alert(`"${file.name}" no es un PDF válido.`);
@@ -67,10 +72,12 @@ const WorkOrdersPage: React.FC = () => {
     }
     return true;
   };
-  
+
   const validateImageFile = (file: File) => {
     if (!isImage(file)) {
-      alert(`Formato no permitido: ${file.name} (${file.type}). Solo PNG/JPEG/WEBP.`);
+      alert(
+        `Formato no permitido: ${file.name} (${file.type}). Solo PNG/JPEG/WEBP.`
+      );
       return false;
     }
     return true;
@@ -137,7 +144,7 @@ const WorkOrdersPage: React.FC = () => {
             <Actions>
               <BtnEmpalme
                 onClick={() => {
-                  closeToast(); 
+                  closeToast();
                   resolve(0);
                 }}
               >
@@ -145,7 +152,7 @@ const WorkOrdersPage: React.FC = () => {
               </BtnEmpalme>
               <BtnCollector
                 onClick={() => {
-                  closeToast(); 
+                  closeToast();
                   resolve(1);
                 }}
               >
@@ -311,12 +318,14 @@ const WorkOrdersPage: React.FC = () => {
       (files.ot ? 1 : 0) +
       (files.sku ? 1 : 0) +
       (files.op ? 1 : 0) +
-      (files.cardImage ? 1 : 0); 
+      (files.cardImage ? 1 : 0);
     const replacing = files[type] ? 1 : 0;
     const newTotal = baseCount - replacing + 1 + extraFiles.length;
 
     if (newTotal > MAX_TOTAL_FILES) {
-      alert(`Con este archivo superas el máximo de ${MAX_TOTAL_FILES} por orden.`);
+      alert(
+        `Con este archivo superas el máximo de ${MAX_TOTAL_FILES} por orden.`
+      );
       e.target.value = '';
       return;
     }
@@ -336,7 +345,9 @@ const WorkOrdersPage: React.FC = () => {
     const availableSlots = MAX_TOTAL_FILES - (baseCount + currentExtra);
 
     if (availableSlots <= 0) {
-      alert(`Ya alcanzaste el máximo de ${MAX_TOTAL_FILES} archivos por orden.`);
+      alert(
+        `Ya alcanzaste el máximo de ${MAX_TOTAL_FILES} archivos por orden.`
+      );
       e.target.value = '';
       return;
     }
@@ -357,12 +368,12 @@ const WorkOrdersPage: React.FC = () => {
   const handleCardImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
-  
+
     if (!validateImageFile(file)) {
       e.target.value = '';
       return;
     }
-  
+
     const baseCount =
       (files.ot ? 1 : 0) +
       (files.sku ? 1 : 0) +
@@ -370,16 +381,18 @@ const WorkOrdersPage: React.FC = () => {
       (files.cardImage ? 1 : 0);
     const replacing = files.cardImage ? 1 : 0;
     const newTotal = baseCount - replacing + 1 + extraFiles.length;
-  
+
     if (newTotal > MAX_TOTAL_FILES) {
-      alert(`Con este archivo superas el máximo de ${MAX_TOTAL_FILES} por orden.`);
+      alert(
+        `Con este archivo superas el máximo de ${MAX_TOTAL_FILES} por orden.`
+      );
       e.target.value = '';
       return;
     }
-  
+
     setFiles((prev) => ({ ...prev, cardImage: file }));
   };
-  
+
   const removeCardImage = () => {
     setFiles((prev) => ({ ...prev, cardImage: null }));
   };
@@ -400,7 +413,9 @@ const WorkOrdersPage: React.FC = () => {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!files.ot || !files.sku || !files.op || !files.cardImage) {
-      alert('Los archivos OT, SKU, OP (PDF) y la imagen de tarjeta son obligatorios.');
+      alert(
+        'Los archivos OT, SKU, OP (PDF) y la imagen de tarjeta son obligatorios.'
+      );
       return;
     }
     if (
@@ -428,7 +443,7 @@ const WorkOrdersPage: React.FC = () => {
       (files.ot ? 1 : 0) +
       (files.sku ? 1 : 0) +
       (files.op ? 1 : 0) +
-      (files.cardImage ? 1 : 0) + 
+      (files.cardImage ? 1 : 0) +
       extraFiles.length;
 
     if (extraFiles.length > MAX_ATTACHMENTS) {
@@ -475,13 +490,16 @@ const WorkOrdersPage: React.FC = () => {
         files: [],
       });
       setFiles({ ot: null, sku: null, op: null, cardImage: null });
+      setExtraFiles([]);
       setDropdownCount(4);
+      setFileInputsKey((k) => k + 1);
     } catch (error: any) {
       console.error(error);
       setMessage('Error al crear la orden de trabajo');
       alert('La OT es duplicada');
     }
   };
+  
   return (
     <PageContainer>
       <TitleWrapper>
@@ -640,6 +658,7 @@ const WorkOrdersPage: React.FC = () => {
             {/* === Adjuntos adicionales (único bloque) === */}
             <Label>Adjuntos adicionales (PDF / Imágenes):</Label>
             <label
+              key={`upload-extra-${fileInputsKey}`}
               htmlFor="upload-extra"
               style={{
                 borderRadius: '10rem',
@@ -659,10 +678,10 @@ const WorkOrdersPage: React.FC = () => {
                 onChange={handleExtraFilesChange}
                 disabled={
                   (files.ot ? 1 : 0) +
-                  (files.sku ? 1 : 0) +
-                  (files.op ? 1 : 0) +
-                  (files.cardImage ? 1 : 0) + // NEW
-                  extraFiles.length >=
+                    (files.sku ? 1 : 0) +
+                    (files.op ? 1 : 0) +
+                    (files.cardImage ? 1 : 0) + // NEW
+                    extraFiles.length >=
                   MAX_TOTAL_FILES
                 }
               />
@@ -730,6 +749,7 @@ const WorkOrdersPage: React.FC = () => {
           <Auxiliar style={{ width: '30%' }}>
             <Label>Subir OT (PDF):</Label>
             <label
+              key={`upload-ot-${fileInputsKey}`}
               htmlFor="upload-ot"
               style={{
                 borderRadius: '10rem',
@@ -768,6 +788,7 @@ const WorkOrdersPage: React.FC = () => {
             </label>
             <Label>Subir SKU (PDF):</Label>
             <label
+              key={`upload-sku-${fileInputsKey}`}
               htmlFor="upload-sku"
               style={{
                 borderRadius: '10rem',
@@ -806,6 +827,7 @@ const WorkOrdersPage: React.FC = () => {
             </label>
             <Label>Subir OP (PDF):</Label>
             <label
+              key={`upload-op-${fileInputsKey}`}
               htmlFor="upload-op"
               style={{
                 borderRadius: '10rem',
@@ -844,6 +866,7 @@ const WorkOrdersPage: React.FC = () => {
             </label>
             <Label>Subir imagen de tarjeta (PNG/JPEG/WEBP):</Label>
             <label
+              key={`upload-card-${fileInputsKey}`}
               htmlFor="upload-card-image"
               style={{
                 borderRadius: '10rem',
@@ -866,7 +889,14 @@ const WorkOrdersPage: React.FC = () => {
               </IconButton>
 
               {files.cardImage && (
-                <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', flexWrap: 'wrap' }}>
+                <div
+                  style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '0.5rem',
+                    flexWrap: 'wrap',
+                  }}
+                >
                   <Typography variant="body2" style={{ color: 'black' }}>
                     {files.cardImage.name}
                   </Typography>

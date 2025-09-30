@@ -304,7 +304,7 @@ const Title = styled.h2`
 
 const Section = styled.section`
   margin-top: 3rem;
-  max-width: 80%;
+  width: 100%;
 `;
 
 const SectionTitle = styled.h3`

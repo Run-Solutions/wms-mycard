@@ -214,8 +214,10 @@ export class WorkOrderController {
     }
     return await this.workOrderService.updateWorkOrderAreas(
       id,
-      body.areas,
       user.id,
+      body.sourceAreaId ?? null,
+      body.sourceWorkOrderFlowId ?? null,
+      body.badQuantitySummary,
     );
   }
 }

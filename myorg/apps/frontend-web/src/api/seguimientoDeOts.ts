@@ -113,6 +113,7 @@ export const getFileByName = async (filename: string) => {
 export const updateWorkOrderAreas = async (ot_id: string, payload: any) => {
   const token = await localStorage.getItem('token');
   if (!token) throw new Error('Token no encontrado');
+  console.log(payload, 'payload')
 
   const response = await API.patch(`/work-orders/${ot_id}/areas`, payload, {
     headers: {

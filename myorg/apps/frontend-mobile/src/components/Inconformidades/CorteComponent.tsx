@@ -43,6 +43,9 @@ const CorteComponent: React.FC<{ workOrder: any }> = ({ workOrder }) => {
   const releaseBad = lastPartialRelease
     ? lastPartialRelease.bad_quantity
     : workOrder.areaResponse?.corte.bad_quantity;
+  const releaseNoProcess = lastPartialRelease
+    ? lastPartialRelease.noprocess_quantity
+    : workOrder.areaResponse?.corte.noprocess_quantity;
   const releaseExcess = lastPartialRelease
     ? lastPartialRelease.excess_quantity
     : workOrder.areaResponse?.corte.excess_quantity;
@@ -105,6 +108,15 @@ const CorteComponent: React.FC<{ workOrder: any }> = ({ workOrder }) => {
             style={styles.input}
             editable={false}
             value={String(releaseBad)}
+            mode="outlined"
+            activeOutlineColor="#000"
+            theme={{ roundness: 30 }}
+          />
+          <Text style={styles.subtitle}>Sin procesar:</Text>
+          <TextInput
+            style={styles.input}
+            editable={false}
+            value={String(releaseNoProcess)}
             mode="outlined"
             activeOutlineColor="#000"
             theme={{ roundness: 30 }}
