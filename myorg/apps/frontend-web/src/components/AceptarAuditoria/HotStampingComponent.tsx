@@ -19,12 +19,13 @@ import {
 } from './util/quantityWorkOrder';
 import { getPrevAreaGoodPlusExcess } from './util/lastWorkOrder';
 import BadQuantityModal from './util/BadQuantityModal';
-import { AreaData } from '../LiberarProducto/PersonalizacionComponent';
 import {
   blockSupportsMaterial,
   resolveBlockKey,
 } from '../LiberarProducto/util/areaMappings';
 import { calcularCantidadPorLiberar } from './util/calcularCantidadPorLiberar';
+import type { AreaForBadQty } from '../LiberarProducto/util/BadQuantityModal';
+import { normalizeAreaKey } from '../LiberarProducto/util/areaMappings';
 
 interface Props {
   workOrder: any;
@@ -109,31 +110,7 @@ export default function HotStampingComponentAcceptAuditory({
     return n.toLowerCase().replace(/\s/g, '');
   }, [workOrder?.area?.name]);
 
-  const sumaBadQuantity = useMemo(() => {
-    const bad = Number(areaBadQuantities[`${areaKeyActual}_bad`] || 0);
-    const mat =
-      (workOrder?.area?.id ?? 0) >= 6
-        ? Number(areaBadQuantities[`${areaKeyActual}_material`] || 0)
-        : 0;
-    return bad + mat;
-  }, [areaBadQuantities, areaKeyActual, workOrder?.area?.id]);
-
   const areaKey: AreaBlock = 'hotStamping';
-
-  useEffect(() => {
-    const result = buildDefaultValuesByArea(
-      areaKey,
-      workOrder,
-      sumaBadQuantity,
-      {
-        // filterPartialsByArea: (p) => p.area === areaKey
-      }
-    );
-
-    if (result) {
-      setDefaultValues((prev) => toAfterCorteData(result, prev)); //
-    }
-  }, [workOrder, sumaBadQuantity]);
 
   const computeInitialBadQuantities = useCallback(() => {
     const initialValues: Record<string, string> = {};
@@ -177,7 +154,7 @@ export default function HotStampingComponentAcceptAuditory({
     setShowBadQuantity(true);
   };
 
-  const normalizedAreas: AreaData[] = useMemo(
+  const normalizedAreas: AreaForBadQty[] = useMemo(
     () =>
       previousFlows.map((item) => ({
         supportsMaterial: blockSupportsMaterial(
@@ -201,6 +178,35 @@ export default function HotStampingComponentAcceptAuditory({
   );
   console.log(defaultValues.total_quantity);
 
+  const sumaBadQuantity = useMemo(() => {
+    if (!Array.isArray(normalizedAreas) || normalizedAreas.length === 0)
+      return 0;
+
+    return normalizedAreas.reduce((acc, area) => {
+      const key = normalizeAreaKey(area.name);
+      const bad = Number(areaBadQuantities[`${key}_bad`] ?? 0);
+      const mat = area.supportsMaterial
+        ? Number(areaBadQuantities[`${key}_material`] ?? 0)
+        : 0;
+      return acc + bad + mat;
+    }, 0);
+  }, [normalizedAreas, areaBadQuantities]);
+
+  useEffect(() => {
+    const result = buildDefaultValuesByArea(
+      areaKey,
+      workOrder,
+      sumaBadQuantity,
+      {
+        // filterPartialsByArea: (p) => p.area === areaKey
+      }
+    );
+
+    if (result) {
+      setDefaultValues((prev) => toAfterCorteData(result, prev)); //
+    }
+  }, [workOrder, sumaBadQuantity]);
+
   const prevAreaSum = useMemo(
     () => getPrevAreaGoodPlusExcess(workOrder),
     [workOrder]
@@ -211,12 +217,12 @@ export default function HotStampingComponentAcceptAuditory({
     () => (currentIndex > 0 ? flowList[currentIndex - 1] : null),
     [flowList, currentIndex]
   );
-  
+
   const cantidadporliberar = useMemo(
     () => calcularCantidadPorLiberar(workOrder, lastCompletedOrPartial),
     [workOrder, lastCompletedOrPartial]
   );
-  console.log('Cantidad por liberar', cantidadporliberar)
+  console.log('Cantidad por liberar', cantidadporliberar);
   console.log('Cantidad total', defaultValues.total_quantity);
 
   const handleOpenModal = async (e: React.FormEvent) => {
@@ -242,15 +248,14 @@ export default function HotStampingComponentAcceptAuditory({
       return;
     } else if (
       (partialsActual.length > 0 &&
-        (defaultValues.total_quantity ?? 0) + Number(sampleAuditory) + Number(defaultValues.noprocess_quantity ?? 0)) !==
-      cantidadporliberar
+        (defaultValues.total_quantity ?? 0) +
+          Number(sampleAuditory) +
+          Number(defaultValues.noprocess_quantity ?? 0)) !== cantidadporliberar
     ) {
       alert(
         `La cantidad total a liberar ${
           (defaultValues.total_quantity ?? 0) + Number(sampleAuditory)
-        } es diferente a la entregada por parte del la parcialidad previa ${
-          cantidadporliberar
-        }.`
+        } es diferente a la entregada por parte del la parcialidad previa ${cantidadporliberar}.`
       );
       return;
     }

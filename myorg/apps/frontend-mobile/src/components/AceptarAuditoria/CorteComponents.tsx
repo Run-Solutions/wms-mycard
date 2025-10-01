@@ -24,10 +24,11 @@ import {
   DefaultValues,
   toNum
 } from './util/quantityWorkOrder';
-import BadQuantityModal from './util/BadQuantityModal';
+import BadQuantityModal, { AreaForBadQty } from './util/BadQuantityModal';
 import { AreaData } from '../LiberarProducto/PersonalizacionComponent';
 import {
   blockSupportsMaterial,
+  normalizeAreaKey,
   resolveBlockKey,
 } from '../LiberarProducto/util/areaMappings';
 import { calcularCantidadPorLiberar } from './util/calcularCantidadPorLiberar';
@@ -117,14 +118,41 @@ const CorteComponentAcceptAuditory: React.FC<{ workOrder: any }> = ({
   }, [workOrder?.area?.name]);
 
 
-  const sumaBadQuantity = useMemo(() => {
-    const bad = Number(areaBadQuantities[`${areaKeyActual}_bad`] || 0);
-    const mat =
-      (workOrder?.area?.id ?? 0) >= 6
-        ? Number(areaBadQuantities[`${areaKeyActual}_material`] || 0)
-        : 0;
-    return bad + mat;
-  }, [areaBadQuantities, areaKeyActual, workOrder?.area?.id]);
+  const normalizedAreas: AreaForBadQty[] = useMemo(
+    () =>
+      previousFlows.map((item) => ({
+        supportsMaterial: blockSupportsMaterial(
+          resolveBlockKey(item.area?.name ?? '')
+        ),
+        id: item.area?.id ?? item.id,
+        name: item.area?.name ?? item.name ?? '',
+        malas: item.malas ?? 0,
+        defectuoso: item.defectuoso ?? 0,
+        status: item.status ?? '',
+        response: item.areaResponse ?? {},
+        answers: item.answers ?? [],
+        usuario: item.user?.username ?? '',
+        auditor: '',
+        buenas: 0,
+        cqm: 0,
+        excedente: 0,
+        muestras: 0,
+      })),
+      [previousFlows]
+    );
+    const sumaBadQuantity = useMemo(() => {
+      if (!Array.isArray(normalizedAreas) || normalizedAreas.length === 0) return 0;
+    
+      return normalizedAreas.reduce((acc, area:any) => {
+        const key = normalizeAreaKey(area.name);
+        const bad = Number(areaBadQuantities[`${key}_bad`] ?? 0);
+        const mat = area.supportsMaterial
+          ? Number(areaBadQuantities[`${key}_material`] ?? 0)
+          : 0;
+        return acc + bad + mat;
+      }, 0);
+    }, [normalizedAreas, areaBadQuantities]);
+
 
   const areaKey: AreaBlock = 'corte';
 
@@ -259,28 +287,6 @@ const CorteComponentAcceptAuditory: React.FC<{ workOrder: any }> = ({
     setShowBadQuantity(true);
   };
 
-  const normalizedAreas: AreaData[] = useMemo(
-    () =>
-      previousFlows.map((item) => ({
-        supportsMaterial: blockSupportsMaterial(
-          resolveBlockKey(item.area?.name ?? '')
-        ),
-        id: item.area?.id ?? item.id,
-        name: item.area?.name ?? item.name ?? '',
-        malas: item.malas ?? 0,
-        defectuoso: item.defectuoso ?? 0,
-        status: item.status ?? '',
-        response: item.areaResponse ?? {},
-        answers: item.answers ?? [],
-        usuario: item.user?.username ?? '',
-        auditor: '',
-        buenas: 0,
-        cqm: 0,
-        excedente: 0,
-        muestras: 0,
-      })),
-    [previousFlows]
-  );
   console.log(defaultValues.total_quantity);
 
   return (

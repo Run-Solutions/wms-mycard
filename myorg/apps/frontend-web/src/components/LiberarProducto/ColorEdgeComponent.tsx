@@ -19,7 +19,7 @@ import BadQuantityModal, {
 import SelectionQuestionTable from './util/FormQuestionTable';
 import WorkOrderInfo from './util/WorkOrderInfo';
 import { usePartialReleaseControls } from './util/disablePartialTime';
-import { AreaData } from './PersonalizacionComponent';
+import type { AreaForBadQty } from './util/BadQuantityModal';
 import { getPrevAreaGoodPlusExcess } from '../AceptarAuditoria/util/lastWorkOrder';
 import {
   getCurrentFlowPartialsTotal,
@@ -485,7 +485,7 @@ export default function ColorEdgeComponent({ workOrder }: Props) {
           Number(lastAreaBadQuantity) +
           Number(materialBadQuantity) +
           Number(excessQuantity) +
-        totalParcialesActuales) >
+          totalParcialesActuales) >
       prevAreaSum
     ) {
       alert(
@@ -568,7 +568,7 @@ export default function ColorEdgeComponent({ workOrder }: Props) {
     setShowBadQuantity(true);
   };
 
-  const normalizedAreas: AreaData[] = useMemo(
+  const normalizedAreas: AreaForBadQty[] = useMemo(
     () =>
       previousFlows.map((item) => ({
         supportsMaterial: blockSupportsMaterial(
@@ -780,14 +780,32 @@ export default function ColorEdgeComponent({ workOrder }: Props) {
     }
   };
 
+  // Suma malas de TODAS las áreas previas (y material defectuoso si aplica)
   const sumaBadQuantity = useMemo(() => {
-    const bad = Number(lastAreaBadQuantity) || 0;
-    const supportsMaterial = blockSupportsMaterial(
-      resolveBlockKey(currentFlow?.area?.name ?? '')
-    );
-    const mat = supportsMaterial ? Number(materialBadQuantity) || 0 : 0;
-    return bad + mat;
-  }, [lastAreaBadQuantity, materialBadQuantity, currentFlow?.area?.name]);
+    if (!Array.isArray(normalizedAreas) || normalizedAreas.length === 0) {
+      const supportsMaterial = blockSupportsMaterial(
+        resolveBlockKey(currentFlow?.area?.name ?? '')
+      );
+      const bad = Number(lastAreaBadQuantity) || 0;
+      const mat = supportsMaterial ? Number(materialBadQuantity) || 0 : 0;
+      return bad + mat;
+    }
+
+    return normalizedAreas.reduce((acc, area) => {
+      const key = normalizeAreaKey(area.name);
+      const bad = Number(areaBadQuantities[`${key}_bad`] ?? 0);
+      const mat = area.supportsMaterial
+        ? Number(areaBadQuantities[`${key}_material`] ?? 0)
+        : 0;
+      return acc + bad + mat;
+    }, 0);
+  }, [
+    normalizedAreas,
+    areaBadQuantities,
+    lastAreaBadQuantity,
+    materialBadQuantity,
+    currentFlow?.area?.name,
+  ]);
 
   return (
     <>

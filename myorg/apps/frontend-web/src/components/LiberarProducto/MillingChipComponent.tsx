@@ -19,7 +19,7 @@ import BadQuantityModal, {
 import SelectionQuestionTable from './util/FormQuestionTable';
 import WorkOrderInfo from './util/WorkOrderInfo';
 import { usePartialReleaseControls } from './util/disablePartialTime';
-import { AreaData } from './PersonalizacionComponent';
+import type { AreaForBadQty } from './util/BadQuantityModal';
 import { getPrevAreaGoodPlusExcess } from '../AceptarAuditoria/util/lastWorkOrder';
 import {
   getCurrentFlowPartialsTotal,
@@ -263,7 +263,6 @@ export default function MillingChipComponent({ workOrder }: Props) {
     [partialReleases]
   );
 
-
   const shouldDisableCQM = () => disableAfterCorteCQM;
 
   const shouldDisableLiberar = () => {
@@ -345,7 +344,6 @@ export default function MillingChipComponent({ workOrder }: Props) {
   }, [workOrder?.workOrder?.flow, workOrder?.workOrder?.ot_id]);
 
   const targetAreaId = workOrder?.area?.id ?? null;
-
 
   useEffect(() => {
     if (loggedOnce.current) return;
@@ -488,7 +486,7 @@ export default function MillingChipComponent({ workOrder }: Props) {
           Number(lastAreaBadQuantity) +
           Number(materialBadQuantity) +
           Number(excessQuantity) +
-        totalParcialesActuales) >
+          totalParcialesActuales) >
       prevAreaSum
     ) {
       alert(
@@ -569,7 +567,7 @@ export default function MillingChipComponent({ workOrder }: Props) {
     setShowBadQuantity(true);
   };
 
-  const normalizedAreas: AreaData[] = useMemo(
+  const normalizedAreas: AreaForBadQty[] = useMemo(
     () =>
       previousFlows.map((item) => ({
         supportsMaterial: blockSupportsMaterial(
@@ -786,11 +784,30 @@ export default function MillingChipComponent({ workOrder }: Props) {
   };
 
   const sumaBadQuantity = useMemo(() => {
-    const bad = Number(lastAreaBadQuantity) || 0;
-    const mat =
-      (currentFlow?.area?.id ?? 0) >= 6 ? Number(materialBadQuantity) || 0 : 0;
-    return bad + mat;
-  }, [lastAreaBadQuantity, materialBadQuantity, currentFlow?.area?.id]);
+    if (!Array.isArray(normalizedAreas) || normalizedAreas.length === 0) {
+      const supportsMaterial = blockSupportsMaterial(
+        resolveBlockKey(currentFlow?.area?.name ?? '')
+      );
+      const bad = Number(lastAreaBadQuantity) || 0;
+      const mat = supportsMaterial ? Number(materialBadQuantity) || 0 : 0;
+      return bad + mat;
+    }
+
+    return normalizedAreas.reduce((acc, area) => {
+      const key = normalizeAreaKey(area.name);
+      const bad = Number(areaBadQuantities[`${key}_bad`] ?? 0);
+      const mat = area.supportsMaterial
+        ? Number(areaBadQuantities[`${key}_material`] ?? 0)
+        : 0;
+      return acc + bad + mat;
+    }, 0);
+  }, [
+    normalizedAreas,
+    areaBadQuantities,
+    lastAreaBadQuantity,
+    materialBadQuantity,
+    currentFlow?.area?.name,
+  ]);
 
   return (
     <>
