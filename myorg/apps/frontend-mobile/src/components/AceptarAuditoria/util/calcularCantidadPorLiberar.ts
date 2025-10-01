@@ -34,62 +34,62 @@ interface LastCompletedOrPartial {
 }
 
 /*export function calcularCantidadPorLiberar(
-  currentFlow?: Flow | null,
-  lastCompletedOrPartial?: LastCompletedOrPartial | null
-): number {
-  if (!currentFlow) {
-    return 0;
-  }
-
-  const safeLast = lastCompletedOrPartial ?? {};
-
-  const getAreaResponseQuantity = (): number =>
-    safeLast.areaResponse?.prepress?.plates ??
-    safeLast.areaResponse?.impression?.release_quantity ??
-    safeLast.areaResponse?.serigrafia?.release_quantity ??
-    safeLast.areaResponse?.empalme?.release_quantity ??
-    safeLast.areaResponse?.laminacion?.release_quantity ??
-    safeLast.areaResponse?.corte?.good_quantity ??
-    safeLast.areaResponse?.colorEdge?.good_quantity ??
-    safeLast.areaResponse?.hotStamping?.good_quantity ??
-    safeLast.areaResponse?.millingChip?.good_quantity ??
-    safeLast.areaResponse?.personalizacion?.good_quantity ??
-    currentFlow.workOrder?.quantity ??
-    0;
-
-  const totalLiberado =
-    currentFlow.partialReleases?.reduce(
-      (sum, release) => sum + (release.quantity ?? 0),
-      0
-    ) ?? 0;
-
-  //console.log('Total liberado del current:', totalLiberado);
-
-  const totalValidados = getAreaResponseQuantity();
-  //console.log('Total validados (areaResponse):', totalValidados);
-
-  let cantidadPorLiberar = 0;
-
-  if (safeLast.area?.name === 'preprensa') {
-    cantidadPorLiberar = (currentFlow.workOrder?.quantity ?? 0) - totalLiberado;
-    //console.log('Preprensa: cantidad por liberar calculada.', cantidadPorLiberar);
-  } else if (totalValidados > 0) {
-    const resta = totalValidados - totalLiberado;
-    cantidadPorLiberar = Math.max(resta, 0);
-    //console.log('Cantidad por liberar (validados - liberados):', cantidadPorLiberar);
-  } else if (
-    !safeLast.partialReleases ||
-    safeLast.partialReleases.length === 0
-  ) {
-    cantidadPorLiberar = getAreaResponseQuantity();
-    //console.log('No hay parciales: usando cantidad entregada:', cantidadPorLiberar);
-  } else {
-    cantidadPorLiberar = 0;
-    //console.log('Caso por defecto: cantidad por liberar = 0');
-  }
-
-  return cantidadPorLiberar;
-}*/
+    currentFlow?: Flow | null,
+    lastCompletedOrPartial?: LastCompletedOrPartial | null
+  ): number {
+    if (!currentFlow) {
+      return 0;
+    }
+  
+    const safeLast = lastCompletedOrPartial ?? {};
+  
+    const getAreaResponseQuantity = (): number =>
+      safeLast.areaResponse?.prepress?.plates ??
+      safeLast.areaResponse?.impression?.release_quantity ??
+      safeLast.areaResponse?.serigrafia?.release_quantity ??
+      safeLast.areaResponse?.empalme?.release_quantity ??
+      safeLast.areaResponse?.laminacion?.release_quantity ??
+      safeLast.areaResponse?.corte?.good_quantity ??
+      safeLast.areaResponse?.colorEdge?.good_quantity ??
+      safeLast.areaResponse?.hotStamping?.good_quantity ??
+      safeLast.areaResponse?.millingChip?.good_quantity ??
+      safeLast.areaResponse?.personalizacion?.good_quantity ??
+      currentFlow.workOrder?.quantity ??
+      0;
+  
+    const totalLiberado =
+      currentFlow.partialReleases?.reduce(
+        (sum, release) => sum + (release.quantity ?? 0),
+        0
+      ) ?? 0;
+  
+    //console.log('Total liberado del current:', totalLiberado);
+  
+    const totalValidados = getAreaResponseQuantity();
+    //console.log('Total validados (areaResponse):', totalValidados);
+  
+    let cantidadPorLiberar = 0;
+  
+    if (safeLast.area?.name === 'preprensa') {
+      cantidadPorLiberar = (currentFlow.workOrder?.quantity ?? 0) - totalLiberado;
+      //console.log('Preprensa: cantidad por liberar calculada.', cantidadPorLiberar);
+    } else if (totalValidados > 0) {
+      const resta = totalValidados - totalLiberado;
+      cantidadPorLiberar = Math.max(resta, 0);
+      //console.log('Cantidad por liberar (validados - liberados):', cantidadPorLiberar);
+    } else if (
+      !safeLast.partialReleases ||
+      safeLast.partialReleases.length === 0
+    ) {
+      cantidadPorLiberar = getAreaResponseQuantity();
+      //console.log('No hay parciales: usando cantidad entregada:', cantidadPorLiberar);
+    } else {
+      cantidadPorLiberar = 0;
+      //console.log('Caso por defecto: cantidad por liberar = 0');
+    }
+  
+    return cantidadPorLiberar;
+  }*/
 
 export function calcularCantidadPorLiberar(
   currentFlow?: Flow | null,

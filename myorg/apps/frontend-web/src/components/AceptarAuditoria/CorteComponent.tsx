@@ -17,12 +17,13 @@ import {
   toNum,
 } from './util/quantityWorkOrder';
 import BadQuantityModal from './util/BadQuantityModal';
-import { AreaData } from '../LiberarProducto/PersonalizacionComponent';
 import {
   blockSupportsMaterial,
   resolveBlockKey,
 } from '../LiberarProducto/util/areaMappings';
 import { calcularCantidadPorLiberar } from './util/calcularCantidadPorLiberar';
+import type { AreaForBadQty } from '../LiberarProducto/util/BadQuantityModal';
+import { normalizeAreaKey } from '../LiberarProducto/util/areaMappings';
 
 export type AfterCorteData = {
   good_quantity: number | string;
@@ -116,31 +117,7 @@ export default function CorteComponentAcceptAuditory({ workOrder }: Props) {
     return n.toLowerCase().replace(/\s/g, '');
   }, [workOrder?.area?.name]);
 
-  const sumaBadQuantity = useMemo(() => {
-    const bad = Number(areaBadQuantities[`${areaKeyActual}_bad`] || 0);
-    const mat =
-      (workOrder?.area?.id ?? 0) >= 6
-        ? Number(areaBadQuantities[`${areaKeyActual}_material`] || 0)
-        : 0;
-    return bad + mat;
-  }, [areaBadQuantities, areaKeyActual, workOrder?.area?.id]);
-
   const areaKey: AreaBlock = 'corte';
-
-  useEffect(() => {
-    const result = buildDefaultValuesByArea(
-      areaKey,
-      workOrder,
-      sumaBadQuantity,
-      {
-        // filterPartialsByArea: (p) => p.area === areaKey
-      }
-    );
-
-    if (result) {
-      setDefaultValues((prev) => toAfterCorteData(result, prev)); //
-    }
-  }, [workOrder, sumaBadQuantity]);
 
   const computeInitialBadQuantities = useCallback(() => {
     const initialValues: Record<string, string> = {};
@@ -184,7 +161,7 @@ export default function CorteComponentAcceptAuditory({ workOrder }: Props) {
     setShowBadQuantity(true);
   };
 
-  const normalizedAreas: AreaData[] = useMemo(
+  const normalizedAreas: AreaForBadQty[] = useMemo(
     () =>
       previousFlows.map((item) => ({
         supportsMaterial: blockSupportsMaterial(
@@ -206,6 +183,34 @@ export default function CorteComponentAcceptAuditory({ workOrder }: Props) {
       })),
     [previousFlows]
   );
+
+  const sumaBadQuantity = useMemo(() => {
+    if (!Array.isArray(normalizedAreas) || normalizedAreas.length === 0) return 0;
+  
+    return normalizedAreas.reduce((acc, area) => {
+      const key = normalizeAreaKey(area.name);
+      const bad = Number(areaBadQuantities[`${key}_bad`] ?? 0);
+      const mat = area.supportsMaterial
+        ? Number(areaBadQuantities[`${key}_material`] ?? 0)
+        : 0;
+      return acc + bad + mat;
+    }, 0);
+  }, [normalizedAreas, areaBadQuantities]);
+
+  useEffect(() => {
+    const result = buildDefaultValuesByArea(
+      areaKey,
+      workOrder,
+      sumaBadQuantity,
+      {
+        // filterPartialsByArea: (p) => p.area === areaKey
+      }
+    );
+
+    if (result) {
+      setDefaultValues((prev) => toAfterCorteData(result, prev)); //
+    }
+  }, [workOrder, sumaBadQuantity]);
   
   const lastCompletedOrPartial = useMemo(
     () => (currentIndex > 0 ? flowList[currentIndex - 1] : null),

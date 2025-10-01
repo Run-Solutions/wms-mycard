@@ -22,6 +22,7 @@ import { updateWorkOrderAreas } from '../../api/seguimientoDeOts';
 import { useAuth } from '../../contexts/AuthContext';
 import { calcularCantidadPorLiberar } from './util/calcularCantidadPorLiberar';
 import BadQuantityModal, {
+  AreaForBadQty,
   BadQuantityModalResult,
 } from './util/BadQuantityModal';
 import MachineSection from './util/MachineSection';
@@ -614,7 +615,7 @@ const PersonalizacionComponent = ({ workOrder }: { workOrder: any }) => {
     setShowBadQuantity(true);
   };
 
-  const normalizedAreas: AreaData[] = useMemo(
+  const normalizedAreas: AreaForBadQty[] = useMemo(
     () =>
       previousFlows.map((item) => ({
         supportsMaterial: blockSupportsMaterial(
@@ -833,13 +834,30 @@ const PersonalizacionComponent = ({ workOrder }: { workOrder: any }) => {
   };
 
   const sumaBadQuantity = useMemo(() => {
-    const bad = Number(lastAreaBadQuantity) || 0;
-    const supportsMaterial = blockSupportsMaterial(
-      resolveBlockKey(currentFlow?.area?.name ?? '')
-    );
-    const mat = supportsMaterial ? Number(materialBadQuantity) || 0 : 0;
-    return bad + mat;
-  }, [lastAreaBadQuantity, materialBadQuantity, currentFlow?.area?.name]);
+    if (!Array.isArray(normalizedAreas) || normalizedAreas.length === 0) {
+      const supportsMaterial = blockSupportsMaterial(
+        resolveBlockKey(currentFlow?.area?.name ?? '')
+      );
+      const bad = Number(lastAreaBadQuantity) || 0;
+      const mat = supportsMaterial ? Number(materialBadQuantity) || 0 : 0;
+      return bad + mat;
+    }
+
+    return normalizedAreas.reduce((acc, area:any) => {
+      const key = normalizeAreaKey(area.name);
+      const bad = Number(areaBadQuantities[`${key}_bad`] ?? 0);
+      const mat = area.supportsMaterial
+        ? Number(areaBadQuantities[`${key}_material`] ?? 0)
+        : 0;
+      return acc + bad + mat;
+    }, 0);
+  }, [
+    normalizedAreas,
+    areaBadQuantities,
+    lastAreaBadQuantity,
+    materialBadQuantity,
+    currentFlow?.area?.name,
+  ]);
 
   const handleToggleRespuesta = (
     questionId: number,

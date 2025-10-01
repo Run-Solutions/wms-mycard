@@ -19,7 +19,7 @@ import BadQuantityModal, {
 import SelectionQuestionTable from './util/FormQuestionTable';
 import WorkOrderInfo from './util/WorkOrderInfo';
 import { usePartialReleaseControls } from './util/disablePartialTime';
-import { AreaData } from './PersonalizacionComponent';
+import type { AreaForBadQty } from './util/BadQuantityModal';
 import {
   BlockKey,
   blockSupportsMaterial,
@@ -515,11 +515,11 @@ export default function CorteComponent({ workOrder }: Props) {
     setShowBadQuantity(true);
   };
 
-  const normalizedAreas: AreaData[] = useMemo(
+  const normalizedAreas: AreaForBadQty[] = useMemo(
     () =>
       previousFlows.map((item) => ({
         supportsMaterial: blockSupportsMaterial(
-          resolveBlockKey(item.area?.name ?? ''),
+          resolveBlockKey(item.area?.name ?? '')
         ),
         id: item.area?.id ?? item.id,
         name: item.area?.name ?? item.name ?? '',
@@ -568,7 +568,8 @@ export default function CorteComponent({ workOrder }: Props) {
         // ✅ mappedBlock ahora es BlockKey | undefined
         const mappedBlock = blockMap[areaKey];
         // ✅ blockKey queda BlockKey | null
-        const blockKey: BlockKey | null = mappedBlock ?? resolveBlockKey(areaName);
+        const blockKey: BlockKey | null =
+          mappedBlock ?? resolveBlockKey(areaName);
         if (!blockKey) return [] as any;
 
         const blockData = flow.areaResponse?.[blockKey];
@@ -594,7 +595,7 @@ export default function CorteComponent({ workOrder }: Props) {
 
         return {
           areaId: flow.area_id,
-          block: blockKey,      // ✅ typed
+          block: blockKey, // ✅ typed
           blockId,
           formId,
           cqmId,
@@ -724,13 +725,30 @@ export default function CorteComponent({ workOrder }: Props) {
   };
 
   const sumaBadQuantity = useMemo(() => {
-    const bad = Number(lastAreaBadQuantity) || 0;
-    const supportsMaterial = blockSupportsMaterial(
-      resolveBlockKey(currentFlow?.area?.name ?? '')
-    );
-    const mat = supportsMaterial ? Number(materialBadQuantity) || 0 : 0;
-    return bad + mat;
-  }, [lastAreaBadQuantity, materialBadQuantity, currentFlow?.area?.name]);
+    if (!Array.isArray(normalizedAreas) || normalizedAreas.length === 0) {
+      const supportsMaterial = blockSupportsMaterial(
+        resolveBlockKey(currentFlow?.area?.name ?? '')
+      );
+      const bad = Number(lastAreaBadQuantity) || 0;
+      const mat = supportsMaterial ? Number(materialBadQuantity) || 0 : 0;
+      return bad + mat;
+    }
+
+    return normalizedAreas.reduce((acc, area) => {
+      const key = normalizeAreaKey(area.name);
+      const bad = Number(areaBadQuantities[`${key}_bad`] ?? 0);
+      const mat = area.supportsMaterial
+        ? Number(areaBadQuantities[`${key}_material`] ?? 0)
+        : 0;
+      return acc + bad + mat;
+    }, 0);
+  }, [
+    normalizedAreas,
+    areaBadQuantities,
+    lastAreaBadQuantity,
+    materialBadQuantity,
+    currentFlow?.area?.name,
+  ]);
 
   return (
     <>
@@ -823,39 +841,39 @@ export default function CorteComponent({ workOrder }: Props) {
 
       {/* Modal para marcar malas por areas previas al liberar */}
       {showBadQuantity && (
-          <BadQuantityModal
-            areas={normalizedAreas}
-            areaBadQuantities={areaBadQuantities}
-            setAreaBadQuantities={setAreaBadQuantities}
-            onConfirm={({ inputsByArea }) => {
-              const currentAreaInputs = inputsByArea.find(
-                (item) => item.areaId === workOrder.area.id
-              );
+        <BadQuantityModal
+          areas={normalizedAreas}
+          areaBadQuantities={areaBadQuantities}
+          setAreaBadQuantities={setAreaBadQuantities}
+          onConfirm={({ inputsByArea }) => {
+            const currentAreaInputs = inputsByArea.find(
+              (item) => item.areaId === workOrder.area.id
+            );
 
-              if (currentAreaInputs) {
-                const normalizeLabel = (value: string) =>
-                  value
-                    .normalize('NFD')
-                    .replace(/[\u0300-\u036f]/g, '')
-                    .trim()
-                    .toLowerCase();
+            if (currentAreaInputs) {
+              const normalizeLabel = (value: string) =>
+                value
+                  .normalize('NFD')
+                  .replace(/[\u0300-\u036f]/g, '')
+                  .trim()
+                  .toLowerCase();
 
-                const findValue = (label: string) =>
-                  currentAreaInputs.values.find(
-                    (entry) => normalizeLabel(entry.label) === normalizeLabel(label)
-                  )?.value ?? 0;
+              const findValue = (label: string) =>
+                currentAreaInputs.values.find(
+                  (entry) =>
+                    normalizeLabel(entry.label) === normalizeLabel(label)
+                )?.value ?? 0;
 
-                setLastBadQuantity(String(findValue('Malas')));
-                setMaterialBadQuantity(String(findValue('Malo de fábrica')));
-              }
+              setLastBadQuantity(String(findValue('Malas')));
+              setMaterialBadQuantity(String(findValue('Malo de fábrica')));
+            }
 
-              setShowBadQuantity(false);
-              void handleSaveChanges(inputsByArea);
-            }}
-            onClose={() => setShowBadQuantity(false)}
-          />
-        )
-      }
+            setShowBadQuantity(false);
+            void handleSaveChanges(inputsByArea);
+          }}
+          onClose={() => setShowBadQuantity(false)}
+        />
+      )}
 
       {/* Modal para enviar a liberacion */}
       {showConfirm && (
@@ -896,7 +914,7 @@ export default function CorteComponent({ workOrder }: Props) {
               onToggle={handleToggleRespuesta}
             />
             <InputGroup style={{ paddingTop: '30px' }}>
-              <Label style={{ color: '#374151'}}>Muestras:</Label>
+              <Label style={{ color: '#374151' }}>Muestras:</Label>
               <Input
                 type="number"
                 placeholder="Ej: 2"
@@ -1057,7 +1075,8 @@ const CqmButton = styled.button<CqmButtonProps>`
       ['Enviado a CQM', 'En Calidad'].includes($status) ||
       Number($cantidadporliberar) === 0 ||
       disabled
-    ) return '#9ca3af'; // gris
+    )
+      return '#9ca3af'; // gris
     return '#0038A8'; // azul
   }};
   color: white;
@@ -1070,20 +1089,22 @@ const CqmButton = styled.button<CqmButtonProps>`
       ['Enviado a CQM', 'En Calidad', 'Listo'].includes($status) ||
       Number($cantidadporliberar) === 0 ||
       disabled
-    ) return 'not-allowed';
+    )
+      return 'not-allowed';
     return 'pointer';
   }};
 
   &:hover {
     background-color: ${({ $status, $cantidadporliberar, disabled }) => {
-    if ($status === 'Listo') return '#16a34a';
-    if (
-      ['Enviado a CQM', 'En Calidad'].includes($status) ||
-      Number($cantidadporliberar) === 0 ||
-      disabled
-    ) return '#9ca3af';
-    return '#1d4ed8';
-  }};
+      if ($status === 'Listo') return '#16a34a';
+      if (
+        ['Enviado a CQM', 'En Calidad'].includes($status) ||
+        Number($cantidadporliberar) === 0 ||
+        disabled
+      )
+        return '#9ca3af';
+      return '#1d4ed8';
+    }};
   }
 `;
 
