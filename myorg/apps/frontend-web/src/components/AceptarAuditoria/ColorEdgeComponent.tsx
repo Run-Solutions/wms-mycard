@@ -15,7 +15,7 @@ import {
   buildDefaultValuesByArea,
   AreaBlock,
   DefaultValues,
-  toNum
+  toNum,
 } from './util/quantityWorkOrder';
 import { getPrevAreaGoodPlusExcess } from './util/lastWorkOrder';
 import BadQuantityModal from './util/BadQuantityModal';
@@ -24,6 +24,7 @@ import {
   blockSupportsMaterial,
   resolveBlockKey,
 } from '../LiberarProducto/util/areaMappings';
+import { calcularCantidadPorLiberar } from './util/calcularCantidadPorLiberar';
 
 interface Props {
   workOrder: any;
@@ -43,7 +44,7 @@ export default function ColorEdgeComponentAcceptAuditory({ workOrder }: Props) {
     bad_quantity: '',
     excess_quantity: '',
     noprocess_quantity: '',
-    cqm_quantity: '',    
+    cqm_quantity: '',
     comments: '',
     total_quantity: 0,
     total_execbuen: 0,
@@ -56,23 +57,23 @@ export default function ColorEdgeComponentAcceptAuditory({ workOrder }: Props) {
     if (typeof v === 'boolean') return v ? 1 : 0;
     return v as string | number; // ya restringimos los otros casos
   };
-  
+
   const toAfterCorteData = (
     d: DefaultValues,
     prev?: AfterCorteData
   ): AfterCorteData => {
     return {
       ...(prev ?? ({} as AfterCorteData)),
-  
+
       good_quantity: asStrNum(d.good_quantity),
       bad_quantity: asStrNum(d.bad_quantity),
       excess_quantity: asStrNum(d.excess_quantity),
       noprocess_quantity: asStrNum(d.noprocess_quantity),
       cqm_quantity: asStrNum(d.cqm_quantity),
-  
+
       comments: (d.comments ?? '') as string,
       total_quantity: d.total_quantity ?? 0,
-  
+
       // Si quieres otro criterio, cámbialo aquí
       total_execbuen: toNum(d.good_quantity),
     };
@@ -147,6 +148,9 @@ export default function ColorEdgeComponentAcceptAuditory({ workOrder }: Props) {
           initialValues[`${areaName}_bad`] = detail?.bad_quantity
             ? String(detail.bad_quantity)
             : '0';
+          initialValues[`${areaName}_material`] = detail?.material_quantity
+            ? String(detail.material_quantity)
+            : '0';
         }
       });
     });
@@ -195,8 +199,21 @@ export default function ColorEdgeComponentAcceptAuditory({ workOrder }: Props) {
   );
   console.log(defaultValues.total_quantity);
 
+  const lastCompletedOrPartial = useMemo(
+    () => (currentIndex > 0 ? flowList[currentIndex - 1] : null),
+    [flowList, currentIndex]
+  );
+  
+  const cantidadporliberar = useMemo(
+    () => calcularCantidadPorLiberar(workOrder, lastCompletedOrPartial),
+    [workOrder, lastCompletedOrPartial]
+  );
+  console.log('Cantidad por liberar', cantidadporliberar)
+  console.log('Cantidad total', defaultValues.total_quantity);
+
   const handleOpenModal = async (e: React.FormEvent) => {
     e.preventDefault();
+    const partialsActual = workOrder?.partialReleases ?? [];
 
     if (!sampleAuditory) {
       alert('Por favor, asegurate de ingresar muestras.');
@@ -208,22 +225,30 @@ export default function ColorEdgeComponentAcceptAuditory({ workOrder }: Props) {
       (defaultValues.total_quantity ?? 0) + Number(sampleAuditory) > prevAreaSum
     ) {
       alert(
-        'La cantidad total a liberar es mayor a la entregada por parte del área previa.'
+        `La cantidad total a liberar ${
+          (defaultValues.total_quantity ?? 0) + Number(sampleAuditory)
+        } es mayor a la entregada por parte del área previa ${
+          defaultValues.total_quantity
+        }.`
       );
       return;
     } else if (
-      (defaultValues.total_quantity ?? 0) + Number(sampleAuditory) !==
-        prevAreaSum &&
-      workOrder?.areaResponse?.colorEdge
+      (partialsActual.length > 0 &&
+        (defaultValues.total_quantity ?? 0) + Number(sampleAuditory) + Number(defaultValues.noprocess_quantity ?? 0)) !==
+      cantidadporliberar
     ) {
       alert(
-        'La cantidad total a liberar es mayor a la entregada por parte del área previa.'
+        `La cantidad total a liberar ${
+          (defaultValues.total_quantity ?? 0) + Number(sampleAuditory)
+        } es diferente a la entregada por parte del la parcialidad previa ${
+          cantidadporliberar
+        }.`
       );
       return;
     }
 
     setShowConfirm(true);
-  }
+  };
 
   const prevAreaSum = useMemo(
     () => getPrevAreaGoodPlusExcess(workOrder),
@@ -443,7 +468,7 @@ const SectionTitle = styled.h3`
   font-size: 1.25rem;
   font-weight: 600;
   margin: 2rem 0 1rem;
-  color: #374151;
+  color: ${({ theme }) => theme.palette.text.primary};
 `;
 
 const Label = styled.label`

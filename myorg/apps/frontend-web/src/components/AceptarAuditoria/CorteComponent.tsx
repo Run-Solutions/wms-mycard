@@ -22,13 +22,14 @@ import {
   blockSupportsMaterial,
   resolveBlockKey,
 } from '../LiberarProducto/util/areaMappings';
+import { calcularCantidadPorLiberar } from './util/calcularCantidadPorLiberar';
 
 export type AfterCorteData = {
   good_quantity: number | string;
   bad_quantity: number | string;
   excess_quantity: number | string;
   noprocess_quantity: number | string;
-  cqm_quantity: number | string; 
+  cqm_quantity: number | string;
   comments: string;
   total_quantity: number;
   total_execbuen: number;
@@ -52,7 +53,7 @@ export default function CorteComponentAcceptAuditory({ workOrder }: Props) {
     bad_quantity: '',
     excess_quantity: '',
     noprocess_quantity: '',
-    cqm_quantity: '', 
+    cqm_quantity: '',
     comments: '',
     total_quantity: 0,
     total_execbuen: 0,
@@ -156,6 +157,9 @@ export default function CorteComponentAcceptAuditory({ workOrder }: Props) {
           initialValues[`${areaName}_bad`] = detail?.bad_quantity
             ? String(detail.bad_quantity)
             : '0';
+          initialValues[`${areaName}_material`] = detail?.material_quantity
+            ? String(detail.material_quantity)
+            : '0';
         }
       });
     });
@@ -202,20 +206,51 @@ export default function CorteComponentAcceptAuditory({ workOrder }: Props) {
       })),
     [previousFlows]
   );
-  console.log(defaultValues.total_quantity);
+  
+  const lastCompletedOrPartial = useMemo(
+    () => (currentIndex > 0 ? flowList[currentIndex - 1] : null),
+    [flowList, currentIndex]
+  );
+  
+  const cantidadporliberar = useMemo(
+    () => calcularCantidadPorLiberar(workOrder, lastCompletedOrPartial),
+    [workOrder, lastCompletedOrPartial]
+  );
+  console.log('Cantidad por liberar', cantidadporliberar)
+  console.log('Cantidad total', defaultValues.total_quantity);
 
   const handleOpenModal = async (e: React.FormEvent) => {
     e.preventDefault();
-    console.log('(defaultValues.total_quantity ?? 0) + Number(sampleAuditory))', (defaultValues.total_quantity ?? 0) + Number(sampleAuditory))
+    const partialsActual = workOrder?.partialReleases ?? [];
+    console.log(
+      '(defaultValues.total_quantity ?? 0) + Number(sampleAuditory))',
+      (defaultValues.total_quantity ?? 0) + Number(sampleAuditory)
+    );
+    console.log(
+      "(total_quantity + sampleAuditory + noprocess_quantity)",
+      (Number(defaultValues.total_quantity ?? 0) +
+        Number(sampleAuditory) +
+        Number(defaultValues.noprocess_quantity ?? 0))
+    );
     if (!sampleAuditory) {
       alert('Por favor, asegurate de ingresar muestras.');
       return;
     } else if (
       ((defaultValues.total_quantity ?? 0) + Number(sampleAuditory)) % 24 !==
-      0
+        0 &&
+      workOrder?.areaResponse?.corte
     ) {
       alert(
         'Por favor, asegurate de ingresar muestras correctas, ya que la cantidad total no es divisible entre 24.'
+      );
+      return;
+    } else if (
+      (partialsActual.length > 0 &&
+        (defaultValues.total_quantity ?? 0) + Number(sampleAuditory) + Number(defaultValues.noprocess_quantity ?? 0)) !==
+      cantidadporliberar
+    ) {
+      alert(
+        'Por favor, asegurate de ingresar muestras correctas, ya que la cantidad total no es igual a los no procesados del primer parcial.'
       );
       return;
     }
@@ -414,7 +449,7 @@ const Title = styled.h2`
   font-size: 1.75rem;
   font-weight: 700;
   margin-bottom: 1.5rem;
-  color: #1f2937;
+  color: ${({ theme }) => theme.palette.text.primary};
 `;
 
 const NewData = styled.div``;
@@ -423,12 +458,12 @@ const SectionTitle = styled.h3`
   font-size: 1.25rem;
   font-weight: 600;
   margin: 2rem 0 1rem;
-  color: #374151;
+  color: ${({ theme }) => theme.palette.text.primary};
 `;
 
 const Label = styled.label`
   font-weight: 600;
-  color: #6b7280;
+  color: ${({ theme }) => theme.palette.text.primary};
 `;
 
 const NewDataWrapper = styled.div`

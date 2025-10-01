@@ -164,7 +164,6 @@ export function buildDefaultValuesByArea(
       values.excess_quantity,
       values.cqm_quantity,
       values.auditoria_quantity,
-      values.noprocess_quantity
     );
   } else if (areaData && allValidated) {
     // Hay parciales y todos validados: trabajamos con "restantes"
@@ -208,7 +207,6 @@ export function buildDefaultValuesByArea(
       areaData.excess_quantity,
       values.cqm_quantity,
       values.auditoria_quantity,
-      areaData.noprocess_quantity
     );
     totalCalculado = totalResta;
   } else {
@@ -222,20 +220,16 @@ export function buildDefaultValuesByArea(
       material_quantity: firstUnvalidated.material_quantity ?? '',
       noprocess_quantity: firstUnvalidated.noprocess_quantity ?? '',
       cqm_quantity: cqm_quantity || '',
-      auditoria_quantity: auditory_quantity || 0,
+      auditoria_quantity: auditory_quantity || '',
       comments: firstUnvalidated.observation ?? '',
     };
-    console.log('Auditoria first unvalidated', auditory_quantity);
-    
+
     totalCalculado = addN(
       values.good_quantity,
       sumaBadQuantity,
       values.excess_quantity,
-      values.auditoria_quantity,
       values.cqm_quantity,
-      values.noprocess_quantity
     );
-    console.log('totalCalculado', totalCalculado);
   }
 
   return { ...values, total_quantity: totalCalculado };

@@ -32,6 +32,7 @@ import {
   blockSupportsMaterial,
   resolveBlockKey,
 } from '../LiberarProducto/util/areaMappings';
+import { calcularCantidadPorLiberar } from './util/calcularCantidadPorLiberar';
 
 const MillingChipComponentAcceptAuditory: React.FC<{ workOrder: any }> = ({
   workOrder,
@@ -147,6 +148,9 @@ const MillingChipComponentAcceptAuditory: React.FC<{ workOrder: any }> = ({
           initialValues[`${areaName}_bad`] = detail?.bad_quantity
             ? String(detail.bad_quantity)
             : '0';
+          initialValues[`${areaName}_material`] = detail?.material_quantity
+            ? String(detail.material_quantity)
+            : '0';
         }
       });
     });
@@ -162,7 +166,21 @@ const MillingChipComponentAcceptAuditory: React.FC<{ workOrder: any }> = ({
     }
   }, [computeInitialBadQuantities]);
 
+  const lastCompletedOrPartial = useMemo(
+    () => (currentIndex > 0 ? flowList[currentIndex - 1] : null),
+    [flowList, currentIndex]
+  );
+  
+  const cantidadporliberar = useMemo(
+    () => calcularCantidadPorLiberar(workOrder, lastCompletedOrPartial),
+    [workOrder, lastCompletedOrPartial]
+  );
+  console.log('Cantidad por liberar', cantidadporliberar)
+  console.log('Cantidad total', defaultValues.total_quantity);
+
   const handleOpenModal = async () => {
+    const partialsActual = workOrder?.partialReleases ?? [];
+
     if (!sampleAuditory) {
       alert('Por favor, asegurate de ingresar muestras.');
       return;
@@ -173,16 +191,24 @@ const MillingChipComponentAcceptAuditory: React.FC<{ workOrder: any }> = ({
       (defaultValues.total_quantity ?? 0) + Number(sampleAuditory) > prevAreaSum
     ) {
       alert(
-        'La cantidad total a liberar es mayor a la entregada por parte del área previa.'
+        `La cantidad total a liberar ${
+          (defaultValues.total_quantity ?? 0) + Number(sampleAuditory)
+        } es mayor a la entregada por parte del área previa ${
+          defaultValues.total_quantity
+        }.`
       );
       return;
     } else if (
-      (defaultValues.total_quantity ?? 0) + Number(sampleAuditory) !==
-        prevAreaSum &&
-      workOrder?.areaResponse?.millingChip
+      (partialsActual.length > 0 &&
+        (defaultValues.total_quantity ?? 0) + Number(sampleAuditory) + Number(defaultValues.noprocess_quantity ?? 0)) !==
+      cantidadporliberar
     ) {
       alert(
-        'La cantidad total a liberar es mayor a la entregada por parte del área previa.'
+        `La cantidad total a liberar ${
+          (defaultValues.total_quantity ?? 0) + Number(sampleAuditory)
+        } es diferente a la entregada por parte del la parcialidad previa ${
+          cantidadporliberar
+        }.`
       );
       return;
     }

@@ -137,7 +137,10 @@ export default function SerigrafiaComponentAccept({ workOrder }: Props) {
   return (
     <Container>
       <Title>Área: {workOrder?.area.name || 'No definida'}</Title>
-      <WorkOrderHojasInfo workOrder={workOrder} lastCompletedOrPartial={lastCompletedOrPartial} />
+      <WorkOrderHojasInfo
+        workOrder={workOrder}
+        lastCompletedOrPartial={lastCompletedOrPartial}
+      />
 
       <NewData>
         <SectionTitle>Datos de Producción</SectionTitle>
@@ -259,7 +262,7 @@ const Title = styled.h2`
   font-size: 1.75rem;
   font-weight: 700;
   margin-bottom: 1.5rem;
-  color: #1f2937;
+  color: ${({ theme }) => theme.palette.text.primary};
 `;
 
 const NewData = styled.div``;
@@ -268,12 +271,13 @@ const SectionTitle = styled.h3`
   font-size: 1.25rem;
   font-weight: 600;
   margin: 2rem 0 1rem;
-  color: #374151;
+  color: ${({ theme }) => theme.palette.text.primary};
 `;
 
 const Label = styled.label`
   font-weight: 600;
-  color: #6b7280;
+  color:  color: ${({ theme }) => theme.palette.text.primary};
+#6b7280;
 `;
 
 const NewDataWrapper = styled.div`

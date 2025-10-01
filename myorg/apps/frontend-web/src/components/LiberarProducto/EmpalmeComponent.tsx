@@ -436,8 +436,8 @@ export default function EmpalmeComponent({ workOrder }: Props) {
               onToggle={handleToggleRespuesta}
             />
             <InputGroup style={{ paddingTop: '30px' }}>
-              <Label>Muestras:</Label>
-              <Input
+            <Label style={{ color: '#374151'}}>Muestras:</Label>
+            <Input
                 type="number"
                 placeholder="Ej: 2"
                 value={sampleQuantity}

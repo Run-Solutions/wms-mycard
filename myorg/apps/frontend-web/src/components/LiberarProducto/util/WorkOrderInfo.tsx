@@ -425,7 +425,7 @@ export function WorkOrderHojasInfo({
                 </p>
               </CardContent>
             </Card>
-            <Card className="bg-blue-400">
+            {/*<Card className="bg-blue-400">
               <CardContent>
                 <p className="text-sm text-muted-foreground text-black">
                   Cantidad restante parcial por liberar:
@@ -448,29 +448,7 @@ export function WorkOrderHojasInfo({
                   })()}
                 </p>
               </CardContent>
-            </Card>
-            <Card className="bg-blue-400">
-              <CardContent>
-                <p className="text-sm text-muted-foreground text-black">
-                  Cantidad restante parcial por liberar:
-                </p>
-                <p className="text-xl font-semibold text-black">
-                  {(() => {
-                    const ps = workOrder.partialReleases ?? [];
-                    const totalQty = ps.reduce(
-                      (s: any, p: any) => s + (Number(p?.quantity) || 0),
-                      0
-                    );
-                    const totalRel = ps.reduce(
-                      (s: any, p: any) =>
-                        s + (Number(p?.release_quantity) || 0),
-                      0
-                    );
-                    return totalQty - totalRel;
-                  })()}
-                </p>
-              </CardContent>
-            </Card>
+            </Card>*/}
           </>
         )}
       </div>

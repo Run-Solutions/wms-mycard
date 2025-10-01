@@ -30,6 +30,7 @@ import {
   blockSupportsMaterial,
   resolveBlockKey,
 } from '../LiberarProducto/util/areaMappings';
+import { calcularCantidadPorLiberar } from './util/calcularCantidadPorLiberar';
 
 export type AfterCorteData = {
   good_quantity: number | string;
@@ -152,6 +153,9 @@ const CorteComponentAcceptAuditory: React.FC<{ workOrder: any }> = ({
           initialValues[`${areaName}_bad`] = detail?.bad_quantity
             ? String(detail.bad_quantity)
             : '0';
+          initialValues[`${areaName}_material`] = detail?.material_quantity
+            ? String(detail.material_quantity)
+            : '0';
         }
       });
     });
@@ -167,24 +171,53 @@ const CorteComponentAcceptAuditory: React.FC<{ workOrder: any }> = ({
     }
   }, [computeInitialBadQuantities]);
 
+  const lastCompletedOrPartial = useMemo(
+    () => (currentIndex > 0 ? flowList[currentIndex - 1] : null),
+    [flowList, currentIndex]
+  );
+
+  const cantidadporliberar = useMemo(
+    () => calcularCantidadPorLiberar(workOrder, lastCompletedOrPartial),
+    [workOrder, lastCompletedOrPartial]
+  );
+
   const handleOpenModal = async () => {
+    const partialsActual = workOrder?.partialReleases ?? [];
+    console.log(
+      '(defaultValues.total_quantity ?? 0) + Number(sampleAuditory))',
+      (defaultValues.total_quantity ?? 0) + Number(sampleAuditory)
+    );
+    console.log(
+      "(total_quantity + sampleAuditory + noprocess_quantity)",
+      (Number(defaultValues.total_quantity ?? 0) +
+        Number(sampleAuditory) +
+        Number(defaultValues.noprocess_quantity ?? 0))
+    );
     if (!sampleAuditory) {
-      Alert.alert('Error', 'Por favor, asegurate de ingresar muestras.');
+      alert('Por favor, asegurate de ingresar muestras.');
       return;
     } else if (
       ((defaultValues.total_quantity ?? 0) + Number(sampleAuditory)) % 24 !==
         0 &&
       workOrder?.areaResponse?.corte
     ) {
-      Alert.alert(
-        'Error',
+      alert(
         'Por favor, asegurate de ingresar muestras correctas, ya que la cantidad total no es divisible entre 24.'
       );
       return;
+    } else if (
+      (partialsActual.length > 0 &&
+        (defaultValues.total_quantity ?? 0) + Number(sampleAuditory) + Number(defaultValues.noprocess_quantity ?? 0)) !==
+      cantidadporliberar
+    ) {
+      alert(
+        'Por favor, asegurate de ingresar muestras correctas, ya que la cantidad total no es igual a los no procesados del primer parcial.'
+      );
+      return;
     }
-    setShowConfirm(true);
-  }
 
+    setShowConfirm(true);
+  };
   const handleSubmit = async () => {
     const CorteId = workOrder?.areaResponse?.corte?.id ?? workOrder.id;
     try {

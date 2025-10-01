@@ -6,6 +6,8 @@ import {
   IsArray,
   IsOptional,
   ValidateNested,
+  IsIn,
+  IsObject,
 } from 'class-validator';
 import { Type } from 'class-transformer';
 
@@ -96,9 +98,10 @@ export class UpdateAreaDataDto {
 
   data: Record<string, any>;
 
+  @IsOptional()
   @ValidateNested()
   @Type(() => SampleDataDto)
-  sample_data: SampleDataDto;
+  sample_data?: SampleDataDto;
 }
 
 export class UpdateWorkOrderAreasDto {
@@ -121,6 +124,59 @@ export class UpdateWorkOrderAreasDto {
   @Type(() => Number)
   @IsInt()
   sourceWorkOrderFlowId?: number;
+}
+
+export const AREA_RESPONSE_BLOCKS = [
+  'prepress',
+  'impression',
+  'serigrafia',
+  'empalme',
+  'laminacion',
+  'corte',
+  'colorEdge',
+  'hotStamping',
+  'millingChip',
+  'personalizacion',
+] as const;
+
+export type AreaResponseBlock = (typeof AREA_RESPONSE_BLOCKS)[number];
+
+export class UpdateAreaResponseEntryDto {
+  @Type(() => Number)
+  @IsInt()
+  areaId!: number;
+
+  @IsIn(AREA_RESPONSE_BLOCKS)
+  block!: AreaResponseBlock;
+
+  @Type(() => Number)
+  @IsInt()
+  blockId!: number;
+
+  @IsOptional()
+  @Type(() => Number)
+  @IsInt()
+  formId?: number;
+
+  @IsOptional()
+  @Type(() => Number)
+  @IsInt()
+  cqmId?: number;
+
+  @IsObject()
+  data!: Record<string, number>;
+
+  @IsOptional()
+  @ValidateNested()
+  @Type(() => SampleDataDto)
+  sample_data?: SampleDataDto;
+}
+
+export class UpdateAreaResponseDataDto {
+  @IsArray()
+  @ValidateNested({ each: true })
+  @Type(() => UpdateAreaResponseEntryDto)
+  areas!: UpdateAreaResponseEntryDto[];
 }
 
 export class UpdateFlowUserDto {

@@ -18,6 +18,9 @@ import { InternalStackParamList } from '../../../../navigation/types';
 
 import InfoCard from '../../../../components/SeguimientoDeOts/InfoCard';
 import PartialHistory from '../../../../components/SeguimientoDeOts/PartialHistory';
+import BadQuantityModal, {
+  BadQuantityModalResult,
+} from '../../../../components/SeguimientoDeOts/BadQuantityModal';
 import {
   fetchWorkOrderById,
   fetchAllUsers,
@@ -104,6 +107,8 @@ const FALLBACK_FIELDS = [
   'material_quantity',
   'plates',
 ];
+
+const EDITING_ENABLED = false;
 
 const getAreaKey = (area: AreaData) => AREA_KEY_BY_ID[area.id] ?? null;
 
@@ -443,6 +448,7 @@ const CerrarOrdenDeTrabajoAuxScreen: React.FC = () => {
   const [areaBadQuantities, setAreaBadQuantities] = useState<{
     [key: string]: string;
   }>({});
+  const [modalAreas, setModalAreas] = useState<AreaData[]>([]);
 
   const [partialSectionOpen, setPartialSectionOpen] = useState(false);
 
@@ -539,6 +545,7 @@ const CerrarOrdenDeTrabajoAuxScreen: React.FC = () => {
   });
 
   const openOperatorModal = (area: AreaData, partial: PartialType) => {
+    if (!EDITING_ENABLED) return;
     const currentId = partial?.user_id ?? area.assigned_user_id ?? null;
     setOpModal({
       open: true,
@@ -915,6 +922,16 @@ const CerrarOrdenDeTrabajoAuxScreen: React.FC = () => {
     0
   );
 
+  const filteredAreas = useMemo(
+    () =>
+      areas.filter(
+        (area) =>
+          area.status === 'Completado' &&
+          area.name.toLowerCase() !== 'preprensa'
+      ),
+    [areas]
+  );
+
   const getSumaMalasHasta = (areaId: number): number => {
     return areas
       .filter((a) => a.id <= areaId)
@@ -1015,6 +1032,7 @@ const CerrarOrdenDeTrabajoAuxScreen: React.FC = () => {
     area: AreaData,
     partial?: AreaData['partials'][number] | null
   ) => {
+    if (!EDITING_ENABLED) return false;
     if (workOrder?.status === 'Cerrado') return false;
 
     const editableStatuses = [
@@ -1038,24 +1056,67 @@ const CerrarOrdenDeTrabajoAuxScreen: React.FC = () => {
     noprocess: 'Sin procesar',
   };
 
-  const handleOpenBadQuantityModal = () => {
+  const handleOpenBadQuantityModal = (triggerArea?: AreaData) => {
+    const normalize = (name: string) => name.toLowerCase().replace(/\s/g, '');
+    const baseKeys = ['impresion', 'serigrafia', 'empalme', 'laminacion', 'corte'];
+    const triggerKey = triggerArea ? normalize(triggerArea.name) : null;
+
+    const keysToInclude = new Set(baseKeys);
+    if (triggerKey) keysToInclude.add(triggerKey);
+
+    const selectedAreas = areas.filter((area) =>
+      keysToInclude.has(normalize(area.name))
+    );
+
+    const orderMap = new Map<string, number>();
+    baseKeys.forEach((key, index) => orderMap.set(key, index));
+    if (triggerKey && !orderMap.has(triggerKey)) {
+      orderMap.set(triggerKey, orderMap.size);
+    }
+
+    const sortedAreas = [...selectedAreas].sort((a, b) => {
+      const aIndex = orderMap.get(normalize(a.name)) ?? Number.MAX_SAFE_INTEGER;
+      const bIndex = orderMap.get(normalize(b.name)) ?? Number.MAX_SAFE_INTEGER;
+      return aIndex - bIndex;
+    });
+
+    const fallbackAreas = areas.filter(
+      (area) =>
+        area.status === 'Completado' &&
+        area.name.toLowerCase() !== 'preprensa'
+    );
+
+    const finalAreas = sortedAreas.length
+      ? sortedAreas
+      : fallbackAreas.length
+      ? fallbackAreas
+      : areas;
+
     const initialValues: { [key: string]: string } = {};
-    areas.forEach((area) => {
-      const areaKey = area.name.toLowerCase().replace(/\s/g, '');
+    finalAreas.forEach((area) => {
+      const areaKey = normalize(area.name);
       initialValues[`${areaKey}_bad`] = area.malas?.toString() || '0';
-      if (area.id >= 6)
+      if (area.id >= 6) {
         initialValues[`${areaKey}_material`] =
           area.defectuoso?.toString() || '0';
+      }
     });
+
+    setModalAreas(finalAreas);
     setAreaBadQuantities(initialValues);
     setShowBadQuantity(true);
   };
 
-  const renderEditableNumber = (value: any, onChange: (t: string) => void) => (
+  const renderEditableNumber = (
+    value: any,
+    onChange: (t: string) => void
+  ) => (
     <TextInput
+      editable={EDITING_ENABLED}
+      selectTextOnFocus={EDITING_ENABLED}
       keyboardType="numeric"
       value={String(value ?? 0)}
-      onChangeText={onChange}
+      onChangeText={EDITING_ENABLED ? onChange : undefined}
       placeholderTextColor="#9CA3AF"
       style={[
         styles.input,
@@ -1066,6 +1127,7 @@ const CerrarOrdenDeTrabajoAuxScreen: React.FC = () => {
           borderRadius: 9,
           paddingHorizontal: 8,
         },
+        !EDITING_ENABLED && styles.readOnlyInput,
       ]}
     />
   );
@@ -1190,22 +1252,21 @@ const CerrarOrdenDeTrabajoAuxScreen: React.FC = () => {
 
     if (field === 'malas') {
       if (area.id >= 6) {
+        const aggregatedBad = getSumaMalasHasta(area.id);
+        const canOpenModal = area.status === 'Completado';
         return (
-          <TouchableOpacity onPress={handleOpenBadQuantityModal}>
+          <TouchableOpacity
+            onPress={() => handleOpenBadQuantityModal(area)}
+            disabled={!canOpenModal}
+            activeOpacity={0.7}
+          >
             <View
               style={[
-                styles.input,
-                {
-                  height: 40,
-                  backgroundColor: '#eaeaf5',
-                  borderRadius: 9,
-                  justifyContent: 'center',
-                },
+                styles.badQtyBox,
+                !canOpenModal && styles.badQtyBoxDisabled,
               ]}
             >
-              <Text style={{ textAlign: 'center' }}>
-                {getSumaMalasHasta(area.id)}
-              </Text>
+              <Text style={styles.badQtyText}>{aggregatedBad}</Text>
             </View>
           </TouchableOpacity>
         );
@@ -1351,7 +1412,9 @@ const CerrarOrdenDeTrabajoAuxScreen: React.FC = () => {
               const cells = renderSpannedCells(area, 'encargado', () => (
                 <TouchableOpacity
                   disabled={!editable}
-                  onPress={() => openOperatorModal(area, null)}
+                  onPress={
+                    editable ? () => openOperatorModal(area, null) : undefined
+                  }
                   style={{
                     paddingHorizontal: 8,
                     paddingVertical: 6,
@@ -1596,6 +1659,43 @@ const CerrarOrdenDeTrabajoAuxScreen: React.FC = () => {
               <Text style={styles.cellLabel}>{fieldLabels[field]}</Text>
               {areas.flatMap((area, aIndex) => {
                 if (area.parciales > 0 && area.partials?.length) {
+                  const rem = getRemainder(area);
+                  const canTriggerModal =
+                    field === 'malas' &&
+                    area.id >= 6 &&
+                    area.status === 'Completado';
+
+                  const renderBadTrigger = (displayValue: number) => (
+                    <TouchableOpacity
+                      onPress={() => handleOpenBadQuantityModal(area)}
+                      activeOpacity={0.7}
+                    >
+                      <View style={styles.badQtyBox}>
+                        <Text style={styles.badQtyText}>{displayValue}</Text>
+                      </View>
+                    </TouchableOpacity>
+                  );
+
+                  const renderValue = (
+                    displayValue: number,
+                    shouldTrigger: boolean,
+                    emphasize = false
+                  ) => {
+                    if (canTriggerModal && shouldTrigger) {
+                      return renderBadTrigger(displayValue);
+                    }
+                    return (
+                      <Text
+                        style={{
+                          textAlign: 'center',
+                          fontWeight: emphasize ? '600' : '400',
+                        }}
+                      >
+                        {displayValue}
+                      </Text>
+                    );
+                  };
+
                   const cells = area.partials.map((p, pIndex) => {
                     const value =
                       field === 'buenas'
@@ -1605,16 +1705,24 @@ const CerrarOrdenDeTrabajoAuxScreen: React.FC = () => {
                         : field === 'excedente'
                         ? toNum(p.excess_quantity)
                         : toNum(p.noprocess_quantity);
+
+                    const isLastPartialColumn =
+                      pIndex === area.partials.length - 1 && rem <= 0;
+                    const displayValue =
+                      canTriggerModal && isLastPartialColumn
+                        ? toNum(area.malas ?? value)
+                        : value;
+
                     return (
-                      <Text
-                        key={`area-${area.id}-parcial-${p.id}-${field}-${pIndex}`}
+                      <View
+                        key={`area-${area.id}-parcial-${p.id ?? pIndex}-${field}`}
                         style={styles.cellUser}
                       >
-                        {value}
-                      </Text>
+                        {renderValue(displayValue, isLastPartialColumn)}
+                      </View>
                     );
                   });
-                  const rem = getRemainder(area);
+
                   if (rem > 0) {
                     let remValue = 0;
                     switch (field) {
@@ -1633,17 +1741,23 @@ const CerrarOrdenDeTrabajoAuxScreen: React.FC = () => {
                       default:
                         remValue = 0;
                     }
+
+                    const displayRemValue =
+                      canTriggerModal ? toNum(area.malas ?? remValue) : remValue;
+
                     cells.push(
-                      <Text
+                      <View
                         key={`prod-${area.id}-${field}-rem`}
-                        style={[styles.cellUser, { fontWeight: '600' }]}
+                        style={styles.cellUser}
                       >
-                        {remValue}
-                      </Text>
+                        {renderValue(displayRemValue, true, true)}
+                      </View>
                     );
                   }
+
                   return cells;
                 }
+
                 return (
                   <View
                     key={`prod-${area.id}-${field}-single-${aIndex}`}
@@ -1822,14 +1936,32 @@ const CerrarOrdenDeTrabajoAuxScreen: React.FC = () => {
         />
       )}
 
+      <BadQuantityModal
+        visible={showBadQuantity}
+        areas={modalAreas.length ? modalAreas : filteredAreas}
+        areaBadQuantities={areaBadQuantities}
+        setAreaBadQuantities={setAreaBadQuantities}
+        onConfirm={(result: BadQuantityModalResult) => {
+          setShowBadQuantity(false);
+          setModalAreas([]);
+          handleSaveChanges(result?.updatedAreas ?? areas);
+        }}
+        onClose={() => {
+          setShowBadQuantity(false);
+          setModalAreas([]);
+        }}
+      />
+
       {workOrder?.status !== 'Cerrado' && (
         <>
-          <TouchableOpacity
-            style={styles.buttonSave}
-            onPress={() => handleSaveChanges(areas)}
-          >
-            <Text style={styles.buttonText}>Guardar Cambios</Text>
-          </TouchableOpacity>
+          {EDITING_ENABLED && (
+            <TouchableOpacity
+              style={styles.buttonSave}
+              onPress={() => handleSaveChanges(areas)}
+            >
+              <Text style={styles.buttonText}>Guardar Cambios</Text>
+            </TouchableOpacity>
+          )}
           <TouchableOpacity
             style={styles.button}
             onPress={() => {
@@ -2061,6 +2193,30 @@ const styles = StyleSheet.create({
   input: {
     width: 80,
     marginVertical: 4,
+  },
+  readOnlyInput: {
+    backgroundColor: '#f3f4f6',
+    color: '#111827',
+  },
+  badQtyBox: {
+    minWidth: 80,
+    minHeight: 40,
+    paddingHorizontal: 8,
+    paddingVertical: 8,
+    borderRadius: 9,
+    borderWidth: 1,
+    borderColor: '#c7d2fe',
+    backgroundColor: '#eaeaf5',
+    justifyContent: 'center',
+  },
+  badQtyBoxDisabled: {
+    backgroundColor: '#f3f4f6',
+    borderColor: '#e5e7eb',
+  },
+  badQtyText: {
+    textAlign: 'center',
+    color: '#1f2937',
+    fontWeight: '600',
   },
   button: {
     backgroundColor: '#0038A8',

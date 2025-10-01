@@ -538,31 +538,11 @@ export default function PersonalizacionComponent({ workOrder }: Props) {
     [currentFlow]
   );
 
-  // total actual “digitado” si lo necesita separado
-  const totalActualDigitado = useMemo(
-    () =>
-      getCurrentInputTotal({
-        cqm_quantity,
-        goodQuantity,
-        lastAreaBadQuantity,
-        materialBadQuantity,
-        excessQuantity,
-        noProcessQuantity,
-      }),
-    [
-      cqm_quantity,
-      goodQuantity,
-      lastAreaBadQuantity,
-      materialBadQuantity,
-      excessQuantity,
-      noProcessQuantity,
-    ]
-  );
-
   console.log('totalParcialesActuales', totalParcialesActuales);
 
   const handleLiberarClick = () => {
     const numValue = Number(goodQuantity);
+    const partialsActual = currentFlow?.partialReleases ?? [];
     if (
       Number.isNaN(numValue) ||
       !Number.isInteger(numValue) ||
@@ -572,15 +552,26 @@ export default function PersonalizacionComponent({ workOrder }: Props) {
       return;
     } else if (
       cqm_quantity +
-        Number(goodQuantity) +
-        Number(lastAreaBadQuantity) +
-        Number(materialBadQuantity) +
-        Number(excessQuantity) +
-        Number(noProcessQuantity)  + totalParcialesActuales>
+        (Number(goodQuantity) +
+          Number(lastAreaBadQuantity) +
+          Number(materialBadQuantity) +
+          Number(excessQuantity) +
+          totalParcialesActuales) >
       prevAreaSum
     ) {
       alert(
-        'La cantidad total a liberar el mayor a la entregada por parte del área previa.'
+        'La cantidad total a liberar es mayor a la entregada por parte del área previa.'
+      );
+      return;
+    } else if (
+      partialsActual.length > 0 &&
+      Number(goodQuantity) +
+        Number(lastAreaBadQuantity) +
+        Number(excessQuantity) >
+        cantidadporliberar
+    ) {
+      alert(
+        `La cantidad total a liberar es mayor a la entregada no procesada por la parcialidad anterior ${cantidadporliberar}.`
       );
       return;
     }
@@ -595,7 +586,6 @@ export default function PersonalizacionComponent({ workOrder }: Props) {
 
     setShowConfirm(true);
   };
-
   const toggleQualitySection = () => {
     setQualitySectionOpen(!qualitySectionOpen);
   };
@@ -638,22 +628,22 @@ export default function PersonalizacionComponent({ workOrder }: Props) {
     const initialValues: Record<string, string> = {};
 
     previousFlows.forEach((flow) => {
-      flow.badQuantityDetails.map((detail: any) => {
-        console.log('detail', currentFlow);
-
-        if (detail.source_area_id === currentFlow.area_id) {
-          const areaName = detail.targetArea.name;
-          initialValues[`${areaName}_bad`] = detail.bad_quantity
-            ? String(detail.bad_quantity)
-            : '0';
+      (flow?.badQuantityDetails ?? []).forEach((detail: any) => {
+        if (detail?.source_area_id === currentFlow?.area_id) {
+          const areaName = normalizeAreaKey(detail?.targetArea?.name ?? '');
+          initialValues[`${areaName}_bad`] =
+            detail?.bad_quantity != null ? String(detail.bad_quantity) : '0';
+          initialValues[`${areaName}_material`] =
+            detail?.material_quantity != null
+              ? String(detail.material_quantity)
+              : '0';
         }
       });
     });
-    console.log('initvalues', initialValues);
+
     setAreaBadQuantities(initialValues);
     setShowBadQuantity(true);
   };
-
 
   const normalizedAreas: AreaData[] = useMemo(
     () =>

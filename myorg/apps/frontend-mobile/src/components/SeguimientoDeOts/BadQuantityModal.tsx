@@ -11,6 +11,15 @@ import {
 } from 'react-native';
 import { AreaData } from '../../app/protected/seguimientoDeOts/[id]/page';
 
+export interface BadQuantityModalResult {
+  inputsByArea: Array<{
+    areaId: number;
+    areaName: string;
+    values: Array<{ label: string; value: number }>;
+  }>;
+  updatedAreas: AreaData[];
+}
+
 interface Props {
   visible: boolean;
   areas: AreaData[];
@@ -18,7 +27,7 @@ interface Props {
   setAreaBadQuantities: React.Dispatch<
     React.SetStateAction<{ [key: string]: string }>
   >;
-  onConfirm: (updatedAreas: AreaData[]) => void;
+  onConfirm: (result: BadQuantityModalResult) => void;
   onClose: () => void;
 }
 
@@ -43,7 +52,35 @@ const BadQuantityModal: React.FC<Props> = ({
       };
     });
 
-    onConfirm(updatedAreas);
+    const inputsByArea = areas.map((area) => {
+      const areaKey = area.name.toLowerCase().replace(/\s/g, '');
+
+      const parseValue = (value: string | undefined) => {
+        const parsed = parseInt(String(value ?? '0').trim(), 10);
+        return Number.isFinite(parsed) ? parsed : 0;
+      };
+
+      const badValue = parseValue(areaBadQuantities[`${areaKey}_bad`]);
+
+      const values: Array<{ label: string; value: number }> = [
+        { label: 'Malas', value: badValue },
+      ];
+
+      if (area.id >= 6) {
+        const materialValue = parseValue(
+          areaBadQuantities[`${areaKey}_material`],
+        );
+        values.push({ label: 'Malo de fábrica', value: materialValue });
+      }
+
+      return {
+        areaId: area.id,
+        areaName: area.name,
+        values,
+      };
+    });
+
+    onConfirm({ updatedAreas, inputsByArea });
   };
 
   return (

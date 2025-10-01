@@ -15,7 +15,7 @@ import {
   buildDefaultValuesByArea,
   AreaBlock,
   DefaultValues,
-  toNum
+  toNum,
 } from './util/quantityWorkOrder';
 import { getPrevAreaGoodPlusExcess } from './util/lastWorkOrder';
 import BadQuantityModal from './util/BadQuantityModal';
@@ -24,6 +24,7 @@ import {
   blockSupportsMaterial,
   resolveBlockKey,
 } from '../LiberarProducto/util/areaMappings';
+import { calcularCantidadPorLiberar } from './util/calcularCantidadPorLiberar';
 
 interface Props {
   workOrder: any;
@@ -45,7 +46,7 @@ export default function HotStampingComponentAcceptAuditory({
     bad_quantity: '',
     excess_quantity: '',
     noprocess_quantity: '',
-    cqm_quantity: '',    
+    cqm_quantity: '',
     comments: '',
     total_quantity: 0,
     total_execbuen: 0,
@@ -58,23 +59,23 @@ export default function HotStampingComponentAcceptAuditory({
     if (typeof v === 'boolean') return v ? 1 : 0;
     return v as string | number; // ya restringimos los otros casos
   };
-  
+
   const toAfterCorteData = (
     d: DefaultValues,
     prev?: AfterCorteData
   ): AfterCorteData => {
     return {
       ...(prev ?? ({} as AfterCorteData)),
-  
+
       good_quantity: asStrNum(d.good_quantity),
       bad_quantity: asStrNum(d.bad_quantity),
       excess_quantity: asStrNum(d.excess_quantity),
       noprocess_quantity: asStrNum(d.noprocess_quantity),
       cqm_quantity: asStrNum(d.cqm_quantity),
-  
+
       comments: (d.comments ?? '') as string,
       total_quantity: d.total_quantity ?? 0,
-  
+
       // Si quieres otro criterio, cámbialo aquí
       total_execbuen: toNum(d.good_quantity),
     };
@@ -120,12 +121,17 @@ export default function HotStampingComponentAcceptAuditory({
   const areaKey: AreaBlock = 'hotStamping';
 
   useEffect(() => {
-    const result = buildDefaultValuesByArea(areaKey, workOrder, sumaBadQuantity, {
-      // filterPartialsByArea: (p) => p.area === areaKey
-    });
-  
+    const result = buildDefaultValuesByArea(
+      areaKey,
+      workOrder,
+      sumaBadQuantity,
+      {
+        // filterPartialsByArea: (p) => p.area === areaKey
+      }
+    );
+
     if (result) {
-      setDefaultValues(prev => toAfterCorteData(result, prev)); // 
+      setDefaultValues((prev) => toAfterCorteData(result, prev)); //
     }
   }, [workOrder, sumaBadQuantity]);
 
@@ -143,6 +149,9 @@ export default function HotStampingComponentAcceptAuditory({
           const areaName = makeAreaKey(detail?.targetArea?.name);
           initialValues[`${areaName}_bad`] = detail?.bad_quantity
             ? String(detail.bad_quantity)
+            : '0';
+          initialValues[`${areaName}_material`] = detail?.material_quantity
+            ? String(detail.material_quantity)
             : '0';
         }
       });
@@ -192,10 +201,28 @@ export default function HotStampingComponentAcceptAuditory({
   );
   console.log(defaultValues.total_quantity);
 
-  const prevAreaSum = useMemo(() => getPrevAreaGoodPlusExcess(workOrder), [workOrder]);
+  const prevAreaSum = useMemo(
+    () => getPrevAreaGoodPlusExcess(workOrder),
+    [workOrder]
+  );
   console.log('prevAreaSum', prevAreaSum);
 
+  const lastCompletedOrPartial = useMemo(
+    () => (currentIndex > 0 ? flowList[currentIndex - 1] : null),
+    [flowList, currentIndex]
+  );
+  
+  const cantidadporliberar = useMemo(
+    () => calcularCantidadPorLiberar(workOrder, lastCompletedOrPartial),
+    [workOrder, lastCompletedOrPartial]
+  );
+  console.log('Cantidad por liberar', cantidadporliberar)
+  console.log('Cantidad total', defaultValues.total_quantity);
+
   const handleOpenModal = async (e: React.FormEvent) => {
+    e.preventDefault();
+    const partialsActual = workOrder?.partialReleases ?? [];
+
     if (!sampleAuditory) {
       alert('Por favor, asegurate de ingresar muestras.');
       return;
@@ -206,26 +233,35 @@ export default function HotStampingComponentAcceptAuditory({
       (defaultValues.total_quantity ?? 0) + Number(sampleAuditory) > prevAreaSum
     ) {
       alert(
-        'La cantidad total a liberar es mayor a la entregada por parte del área previa.'
+        `La cantidad total a liberar ${
+          (defaultValues.total_quantity ?? 0) + Number(sampleAuditory)
+        } es mayor a la entregada por parte del área previa ${
+          defaultValues.total_quantity
+        }.`
       );
       return;
     } else if (
-      (defaultValues.total_quantity ?? 0) + Number(sampleAuditory) !==
-        prevAreaSum &&
-      workOrder?.areaResponse?.hotStamping
+      (partialsActual.length > 0 &&
+        (defaultValues.total_quantity ?? 0) + Number(sampleAuditory) + Number(defaultValues.noprocess_quantity ?? 0)) !==
+      cantidadporliberar
     ) {
       alert(
-        'La cantidad total a liberar --- es mayor a la entregada por parte del área previa.'
+        `La cantidad total a liberar ${
+          (defaultValues.total_quantity ?? 0) + Number(sampleAuditory)
+        } es diferente a la entregada por parte del la parcialidad previa ${
+          cantidadporliberar
+        }.`
       );
       return;
     }
+
     setShowConfirm(true);
-  }
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
-    console.log((defaultValues.total_quantity ?? 0) + Number(sampleAuditory))
+    console.log((defaultValues.total_quantity ?? 0) + Number(sampleAuditory));
     e.preventDefault();
-    
+
     const HotStampingId =
       workOrder?.areaResponse?.hotStamping?.id ?? workOrder.id;
     try {
@@ -428,7 +464,7 @@ const Title = styled.h2`
   font-size: 1.75rem;
   font-weight: 700;
   margin-bottom: 1.5rem;
-  color: #1f2937;
+  color: ${({ theme }) => theme.palette.text.primary};
 `;
 
 const NewData = styled.div``;
@@ -437,12 +473,12 @@ const SectionTitle = styled.h3`
   font-size: 1.25rem;
   font-weight: 600;
   margin: 2rem 0 1rem;
-  color: #374151;
+  color: ${({ theme }) => theme.palette.text.primary};
 `;
 
 const Label = styled.label`
   font-weight: 600;
-  color: #6b7280;
+  color: ${({ theme }) => theme.palette.text.primary};
 `;
 
 const NewDataWrapper = styled.div`
@@ -463,22 +499,6 @@ const Input = styled.input`
   border: 2px solid #d1d5db;
   border-radius: 0.5rem;
   color: black;
-  margin-top: 0.25rem;
-  outline: none;
-  font-size: 1rem;
-  transition: border 0.3s;
-
-  &:focus {
-    border-color: #0038a8;
-  }
-`;
-
-const InputBad = styled.input`
-  width: 100%;
-  color: black;
-  padding: 0.75rem 1rem;
-  border: 2px solid #d1d5db;
-  border-radius: 0.5rem;
   margin-top: 0.25rem;
   outline: none;
   font-size: 1rem;

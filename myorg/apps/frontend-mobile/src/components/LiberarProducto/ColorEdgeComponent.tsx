@@ -448,8 +448,9 @@ const ColorEdgeComponent = ({ workOrder }: { workOrder: any }) => {
 
   const handleLiberarClick = async () => {
     const numValue = Number(goodQuantity);
+    const partialsActual = currentFlow?.partialReleases ?? [];
     if (isNaN(numValue) || !Number.isInteger(numValue) || numValue <= 0) {
-      Alert.alert('Cantidad de muestra inválida');
+      Alert.alert('Por favor, ingresa una cantidad válida para Buenas.');
       return;
     } else if (
       cqm_quantity +
@@ -457,15 +458,37 @@ const ColorEdgeComponent = ({ workOrder }: { workOrder: any }) => {
           Number(lastAreaBadQuantity) +
           Number(materialBadQuantity) +
           Number(excessQuantity) +
-          Number(noProcessQuantity)) +
-        totalParcialesActuales >
+        totalParcialesActuales) >
       prevAreaSum
     ) {
       Alert.alert(
         'La cantidad total a liberar el mayor a la entregada por parte del área previa.'
       );
       return;
+    } else if (
+      partialsActual.length > 0 &&
+      Number(goodQuantity) +
+        Number(lastAreaBadQuantity) +
+        Number(excessQuantity) >
+        cantidadporliberar
+    ) {
+      Alert.alert(
+        `La cantidad total a liberar es diferente a la entregada no procesada por la parcialidad anterior ${cantidadporliberar}.`
+      );
+      return;
     }
+
+    const partials = lastCompletedOrPartial?.partialReleases ?? [];
+    if (Array.isArray(partials) && partials.length > 0) {
+      const totalValidatedQuantity = partials
+        .filter((release: PartialRelease) => release.validated)
+        .reduce((sum: number, r: PartialRelease) => sum + (r.quantity ?? 0), 0);
+      console.log('Total validado:', totalValidatedQuantity);
+    }
+    setShowConfirm(true);
+  };
+
+  const handleColorEdgeSubmit = async () => {
     const payload = {
       workOrderId: workOrder.workOrder.id,
       workOrderFlowId: currentFlow.id,
@@ -499,18 +522,19 @@ const ColorEdgeComponent = ({ workOrder }: { workOrder: any }) => {
     const initialValues: Record<string, string> = {};
 
     previousFlows.forEach((flow) => {
-      flow.badQuantityDetails.map((detail: any) => {
-        console.log('detail', currentFlow);
-
-        if (detail.source_area_id === currentFlow.area_id) {
-          const areaName = detail.targetArea.name;
-          initialValues[`${areaName}_bad`] = detail.bad_quantity
-            ? String(detail.bad_quantity)
-            : '0';
+      (flow?.badQuantityDetails ?? []).forEach((detail: any) => {
+        if (detail?.source_area_id === currentFlow?.area_id) {
+          const areaName = normalizeAreaKey(detail?.targetArea?.name ?? '');
+          initialValues[`${areaName}_bad`] =
+            detail?.bad_quantity != null ? String(detail.bad_quantity) : '0';
+          initialValues[`${areaName}_material`] =
+            detail?.material_quantity != null
+              ? String(detail.material_quantity)
+              : '0';
         }
       });
     });
-    console.log('initvalues', initialValues);
+
     setAreaBadQuantities(initialValues);
     setShowBadQuantity(true);
   };
@@ -866,7 +890,7 @@ const ColorEdgeComponent = ({ workOrder }: { workOrder: any }) => {
           styles.buttonSecondary,
           disableLiberarButton && styles.disabledButton,
         ]}
-        onPress={() => !disableLiberarButton && setShowConfirm(true)}
+        onPress={() => !disableLiberarButton && handleLiberarClick()}
         disabled={disableLiberarButton}
       >
         <Text style={styles.buttonText}>Liberar Producto</Text>
@@ -895,8 +919,7 @@ const ColorEdgeComponent = ({ workOrder }: { workOrder: any }) => {
 
             const findValue = (label: string) =>
               currentAreaInputs.values.find(
-                (entry) =>
-                  normalizeLabel(entry.label) === normalizeLabel(label)
+                (entry) => normalizeLabel(entry.label) === normalizeLabel(label)
               )?.value ?? 0;
 
             setLastBadQuantity(String(findValue('Malas')));
@@ -1001,7 +1024,7 @@ const ColorEdgeComponent = ({ workOrder }: { workOrder: any }) => {
               </TouchableOpacity>
               <TouchableOpacity
                 style={styles.confirmButton}
-                onPress={handleLiberarClick}
+                onPress={handleColorEdgeSubmit}
               >
                 <Text style={styles.modalButtonText}>Confirmar</Text>
               </TouchableOpacity>

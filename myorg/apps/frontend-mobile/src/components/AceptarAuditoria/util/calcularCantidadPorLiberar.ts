@@ -2,7 +2,7 @@
 interface PartialRelease {
   validated: boolean;
   noprocess_quantity: number;
-  quantity: number;  
+  quantity: number;
 }
 
 interface AreaResponse {
@@ -114,15 +114,14 @@ export function calcularCantidadPorLiberar(
     0;
 
   // 1) Si hay un parcial validado, usar su no procesado
-  const lastPartial = currentFlow.partialReleases?.length
-    ? currentFlow.partialReleases[currentFlow.partialReleases.length - 1]
-    : undefined;
-  console.log('lastParcial', lastPartial)
+  const lastPartial = currentFlow.partialReleases
+    ?.slice() // copiamos para no mutar
+    .reverse()
+    .find((pr) => pr.validated);
 
-  if (
-    lastPartial &&
-     typeof lastPartial.noprocess_quantity === 'number'
-  ) {
+  console.log('lastValidatedPartial', lastPartial);
+
+  if (lastPartial && typeof lastPartial.noprocess_quantity === 'number') {
     return Math.max(lastPartial.noprocess_quantity ?? 0, 0);
   }
 
@@ -142,7 +141,10 @@ export function calcularCantidadPorLiberar(
   } else if (totalValidados > 0) {
     const resta = totalValidados - totalLiberado;
     cantidadPorLiberar = Math.max(resta, 0);
-  } else if (!safeLast.partialReleases || safeLast.partialReleases.length === 0) {
+  } else if (
+    !safeLast.partialReleases ||
+    safeLast.partialReleases.length === 0
+  ) {
     cantidadPorLiberar = getAreaResponseQuantity();
   } else {
     cantidadPorLiberar = 0;

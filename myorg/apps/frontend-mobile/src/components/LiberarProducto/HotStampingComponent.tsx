@@ -452,27 +452,34 @@ const HotStampingComponent = ({ workOrder }: { workOrder: any }) => {
 
   console.log('totalParcialesActuales', totalParcialesActuales);
 
-  const handleLiberarClick = () => {
+  const handleLiberarClick = async () => {
     const numValue = Number(goodQuantity);
-    if (
-      Number.isNaN(numValue) ||
-      !Number.isInteger(numValue) ||
-      numValue <= 0
-    ) {
-      alert('Por favor, ingresa una cantidad válida para Buenas.');
+    const partialsActual = currentFlow?.partialReleases ?? [];
+    if (isNaN(numValue) || !Number.isInteger(numValue) || numValue <= 0) {
+      Alert.alert('Por favor, ingresa una cantidad válida para Buenas.');
       return;
     } else if (
       cqm_quantity +
-        Number(goodQuantity) +
-        Number(lastAreaBadQuantity) +
-        Number(materialBadQuantity) +
-        Number(excessQuantity) +
-        Number(noProcessQuantity) +
-        totalParcialesActuales >
+        (Number(goodQuantity) +
+          Number(lastAreaBadQuantity) +
+          Number(materialBadQuantity) +
+          Number(excessQuantity) +
+        totalParcialesActuales) >
       prevAreaSum
     ) {
-      alert(
+      Alert.alert(
         'La cantidad total a liberar el mayor a la entregada por parte del área previa.'
+      );
+      return;
+    } else if (
+      partialsActual.length > 0 &&
+      Number(goodQuantity) +
+        Number(lastAreaBadQuantity) +
+        Number(excessQuantity) >
+        cantidadporliberar
+    ) {
+      Alert.alert(
+        `La cantidad total a liberar es diferente a la entregada no procesada por la parcialidad anterior ${cantidadporliberar}.`
       );
       return;
     }
@@ -484,7 +491,6 @@ const HotStampingComponent = ({ workOrder }: { workOrder: any }) => {
         .reduce((sum: number, r: PartialRelease) => sum + (r.quantity ?? 0), 0);
       console.log('Total validado:', totalValidatedQuantity);
     }
-
     setShowConfirm(true);
   };
 
@@ -523,18 +529,19 @@ const HotStampingComponent = ({ workOrder }: { workOrder: any }) => {
     const initialValues: Record<string, string> = {};
 
     previousFlows.forEach((flow) => {
-      flow.badQuantityDetails.map((detail: any) => {
-        console.log('detail', currentFlow);
-
-        if (detail.source_area_id === currentFlow.area_id) {
-          const areaName = detail.targetArea.name;
-          initialValues[`${areaName}_bad`] = detail.bad_quantity
-            ? String(detail.bad_quantity)
-            : '0';
+      (flow?.badQuantityDetails ?? []).forEach((detail: any) => {
+        if (detail?.source_area_id === currentFlow?.area_id) {
+          const areaName = normalizeAreaKey(detail?.targetArea?.name ?? '');
+          initialValues[`${areaName}_bad`] =
+            detail?.bad_quantity != null ? String(detail.bad_quantity) : '0';
+          initialValues[`${areaName}_material`] =
+            detail?.material_quantity != null
+              ? String(detail.material_quantity)
+              : '0';
         }
       });
     });
-    console.log('initvalues', initialValues);
+
     setAreaBadQuantities(initialValues);
     setShowBadQuantity(true);
   };
@@ -948,8 +955,7 @@ const HotStampingComponent = ({ workOrder }: { workOrder: any }) => {
 
             const findValue = (label: string) =>
               currentAreaInputs.values.find(
-                (entry) =>
-                  normalizeLabel(entry.label) === normalizeLabel(label)
+                (entry) => normalizeLabel(entry.label) === normalizeLabel(label)
               )?.value ?? 0;
 
             setLastBadQuantity(String(findValue('Malas')));

@@ -149,6 +149,7 @@ const BadQuantityModal: React.FC<Props> = ({
                       <input
                         type="number"
                         min="0"
+                        style={{ color: '#374151'}}
                         className="w-full border border-gray-300 rounded px-3 py-2 text-sm outline-blue-500"
                         value={areaBadQuantities[`${areaKey}_bad`] || '0'}
                         onChange={(e) =>
@@ -169,6 +170,7 @@ const BadQuantityModal: React.FC<Props> = ({
                         <input
                           type="number"
                           min="0"
+                          style={{ color: '#374151'}}
                           className="w-full border border-gray-300 rounded px-3 py-2 text-sm outline-blue-500"
                           value={
                             areaBadQuantities[`${areaKey}_material`] || '0'

@@ -467,31 +467,11 @@ export default function ColorEdgeComponent({ workOrder }: Props) {
     [currentFlow]
   );
 
-  // total actual “digitado” si lo necesita separado
-  const totalActualDigitado = useMemo(
-    () =>
-      getCurrentInputTotal({
-        cqm_quantity,
-        goodQuantity,
-        lastAreaBadQuantity,
-        materialBadQuantity,
-        excessQuantity,
-        noProcessQuantity,
-      }),
-    [
-      cqm_quantity,
-      goodQuantity,
-      lastAreaBadQuantity,
-      materialBadQuantity,
-      excessQuantity,
-      noProcessQuantity,
-    ]
-  );
-
   console.log('totalParcialesActuales', totalParcialesActuales);
 
   const handleLiberarClick = () => {
     const numValue = Number(goodQuantity);
+    const partialsActual = currentFlow?.partialReleases ?? [];
     if (
       Number.isNaN(numValue) ||
       !Number.isInteger(numValue) ||
@@ -505,12 +485,22 @@ export default function ColorEdgeComponent({ workOrder }: Props) {
           Number(lastAreaBadQuantity) +
           Number(materialBadQuantity) +
           Number(excessQuantity) +
-          Number(noProcessQuantity)) +
-        totalParcialesActuales >
+        totalParcialesActuales) >
       prevAreaSum
     ) {
       alert(
         'La cantidad total a liberar es mayor a la entregada por parte del área previa.'
+      );
+      return;
+    } else if (
+      partialsActual.length > 0 &&
+      Number(goodQuantity) +
+        Number(lastAreaBadQuantity) +
+        Number(excessQuantity) >
+        cantidadporliberar
+    ) {
+      alert(
+        `La cantidad total a liberar es mayor a la entregada no procesada por la parcialidad anterior ${cantidadporliberar}.`
       );
       return;
     }
@@ -544,6 +534,7 @@ export default function ColorEdgeComponent({ workOrder }: Props) {
 
     try {
       await releaseProductFromColorEdge(payload);
+      setShowConfirm(false);
       router.push('/liberarProducto');
     } catch (error) {
       console.error('Error al enviar datos:', error);
@@ -560,18 +551,19 @@ export default function ColorEdgeComponent({ workOrder }: Props) {
     const initialValues: Record<string, string> = {};
 
     previousFlows.forEach((flow) => {
-      flow.badQuantityDetails.map((detail: any) => {
-        console.log('detail', currentFlow);
-
-        if (detail.source_area_id === currentFlow.area_id) {
-          const areaName = detail.targetArea.name;
-          initialValues[`${areaName}_bad`] = detail.bad_quantity
-            ? String(detail.bad_quantity)
-            : '0';
+      (flow?.badQuantityDetails ?? []).forEach((detail: any) => {
+        if (detail?.source_area_id === currentFlow?.area_id) {
+          const areaName = normalizeAreaKey(detail?.targetArea?.name ?? '');
+          initialValues[`${areaName}_bad`] =
+            detail?.bad_quantity != null ? String(detail.bad_quantity) : '0';
+          initialValues[`${areaName}_material`] =
+            detail?.material_quantity != null
+              ? String(detail.material_quantity)
+              : '0';
         }
       });
     });
-    console.log('initvalues', initialValues);
+
     setAreaBadQuantities(initialValues);
     setShowBadQuantity(true);
   };
@@ -1014,7 +1006,7 @@ const Title = styled.h2`
   font-size: 1.75rem;
   font-weight: 700;
   margin-bottom: 1.5rem;
-  color: #1f2937;
+  color: ${({ theme }) => theme.palette.text.primary};
 `;
 
 const NewData = styled.div``;
@@ -1023,12 +1015,12 @@ const SectionTitle = styled.h3`
   font-size: 1.25rem;
   font-weight: 600;
   margin: 2rem 0 1rem;
-  color: #374151;
+  color: ${({ theme }) => theme.palette.text.primary};
 `;
 
 const Label = styled.label`
   font-weight: 600;
-  color: #6b7280;
+  color: ${({ theme }) => theme.palette.text.primary};
 `;
 
 const NewDataWrapper = styled.div`

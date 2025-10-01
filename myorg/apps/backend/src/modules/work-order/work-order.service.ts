@@ -9,6 +9,8 @@ import { Prisma } from '@prisma/client';
 import {
   CreateWorkOrderDto,
   BadQuantitySummaryDto,
+  UpdateAreaResponseDataDto,
+  UpdateAreaResponseEntryDto,
 } from './dto/create-work-order.dto';
 
 type BlockKey =
@@ -116,6 +118,49 @@ const BLOCK_CONFIG: Record<
     delegate: 'personalizacionResponse',
     updatableFields: ['bad_quantity', 'material_quantity'],
   },
+};
+
+const BLOCK_DATA_FIELDS: Record<BlockKey, ReadonlyArray<string>> = {
+  prepress: ['plates', 'positives', 'bad_quantity', 'excess_quantity'],
+  impression: ['release_quantity', 'bad_quantity', 'excess_quantity'],
+  serigrafia: ['release_quantity', 'bad_quantity', 'excess_quantity'],
+  empalme: ['release_quantity', 'bad_quantity', 'excess_quantity'],
+  laminacion: ['release_quantity', 'bad_quantity', 'excess_quantity'],
+  corte: [
+    'good_quantity',
+    'bad_quantity',
+    'excess_quantity',
+    'noprocess_quantity',
+    'material_quantity',
+  ],
+  colorEdge: [
+    'good_quantity',
+    'bad_quantity',
+    'excess_quantity',
+    'noprocess_quantity',
+    'material_quantity',
+  ],
+  hotStamping: [
+    'good_quantity',
+    'bad_quantity',
+    'excess_quantity',
+    'noprocess_quantity',
+    'material_quantity',
+  ],
+  millingChip: [
+    'good_quantity',
+    'bad_quantity',
+    'excess_quantity',
+    'noprocess_quantity',
+    'material_quantity',
+  ],
+  personalizacion: [
+    'good_quantity',
+    'bad_quantity',
+    'excess_quantity',
+    'noprocess_quantity',
+    'material_quantity',
+  ],
 };
 
 const PARTIAL_RELEASE_FIELDS: ReadonlyArray<UpdatableField> = [
@@ -659,6 +704,261 @@ export class WorkOrderService {
       });
       return { message: 'Respuesta guardada con exito' };
     });
+  }
+
+  async updateAreaResponseData(
+    workOrderOtId: string,
+    _userId: number,
+    dto: UpdateAreaResponseDataDto,
+  ) {
+    const incomingAreas = Array.isArray(dto?.areas) ? dto.areas : [];
+
+    if (incomingAreas.length === 0) {
+      return {
+        success: true,
+        message: 'No se enviaron áreas para actualizar.',
+        updatedAreas: [],
+      };
+    }
+
+    const workOrder = await this.prisma.workOrder.findUnique({
+      where: { ot_id: workOrderOtId },
+      select: { id: true },
+    });
+
+    if (!workOrder) {
+      throw new NotFoundException(
+        `No se encontró la orden de trabajo con ot_id: ${workOrderOtId}`,
+      );
+    }
+
+    const validEntries = incomingAreas.filter((entry) => {
+      if (!entry) return false;
+      const blockKey = entry.block as BlockKey;
+      if (!BLOCK_DATA_FIELDS[blockKey]) return false;
+      const areaId = Number(entry.areaId);
+      const blockId = Number(entry.blockId);
+      return Number.isFinite(areaId) && Number.isFinite(blockId) && blockId > 0;
+    }) as UpdateAreaResponseEntryDto[];
+
+    if (validEntries.length === 0) {
+      return {
+        success: true,
+        message: 'No se encontraron áreas válidas para actualizar.',
+        updatedAreas: [],
+      };
+    }
+
+    const updatedAreas: Array<{
+      areaId: number;
+      block: BlockKey;
+      blockId: number;
+      data: Record<string, number>;
+      sample_data?: Record<string, number>;
+      formId: number | null;
+      cqmId: number | null;
+    }> = [];
+
+    await this.prisma.$transaction(async (tx) => {
+      for (const area of validEntries) {
+        const blockKey = area.block as BlockKey;
+        const fields = BLOCK_DATA_FIELDS[blockKey];
+        if (!fields) {
+          continue;
+        }
+
+        const blockConfig = BLOCK_CONFIG[blockKey];
+        if (!blockConfig) {
+          continue;
+        }
+
+        const areaId = Number(area.areaId);
+        const blockId = Number(area.blockId);
+
+        const delegate = (tx as Record<string, any>)[blockConfig.delegate];
+        if (!delegate?.findUnique || !delegate?.update) {
+          continue;
+        }
+
+        const blockRecord = (await delegate.findUnique({
+          where: { id: blockId },
+          include: {
+            areas_response: {
+              select: {
+                id: true,
+                area_id: true,
+                work_order_id: true,
+                work_order_flow_id: true,
+              },
+            },
+          },
+        })) as any;
+
+        if (!blockRecord) {
+          throw new BadRequestException(
+            `No se encontró el bloque ${blockKey} con id ${blockId}.`,
+          );
+        }
+
+        const areaResponse = blockRecord.areas_response;
+        if (!areaResponse || areaResponse.work_order_id !== workOrder.id) {
+          throw new BadRequestException(
+            'El bloque no pertenece a la orden de trabajo indicada.',
+          );
+        }
+
+        if (areaResponse.area_id !== areaId) {
+          throw new BadRequestException(
+            'El bloque no coincide con el área proporcionada.',
+          );
+        }
+
+        const sanitizedData: Record<string, number> = {};
+        for (const field of fields) {
+          if (
+            area.data &&
+            Object.prototype.hasOwnProperty.call(area.data, field)
+          ) {
+            const numeric = Number((area.data as Record<string, any>)[field]);
+            if (Number.isFinite(numeric)) {
+              sanitizedData[field] = Math.round(numeric);
+            }
+          }
+        }
+
+        if (Object.keys(sanitizedData).length > 0) {
+          await delegate.update({
+            where: { id: blockId },
+            data: sanitizedData,
+          });
+        }
+
+        const sampleDataResult: Record<string, number> = {};
+        const payloadSample = area.sample_data ?? {};
+
+        if (
+          payloadSample.sample_quantity !== undefined &&
+          payloadSample.sample_quantity !== null &&
+          area.cqmId
+        ) {
+          const blockFormAnswerId =
+            typeof blockRecord.form_answer_id === 'number'
+              ? blockRecord.form_answer_id
+              : null;
+
+          if (blockFormAnswerId && blockFormAnswerId !== area.cqmId) {
+            throw new BadRequestException(
+              'El formulario de CQM no coincide con el bloque indicado.',
+            );
+          }
+
+          const formAnswerRecord = await tx.formAnswer.findUnique({
+            where: { id: area.cqmId },
+            select: { id: true, work_order_flow_id: true },
+          });
+
+          if (!formAnswerRecord) {
+            throw new BadRequestException('Formulario de CQM no encontrado.');
+          }
+
+          if (
+            formAnswerRecord.work_order_flow_id !==
+            areaResponse.work_order_flow_id
+          ) {
+            throw new BadRequestException(
+              'El formulario de CQM no pertenece al flujo indicado.',
+            );
+          }
+
+          const normalized = Number(payloadSample.sample_quantity);
+          if (Number.isFinite(normalized)) {
+            const rounded = Math.round(normalized);
+            await tx.formAnswer.update({
+              where: { id: formAnswerRecord.id },
+              data: { sample_quantity: rounded },
+            });
+            sampleDataResult.sample_quantity = rounded;
+          }
+        }
+
+        if (
+          payloadSample.sample_auditory !== undefined &&
+          payloadSample.sample_auditory !== null &&
+          area.formId
+        ) {
+          const blockFormAuditoryId =
+            typeof blockRecord.form_auditory_id === 'number'
+              ? blockRecord.form_auditory_id
+              : null;
+
+          if (blockFormAuditoryId && blockFormAuditoryId !== area.formId) {
+            throw new BadRequestException(
+              'El registro de auditoría no coincide con el bloque indicado.',
+            );
+          }
+
+          const formAuditoryRecord = await tx.formAuditory.findUnique({
+            where: { id: area.formId },
+            select: { id: true, work_order_flow_id: true },
+          });
+
+          if (!formAuditoryRecord) {
+            throw new BadRequestException(
+              'Registro de auditoría no encontrado.',
+            );
+          }
+
+          if (
+            formAuditoryRecord.work_order_flow_id !==
+            areaResponse.work_order_flow_id
+          ) {
+            throw new BadRequestException(
+              'El registro de auditoría no pertenece al flujo indicado.',
+            );
+          }
+
+          const normalized = Number(payloadSample.sample_auditory);
+          if (Number.isFinite(normalized)) {
+            const rounded = Math.round(normalized);
+            await tx.formAuditory.update({
+              where: { id: formAuditoryRecord.id },
+              data: { sample_auditory: rounded },
+            });
+            sampleDataResult.sample_auditory = rounded;
+          }
+        }
+
+        if (
+          Object.keys(sanitizedData).length > 0 ||
+          Object.keys(sampleDataResult).length > 0
+        ) {
+          updatedAreas.push({
+            areaId,
+            block: blockKey,
+            blockId,
+            data: sanitizedData,
+            sample_data:
+              Object.keys(sampleDataResult).length > 0
+                ? sampleDataResult
+                : undefined,
+            formId:
+              typeof blockRecord.form_auditory_id === 'number'
+                ? blockRecord.form_auditory_id
+                : area.formId ?? null,
+            cqmId:
+              typeof blockRecord.form_answer_id === 'number'
+                ? blockRecord.form_answer_id
+                : area.cqmId ?? null,
+          });
+        }
+      }
+    });
+
+    return {
+      success: true,
+      message: 'Datos de áreas actualizados correctamente.',
+      updatedAreas,
+    };
   }
 
   async updateWorkOrderAreas(

@@ -18,12 +18,15 @@ import {
   fetchAllUsers,
   updateFlowAssignedUser,
   updateWorkOrderAreas,
+  updateAreaResponseData,
 } from '../../../../api/seguimientoDeOts';
 import { TextInput } from 'react-native-paper';
 import InfoCard from '../../../../components/SeguimientoDeOts/InfoCard';
 import InconformitiesHistory from '../../../../components/SeguimientoDeOts/InconformitiesHistory';
 import ProgressBarAreas from '../../../../components/SeguimientoDeOts/ProgressBarAreas';
-import BadQuantityModal from '../../../../components/SeguimientoDeOts/BadQuantityModal';
+import BadQuantityModal, {
+  BadQuantityModalResult,
+} from '../../../../components/SeguimientoDeOts/BadQuantityModal';
 import { VistosBuenosHistory } from '../../../../components/SeguimientoDeOts/VistosBuenosHistory';
 import PartialHistory from '../../../../components/SeguimientoDeOts/PartialHistory';
 import * as FileSystem from 'expo-file-system';
@@ -146,6 +149,9 @@ const AREA_KEY_BY_ID: Record<number, string> = {
 };
 const getAreaKey = (area: AreaData) => AREA_KEY_BY_ID[area.id] ?? null;
 
+const blockSupportsMaterial = (block?: string | null) =>
+  !!block && ['corte', 'colorEdge', 'millingChip', 'personalizacion'].includes(block);
+
 const toNum = (v: any) =>
   v == null ? 0 : typeof v === 'number' ? v : Number(v) || 0;
 
@@ -241,6 +247,35 @@ const getRemainderByField = (
 
   return Math.max(total - parcialesSum, 0);
 };
+const getRemainderBySum = (
+  area: AreaData,
+  field: 'buenas' | 'malas' | 'excedente' | 'noprocess' | 'defectuoso'
+) => {
+  const block = getAreaBlock(area) as any;
+  if (!block) return 0;
+  let total = 0;
+  switch (field) {
+    case 'buenas':
+      total = toNum(
+        block.release_quantity ?? block.good_quantity ?? block.plates
+      );
+      break;
+    case 'malas':
+      total = toNum(block.bad_quantity);
+      break;
+    case 'excedente':
+      total = toNum(block.excess_quantity);
+      break;
+    case 'noprocess':
+      total = toNum(block.noprocess_quantity);
+      break;
+    case 'defectuoso':
+      total = toNum(block.material_quantity);
+      break;
+  }
+  return Math.max(total, 0);
+
+}
 
 const getRemainder = (area: AreaData) => getRemainderByField(area, 'buenas');
 
@@ -473,6 +508,7 @@ const WorkOrderDetailScreen: React.FC = () => {
   const [areaBadQuantities, setAreaBadQuantities] = useState<{
     [key: string]: string;
   }>({});
+  const [badModalOwner, setBadModalOwner] = useState<AreaData | null>(null);
   const [vistosBuenosHistory, setVistosBuenosHistory] = useState<any[]>([]);
 
   const toggleQualitySection = () => setQualitySectionOpen(!qualitySectionOpen);
@@ -794,7 +830,7 @@ const WorkOrderDetailScreen: React.FC = () => {
     const byTarget = new Map<number, number>();        // opcional: acumulados por target
     const byTargetMat = new Map<number, number>();     // opcional: material por target
     const bySourceTarget = new Map<number, Map<number, { bad: number; mat: number }>>();
-  
+
     const flows = workOrder?.flow ?? [];
     flows.forEach((f: any) => {
       (f?.badQuantityDetails ?? []).forEach((d: any) => {
@@ -802,7 +838,7 @@ const WorkOrderDetailScreen: React.FC = () => {
         const t = Number(d?.target_area_id) || 0;
         const bad = toNum(d?.bad_quantity);
         const mat = toNum(d?.material_quantity);
-  
+
         if (t) {
           byTarget.set(t, (byTarget.get(t) || 0) + bad);
           byTargetMat.set(t, (byTargetMat.get(t) || 0) + mat);
@@ -815,10 +851,10 @@ const WorkOrderDetailScreen: React.FC = () => {
         }
       });
     });
-  
+
     return { byTarget, byTargetMat, bySourceTarget };
   }, [workOrder]);
-  
+
   const sumBadBySource = (sourceId: number, { includeSelf = false } = {}) => {
     const m = badAgg.bySourceTarget.get(sourceId);
     if (!m) return 0;
@@ -832,13 +868,13 @@ const WorkOrderDetailScreen: React.FC = () => {
 
   const handleOpenBadQuantityModal = (ownerArea: AreaData) => {
     const initialValues: Record<string, string> = {};
-  
+
     const areasForModal = areas.filter(
       (a) => a.status === 'Completado' && a.name.toLowerCase() !== 'preprensa'
     );
-  
+
     const perTarget = badAgg.bySourceTarget.get(ownerArea.id) ?? new Map();
-  
+
     areasForModal.forEach((area) => {
       if (area.id === ownerArea.id) return; // 🔒 excluye self-target
       const key = area.name.toLowerCase().replace(/\s/g, '');
@@ -846,8 +882,9 @@ const WorkOrderDetailScreen: React.FC = () => {
       initialValues[`${key}_bad`] = String(agg.bad);
       if (area.id >= 6) initialValues[`${key}_material`] = String(agg.mat);
     });
-  
+
     setAreaBadQuantities(initialValues);
+    setBadModalOwner(ownerArea);
     setShowBadQuantity(true);
   };
 
@@ -891,10 +928,10 @@ const WorkOrderDetailScreen: React.FC = () => {
       prev.map((a) =>
         a.id === area.id
           ? {
-              ...a,
-              assigned_user_id: newUserId,
-              usuario: operatorById.get(newUserId) ?? a.usuario,
-            }
+            ...a,
+            assigned_user_id: newUserId,
+            usuario: operatorById.get(newUserId) ?? a.usuario,
+          }
           : a
       )
     );
@@ -1002,38 +1039,58 @@ const WorkOrderDetailScreen: React.FC = () => {
     // fallback seguro (nunca devolvemos string/number sueltos)
     return <View />;
   };
-
-  const getAreaColCount = (area: AreaData) =>
-    area.parciales > 0 ? area.parciales + (getRemainder(area) > 0 ? 1 : 0) : 1;
-
-  const renderSpannedCells = (
-    area: AreaData,
-    keyBase: string,
-    renderContent: () => React.ReactNode // 👈 acepta ReactNode
-  ): React.ReactElement[] => {
-    const cols = getAreaColCount(area);
-    const contentEl = ensureElement(renderContent()); // 👈 obligamos a Element
-    const emptyEl = <View />;
-
-    const cells: React.ReactElement[] = [];
-    for (let i = 0; i < cols; i++) {
-      cells.push(
-        <View key={`${keyBase}-${area.id}-${i}`} style={styles.cellUser}>
-          {i === cols - 1 ? contentEl : emptyEl}
-        </View>
-      );
-    }
-    return cells;
+  const areaColSpan = (area: AreaData) => {
+    const base = Math.max(1, area.parciales || 0);
+    const hasRem = area.parciales > 0 && getRemainder(area) > 0;
+    return area.parciales > 0 ? base + (hasRem ? 2 : 0) : 1;
   };
 
-  const totalCols = areas.reduce(
-    (sum, area) =>
-      sum +
-      (area.parciales > 0
-        ? area.parciales + (getRemainder(area) > 0 ? 1 : 0)
-        : 1),
+  const totalColsDynamic = areas.reduce(
+    (sum, area) => sum + areaColSpan(area),
     0
   );
+
+  // ✅ cuenta P1..Pn + (Rem + Σ si hay rem), o 1 si no hay parciales
+  const getAreaSpanCount = (area: any) =>
+    (area.parciales || 0) > 0
+      ? (area.parciales || 0) + (getRemainder(area) > 0 ? 2 : 0)
+      : 1;
+
+  /**
+   * Simula colSpan repitiendo celdas.
+   * - i === 0: renderiza el contenido real (tu badge, botón, etc.)
+   * - resto: placeholders vacíos para alinear columnas, ocupando Rem y Σ si aplican
+   * Si quisieras repetir el contenido en todas (incluida Σ), pasa { repeat: true }.
+   */
+  const renderSpannedCells = (
+    area: any,
+    key: string,
+    renderer: () => React.ReactNode,
+    opts?: { repeat?: boolean }
+  ) => {
+    const span = getAreaSpanCount(area);
+    return Array.from({ length: span }).map((_, i) => (
+      <View
+        key={`${key}-${area.id}-${i}`}
+        style={[
+          styles.cellUser,
+          { justifyContent: 'center', alignItems: 'center' }, // 👈 centrado
+        ]}
+      >
+        {opts?.repeat || i === 0 ? (
+          // contenido real en la primera celda (o en todas si repeat)
+          React.isValidElement(renderer()) ? (
+            renderer()
+          ) : (
+            <Text>{String(renderer())}</Text>
+          )
+        ) : (
+          // placeholder invisible para mantener el grid (ocupa Rem y Σ)
+          <Text style={{ opacity: 0 }}>.</Text>
+        )}
+      </View>
+    ));
+  };
 
   const handleValueChange = (
     areaId: number,
@@ -1047,80 +1104,319 @@ const WorkOrderDetailScreen: React.FC = () => {
     );
   };
 
-  const handleSaveChanges = async (updatedAreas: AreaData[]) => {
-    const effectiveAreas = updatedAreas ?? areas;
-    const payload = {
-      areas: effectiveAreas
-        .filter((area) => area.status === 'Completado')
-        .map((updated) => {
-          const blockMap: Record<string, string> = {
-            preprensa: 'prepress',
-            impresion: 'impression',
-            serigrafia: 'serigrafia',
-            empalme: 'empalme',
-            laminacion: 'laminacion',
-            corte: 'corte',
-            coloredge: 'colorEdge',
-            millingchip: 'millingChip',
-            hotstamping: 'hotStamping',
-            personalizacion: 'personalizacion',
+  const handleSaveChanges = async (modalResult?: BadQuantityModalResult) => {
+    if (!workOrder) {
+      Alert.alert('Error', 'No se encontró información de la orden de trabajo.');
+      return;
+    }
+
+    const toInt = (v: any) => {
+      const n = parseInt(String(v ?? '0').trim(), 10);
+      return Number.isFinite(n) ? n : 0;
+    };
+
+    const modalInputs = modalResult?.inputsByArea ?? [];
+    const updatedAreasFromModal = modalResult?.updatedAreas ?? null;
+
+    const effectiveAreas = updatedAreasFromModal
+      ? areas.map((area) => {
+        const replacement = updatedAreasFromModal.find(
+          (item) => item.id === area.id
+        );
+        if (!replacement) return area;
+        return {
+          ...area,
+          malas: Number(replacement.malas ?? area.malas ?? 0),
+          defectuoso: Number(replacement.defectuoso ?? area.defectuoso ?? 0),
+        };
+      })
+      : areas;
+
+    if (updatedAreasFromModal) {
+      setAreas(effectiveAreas);
+    }
+
+    const blockMap: Record<string, string> = {
+      preprensa: 'prepress',
+      impresion: 'impression',
+      serigrafia: 'serigrafia',
+      empalme: 'empalme',
+      laminacion: 'laminacion',
+      corte: 'corte',
+      coloredge: 'colorEdge',
+      millingchip: 'millingChip',
+      hotstamping: 'hotStamping',
+      personalizacion: 'personalizacion',
+    };
+
+    const areasFromTable = effectiveAreas
+      .filter((area) => area.status === 'Completado')
+      .map((area) => {
+        const normalizedName = area.name.toLowerCase().replace(/\s/g, '');
+        const block = blockMap[normalizedName] ?? null;
+        if (!block) return null;
+
+        const blockData = (area.response as any)?.[block];
+        const blockId = blockData?.id ?? null;
+        if (!blockId) return null;
+
+        const formId = blockData?.form_auditory_id ?? null;
+        const cqmId = blockData?.form_answer_id ?? null;
+
+        let data: Record<string, number> = {
+          good_quantity: Number(area.buenas ?? 0),
+          bad_quantity: Number(area.malas ?? 0),
+          excess_quantity: Number(area.excedente ?? 0),
+          noprocess_quantity: Number(area.noprocess ?? 0),
+          material_quantity: Number(area.defectuoso ?? 0),
+        };
+        let sample_data: Record<string, number> = {
+          sample_quantity: Number(area.cqm ?? 0),
+          sample_auditory: Number(area.muestras ?? 0),
+        };
+
+        if (block === 'prepress') {
+          data = { plates: Number(area.buenas ?? 0) };
+        }
+        if (['impression', 'serigrafia', 'laminacion', 'empalme'].includes(block)) {
+          data = {
+            release_quantity: Number(area.buenas ?? 0),
+            bad_quantity: Number(area.malas ?? 0),
+            excess_quantity: Number(area.excedente ?? 0),
           };
-          const normalizedName = updated.name.toLowerCase().replace(/\s/g, '');
-          const block = blockMap[normalizedName] || 'otros';
+          sample_data = { sample_quantity: Number(area.cqm ?? 0) };
+        }
 
-          const blockId = (updated.response as any)?.[block]?.id;
-          const formId = (updated.response as any)?.[block]?.form_auditory_id;
-          const cqmId = (updated.response as any)?.[block]?.form_answer_id;
+        return {
+          areaId: area.id,
+          block,
+          blockId,
+          formId,
+          cqmId,
+          data,
+          sample_data,
+        };
+      })
+      .filter((item): item is {
+        areaId: number;
+        block: string;
+        blockId: number;
+        formId: number | null;
+        cqmId: number | null;
+        data: Record<string, number>;
+        sample_data: Record<string, number>;
+      } => item !== null);
 
-          let data: Record<string, number> = {
-            good_quantity: updated.buenas,
-            bad_quantity: updated.malas,
-            excess_quantity: updated.excedente,
-            noprocess_quantity: updated.noprocess,
-            material_quantity: updated.defectuoso,
-          };
-          let sample_data: Record<string, number> = {
-            sample_quantity: updated.cqm,
-            sample_auditory: updated.muestras,
-          };
+    let areasFromBadModal: Array<{
+      areaId: number;
+      block: string;
+      blockId: number | null;
+      formId: number | null;
+      cqmId: number | null;
+      data: Record<string, number>;
+      inputsByArea: Array<{ label: string; value: number }>;
+    }> = [];
 
-          if (block === 'prepress') {
-            data = { plates: updated.buenas };
-          }
-          if (
-            ['impression', 'serigrafia', 'laminacion', 'empalme'].includes(
-              block
-            )
-          ) {
-            data = {
-              release_quantity: updated.buenas,
-              bad_quantity: updated.malas,
-              excess_quantity: updated.excedente,
-            };
-            sample_data = { sample_quantity: updated.cqm };
-          }
+    if (modalInputs.length) {
+      const flows = workOrder?.flow ?? [];
+      const inputsMap = new Map(modalInputs.map((i) => [i.areaId, i.values]));
 
-          return {
-            areaId: updated.id,
+      areasFromBadModal = flows.flatMap((flow: any) => {
+        const areaIdNum = Number(flow?.area_id);
+        if (!Number.isFinite(areaIdNum)) return [];
+
+        const block = AREA_KEY_BY_ID[areaIdNum];
+        if (!block) return [];
+
+        const blockData = flow.areaResponse?.[block];
+        const blockId = blockData?.id ?? null;
+        if (!blockId) return [];
+
+        const formId = blockData?.form_auditory_id ?? null;
+        const cqmId = blockData?.form_answer_id ?? null;
+
+        const areaKey = (flow.area?.name ?? '').toLowerCase().replace(/\s/g, '');
+        const supportsMaterial = blockSupportsMaterial(block);
+        const badKey = `${areaKey}_bad`;
+        const materialKey = `${areaKey}_material`;
+
+        const data: Record<string, number> = {
+          bad_quantity: toInt(areaBadQuantities[badKey]),
+        };
+        if (supportsMaterial) {
+          data.material_quantity = toInt(areaBadQuantities[materialKey]);
+        }
+
+        return [
+          {
+            areaId: areaIdNum,
             block,
             blockId,
             formId,
             cqmId,
             data,
-            sample_data,
-          };
-        }),
-    };
+            inputsByArea: inputsMap.get(areaIdNum) ?? [],
+          },
+        ];
+      });
+    }
 
-    console.log('Payload a enviar:', payload);
+    const sourceAreaId = badModalOwner?.id ?? null;
+    const sourceWorkOrderFlowId =
+      workOrder?.flow?.find((f: any) => Number(f?.area_id) === sourceAreaId)?.id ??
+      null;
+
+    const combinedAreas = [...areasFromTable, ...areasFromBadModal];
+
+    const areasForDataUpdate = combinedAreas
+      .map((item) => {
+        if (!item?.block) return null;
+
+        const areaIdNum = Number(item.areaId);
+        const blockIdNum = Number(item.blockId);
+
+        if (
+          !Number.isFinite(areaIdNum) ||
+          !Number.isFinite(blockIdNum) ||
+          blockIdNum <= 0
+        ) {
+          return null;
+        }
+
+        const sanitizedData: Record<string, number> = {};
+        Object.entries(item.data ?? {}).forEach(([key, value]) => {
+          const numeric = Number(value);
+          if (Number.isFinite(numeric)) {
+            sanitizedData[key] = Math.round(numeric);
+          }
+        });
+
+        const sampleRaw = (item as any).sample_data ?? {};
+        const sampleSanitized: Record<string, number> = {};
+
+        if (sampleRaw.sample_quantity !== undefined) {
+          const numeric = Number(sampleRaw.sample_quantity);
+          if (Number.isFinite(numeric)) {
+            sampleSanitized.sample_quantity = Math.round(numeric);
+          }
+        }
+        if (sampleRaw.sample_auditory !== undefined) {
+          const numeric = Number(sampleRaw.sample_auditory);
+          if (Number.isFinite(numeric)) {
+            sampleSanitized.sample_auditory = Math.round(numeric);
+          }
+        }
+
+        if (
+          Object.keys(sanitizedData).length === 0 &&
+          Object.keys(sampleSanitized).length === 0
+        ) {
+          return null;
+        }
+
+        const entry: {
+          areaId: number;
+          block: string;
+          blockId: number;
+          formId?: number;
+          cqmId?: number;
+          data: Record<string, number>;
+          sample_data?: Record<string, number>;
+        } = {
+          areaId: areaIdNum,
+          block: String(item.block),
+          blockId: blockIdNum,
+          data: sanitizedData,
+        };
+
+        const formIdNum = Number((item as any).formId);
+        if (Number.isFinite(formIdNum) && formIdNum > 0) {
+          entry.formId = formIdNum;
+        }
+
+        const cqmIdNum = Number((item as any).cqmId);
+        if (Number.isFinite(cqmIdNum) && cqmIdNum > 0) {
+          entry.cqmId = cqmIdNum;
+        }
+
+        if (Object.keys(sampleSanitized).length > 0) {
+          entry.sample_data = sampleSanitized;
+        }
+
+        return entry;
+      })
+      .filter(Boolean) as Array<{
+        areaId: number;
+        block: string;
+        blockId: number;
+        formId?: number;
+        cqmId?: number;
+        data: Record<string, number>;
+        sample_data?: Record<string, number>;
+      }>;
+
+    const summary = modalInputs
+      .map((item) => {
+        const areaId = Number(item.areaId);
+        const areaName =
+          item.areaName ??
+          effectiveAreas.find((area) => Number(area.id) === areaId)?.name ??
+          '';
+        const values = (item.values ?? [])
+          .map((entry) => ({
+            label: entry?.label ?? '',
+            value: Number.isFinite(Number(entry?.value))
+              ? Number(entry?.value)
+              : 0,
+          }))
+          .filter((entry) => !!entry.label);
+
+        return {
+          areaId,
+          areaName,
+          values,
+        };
+      })
+      .filter(
+        (entry) =>
+          Number.isFinite(entry.areaId) &&
+          !!entry.areaName &&
+          entry.values.length > 0,
+      );
+
+    if (areasForDataUpdate.length === 0 && summary.length === 0) {
+      Alert.alert('Sin cambios', 'No hay cambios para guardar.');
+      return;
+    }
 
     try {
-      await updateWorkOrderAreas(workOrder.ot_id, payload);
+      if (areasForDataUpdate.length > 0) {
+        await updateAreaResponseData(workOrder.ot_id, {
+          areas: areasForDataUpdate,
+        });
+      }
+
+      if (summary.length > 0) {
+        const payload: any = {
+          badQuantitySummary: summary,
+        };
+        if (sourceAreaId) {
+          payload.sourceAreaId = sourceAreaId;
+        }
+        if (sourceWorkOrderFlowId) {
+          payload.sourceWorkOrderFlowId = sourceWorkOrderFlowId;
+        }
+
+        await updateWorkOrderAreas(workOrder.ot_id, payload);
+      }
+
       Alert.alert('Éxito', 'Cambios guardados correctamente');
       fetchAndSetData(String(id));
     } catch (err) {
       console.error(err);
       Alert.alert('Error', 'Error al guardar los cambios');
+    } finally {
+      setBadModalOwner(null);
     }
   };
 
@@ -1291,9 +1587,9 @@ const WorkOrderDetailScreen: React.FC = () => {
         </InfoCard>
         <InfoCard label="Evidencias de destrucción">
           {Array.isArray(workOrder?.files) &&
-          workOrder.files.some(
-            (f: any) => f.type === 'DESTRUCTION_EVIDENCE'
-          ) ? (
+            workOrder.files.some(
+              (f: any) => f.type === 'DESTRUCTION_EVIDENCE'
+            ) ? (
             <ScrollView
               horizontal
               showsHorizontalScrollIndicator={false}
@@ -1343,22 +1639,33 @@ const WorkOrderDetailScreen: React.FC = () => {
                         {area.name}{' '}
                         {area.isCollator && area.id === 4 ? '(C)' : ''}
                         {'\n'}
-                        <Text style={{ fontSize: 11, color: '#6b7280' }}>{`P${
-                          i + 1
-                        }`}</Text>
+                        <Text style={{ fontSize: 11, color: '#6b7280' }}>{`P${i + 1
+                          }`}</Text>
                       </Text>
                     ))}
                     {getRemainder(area) > 0 && (
-                      <Text
-                        key={`hdr-${area.id}-rem`}
-                        style={[styles.cellUser, { fontWeight: '600' }]}
-                      >
-                        {area.name}
-                        {'\n'}
-                        <Text style={{ fontSize: 11, color: '#6b7280' }}>
-                          Rem
+                      <>
+                        <Text
+                          key={`hdr-${area.id}-rem`}
+                          style={[styles.cellUser, { fontWeight: '600' }]}
+                        >
+                          {area.name}
+                          {'\n'}
+                          <Text style={{ fontSize: 11, color: '#6b7280' }}>
+                            Rem
+                          </Text>
                         </Text>
-                      </Text>
+                        <Text
+                          key={`hdr-${area.id}-sum`}
+                          style={[styles.cellUser, { fontWeight: '600' }]}
+                        >
+                          {area.name}
+                          {'\n'}
+                          <Text style={{ fontSize: 11, color: '#6b7280' }}>
+                            Σ
+                          </Text>
+                        </Text>
+                      </>
                     )}
                   </>
                 ) : (
@@ -1623,7 +1930,7 @@ const WorkOrderDetailScreen: React.FC = () => {
             >
               📥 Producción
             </Text>
-            {Array.from({ length: totalCols }).map((_, i) => (
+            {Array.from({ length: totalColsDynamic }).map((_, i) => (
               <Text key={`prod-sp-${i}`} style={[styles.cellUser]} />
             ))}
           </View>
@@ -1640,10 +1947,10 @@ const WorkOrderDetailScreen: React.FC = () => {
                       field === 'buenas'
                         ? toNum(p.quantity)
                         : field === 'malas'
-                        ? toNum(p.bad_quantity)
-                        : field === 'excedente'
-                        ? toNum(p.excess_quantity)
-                        : toNum(p.noprocess_quantity);
+                          ? toNum(p.bad_quantity)
+                          : field === 'excedente'
+                            ? toNum(p.excess_quantity)
+                            : toNum(p.noprocess_quantity);
                     return (
                       <Text
                         key={`area-${area.id}-parcial-${p.id}-${field}-${pIndex}`}
@@ -1703,7 +2010,7 @@ const WorkOrderDetailScreen: React.FC = () => {
             >
               🔍 Calidad
             </Text>
-            {Array.from({ length: totalCols }).map((_, i) => (
+            {Array.from({ length: totalColsDynamic }).map((_, i) => (
               <Text key={`prod-sp-${i}`} style={[styles.cellUser]} />
             ))}
           </View>
@@ -1715,15 +2022,16 @@ const WorkOrderDetailScreen: React.FC = () => {
               </Text>
               {areas.flatMap((area, aIdx) => {
                 if (area.parciales > 0) {
-                  // ✅ AHORA llenamos cada parcial y (si existe) REM con datos reales
+                  const hasRem = getRemainder(area) > 0;
                   const vals =
                     field === 'cqm'
-                      ? getPerPartialCqm(area) // ✅ sin fallback para Rem
+                      ? getPerPartialCqm(area) // incluye Rem como último índice si lo manejas así
                       : getPerPartialValues(
-                          area,
-                          field as 'defectuoso' | 'muestras'
-                        );
-                  return vals.map((v, i) => (
+                        area,
+                        field as 'defectuoso' | 'muestras'
+                      );
+
+                  const cells = vals.map((v, i) => (
                     <Text
                       key={`cell-area-${area.id}-parcial-${i}-${field}`}
                       style={styles.cellUser}
@@ -1731,13 +2039,32 @@ const WorkOrderDetailScreen: React.FC = () => {
                       {v}
                     </Text>
                   ));
+
+                  if (hasRem) {
+                    const toN = (x: any) =>
+                      typeof x === 'number' ? x : toNum(x);
+                    const sumVal = (vals as (number | string)[]).reduce<number>(
+                      (acc, x) => acc + toN(x),
+                      0
+                    );
+                    cells.push(
+                      <Text
+                        key={`cell-area-${area.id}-sum-${field}`}
+                        style={[styles.cellUser, { fontWeight: '700' }]}
+                      >
+                        {sumVal}
+                      </Text>
+                    );
+                  }
+                  return cells;
                 }
-                // Sin parciales → comportamiento anterior (una sola celda)
+
                 const totalValue =
                   field === 'cqm'
-                    ? getSingleCqm(area) // ✅ ahora toma el sample_quantity del último answer
+                    ? getSingleCqm(area)
                     : renderCell?.(area, field as any) ??
-                      getAnswerValue(undefined, field as any, area);
+                    getAnswerValue(undefined, field as any, area);
+
                 return (
                   <View
                     key={`cell-area-${area.id}-no-ans-${field}-${aIdx}`}
@@ -1881,7 +2208,7 @@ const WorkOrderDetailScreen: React.FC = () => {
         <>
           <TouchableOpacity
             style={styles.buttonSave}
-            onPress={() => handleSaveChanges(areas)}
+            onPress={() => handleSaveChanges()}
           >
             <Text style={styles.buttonText}>Guardar Cambios</Text>
           </TouchableOpacity>
@@ -1899,11 +2226,15 @@ const WorkOrderDetailScreen: React.FC = () => {
         areas={filteredAreas}
         areaBadQuantities={areaBadQuantities}
         setAreaBadQuantities={setAreaBadQuantities}
-        onConfirm={(updatedAreas) => {
+        onConfirm={(result: BadQuantityModalResult) => {
           setShowBadQuantity(false);
-          handleSaveChanges(updatedAreas);
+          handleSaveChanges(result);
+          setBadModalOwner(null);
         }}
-        onClose={() => setShowBadQuantity(false)}
+        onClose={() => {
+          setShowBadQuantity(false);
+          setBadModalOwner(null);
+        }}
       />
 
       {/* Modal reasignación operador */}

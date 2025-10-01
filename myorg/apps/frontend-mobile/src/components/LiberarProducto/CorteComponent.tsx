@@ -44,7 +44,6 @@ import {
   saveBadQuantitySummaryAsync,
 } from './util/areaMappings';
 
-
 interface PartialRelease {
   validated: boolean;
   quantity: number;
@@ -395,10 +394,37 @@ const CorteComponent = ({ workOrder }: { workOrder: any }) => {
       warned.current = true;
     }
   }, [currentFlow]);
-  
 
   if (!currentFlow) return null; // Falla segura en render
 
+  const handleLiberarClick = async () => {
+    const numValue = Number(goodQuantity);
+    const partialsActual = currentFlow?.partialReleases ?? [];
+    if (isNaN(numValue) || !Number.isInteger(numValue) || numValue <= 0) {
+      Alert.alert('Por favor, ingresa una cantidad válida para Buenas.');
+      return;
+    } else if (
+      partialsActual.length > 0 &&
+      Number(goodQuantity) +
+        Number(lastAreaBadQuantity) +
+        Number(excessQuantity) >
+        cantidadporliberar
+    ) {
+      Alert.alert(
+        `La cantidad total a liberar es diferente a la entregada no procesada por la parcialidad anterior ${cantidadporliberar}.`
+      );
+      return;
+    }
+
+    const partials = lastCompletedOrPartial?.partialReleases ?? [];
+    if (Array.isArray(partials) && partials.length > 0) {
+      const totalValidatedQuantity = partials
+        .filter((release: PartialRelease) => release.validated)
+        .reduce((sum: number, r: PartialRelease) => sum + (r.quantity ?? 0), 0);
+      console.log('Total validado:', totalValidatedQuantity);
+    }
+    setShowConfirm(true);
+  };
 
   const handleCorteSubmit = async () => {
     const numValue = Number(goodQuantity);
@@ -460,7 +486,7 @@ const CorteComponent = ({ workOrder }: { workOrder: any }) => {
     () =>
       previousFlows.map((item) => ({
         supportsMaterial: blockSupportsMaterial(
-          resolveBlockKey(item.area?.name ?? ''),
+          resolveBlockKey(item.area?.name ?? '')
         ),
         id: item.area?.id ?? item.id,
         name: item.area?.name ?? item.name ?? '',
@@ -509,7 +535,8 @@ const CorteComponent = ({ workOrder }: { workOrder: any }) => {
         // ✅ mappedBlock ahora es BlockKey | undefined
         const mappedBlock = blockMap[areaKey];
         // ✅ blockKey queda BlockKey | null
-        const blockKey: BlockKey | null = mappedBlock ?? resolveBlockKey(areaName);
+        const blockKey: BlockKey | null =
+          mappedBlock ?? resolveBlockKey(areaName);
         if (!blockKey) return [] as any;
 
         const blockData = flow.areaResponse?.[blockKey];
@@ -535,7 +562,7 @@ const CorteComponent = ({ workOrder }: { workOrder: any }) => {
 
         return {
           areaId: flow.area_id,
-          block: blockKey,      // ✅ typed
+          block: blockKey, // ✅ typed
           blockId,
           formId,
           cqmId,
@@ -803,7 +830,7 @@ const CorteComponent = ({ workOrder }: { workOrder: any }) => {
           styles.buttonSecondary,
           disableLiberarButton && styles.disabledButton,
         ]}
-        onPress={() => !disableLiberarButton && setShowConfirm(true)}
+        onPress={() => !disableLiberarButton && handleLiberarClick()}
         disabled={disableLiberarButton}
       >
         <Text style={styles.buttonText}>Liberar Producto</Text>
@@ -832,8 +859,7 @@ const CorteComponent = ({ workOrder }: { workOrder: any }) => {
 
             const findValue = (label: string) =>
               currentAreaInputs.values.find(
-                (entry) =>
-                  normalizeLabel(entry.label) === normalizeLabel(label)
+                (entry) => normalizeLabel(entry.label) === normalizeLabel(label)
               )?.value ?? 0;
 
             setLastBadQuantity(String(findValue('Malas')));

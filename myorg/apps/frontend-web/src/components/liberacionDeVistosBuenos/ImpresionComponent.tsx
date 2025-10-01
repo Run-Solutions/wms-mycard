@@ -399,7 +399,7 @@ const RadioLabel = styled.label`
   align-items: center;
   gap: 0.5rem;
   font-weight: 500;
-  color: #374151;
+  color: ${({ theme }) => theme.palette.text.primary};
 `;
 
 const Radio = styled.input`

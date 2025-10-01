@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import {
   View,
   Text,
@@ -15,6 +15,12 @@ import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { RootStackParamList } from '../../navigation/types';
 import { acceptMillingChipInconformityAuditory } from '../../api/rechazos';
 import { InconformityData } from './CorteComponent';
+import BadQuantityModal from '../AceptarAuditoria/util/BadQuantityModal';
+import { AreaData } from '../LiberarProducto/PersonalizacionComponent';
+import {
+  blockSupportsMaterial,
+  resolveBlockKey,
+} from '../LiberarProducto/util/areaMappings';
 
 interface Props {
   workOrder: any;
@@ -155,84 +161,94 @@ const MillingChipComponent: React.FC<Props> = ({ workOrder, currentFlow }) => {
     }
   };
 
-  const flowList = [...workOrder.flow];
-  const currentIndex = flowList.findIndex(
-    (item) => item.id === currentFlow?.id
+  // 1) No recrees flowList en cada render
+  const flowList = useMemo(() => workOrder?.flow ?? [], [workOrder?.flow]);
+
+  // 2) Memoiza previousFlows basado en refs estables
+  const currentIndex = useMemo(
+    () => flowList.findIndex((item: any) => item.id === currentFlow?.id),
+    [flowList, currentFlow?.id]
   );
-  const previousFlows = flowList
-    .slice(0, currentIndex + 1)
-    .filter((flow) => flow.area_id !== 1);
 
-  console.log('Áreas anteriores sin Preprensa:', previousFlows);
-  const handleOpenBadQuantityModal = () => {
-    const initialValues: { [areaName: string]: string } = {};
+  const previousFlows = useMemo(
+    () =>
+      flowList
+        .slice(0, currentIndex + 1)
+        .filter((flow: any) => flow.area_id !== 1),
+    [flowList, currentIndex]
+  );
 
-    previousFlows.forEach((flow) => {
-      const areaName = flow.area.name;
+  // 3) Arregla las deps y evita setState si no cambió
+  const computeInitialBadQuantities = useCallback(() => {
+    const initialValues: Record<string, string> = {};
+    const makeAreaKey = (name?: string) =>
+      (name ?? '').toLowerCase().replace(/\s/g, '');
 
-      let badQuantity: number | null | undefined = null;
-      let materialBadQuantity: number | null | undefined = null;
-
-      // Primero, busca en areaResponse
-      if (flow.areaResponse?.impression) {
-        badQuantity = flow.areaResponse.impression.bad_quantity;
-      } else if (flow.areaResponse?.serigrafia) {
-        badQuantity = flow.areaResponse.serigrafia.bad_quantity;
-      } else if (flow.areaResponse?.empalme) {
-        badQuantity = flow.areaResponse.empalme.bad_quantity;
-      } else if (flow.areaResponse?.laminacion) {
-        badQuantity = flow.areaResponse.laminacion.bad_quantity;
-      } else if (flow.areaResponse?.corte) {
-        badQuantity = flow.areaResponse.corte.bad_quantity;
-        materialBadQuantity = flow.areaResponse.corte.material_quantity;
-      } else if (flow.areaResponse?.colorEdge) {
-        badQuantity = flow.areaResponse.colorEdge.bad_quantity;
-        materialBadQuantity = flow.areaResponse.colorEdge.material_quantity;
-      } else if (flow.areaResponse?.hotStamping) {
-        badQuantity = flow.areaResponse.hotStamping.bad_quantity;
-        materialBadQuantity = flow.areaResponse.hotStamping.material_quantity;
-      } else if (flow.areaResponse?.millingChip) {
-        badQuantity = flow.areaResponse.millingChip.bad_quantity;
-        materialBadQuantity = flow.areaResponse.millingChip.material_quantity;
-      }
-
-      // Si sigue sin valor, busca en partialReleases
-      if (
-        (badQuantity === null || badQuantity === undefined) &&
-        flow.partialReleases?.length > 0
-      ) {
-        badQuantity = flow.partialReleases.reduce(
-          (sum: number, release: any) => {
-            return sum + (release.bad_quantity ?? 0);
-          },
-          0
-        );
-        materialBadQuantity = flow.partialReleases.reduce(
-          (sum: number, release: any) => {
-            return sum + (release.material_quantity ?? 0);
-          },
-          0
-        );
-      }
-
-      // Guardar valores por separado
-      initialValues[`${areaName}_bad`] =
-        badQuantity !== null && badQuantity !== undefined
-          ? String(badQuantity)
-          : '';
-
-      initialValues[`${areaName}_material`] =
-        materialBadQuantity !== null && materialBadQuantity !== undefined
-          ? String(materialBadQuantity)
-          : '';
+    previousFlows.forEach((flow: any) => {
+      (flow?.badQuantityDetails ?? []).forEach((detail: any) => {
+        const currentAreaId = currentFlow?.area_id ?? currentFlow?.area?.id;
+        if (detail?.source_area_id === currentAreaId) {
+          const areaName = makeAreaKey(detail?.targetArea?.name);
+          initialValues[`${areaName}_bad`] = detail?.bad_quantity
+            ? String(detail.bad_quantity)
+            : '0';
+          initialValues[`${areaName}_material`] = detail?.material_quantity
+            ? String(detail.material_quantity)
+            : '0';
+        }
+      });
     });
 
-    setAreaBadQuantities(initialValues);
+    return initialValues;
+  }, [previousFlows, currentFlow?.area_id, currentFlow?.area?.id]);
+
+  // 4) Solo setear si realmente cambió (comparación simple por string)
+  useEffect(() => {
+    const initial = computeInitialBadQuantities();
+    if (Object.keys(initial).length > 0) {
+      setAreaBadQuantities((prev) => {
+        const same = JSON.stringify(prev) === JSON.stringify(initial); // barato y suficiente aquí
+        return same ? prev : initial;
+      });
+    }
+  }, [computeInitialBadQuantities]);
+
+  // 5) Y lo mismo al abrir el modal
+  const handleOpenBadQuantityModal = () => {
+    const initial = computeInitialBadQuantities();
+    if (Object.keys(initial).length > 0) {
+      setAreaBadQuantities((prev) => {
+        const same = JSON.stringify(prev) === JSON.stringify(initial);
+        return same ? prev : initial;
+      });
+    }
     setShowBadQuantity(true);
-    console.log('Valores iniciales para malas por área:', initialValues);
   };
 
-  const sumaBadQuantity = previousFlows.reduce((sum, flow) => {
+  const normalizedAreas: AreaData[] = useMemo(
+    () =>
+      previousFlows.map((item: any) => ({
+        supportsMaterial: blockSupportsMaterial(
+          resolveBlockKey(item.area?.name ?? '')
+        ),
+        id: item.area?.id ?? item.id,
+        name: item.area?.name ?? item.name ?? '',
+        malas: item.malas ?? 0,
+        defectuoso: item.defectuoso ?? 0,
+        status: item.status ?? '',
+        response: item.areaResponse ?? {},
+        answers: item.answers ?? [],
+        usuario: item.user?.username ?? '',
+        auditor: '',
+        buenas: 0,
+        cqm: 0,
+        excedente: 0,
+        muestras: 0,
+      })),
+    [previousFlows]
+  );
+
+  const sumaBadQuantity = previousFlows.reduce((sum: any, flow: any) => {
     let bad = 0;
 
     if (flow.areaResponse?.millingChip) {
@@ -352,82 +368,17 @@ const MillingChipComponent: React.FC<Props> = ({ workOrder, currentFlow }) => {
         <TouchableOpacity style={styles.button} onPress={openModal}>
           <Text style={styles.buttonText}>Aceptar Inconformidad</Text>
         </TouchableOpacity>
+
         {/* Modal para marcar malas por areas previas al liberar */}
-        <Modal visible={showBadQuantity} transparent animationType="fade">
-          <View style={styles.modalOverlay}>
-            <View style={styles.modalBoxScrollable}>
-              <Text style={styles.modalTitle}>Registrar malas por área</Text>
-
-              <ScrollView style={{ maxHeight: 400 }}>
-                {previousFlows.map((flow, index) => {
-                  const areaKey = flow.area.name.toLowerCase();
-                  return (
-                    <View key={`${flow.id}-${index}`} style={{ marginTop: 16 }}>
-                      <Text style={styles.areaLabel}>
-                        {flow.area.name.toUpperCase()}
-                      </Text>
-
-                      <View style={styles.areaInputsContainer}>
-                        <View style={[styles.inputGroup, { maxWidth: '40%' }]}>
-                          <Text style={styles.inputLabel}>Malas</Text>
-                          <TextInput
-                            style={styles.input}
-                            theme={{ roundness: 30 }}
-                            mode="outlined"
-                            activeOutlineColor="#000"
-                            keyboardType="numeric"
-                            value={areaBadQuantities[`${areaKey}_bad`] || '0'}
-                            onChangeText={(text) =>
-                              setAreaBadQuantities((prev) => ({
-                                ...prev,
-                                [`${areaKey}_bad`]: text,
-                              }))
-                            }
-                          />
-                        </View>
-
-                        {flow.area_id >= 6 && (
-                          <View
-                            style={[styles.inputGroup, { maxWidth: '40%' }]}
-                          >
-                            <Text style={styles.inputLabel}>
-                              Materia Prima Defectuosa
-                            </Text>
-                            <TextInput
-                              style={styles.input}
-                              theme={{ roundness: 30 }}
-                              mode="outlined"
-                              activeOutlineColor="#000"
-                              keyboardType="numeric"
-                              value={
-                                areaBadQuantities[`${areaKey}_material`] || '0'
-                              }
-                              onChangeText={(text) =>
-                                setAreaBadQuantities((prev) => ({
-                                  ...prev,
-                                  [`${areaKey}_material`]: text,
-                                }))
-                              }
-                            />
-                          </View>
-                        )}
-                      </View>
-                    </View>
-                  );
-                })}
-              </ScrollView>
-
-              <View style={styles.modalActions}>
-                <TouchableOpacity
-                  style={styles.cancelButton}
-                  onPress={() => setShowBadQuantity(false)}
-                >
-                  <Text style={styles.modalButtonText}>Cancelar</Text>
-                </TouchableOpacity>
-              </View>
-            </View>
-          </View>
-        </Modal>
+        {showBadQuantity && (
+          <BadQuantityModal
+            visible={true}
+            areas={normalizedAreas}
+            areaBadQuantities={areaBadQuantities}
+            setAreaBadQuantities={setAreaBadQuantities}
+            onClose={() => setShowBadQuantity(false)}
+          />
+        )}
 
         <Modal visible={showModal} transparent animationType="fade">
           <View style={styles.modalOverlay}>

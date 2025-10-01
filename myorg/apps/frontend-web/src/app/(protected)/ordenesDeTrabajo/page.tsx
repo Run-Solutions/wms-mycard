@@ -412,10 +412,8 @@ const WorkOrdersPage: React.FC = () => {
   // Para el envío de la informacion
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!files.ot || !files.sku || !files.op || !files.cardImage) {
-      alert(
-        'Los archivos OT, SKU, OP (PDF) y la imagen de tarjeta son obligatorios.'
-      );
+    if (!files.ot || !files.sku || !files.op) {
+      alert('Los archivos OT, SKU y OP (PDF) son obligatorios.');
       return;
     }
     if (
@@ -460,21 +458,28 @@ const WorkOrdersPage: React.FC = () => {
       (id) => id !== '' && id !== undefined && id !== null
     );
 
+    const filePayload: {
+      ot: File;
+      sku: File;
+      op: File;
+      cardImage?: File;
+      attachments?: File[];
+    } = {
+      ot: files.ot as File,
+      sku: files.sku as File,
+      op: files.op as File,
+      ...(files.cardImage ? { cardImage: files.cardImage } : {}),
+      ...(extraFiles.length ? { attachments: extraFiles } : {}),
+    };
+
     const payload = {
       ...formData,
       areasOperatorIds: cleanedAreasOperatorIds,
-      files: extraFiles,
       total_sheets: totalSheets,
     };
 
     try {
-      const result = await createWorkOrder(payload, {
-        ot: files.ot!,
-        sku: files.sku!,
-        op: files.op!,
-        cardImage: files.cardImage,
-        attachments: extraFiles,
-      });
+      const result = await createWorkOrder(payload, filePayload);
       setMessage(result.message || 'Orden de trabajo creada correctamente');
       // Reseteamos
       setFormData({
