@@ -449,7 +449,7 @@ export default function LaminacionComponent({ workOrder }: Props) {
               onToggle={handleToggleRespuesta}
             />
             <InputGroup style={{ paddingTop: '30px', width: '70%' }}>
-              <Label>Validar Acabado Vs Orden De Trabajo:</Label>
+              <Label style={{ color: '#374151'}}>Validar Acabado Vs Orden De Trabajo:</Label>
               <RadioGroup>
                 <RadioLabel>
                   <Radio
@@ -513,7 +513,7 @@ export default function LaminacionComponent({ workOrder }: Props) {
               )}
             </InputGroup>
             <InputGroup style={{ paddingTop: '30px' }}>
-              <Label>Muestras:</Label>
+            <Label style={{ color: '#374151'}}>Muestras:</Label>
               <Input
                 type="number"
                 placeholder="Ej: 2"

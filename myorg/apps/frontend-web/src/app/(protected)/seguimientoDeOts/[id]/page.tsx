@@ -1,14 +1,16 @@
 // myorg/apps/frontend-web/src/app/(protected)/seguimientoDeOts/[id]/page.tsx
 'use client';
 
-import { use, useState, Fragment, useEffect, useMemo } from 'react';
+import React, { use, useState, Fragment, useEffect, useMemo, } from 'react';
 import { useRouter } from 'next/navigation';
 import styled from 'styled-components';
 
 import { Card, CardContent } from '@/components/ui/card';
 import ProgressBarAreas from '@/components/SeguimientoDeOts/ProgressBarAreas';
 import InconformitiesHistory from '@/components/SeguimientoDeOts/InconformitiesHistory';
-import BadQuantityModal from '@/components/SeguimientoDeOts/BadQuantityModal';
+import BadQuantityModal, {
+  BadQuantityModalResult,
+} from '@/components/SeguimientoDeOts/BadQuantityModal';
 import PartialHistory from '@/components/SeguimientoDeOts/PartialHistory';
 import { VistosBuenosHistory } from '@/components/SeguimientoDeOts/VistosBuenosHistory';
 import { AreaTotalsForPartialHistory } from '@/components/SeguimientoDeOts/PartialHistory';
@@ -19,6 +21,7 @@ import {
   updateFlowAssignedUser,
   closeWorkOrder,
   updateWorkOrderAreas,
+  updateAreaResponseData,
   getFileByName,
 } from '@/api/seguimientoDeOts';
 
@@ -35,6 +38,49 @@ import {
 // ========================================================
 // Types
 // ========================================================
+
+type BlockKey =
+  | 'prepress'
+  | 'impression'
+  | 'serigrafia'
+  | 'empalme'
+  | 'laminacion'
+  | 'corte'
+  | 'colorEdge'
+  | 'hotStamping'
+  | 'millingChip'
+  | 'personalizacion';
+
+const normalizeAreaKey = (name?: string | null) =>
+  (name ?? '')
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .toLowerCase()
+    .replace(/\s/g, '');
+
+const resolveBlockKey = (name?: string | null): BlockKey | null => {
+  const key = normalizeAreaKey(name);
+  const map: Record<string, BlockKey> = {
+    preprensa: 'prepress',
+    impresion: 'impression',
+    serigrafia: 'serigrafia',
+    empalme: 'empalme',
+    laminacion: 'laminacion',
+    corte: 'corte',
+    coloredge: 'colorEdge',
+    'color edge': 'colorEdge',
+    millingchip: 'millingChip',
+    'milling chip': 'millingChip',
+    hotstamping: 'hotStamping',
+    personalizacion: 'personalizacion',
+  };
+  return map[key] ?? null;
+};
+
+const blockSupportsMaterial = (block?: BlockKey | null) =>
+  !!block && ['corte', 'colorEdge', 'millingChip', 'personalizacion'].includes(block);
+
+
 
 interface Props {
   params: Promise<{ id: string }>;
@@ -161,7 +207,9 @@ const getAreaBlock = (area: any) => {
 
 // ---- Remainders (by field) ----
 
-const buildAreaTotalsByAreaId = (wo: any): Record<number, AreaTotalsForPartialHistory> => {
+const buildAreaTotalsByAreaId = (
+  wo: any
+): Record<number, AreaTotalsForPartialHistory> => {
   const map: Record<number, AreaTotalsForPartialHistory> = {};
   const flows = wo?.flow ?? [];
 
@@ -239,6 +287,43 @@ const getRemainderByField = (
   }
 
   return Math.max(total - parcialesSum, 0);
+};
+
+const getRemainderBySum = (
+  area: AreaData,
+  field: 'buenas' | 'malas' | 'excedente' | 'noprocess' | 'defectuoso'
+) => {
+  const block = getAreaBlock(area) as any;
+  if (!block) return 0;
+
+  let total = 0;
+
+  switch (field) {
+    case 'buenas':
+      total = toNum(
+        block.release_quantity ?? block.good_quantity ?? block.plates
+      );
+
+      break;
+    case 'malas':
+      total = toNum(block.bad_quantity);
+
+      break;
+    case 'excedente':
+      total = toNum(block.excess_quantity);
+
+      break;
+    case 'noprocess':
+      total = toNum(block.noprocess_quantity);
+
+      break;
+    case 'defectuoso':
+      total = toNum(block.material_quantity);
+
+      break;
+  }
+
+  return Math.max(total, 0);
 };
 
 const getRemainder = (area: AreaData) => getRemainderByField(area, 'buenas');
@@ -455,6 +540,9 @@ export default function SeguimientoDeOtsAuxPage({ params }: Props) {
   const [partialSectionOpen, setPartialSectionOpen] = useState(false);
   const [inconformitySectionOpen, setInconformitySectionOpen] = useState(false);
 
+  const [badModalOwner, setBadModalOwner] = useState<AreaData | null>(null);
+  const [modalAreas, setModalAreas] = useState<AreaData[]>([]);
+
   // ---- Operators maps ----
   const operatorOptionsByAreaId = useMemo(() => {
     const map = new Map<number, Array<{ id: number; username: string }>>();
@@ -516,6 +604,28 @@ export default function SeguimientoDeOtsAuxPage({ params }: Props) {
     () => buildAreaTotalsByAreaId(workOrder),
     [workOrder]
   );
+
+  // Suma de malas/material por área DESTINO a partir de TODOS los badQuantityDetails del flujo
+  const badQtyAgg = useMemo(() => {
+    const badByTarget = new Map<number, number>();
+    const matByTarget = new Map<number, number>();
+
+    const flows = workOrder?.flow ?? [];
+    flows.forEach((f: any) => {
+      (f?.badQuantityDetails ?? []).forEach((d: any) => {
+        const tId = Number(d?.target_area_id) || 0;
+        if (!tId) return;
+
+        const bad = toNum(d?.bad_quantity);
+        const mat = toNum(d?.material_quantity);
+
+        badByTarget.set(tId, (badByTarget.get(tId) || 0) + bad);
+        matByTarget.set(tId, (matByTarget.get(tId) || 0) + mat);
+      });
+    });
+
+    return { badByTarget, matByTarget };
+  }, [workOrder]);
 
   const modalOptions = useMemo(() => {
     if (!opModal.areaId) return [];
@@ -715,25 +825,83 @@ export default function SeguimientoDeOtsAuxPage({ params }: Props) {
 
   const areaColSpan = (area: AreaData) => {
     const base = Math.max(1, area.parciales || 0);
-    const rem = area.parciales > 0 && getRemainder(area) > 0 ? 1 : 0;
-    return area.parciales > 0 ? base + rem : 1;
+    const hasRem = area.parciales > 0 && getRemainder(area) > 0;
+    return area.parciales > 0 ? base + (hasRem ? 2 : 0) : 1;
   };
 
-  const getSumaMalasHasta = (areaId: number): number =>
-    areas
-      .filter((a) => a.id <= areaId)
-      .reduce((sum, a) => sum + (a.malas || 0), 0);
+  const badAgg = useMemo(() => {
+    const byTarget = new Map<number, number>();        // opcional: acumulados por target
+    const byTargetMat = new Map<number, number>();     // opcional: material por target
+    const bySourceTarget = new Map<number, Map<number, { bad: number; mat: number }>>();
 
-  const handleOpenBadQuantityModal = () => {
-    const initialValues: { [key: string]: string } = {};
-    areas.forEach((area) => {
-      const areaKey = area.name.toLowerCase().replace(/\s/g, '');
-      initialValues[`${areaKey}_bad`] = area.malas?.toString() || '0';
-      if (area.id >= 6)
-        initialValues[`${areaKey}_material`] =
-          area.defectuoso?.toString() || '0';
+    const flows = workOrder?.flow ?? [];
+    flows.forEach((f: any) => {
+      (f?.badQuantityDetails ?? []).forEach((d: any) => {
+        const s = Number(d?.source_area_id) || 0;
+        const t = Number(d?.target_area_id) || 0;
+        const bad = toNum(d?.bad_quantity);
+        const mat = toNum(d?.material_quantity);
+
+        if (t) {
+          byTarget.set(t, (byTarget.get(t) || 0) + bad);
+          byTargetMat.set(t, (byTargetMat.get(t) || 0) + mat);
+        }
+        if (s) {
+          if (!bySourceTarget.has(s)) bySourceTarget.set(s, new Map());
+          const m = bySourceTarget.get(s)!;
+          const prev = m.get(t) ?? { bad: 0, mat: 0 };
+          m.set(t, { bad: prev.bad + bad, mat: prev.mat + mat });
+        }
+      });
     });
+
+    return { byTarget, byTargetMat, bySourceTarget };
+  }, [workOrder]);
+
+  const sumBadBySource = (sourceId: number, { includeSelf = false } = {}) => {
+    const m = badAgg.bySourceTarget.get(sourceId);
+    if (!m) return 0;
+    let total = 0;
+    m.forEach((v, tId) => {
+      if (!includeSelf && tId === sourceId) return;
+      total += toNum(v.bad);
+    });
+    return total;
+  };
+
+  const handleOpenBadQuantityModal = (ownerArea: AreaData) => {
+    const initialValues: Record<string, string> = {};
+
+    const TARGET_AREA_IDS = [2, 3, 4, 5, 6];
+
+    const orderedAreas: AreaData[] = [];
+    const pushUnique = (candidate: AreaData | undefined | null) => {
+      if (!candidate) return;
+      if (orderedAreas.some((item) => item.id === candidate.id)) return;
+      orderedAreas.push(candidate);
+    };
+
+    TARGET_AREA_IDS.forEach((targetId) => {
+      const match = areas.find((area) => Number(area.id) === targetId);
+      pushUnique(match);
+    });
+
+    pushUnique(ownerArea);
+
+    const perTarget = badAgg.bySourceTarget.get(ownerArea.id) ?? new Map();
+
+    orderedAreas.forEach((area) => {
+      const key = normalizeAreaKey(area.name);
+      const agg = perTarget.get(area.id) ?? { bad: 0, mat: 0 };
+      initialValues[`${key}_bad`] = String(Number(agg.bad ?? 0));
+      if (area.id >= 6) {
+        initialValues[`${key}_material`] = String(Number(agg.mat ?? 0));
+      }
+    });
+
+    setModalAreas(orderedAreas);
     setAreaBadQuantities(initialValues);
+    setBadModalOwner(ownerArea);
     setShowBadQuantity(true);
   };
 
@@ -768,7 +936,7 @@ export default function SeguimientoDeOtsAuxPage({ params }: Props) {
       muestras = Number(area.muestras ?? 0) + sums.muestras;
     }
 
-    return buenas + malas + excedente + noprocess + defectuoso + cqm + muestras;
+    return buenas + malas + excedente + defectuoso + cqm + muestras;
   };
 
   const cantidadHojasRaw = Number(workOrder?.quantity) / 24;
@@ -785,7 +953,16 @@ export default function SeguimientoDeOtsAuxPage({ params }: Props) {
     .filter((area) => area.id >= 6)
     .reduce((acc, area) => acc + (area.cqm || 0), 0);
   const totalMuestras = areas.reduce(
-    (acc, area) => acc + (area.muestras || 0),
+    (acc, area) => {
+      if (area.partials.length > 0) {
+        acc += area.partials.reduce(
+          (pAcc, p) => pAcc + Number(p?.formAuditory?.sample_auditory ?? 0),
+          0
+        );
+      }
+      acc += (area.muestras || 0)
+      return acc;
+    },
     0
   );
   const totalUltimaBuenas = ultimaArea?.buenas || 0;
@@ -846,10 +1023,10 @@ export default function SeguimientoDeOtsAuxPage({ params }: Props) {
       prev.map((a) =>
         a.id === area.id
           ? {
-              ...a,
-              assigned_user_id: newUserId,
-              usuario: operatorById.get(newUserId) ?? a.usuario,
-            }
+            ...a,
+            assigned_user_id: newUserId,
+            usuario: operatorById.get(newUserId) ?? a.usuario,
+          }
           : a
       )
     );
@@ -882,8 +1059,8 @@ export default function SeguimientoDeOtsAuxPage({ params }: Props) {
       return <span>{Number(area[field] ?? 0)}</span>;
 
     // 3. Preprensa → solo 'buenas' editable
-    if (area.id === 1) {
-      if (field === 'buenas') {
+
+      if (['buenas', 'excedente', 'noprocess'].includes(field)) {
         return (
           <input
             type="number"
@@ -894,8 +1071,6 @@ export default function SeguimientoDeOtsAuxPage({ params }: Props) {
           />
         );
       }
-      return <span>{Number(area[field] ?? 0)}</span>;
-    }
 
     // 4. CQM editable desde Impresión (id >= 2)
     if (field === 'cqm') {
@@ -935,9 +1110,9 @@ export default function SeguimientoDeOtsAuxPage({ params }: Props) {
         return (
           <input
             type="number"
-            value={getSumaMalasHasta(area.id)}
+            value={sumBadBySource(area.id)}
             min={0}
-            onClick={handleOpenBadQuantityModal}
+            onClick={() => handleOpenBadQuantityModal(area)}
             readOnly
             style={{
               width: '80px',
@@ -984,83 +1159,312 @@ export default function SeguimientoDeOtsAuxPage({ params }: Props) {
     );
   };
 
-  const handleSaveChanges = async (updatedAreas: AreaData[]) => {
-    const payload = {
-      areas: areas
-        .filter((area) => area.status === 'Completado')
-        .map((area) => {
-          const updated = updatedAreas.find((a) => a.id === area.id) || area;
+  const handleSaveChanges = async (modalResult?: BadQuantityModalResult) => {
+    if (!workOrder) {
+      alert('No se encontró información de la orden de trabajo.');
+      return;
+    }
 
-          const blockMap: Record<string, string> = {
-            preprensa: 'prepress',
-            impresion: 'impression',
-            serigrafia: 'serigrafia',
-            empalme: 'empalme',
-            laminacion: 'laminacion',
-            corte: 'corte',
-            coloredge: 'colorEdge',
-            millingchip: 'millingChip',
-            hotstamping: 'hotStamping',
-            personalizacion: 'personalizacion',
+    const toInt = (v: any) => {
+      const n = parseInt(String(v ?? '0').trim(), 10);
+      return Number.isFinite(n) ? n : 0;
+    };
+
+    const modalInputs = modalResult?.inputsByArea ?? [];
+    const updatedAreasFromModal = modalResult?.updatedAreas ?? null;
+
+    const effectiveAreas = updatedAreasFromModal
+      ? areas.map((area) => {
+        const replacement = updatedAreasFromModal.find(
+          (item) => item.id === area.id
+        );
+        if (!replacement) return area;
+        return {
+          ...area,
+          malas: Number(replacement.malas ?? area.malas ?? 0),
+          defectuoso: Number(replacement.defectuoso ?? area.defectuoso ?? 0),
+        };
+      })
+      : areas;
+
+    if (updatedAreasFromModal) {
+      setAreas(effectiveAreas);
+    }
+
+    const blockMap: Record<string, BlockKey> = {
+      preprensa: 'prepress',
+      impresion: 'impression',
+      serigrafia: 'serigrafia',
+      empalme: 'empalme',
+      laminacion: 'laminacion',
+      corte: 'corte',
+      coloredge: 'colorEdge',
+      millingchip: 'millingChip',
+      hotstamping: 'hotStamping',
+      personalizacion: 'personalizacion',
+    };
+
+    const areasFromTable = effectiveAreas
+      .filter((area) => area.status === 'Completado')
+      .map((area) => {
+        const normalizedName = area.name.toLowerCase().replace(/\s/g, '');
+        const block = (blockMap[normalizedName] || 'otros') as BlockKey | 'otros';
+
+        const blockId = (area.response as any)?.[block]?.id;
+        const formId = (area.response as any)?.[block]?.form_auditory_id;
+        const cqmId = (area.response as any)?.[block]?.form_answer_id;
+
+        let data: Record<string, number> = {
+          good_quantity: Number(area.buenas ?? 0),
+          bad_quantity: Number(area.malas ?? 0),
+          excess_quantity: Number(area.excedente ?? 0),
+          noprocess_quantity: Number(area.noprocess ?? 0),
+          material_quantity: Number(area.defectuoso ?? 0),
+        };
+        let sample_data: Record<string, number> = {
+          sample_quantity: Number(area.cqm ?? 0),
+          sample_auditory: Number(area.muestras ?? 0),
+        };
+
+        if (block === 'prepress') {
+          data = { plates: Number(area.buenas ?? 0) };
+        }
+        if (['impression', 'serigrafia', 'laminacion', 'empalme'].includes(block)) {
+          data = {
+            release_quantity: Number(area.buenas ?? 0),
+            bad_quantity: Number(area.malas ?? 0),
+            excess_quantity: Number(area.excedente ?? 0),
+            noprocess_quantity: Number(area.noprocess ?? 0),
           };
+          sample_data = { sample_quantity: Number(area.cqm ?? 0) };
+        }
 
-          const normalizedName = updated.name.toLowerCase().replace(/\s/g, '');
-          const block = blockMap[normalizedName] || 'otros';
+        return {
+          areaId: area.id,
+          block,
+          blockId,
+          formId,
+          cqmId,
+          data,
+          sample_data,
+        };
+      });
 
-          const blockId = (updated.response as any)?.[block]?.id;
-          const formId = (updated.response as any)?.[block]?.form_auditory_id;
-          const cqmId = (updated.response as any)?.[block]?.form_answer_id;
+    let areasFromBadModal: Array<{
+      areaId: number;
+      block: BlockKey;
+      blockId: number | null;
+      formId: number | null;
+      cqmId: number | null;
+      data: Record<string, number>;
+      inputsByArea: Array<{ label: string; value: number }>;
+    }> = [];
 
-          let data: Record<string, number> = {
-            good_quantity: updated.buenas,
-            bad_quantity: updated.malas,
-            excess_quantity: updated.excedente,
-            noprocess_quantity: updated.noprocess,
-            material_quantity: updated.defectuoso,
-          };
-          let sample_data: Record<string, number> = {
-            sample_quantity: updated.cqm,
-            sample_auditory: updated.muestras,
-          };
+    if (modalInputs.length) {
+      const flows = workOrder?.flow ?? [];
+      const inputsMap = new Map(modalInputs.map((i) => [i.areaId, i.values]));
 
-          if (block === 'prepress') {
-            data = {
-              plates: updated.buenas,
-            };
-          }
-          if (
-            ['impression', 'serigrafia', 'laminacion', 'empalme'].includes(
-              block
-            )
-          ) {
-            data = {
-              release_quantity: updated.buenas,
-              bad_quantity: updated.malas,
-              excess_quantity: updated.excedente,
-            };
-            sample_data = {
-              sample_quantity: updated.cqm,
-            };
-          }
+      areasFromBadModal = flows.flatMap((flow: any) => {
+        const areaName = flow.area?.name ?? '';
+        const areaKey = normalizeAreaKey(areaName);
 
-          return {
-            areaId: updated.id,
-            block,
+        const targetMap: Partial<Record<string, BlockKey>> = {
+          impresion: 'impression',
+          serigrafia: 'serigrafia',
+          empalme: 'empalme',
+          laminacion: 'laminacion',
+          corte: 'corte',
+        };
+
+        if (areaKey === 'coloredge') return [];
+
+        const mapped = targetMap[areaKey];
+        const blockKey: BlockKey | null = mapped ?? resolveBlockKey(areaName);
+        if (!blockKey) return [];
+
+        const blockData = flow.areaResponse?.[blockKey];
+        const blockId = blockData?.id ?? null;
+        if (!blockId) return [];
+
+        const formId = blockData?.form_auditory_id ?? null;
+        const cqmId = blockData?.form_answer_id ?? null;
+
+        const supportsMaterial = blockSupportsMaterial(blockKey);
+        const badKey = `${areaKey}_bad`;
+        const materialKey = `${areaKey}_material`;
+
+        const data: Record<string, number> = {
+          bad_quantity: toInt(areaBadQuantities[badKey]),
+        };
+        if (supportsMaterial) {
+          data.material_quantity = toInt(areaBadQuantities[materialKey]);
+        }
+
+        return [
+          {
+            areaId: Number(flow.area_id),
+            block: blockKey,
             blockId,
             formId,
             cqmId,
             data,
-            sample_data,
-          };
-        }),
-    };
+            inputsByArea: inputsMap.get(Number(flow.area_id)) ?? [],
+          },
+        ];
+      });
+    }
 
-    console.log('Payload a enviar:', payload);
+    const sourceAreaId = badModalOwner?.id ?? null;
+    const sourceWorkOrderFlowId =
+      workOrder?.flow?.find((f: any) => Number(f?.area_id) === sourceAreaId)?.id ??
+      null;
+
+    const combinedAreas = [...areasFromTable, ...areasFromBadModal];
+
+    const areasForDataUpdate = combinedAreas
+      .map((item) => {
+        if (!item) return null;
+        if (!item.block || item.block === 'otros') return null;
+
+        const areaIdNum = Number(item.areaId);
+        const blockIdNum = Number(item.blockId);
+
+        if (
+          !Number.isFinite(areaIdNum) ||
+          !Number.isFinite(blockIdNum) ||
+          blockIdNum <= 0
+        ) {
+          return null;
+        }
+
+        const sanitizedData: Record<string, number> = {};
+        Object.entries(item.data ?? {}).forEach(([key, value]) => {
+          const numeric = Number(value);
+          if (Number.isFinite(numeric)) {
+            sanitizedData[key] = Math.round(numeric);
+          }
+        });
+
+        const sampleRaw = (item as any).sample_data ?? {};
+        const sampleSanitized: Record<string, number> = {};
+
+        if (sampleRaw.sample_quantity !== undefined) {
+          const numeric = Number(sampleRaw.sample_quantity);
+          if (Number.isFinite(numeric)) {
+            sampleSanitized.sample_quantity = Math.round(numeric);
+          }
+        }
+        if (sampleRaw.sample_auditory !== undefined) {
+          const numeric = Number(sampleRaw.sample_auditory);
+          if (Number.isFinite(numeric)) {
+            sampleSanitized.sample_auditory = Math.round(numeric);
+          }
+        }
+
+        if (
+          Object.keys(sanitizedData).length === 0 &&
+          Object.keys(sampleSanitized).length === 0
+        ) {
+          return null;
+        }
+
+        const entry: {
+          areaId: number;
+          block: BlockKey;
+          blockId: number;
+          formId?: number;
+          cqmId?: number;
+          data: Record<string, number>;
+          sample_data?: Record<string, number>;
+        } = {
+          areaId: areaIdNum,
+          block: item.block as BlockKey,
+          blockId: blockIdNum,
+          data: sanitizedData,
+        };
+
+        const formIdNum = Number((item as any).formId);
+        if (Number.isFinite(formIdNum) && formIdNum > 0) {
+          entry.formId = formIdNum;
+        }
+
+        const cqmIdNum = Number((item as any).cqmId);
+        if (Number.isFinite(cqmIdNum) && cqmIdNum > 0) {
+          entry.cqmId = cqmIdNum;
+        }
+
+        if (Object.keys(sampleSanitized).length > 0) {
+          entry.sample_data = sampleSanitized;
+        }
+
+        return entry;
+      })
+      .filter(Boolean) as Array<{
+        areaId: number;
+        block: BlockKey;
+        blockId: number;
+        formId?: number;
+        cqmId?: number;
+        data: Record<string, number>;
+        sample_data?: Record<string, number>;
+      }>;
+
+    const summary = modalInputs
+      .map((item) => {
+        const areaId = Number(item.areaId);
+        const areaName =
+          item.areaName ??
+          effectiveAreas.find((area) => Number(area.id) === areaId)?.name ??
+          '';
+        const values = (item.values ?? [])
+          .map((entry) => ({
+            label: entry?.label ?? '',
+            value: Number.isFinite(Number(entry?.value))
+              ? Number(entry?.value)
+              : 0,
+          }))
+          .filter((entry) => !!entry.label);
+
+        return {
+          areaId,
+          areaName,
+          values,
+        };
+      })
+      .filter(
+        (entry) =>
+          Number.isFinite(entry.areaId) &&
+          !!entry.areaName &&
+          entry.values.length > 0,
+      );
+
+    if (areasForDataUpdate.length === 0 && summary.length === 0) {
+      alert('No hay cambios para guardar');
+      return;
+    }
 
     try {
-      await updateWorkOrderAreas(workOrder.ot_id, payload);
+      if (areasForDataUpdate.length > 0) {
+        await updateAreaResponseData(workOrder.ot_id, {
+          areas: areasForDataUpdate,
+        });
+      }
+
+      if (summary.length > 0) {
+        const payload: any = {
+          badQuantitySummary: summary,
+        };
+        if (sourceAreaId) {
+          payload.sourceAreaId = sourceAreaId;
+        }
+        if (sourceWorkOrderFlowId) {
+          payload.sourceWorkOrderFlowId = sourceWorkOrderFlowId;
+        }
+
+        await updateWorkOrderAreas(workOrder.ot_id, payload);
+      }
+
       alert('Cambios guardados correctamente');
-      window.location.reload();
     } catch (err) {
       console.error(err);
       alert('Error al guardar los cambios');
@@ -1130,8 +1534,8 @@ export default function SeguimientoDeOtsAuxPage({ params }: Props) {
     );
   }
 
-  const totalCols = areas.reduce(
-    (sum, area) => sum + (area.parciales > 0 ? area.parciales : 1),
+  const totalColsDynamic = areas.reduce(
+    (sum, area) => sum + areaColSpan(area),
     0
   );
   const filteredAreas = areas.filter(
@@ -1228,12 +1632,12 @@ export default function SeguimientoDeOtsAuxPage({ params }: Props) {
                       file.type === 'OT'
                         ? 'Ver OT'
                         : file.type === 'SKU'
-                        ? 'Ver SKU'
-                        : file.type === 'OP'
-                        ? 'Ver OP'
-                        : file.type === 'CARD_IMAGE'
-                        ? 'Ver TARJETA'
-                        : 'Adjunto';
+                          ? 'Ver SKU'
+                          : file.type === 'OP'
+                            ? 'Ver OP'
+                            : file.type === 'CARD_IMAGE'
+                              ? 'Ver TARJETA'
+                              : 'Adjunto';
                     return (
                       <button
                         key={file.id}
@@ -1339,12 +1743,20 @@ export default function SeguimientoDeOtsAuxPage({ params }: Props) {
                               )
                             )}
                             {rem && (
-                              <th
-                                key={`${area.id}-${index}-sub-rem`}
-                                className="p-2 text-center font-normal text-[0.7rem] text-gray-500"
-                              >
-                                Rem
-                              </th>
+                              <>
+                                <th
+                                  key={`${area.id}-${index}-sub-rem`}
+                                  className="p-2 text-center font-normal text-[0.7rem] text-gray-500"
+                                >
+                                  Rem
+                                </th>
+                                <th
+                                  key={`${area.id}-${index}-sub-sum`}
+                                  className="p-2 text-center font-normal text-[0.7rem] text-gray-500"
+                                >
+                                  Σ
+                                </th>
+                              </>
                             )}
                           </Fragment>
                         );
@@ -1428,14 +1840,26 @@ export default function SeguimientoDeOtsAuxPage({ params }: Props) {
                             operatorById
                           );
                           cells.push(
-                            <td
-                              key={`area-${area.id}-usuario-rem`}
-                              className="text-center font-medium"
-                              title="Remanente"
+                            <React.Fragment
+                              key={`area-${area.id}-usuario-rem-wrapper`}
                             >
-                              {lastUser}
-                            </td>
+                              <td
+                                key={`area-${area.id}-usuario-rem`}
+                                className="text-center font-medium"
+                                title="Remanente"
+                              >
+                                {lastUser}
+                              </td>
+                              <td
+                                key={`area-${area.id}-usuario-rem-sum`}
+                                className="text-center font-medium"
+                                title="Remanente"
+                              >
+                                {lastUser}
+                              </td>
+                            </React.Fragment>
                           );
+
                         }
                         return cells;
                       }
@@ -1464,7 +1888,9 @@ export default function SeguimientoDeOtsAuxPage({ params }: Props) {
                     {areas.flatMap((area, aIdx) => {
                       if (area.parciales > 0) {
                         const reviewers = getPerPartialReviewers(area);
-                        return reviewers.map((name, i) => (
+                        const hasRem = getRemainder(area) > 0;
+
+                        const cells = reviewers.map((name, i) => (
                           <td
                             key={`cell-area-${area.id}-parcial-${i}-calidad`}
                             className="text-center"
@@ -1475,16 +1901,31 @@ export default function SeguimientoDeOtsAuxPage({ params }: Props) {
                             }
                           >
                             <span
-                              className={`px-2 py-1 rounded-lg text-sm font-medium ${
-                                name && name !== '—'
-                                  ? 'bg-yellow-100 text-yellow-800' // badge “Calidad”
-                                  : '' // badge vacío
-                              }`}
+                              className={`px-2 py-1 rounded-lg text-sm font-medium ${name && name !== '—'
+                                ? 'bg-yellow-100 text-yellow-800'
+                                : ''
+                                }`}
                             >
                               {name || '—'}
                             </span>
                           </td>
                         ));
+
+                        // ⚠️ Agregar la celda Σ para cuadrar colSpan cuando hay remanente
+                        if (hasRem) {
+                          cells.push(
+                            <td
+                              key={`cell-area-${area.id}-calidad-sum`}
+                              className="text-center font-semibold"
+                              title="Suma total (parciales + remanente)"
+                            >
+                              {/* Puedes dejar '—' o repetir el último revisor si lo prefieres */}
+                              —
+                            </td>
+                          );
+                        }
+
+                        return cells;
                       }
 
                       // Sin parciales → último answer
@@ -1497,11 +1938,10 @@ export default function SeguimientoDeOtsAuxPage({ params }: Props) {
                           className="text-center"
                         >
                           <span
-                            className={`px-2 py-1 rounded-lg text-sm font-medium ${
-                              reviewerName && reviewerName !== '—'
-                                ? 'bg-yellow-100 text-yellow-800'
-                                : ''
-                            }`}
+                            className={`px-2 py-1 rounded-lg text-sm font-medium ${reviewerName && reviewerName !== '—'
+                              ? 'bg-yellow-100 text-yellow-800'
+                              : ''
+                              }`}
                           >
                             {reviewerName || '—'}
                           </span>
@@ -1516,7 +1956,9 @@ export default function SeguimientoDeOtsAuxPage({ params }: Props) {
                     {areas.flatMap((area, aIdx) => {
                       if (area.parciales > 0) {
                         const reviewers = getPerPartialAuditors(area);
-                        return reviewers.map((name, i) => (
+                        const hasRem = getRemainder(area) > 0;
+
+                        const cells = reviewers.map((name, i) => (
                           <td
                             key={`cell-area-${area.id}-partial-${i}-auditor`}
                             className="text-center"
@@ -1527,21 +1969,35 @@ export default function SeguimientoDeOtsAuxPage({ params }: Props) {
                             }
                           >
                             <span
-                              className={`px-2 py-1 rounded-lg text-sm font-medium ${
-                                name && name !== '—'
-                                  ? 'bg-purple-100 text-purple-800' // badge “Calidad”
-                                  : '' // badge vacío
-                              }`}
+                              className={`px-2 py-1 rounded-lg text-sm font-medium ${name && name !== '—'
+                                ? 'bg-purple-100 text-purple-800'
+                                : ''
+                                }`}
                             >
-                              {name || '-'}
+                              {name || '—'}
                             </span>
                           </td>
                         ));
+
+                        // ⚠️ Agregar la celda Σ para cuadrar colSpan cuando hay remanente
+                        if (hasRem) {
+                          cells.push(
+                            <td
+                              key={`cell-area-${area.id}-auditor-sum`}
+                              className="text-center font-semibold"
+                              title="Suma total (parciales + remanente)"
+                            >
+                              —
+                            </td>
+                          );
+                        }
+
+                        return cells;
                       }
 
-                      const auditor = getLastAuditor(area); // MiniAud | null
-                      const auditorName = auditor?.username ?? '—'; // <- normalizas a string
-                      console.log('LastNas auditorName', auditorName);
+                      // Sin parciales → último auditor
+                      const auditor = getLastAuditor(area);
+                      const auditorName = auditor?.username ?? '—';
 
                       return (
                         <td
@@ -1549,11 +2005,10 @@ export default function SeguimientoDeOtsAuxPage({ params }: Props) {
                           className="text-center"
                         >
                           <span
-                            className={`px-2 py-1 rounded-lg text-sm font-medium ${
-                              auditorName !== '—'
-                                ? 'bg-purple-100 text-purple-800'
-                                : ''
-                            }`}
+                            className={`px-2 py-1 rounded-lg text-sm font-medium ${auditorName !== '—'
+                              ? 'bg-purple-100 text-purple-800'
+                              : ''
+                              }`}
                           >
                             {auditorName}
                           </span>
@@ -1585,7 +2040,7 @@ export default function SeguimientoDeOtsAuxPage({ params }: Props) {
                   {/* Entradas */}
                   <tr>
                     <td
-                      colSpan={1 + totalCols} // 1 extra por la primera columna "Dato"
+                      colSpan={1 + totalColsDynamic} // 1 extra por la primera columna "Dato"
                       className="bg-gray-50 px-3 py-2 font-bold text-gray-500"
                     >
                       📥 Producción
@@ -1600,66 +2055,169 @@ export default function SeguimientoDeOtsAuxPage({ params }: Props) {
 
                         {areas.flatMap((area, aIndex) => {
                           if (area.parciales > 0 && area.partials?.length) {
+                            const aggregatedBad = toNum(sumBadBySource(area.id));
+                            const rem = getRemainder(area);
+                            const aggregatedFieldValue = Number(area[field] ?? 0);
+                            const isEditableAggregateField =
+                              ['excedente', 'noprocess'].includes(field) &&
+                              area.status === 'Completado';
+
                             const cells: React.ReactNode[] = area.partials.map(
                               (p, pIndex) => {
                                 const value =
                                   field === 'buenas'
                                     ? toNum(p.quantity)
                                     : field === 'malas'
-                                    ? toNum(p.bad_quantity)
-                                    : field === 'excedente'
-                                    ? toNum(p.excess_quantity)
-                                    : toNum(p.noprocess_quantity);
+                                      ? toNum(p.bad_quantity)
+                                      : field === 'excedente'
+                                        ? toNum(p.excess_quantity)
+                                        : toNum(p.noprocess_quantity);
+
+                                const isLastPartial =
+                                  rem <= 0 &&
+                                  pIndex === area.partials.length - 1;
+                                const shouldShowModalTrigger =
+                                  field === 'malas' &&
+                                  area.id >= 6 &&
+                                  area.status === 'Completado' &&
+                                  isLastPartial;
+
+                                const shouldRenderAggregateInput =
+                                  isEditableAggregateField && isLastPartial && rem <= 0;
+
                                 return (
                                   <td
-                                    key={`area-${area.id}-parcial-${
-                                      p.id ?? pIndex
-                                    }-${field}`}
+                                    key={`area-${area.id}-parcial-${p.id ?? pIndex
+                                      }-${field}`}
                                     className="text-center"
                                   >
-                                    {value}
+                                    {field === 'malas' ? (
+                                      shouldShowModalTrigger ? (
+                                        <button
+                                          type="button"
+                                          className="inline-flex min-w-[64px] justify-center rounded border border-gray-200 bg-gray-50 px-2 py-1 text-sm text-gray-700 hover:bg-gray-100 focus:outline-none focus:ring-1 focus:ring-blue-400"
+                                          onClick={() => handleOpenBadQuantityModal(area)}
+                                          title={`Cantidad mala total: ${aggregatedBad}`}
+                                        >
+                                          {aggregatedBad}
+                                        </button>
+                                      ) : (
+                                        value
+                                      )
+                                    ) : shouldRenderAggregateInput ? (
+                                      <input
+                                        type="number"
+                                        value={aggregatedFieldValue}
+                                        min={0}
+                                        onChange={(e) =>
+                                          handleValueChange(
+                                            area.id,
+                                            field,
+                                            e.target.value
+                                          )
+                                        }
+                                        className="w-20 rounded border border-gray-200 px-2 py-1 text-center"
+                                      />
+                                    ) : (
+                                      value
+                                    )}
                                   </td>
                                 );
                               }
                             );
 
-                            const rem = getRemainder(area);
                             if (rem > 0) {
                               let remValue = 0;
+                              let remSum = 0;
                               switch (field) {
                                 case 'buenas':
                                   remValue = getRemainderByField(
                                     area,
                                     'buenas'
                                   );
+                                  remSum = getRemainderBySum(area, 'buenas');
                                   break;
                                 case 'excedente':
                                   remValue = getRemainderByField(
                                     area,
                                     'excedente'
                                   );
+                                  remSum = getRemainderBySum(area, 'excedente');
                                   break;
                                 case 'noprocess':
                                   remValue = getRemainderByField(
                                     area,
                                     'noprocess'
                                   );
+                                  remSum = getRemainderBySum(area, 'noprocess');
                                   break;
                                 case 'malas':
                                   remValue = getRemainderByField(area, 'malas');
+                                  remSum = getRemainderBySum(area, 'malas');
                                   break;
                                 default:
                                   remValue = 0;
                               }
 
+                              const shouldShowModalTrigger =
+                                field === 'malas' &&
+                                area.id >= 6 &&
+                                area.status === 'Completado';
+
+                              const remainderAggregateContent =
+                                field === 'malas' && area.status === 'Completado'
+                                  ? shouldShowModalTrigger && remSum > 0
+                                    ? (
+                                        <button
+                                          type="button"
+                                          className="inline-flex min-w-[64px] justify-center rounded border border-gray-200 bg-gray-50 px-2 py-1 text-sm text-gray-700 hover:bg-gray-100 focus:outline-none focus:ring-1 focus:ring-blue-400"
+                                          onClick={() => handleOpenBadQuantityModal(area)}
+                                          title={`Cantidad mala total: ${aggregatedBad}`}
+                                        >
+                                          {aggregatedBad}
+                                        </button>
+                                      )
+                                    : (
+                                        remSum
+                                      )
+                                  : isEditableAggregateField
+                                  ? (
+                                      <input
+                                        type="number"
+                                        value={aggregatedFieldValue}
+                                        min={0}
+                                        onChange={(e) =>
+                                          handleValueChange(
+                                            area.id,
+                                            field,
+                                            e.target.value
+                                          )
+                                        }
+                                        className="w-20 rounded border border-gray-200 px-2 py-1 text-center"
+                                      />
+                                    )
+                                  : remSum;
+
                               cells.push(
-                                <td
-                                  key={`area-${area.id}-parcial-rem-${field}`}
-                                  className="text-center font-semibold"
-                                  title="Remanente"
+                                <React.Fragment
+                                  key={`area-${area.id}-usuario-rem-wrapper-partial`}
                                 >
-                                  {remValue}
-                                </td>
+                                  <td
+                                    key={`area-${area.id}-parcial-rem-${field}`}
+                                    className="text-center font-semibold"
+                                    title="Remanente"
+                                  >
+                                    {remValue}
+                                  </td>
+
+                                  <td
+                                    key={`area-${area.id}-parcial-rem-${field}-sum`}
+                                    className="text-center font-semibold"
+                                    title="Remanente"
+                                  >
+                                    {remainderAggregateContent}
+                                  </td>
+                                </React.Fragment>
                               );
                             }
 
@@ -1682,7 +2240,7 @@ export default function SeguimientoDeOtsAuxPage({ params }: Props) {
                   {/* Control de calidad */}
                   <tr>
                     <td
-                      colSpan={1 + totalCols} // 1 extra por la primera columna "Dato"
+                      colSpan={1 + totalColsDynamic} // 1 extra por la primera columna "Dato"
                       className="bg-gray-50 px-3 py-2 font-bold text-gray-500"
                     >
                       🔍 Calidad
@@ -1698,14 +2256,18 @@ export default function SeguimientoDeOtsAuxPage({ params }: Props) {
 
                       {areas.flatMap((area, aIdx) => {
                         if (area.parciales > 0) {
-                          const vals =
-                            field === 'cqm'
-                              ? getPerPartialCqm(area)
-                              : getPerPartialValues(
-                                  area,
-                                  field as 'defectuoso' | 'muestras'
-                                );
-                          return vals.map((v, i) => (
+                          const hasRem = getRemainder(area) > 0;
+
+                          let vals: Array<number | string>;
+                          if (field === 'cqm') {
+                            vals = getPerPartialCqm(area) as number[];
+                          } else {
+                            vals = getPerPartialValues(
+                              area,
+                              field as 'defectuoso' | 'muestras'
+                            );
+                          }
+                          const cells = vals.map((v, i) => (
                             <td
                               key={`cell-area-${area.id}-parcial-${i}-${field}`}
                               className="text-center"
@@ -1718,13 +2280,32 @@ export default function SeguimientoDeOtsAuxPage({ params }: Props) {
                               {v}
                             </td>
                           ));
-                        }
+                          if (hasRem) {
+                            // suma numérica; en 'muestras' reemplazamos '—' por 0
+                            const toN = (x: any) =>
+                              typeof x === 'number' ? x : toNum(x);
+                            const sumVal = (
+                              vals as (number | string)[]
+                            ).reduce<number>((acc, x) => acc + toN(x), 0);
 
+                            cells.push(
+                              <td
+                                key={`cell-area-${area.id}-parcial-sum-${field}`}
+                                className="text-center font-semibold"
+                                title="Suma total (parciales + remanente)"
+                              >
+                                {sumVal}
+                              </td>
+                            );
+                          }
+
+                          return cells;
+                        }
                         const totalValue =
                           field === 'cqm'
                             ? getSingleCqm(area)
                             : renderCell?.(area, field as any) ??
-                              getAnswerValue(undefined, field as any, area);
+                            getAnswerValue(undefined, field as any, area);
 
                         return (
                           <td
@@ -1903,9 +2484,8 @@ export default function SeguimientoDeOtsAuxPage({ params }: Props) {
                           onClick={() =>
                             setOpModal((s) => ({ ...s, selectedUserId: u.id }))
                           }
-                          className={`w-full text-left px-3 py-2 border-b last:border-b-0 ${
-                            selected ? 'bg-blue-100' : 'hover:bg-gray-50'
-                          }`}
+                          className={`w-full text-left px-3 py-2 border-b last:border-b-0 ${selected ? 'bg-blue-100' : 'hover:bg-gray-50'
+                            }`}
                         >
                           {u.username}
                         </button>
@@ -1930,7 +2510,7 @@ export default function SeguimientoDeOtsAuxPage({ params }: Props) {
           )}
           {workOrder?.status !== 'Cerrado' && (
             <>
-              <SaveButton onClick={() => handleSaveChanges(areas)}>
+              <SaveButton onClick={() => handleSaveChanges()}>
                 Guardar Cambios
               </SaveButton>
               <CloseButton onClick={() => setShowConfirm(true)}>
@@ -1942,16 +2522,20 @@ export default function SeguimientoDeOtsAuxPage({ params }: Props) {
       </Container>
       {showBadQuantity && (
         <BadQuantityModal
-          areas={filteredAreas}
+          areas={modalAreas}
           areaBadQuantities={areaBadQuantities}
           setAreaBadQuantities={setAreaBadQuantities}
-          onConfirm={(updatedAreas) => {
+          onConfirm={(result: BadQuantityModalResult) => {
             setShowBadQuantity(false);
-            // Aquí puedes guardar cambios también
-            console.log('updatedAreas:', updatedAreas);
-            handleSaveChanges(updatedAreas);
+            handleSaveChanges(result);
+            setModalAreas([]);
+            setBadModalOwner(null);
           }}
-          onClose={() => setShowBadQuantity(false)}
+          onClose={() => {
+            setShowBadQuantity(false);
+            setModalAreas([]);
+            setBadModalOwner(null);
+          }}
         />
       )}
       {showConfirm && (

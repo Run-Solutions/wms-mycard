@@ -275,7 +275,8 @@ const OrdenesDeTrabajoScreen: React.FC = () => {
       name: asset.name ?? 'archivo.pdf',
       size: asset.size ?? null,
       uri: asset.uri,
-      type: asset.mimeType ?? guessTypeFromName(asset.name) ?? 'application/pdf',
+      type:
+        asset.mimeType ?? guessTypeFromName(asset.name) ?? 'application/pdf',
     };
 
     if (!validatePdfFile(picked)) return;
@@ -337,7 +338,8 @@ const OrdenesDeTrabajoScreen: React.FC = () => {
 
   const removeMainFile = (type: 'ot' | 'sku' | 'op') =>
     setFiles((prev) => ({ ...prev, [type]: null }));
-  const removeCardImage = () => setFiles((prev) => ({ ...prev, cardImage: null }));
+  const removeCardImage = () =>
+    setFiles((prev) => ({ ...prev, cardImage: null }));
 
   const handlePickExtraFiles = async () => {
     const result = await DocumentPicker.getDocumentAsync({
@@ -402,17 +404,19 @@ const OrdenesDeTrabajoScreen: React.FC = () => {
 
   // ===== Submit (igual a web: cardImage obligatorio) =====
   const handleSubmit = async () => {
-    const {
-      ot_id,
-      mycard_id,
-      quantity,
-      comments,
-      areasOperatorIds,
-      priority,
-    } = formData;
+    const { ot_id, mycard_id, quantity, comments, areasOperatorIds, priority } =
+      formData;
 
-    if (!ot_id.trim() || !mycard_id.trim() || !quantity.trim() || !comments.trim()) {
-      Alert.alert('Datos incompletos', 'Todos los campos son obligatorios excepto la prioridad.');
+    if (
+      !ot_id.trim() ||
+      !mycard_id.trim() ||
+      !quantity.trim() ||
+      !comments.trim()
+    ) {
+      Alert.alert(
+        'Datos incompletos',
+        'Todos los campos son obligatorios excepto la prioridad.'
+      );
       return;
     }
     if (areasOperatorIds.length < 3) {
@@ -420,11 +424,14 @@ const OrdenesDeTrabajoScreen: React.FC = () => {
       return;
     }
     if (areasOperatorIds[0] !== '1') {
-      Alert.alert('Área inicial', 'La primera área debe ser Preprensa (ID: 1).');
+      Alert.alert(
+        'Área inicial',
+        'La primera área debe ser Preprensa (ID: 1).'
+      );
       return;
     }
-    if (!files.ot || !files.sku || !files.op || !files.cardImage) {
-      Alert.alert('Archivos faltantes', 'Debes subir OT, SKU, OP (PDF) y la imagen de tarjeta.');
+    if (!files.ot || !files.sku || !files.op) {
+      Alert.alert('Archivos faltantes', 'Debes subir OT, SKU, OP (PDF)');
       return;
     }
 
@@ -440,11 +447,28 @@ const OrdenesDeTrabajoScreen: React.FC = () => {
       return;
     }
     if (totalFiles > MAX_TOTAL_FILES) {
-      Alert.alert('Límite total', `Máximo ${MAX_TOTAL_FILES} archivos por orden.`);
+      Alert.alert(
+        'Límite total',
+        `Máximo ${MAX_TOTAL_FILES} archivos por orden.`
+      );
       return;
     }
 
     try {
+      const filePayload: {
+        ot: FileLike;
+        sku: FileLike;
+        op: FileLike;
+        cardImage?: FileLike;
+        attachments?: FileLike[];
+      } = {
+        ot: files.ot as FileLike,
+        sku: files.sku as FileLike,
+        op: files.op as FileLike,
+        ...(files.cardImage ? { cardImage: files.cardImage } : {}),
+        ...(extraFiles.length ? { attachments: extraFiles } : {}),
+      };
+
       await createWorkOrder(
         {
           ...formData,
@@ -452,13 +476,7 @@ const OrdenesDeTrabajoScreen: React.FC = () => {
           areasOperatorIds: areasOperatorIds.filter((v) => v !== ''),
           priority,
         },
-        {
-          ot: files.ot,
-          sku: files.sku,
-          op: files.op,
-          cardImage: files.cardImage,
-          attachments: extraFiles,
-        }
+        filePayload
       );
       Alert.alert('✅ Orden creada', 'La orden se envió correctamente.');
 
@@ -485,9 +503,12 @@ const OrdenesDeTrabajoScreen: React.FC = () => {
         err?.url ? `\n• url: ${err.url}` : '',
         err?.responseText ? `\n• body: ${err.responseText}` : '',
       ].join('');
-    
+
       console.error('[createWorkOrder] fallo:', err);
-      Alert.alert('Error al enviar', msg || 'Revisa la consola para más detalles.');
+      Alert.alert(
+        'Error al enviar',
+        msg || 'Revisa la consola para más detalles.'
+      );
     }
   };
 
@@ -498,7 +519,10 @@ const OrdenesDeTrabajoScreen: React.FC = () => {
       <ScrollView style={styles.scrollArea}>
         <TextInput
           placeholder="Número de Orden"
-          style={[styles.input, focusedInput === 'ot_id' && styles.inputFocused]}
+          style={[
+            styles.input,
+            focusedInput === 'ot_id' && styles.inputFocused,
+          ]}
           theme={{ roundness: 30 }}
           mode="outlined"
           activeOutlineColor="#000"
@@ -509,7 +533,10 @@ const OrdenesDeTrabajoScreen: React.FC = () => {
         />
         <TextInput
           placeholder="ID del Presupuesto"
-          style={[styles.input, focusedInput === 'mycard_id' && styles.inputFocused]}
+          style={[
+            styles.input,
+            focusedInput === 'mycard_id' && styles.inputFocused,
+          ]}
           theme={{ roundness: 30 }}
           mode="outlined"
           activeOutlineColor="#000"
@@ -520,7 +547,10 @@ const OrdenesDeTrabajoScreen: React.FC = () => {
         />
         <TextInput
           placeholder="Cantidad (TARJETAS)"
-          style={[styles.input, focusedInput === 'quantity' && styles.inputFocused]}
+          style={[
+            styles.input,
+            focusedInput === 'quantity' && styles.inputFocused,
+          ]}
           theme={{ roundness: 30 }}
           mode="outlined"
           activeOutlineColor="#000"
@@ -532,7 +562,10 @@ const OrdenesDeTrabajoScreen: React.FC = () => {
         />
         <TextInput
           placeholder="Cantidad (Hojas Frente / Hojas Vuelta)"
-          style={[styles.input, focusedInput === 'total_sheets' && styles.inputFocused]}
+          style={[
+            styles.input,
+            focusedInput === 'total_sheets' && styles.inputFocused,
+          ]}
           theme={{ roundness: 30 }}
           mode="outlined"
           activeOutlineColor="#000"
@@ -545,7 +578,10 @@ const OrdenesDeTrabajoScreen: React.FC = () => {
 
         <TextInput
           placeholder="Cantidad de Contactos"
-          style={[styles.input, focusedInput === 'quantity_contacts' && styles.inputFocused]}
+          style={[
+            styles.input,
+            focusedInput === 'quantity_contacts' && styles.inputFocused,
+          ]}
           theme={{ roundness: 30 }}
           mode="outlined"
           activeOutlineColor="#000"
@@ -560,7 +596,11 @@ const OrdenesDeTrabajoScreen: React.FC = () => {
 
         <TextInput
           placeholder="Comentarios"
-          style={[styles.input, focusedInput === 'comments' && styles.inputFocused, { height: 80 }]}
+          style={[
+            styles.input,
+            focusedInput === 'comments' && styles.inputFocused,
+            { height: 80 },
+          ]}
           theme={{ roundness: 30 }}
           mode="outlined"
           activeOutlineColor="#000"
@@ -584,7 +624,8 @@ const OrdenesDeTrabajoScreen: React.FC = () => {
             listMode="SCROLLVIEW"
             open={!!openStates[i]}
             setOpen={(val) => {
-              const isOpen = typeof val === 'function' ? val(!!openStates[i]) : val;
+              const isOpen =
+                typeof val === 'function' ? val(!!openStates[i]) : val;
               setOpenStates((prev) => {
                 const ns: Record<number, boolean> = {};
                 Object.keys(prev).forEach((k) => (ns[+k] = false));
@@ -652,7 +693,9 @@ const OrdenesDeTrabajoScreen: React.FC = () => {
               style={styles.uploadButton}
               onPress={() => handlePickPdf(type)}
             >
-              <Text style={styles.uploadText}>📄 Subir {type.toUpperCase()}</Text>
+              <Text style={styles.uploadText}>
+                📄 Subir {type.toUpperCase()}
+              </Text>
             </TouchableOpacity>
 
             {files[type] && (
@@ -669,9 +712,14 @@ const OrdenesDeTrabajoScreen: React.FC = () => {
         ))}
 
         {/* ====== Imagen de tarjeta ====== */}
-        <Text style={styles.sectionTitle}>Imagen de Tarjeta (PNG/JPEG/WEBP)</Text>
+        <Text style={styles.sectionTitle}>
+          Imagen de Tarjeta (PNG/JPEG/WEBP)
+        </Text>
         <View style={styles.fileInputBox}>
-          <TouchableOpacity style={styles.uploadButton} onPress={handlePickCardImage}>
+          <TouchableOpacity
+            style={styles.uploadButton}
+            onPress={handlePickCardImage}
+          >
             <Text style={styles.uploadText}>🖼️ Subir imagen de tarjeta</Text>
           </TouchableOpacity>
 
@@ -682,7 +730,12 @@ const OrdenesDeTrabajoScreen: React.FC = () => {
               </Text>
               <Image
                 source={{ uri: files.cardImage.uri }}
-                style={{ width: 56, height: 56, borderRadius: 8, marginRight: 8 }}
+                style={{
+                  width: 56,
+                  height: 56,
+                  borderRadius: 8,
+                  marginRight: 8,
+                }}
               />
               <TouchableOpacity onPress={removeCardImage}>
                 <Text style={styles.removeFile}>✖</Text>
@@ -692,9 +745,14 @@ const OrdenesDeTrabajoScreen: React.FC = () => {
         </View>
 
         {/* ====== Adjuntos adicionales ====== */}
-        <Text style={styles.sectionTitle}>Adjuntos adicionales (PDF/Imágenes)</Text>
+        <Text style={styles.sectionTitle}>
+          Adjuntos adicionales (PDF/Imágenes)
+        </Text>
         <View style={styles.fileInputBox}>
-          <TouchableOpacity style={styles.uploadButton} onPress={handlePickExtraFiles}>
+          <TouchableOpacity
+            style={styles.uploadButton}
+            onPress={handlePickExtraFiles}
+          >
             <Text style={styles.uploadText}>📎 Agregar adjuntos</Text>
           </TouchableOpacity>
 
@@ -711,7 +769,8 @@ const OrdenesDeTrabajoScreen: React.FC = () => {
                 </View>
               ))}
               <Text style={{ marginTop: 6, color: '#555' }}>
-                {extraFiles.length} archivo(s) añadidos. Máximo {MAX_ATTACHMENTS} adjuntos. Límite total: {MAX_TOTAL_FILES}.
+                {extraFiles.length} archivo(s) añadidos. Máximo{' '}
+                {MAX_ATTACHMENTS} adjuntos. Límite total: {MAX_TOTAL_FILES}.
               </Text>
             </View>
           )}

@@ -131,7 +131,6 @@ export function getCurrentFlowPartialsTotal(
     'quantity',
     'bad_quantity',
     'excess_quantity',
-    'noprocess_quantity',
     'material_quantity',
   ]);
 

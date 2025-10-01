@@ -2,12 +2,22 @@
 import React from 'react';
 import { AreaData } from '@/app/(protected)/seguimientoDeOts/[id]/page';
 
+export interface BadQuantityModalResult {
+  inputsByArea: Array<{
+    areaId: number;
+    areaName: string;
+    values: Array<{ label: string; value: number }>;
+  }>;
+  updatedAreas: AreaData[];
+}
+
 interface Props {
   areas: AreaData[];
   areaBadQuantities: { [key: string]: string };
   setAreaBadQuantities: React.Dispatch<React.SetStateAction<{ [key: string]: string }>>;
-  onConfirm: (updatedAreas: AreaData[]) => void;
+  onConfirm: (result: BadQuantityModalResult) => void;
   onClose: () => void;
+  isEditable?: boolean;
 }
 
 const BadQuantityModal: React.FC<Props> = ({
@@ -16,23 +26,55 @@ const BadQuantityModal: React.FC<Props> = ({
   setAreaBadQuantities,
   onConfirm,
   onClose,
+  isEditable = true,
 }) => {
+  const normalizeKey = (value: string | undefined | null) =>
+    (value ?? '')
+      .normalize('NFD')
+      .replace(/[\u0300-\u036f]/g, '')
+      .toLowerCase()
+      .replace(/\s/g, '');
+
   const handleConfirm = () => {
+    const parseValue = (value: string | number | undefined) => {
+      const numeric = Number(value);
+      return Number.isFinite(numeric) ? Math.max(0, Math.trunc(numeric)) : 0;
+    };
+
     const updatedAreas = areas.map((area) => {
-      const key = area.name.toLowerCase().replace(/\s/g, '');
+      const key = normalizeKey(area.name);
+      const badValue = parseValue(areaBadQuantities[`${key}_bad`]);
+      const materialValue = parseValue(areaBadQuantities[`${key}_material`]);
+
       return {
         ...area,
-        malas: Number(areaBadQuantities[`${key}_bad`] || 0),
-        defectuoso:
-          area.id >= 6
-            ? Number(areaBadQuantities[`${key}_material`] || 0)
-            : area.defectuoso,
+        malas: badValue,
+        defectuoso: area.id >= 6 ? materialValue : area.defectuoso,
       };
     });
 
-    onConfirm(updatedAreas);
+    const inputsByArea = areas.map((area) => {
+      const key = normalizeKey(area.name);
+      const badValue = parseValue(areaBadQuantities[`${key}_bad`]);
+
+      const values: Array<{ label: string; value: number }> = [
+        { label: 'Malas', value: badValue },
+      ];
+
+      if (area.id >= 6) {
+        const materialValue = parseValue(areaBadQuantities[`${key}_material`]);
+        values.push({ label: 'Malo de fábrica', value: materialValue });
+      }
+
+      return {
+        areaId: area.id,
+        areaName: area.name,
+        values,
+      };
+    });
+
+    onConfirm({ updatedAreas, inputsByArea });
   };
-  console.log('areas desde componente',areas)
 
   return (
     <div className="fixed inset-0 z-50 bg-black/40 flex items-center justify-center p-4">
@@ -48,7 +90,7 @@ const BadQuantityModal: React.FC<Props> = ({
         <div className="overflow-y-auto px-6 py-4 space-y-6">
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             {areas.map((area, index) => {
-              const areaKey = area.name.toLowerCase().replace(/\s/g, '');
+              const areaKey = normalizeKey(area.name);
               return (
                 <div
                   key={`${area.id}-${index}`}
@@ -113,12 +155,12 @@ const BadQuantityModal: React.FC<Props> = ({
           >
             Cancelar
           </button>
-          <button
+          {isEditable &&(<button
             onClick={handleConfirm}
             className="bg-blue-600 hover:bg-blue-700 text-white font-semibold px-5 py-2 rounded-lg"
           >
             Confirmar
-          </button>
+          </button>)}
         </div>
       </div>
     </div>

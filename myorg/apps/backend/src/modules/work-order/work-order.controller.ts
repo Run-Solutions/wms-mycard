@@ -19,6 +19,7 @@ import { WorkOrderService } from './work-order.service';
 import {
   CreateWorkOrderDto,
   UpdateWorkOrderAreasDto,
+  UpdateAreaResponseDataDto,
 } from './dto/create-work-order.dto';
 import { FileFieldsInterceptor } from '@nestjs/platform-express';
 import { JwtAuthGuard } from 'src/auth/jwt-auth.guard';
@@ -202,6 +203,19 @@ export class WorkOrderController {
     return await this.workOrderService.closeWorkOrderById(dto, user.id);
   }
 
+  @Patch(':id/areas/data')
+  async updateAreaResponseData(
+    @Req() req: AuthenticatedRequest,
+    @Param('id') id: string,
+    @Body() body: UpdateAreaResponseDataDto,
+  ) {
+    const user = req.user;
+    if (!user) {
+      throw new ForbiddenException('Usuario no autenticado.');
+    }
+    return await this.workOrderService.updateAreaResponseData(id, user.id, body);
+  }
+
   @Patch(':id/areas')
   async updateWorkOrderAreas(
     @Req() req: AuthenticatedRequest,
@@ -214,8 +228,10 @@ export class WorkOrderController {
     }
     return await this.workOrderService.updateWorkOrderAreas(
       id,
-      body.areas,
       user.id,
+      body.sourceAreaId ?? null,
+      body.sourceWorkOrderFlowId ?? null,
+      body.badQuantitySummary,
     );
   }
 }

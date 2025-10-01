@@ -8,6 +8,7 @@ import {
   useEffect,
   useMemo,
   ChangeEvent,
+  type ReactNode,
 } from 'react';
 import { useRouter } from 'next/navigation';
 import styled from 'styled-components';
@@ -15,7 +16,9 @@ import styled from 'styled-components';
 import { Card, CardContent } from '@/components/ui/card';
 import ProgressBarAreas from '@/components/SeguimientoDeOts/ProgressBarAreas';
 import InconformitiesHistory from '@/components/SeguimientoDeOts/InconformitiesHistory';
-import BadQuantityModal from '@/components/SeguimientoDeOts/BadQuantityModal';
+import BadQuantityModal, {
+  BadQuantityModalResult,
+} from '@/components/SeguimientoDeOts/BadQuantityModal';
 import PartialHistory from '@/components/SeguimientoDeOts/PartialHistory';
 import { AreaTotalsForPartialHistory } from '@/components/SeguimientoDeOts/PartialHistory';
 
@@ -88,6 +91,8 @@ const FALLBACK_FIELDS = [
   'material_quantity',
   'plates',
 ];
+
+const EDITING_ENABLED = false;
 
 const getAreaKey = (area: AreaData) => AREA_KEY_BY_ID[area.id] ?? null;
 
@@ -187,6 +192,32 @@ const getRemainderByField = (
   }
 
   return Math.max(total - parcialesSum, 0);
+};
+
+const getRemainderBySum = (
+  area: AreaData,
+  field: 'buenas' | 'malas' | 'excedente' | 'noprocess' | 'defectuoso'
+) => {
+  const block = getAreaBlock(area) as any;
+  if (!block) return 0;
+
+  switch (field) {
+    case 'buenas':
+      return Math.max(
+        toNum(block.release_quantity ?? block.good_quantity ?? block.plates),
+        0
+      );
+    case 'malas':
+      return Math.max(toNum(block.bad_quantity), 0);
+    case 'excedente':
+      return Math.max(toNum(block.excess_quantity), 0);
+    case 'noprocess':
+      return Math.max(toNum(block.noprocess_quantity), 0);
+    case 'defectuoso':
+      return Math.max(toNum(block.material_quantity), 0);
+    default:
+      return 0;
+  }
 };
 
 const getRemainder = (area: AreaData) => getRemainderByField(area, 'buenas');
@@ -398,6 +429,7 @@ export default function CloseWorkOrderAuxPage({ params }: Props) {
   const [areaBadQuantities, setAreaBadQuantities] = useState<{
     [key: string]: string;
   }>({});
+  const [modalAreas, setModalAreas] = useState<AreaData[]>([]);
 
   const [qualitySectionOpen, setQualitySectionOpen] = useState(false);
   const [partialSectionOpen, setPartialSectionOpen] = useState(false);
@@ -460,6 +492,7 @@ export default function CloseWorkOrderAuxPage({ params }: Props) {
   });
 
   const openOperatorModal = (area: AreaData, partial: PartialType) => {
+    if (!EDITING_ENABLED) return;
     const currentId = partial?.user_id ?? area.assigned_user_id ?? null;
     setOpModal({
       open: true,
@@ -683,8 +716,8 @@ export default function CloseWorkOrderAuxPage({ params }: Props) {
 
   const areaColSpan = (area: AreaData) => {
     const base = Math.max(1, area.parciales || 0);
-    const rem = area.parciales > 0 && getRemainder(area) > 0 ? 1 : 0;
-    return area.parciales > 0 ? base + rem : 1;
+    const hasRem = area.parciales > 0 && getRemainder(area) > 0;
+    return area.parciales > 0 ? base + (hasRem ? 2 : 0) : 1;
   };
 
   const getSumaMalasHasta = (areaId: number): number =>
@@ -692,15 +725,40 @@ export default function CloseWorkOrderAuxPage({ params }: Props) {
       .filter((a) => a.id <= areaId)
       .reduce((sum, a) => sum + (a.malas || 0), 0);
 
-  const handleOpenBadQuantityModal = () => {
+  const handleOpenBadQuantityModal = (triggerArea?: AreaData) => {
+    const normalize = (name: string) => name.toLowerCase().replace(/\s/g, '');
+    const baseKeys = ['impresion', 'serigrafia', 'empalme', 'laminacion', 'corte'];
+    const triggerKey = triggerArea ? normalize(triggerArea.name) : null;
+
+    const keysToInclude = new Set(baseKeys);
+    if (triggerKey) keysToInclude.add(triggerKey);
+
+    const selectedAreas = areas.filter((area) =>
+      keysToInclude.has(normalize(area.name))
+    );
+
+    const orderMap = new Map<string, number>();
+    baseKeys.forEach((key, index) => orderMap.set(key, index));
+    if (triggerKey && !orderMap.has(triggerKey)) {
+      orderMap.set(triggerKey, orderMap.size);
+    }
+
+    const sortedAreas = [...selectedAreas].sort((a, b) => {
+      const aIndex = orderMap.get(normalize(a.name)) ?? Number.MAX_SAFE_INTEGER;
+      const bIndex = orderMap.get(normalize(b.name)) ?? Number.MAX_SAFE_INTEGER;
+      return aIndex - bIndex;
+    });
+
     const initialValues: { [key: string]: string } = {};
-    areas.forEach((area) => {
-      const areaKey = area.name.toLowerCase().replace(/\s/g, '');
+    sortedAreas.forEach((area) => {
+      const areaKey = normalize(area.name);
       initialValues[`${areaKey}_bad`] = area.malas?.toString() || '0';
       if (area.id >= 6)
         initialValues[`${areaKey}_material`] =
           area.defectuoso?.toString() || '0';
     });
+
+    setModalAreas(sortedAreas);
     setAreaBadQuantities(initialValues);
     setShowBadQuantity(true);
   };
@@ -753,9 +811,19 @@ export default function CloseWorkOrderAuxPage({ params }: Props) {
     .filter((area) => area.id >= 6)
     .reduce((acc, area) => acc + (area.cqm || 0), 0);
   const totalMuestras = areas.reduce(
-    (acc, area) => acc + (area.muestras || 0),
+    (acc, area) => {
+      if (area.partials.length > 0) {
+        acc += area.partials.reduce(
+          (pAcc, p) => pAcc + Number(p?.formAuditory?.sample_auditory ?? 0),
+          0
+        ); 
+      }
+      acc += (area.muestras || 0)
+      return acc;
+    },
     0
   );
+  
   const totalUltimaBuenas = ultimaArea?.buenas || 0;
   const totalUltimaExcedente = ultimaArea?.excedente || 0;
   const totalUltimaNoProcess = ultimaArea?.noprocess || 0;
@@ -869,14 +937,53 @@ export default function CloseWorkOrderAuxPage({ params }: Props) {
     }
   };
 
+  const renderReadOnlyValue = (value: string | number) => (
+    <span
+      style={{
+        display: 'inline-block',
+        minWidth: '80px',
+        padding: '4px',
+        textAlign: 'center',
+        backgroundColor: '#f3f4f6',
+        borderRadius: 8,
+      }}
+    >
+      {String(value ?? 0)}
+    </span>
+  );
+
   const renderCell = (area: AreaData, field: NumericField) => {
+    // if (!EDITING_ENABLED) {
+    //   if (field === 'malas' && area.id >= 6 && area.status === 'Completado') {
+    //     return (
+    //       <button
+    //         type="button"
+    //         onClick={handleOpenBadQuantityModal}
+    //         style={{
+    //           display: 'inline-block',
+    //           minWidth: '80px',
+    //           padding: '4px',
+    //           textAlign: 'center',
+    //           backgroundColor: '#f9f9f9',
+    //           borderRadius: 8,
+    //           border: '1px solid #d1d5db',
+    //           cursor: 'pointer',
+    //         }}
+    //       >
+    //         {getSumaMalasHasta(area.id)}
+    //       </button>
+    //     );
+    //   }
+    //   return renderReadOnlyValue(area[field] ?? 0);
+    // }
+
     // 1. OT cerrada → lectura
     if (workOrder?.status === 'Cerrado')
-      return <span>{Number(area[field] ?? 0)}</span>;
+      return renderReadOnlyValue(area[field] ?? 0);
 
     // 2. Área no completada → lectura
     if (area.status !== 'Completado')
-      return <span>{Number(area[field] ?? 0)}</span>;
+      return renderReadOnlyValue(area[field] ?? 0);
 
     // 3. Preprensa → solo 'buenas' editable
     if (area.id === 1) {
@@ -891,7 +998,7 @@ export default function CloseWorkOrderAuxPage({ params }: Props) {
           />
         );
       }
-      return <span>{Number(area[field] ?? 0)}</span>;
+      return renderReadOnlyValue(area[field] ?? 0);
     }
 
     // 4. CQM editable desde Impresión (id >= 2)
@@ -907,7 +1014,7 @@ export default function CloseWorkOrderAuxPage({ params }: Props) {
           />
         );
       }
-      return <span>{Number(area[field] ?? 0)}</span>;
+      return renderReadOnlyValue(area[field] ?? 0);
     }
 
     // 5. Muestras y Defectuoso editables desde Corte (id >= 6)
@@ -923,7 +1030,7 @@ export default function CloseWorkOrderAuxPage({ params }: Props) {
           />
         );
       }
-      return <span>{Number(area[field] ?? 0)}</span>;
+      return renderReadOnlyValue(area[field] ?? 0);
     }
 
     // 6. Malas: desde Corte en adelante se gestiona via modal acumulado
@@ -934,7 +1041,7 @@ export default function CloseWorkOrderAuxPage({ params }: Props) {
             type="number"
             value={getSumaMalasHasta(area.id)}
             min={0}
-            onClick={handleOpenBadQuantityModal}
+            onClick={() => handleOpenBadQuantityModal(area)}
             readOnly
             style={{
               width: '80px',
@@ -1049,11 +1156,12 @@ export default function CloseWorkOrderAuxPage({ params }: Props) {
           };
         }),
     };
-
+    console.log('Payload to save:', payload);
+    
     try {
       await updateWorkOrderAreas(workOrder.ot_id, payload);
       alert('Cambios guardados correctamente');
-      window.location.reload();
+      // window.location.reload();
     } catch (err) {
       alert('Error al guardar los cambios');
     }
@@ -1076,6 +1184,7 @@ export default function CloseWorkOrderAuxPage({ params }: Props) {
     area: AreaData,
     partial?: AreaData['partials'][number] | null
   ) => {
+    if (!EDITING_ENABLED) return false;
     if (workOrder?.status === 'Cerrado') return false;
 
     const editableStatuses = [
@@ -1122,8 +1231,8 @@ export default function CloseWorkOrderAuxPage({ params }: Props) {
     );
   }
 
-  const totalCols = areas.reduce(
-    (sum, area) => sum + (area.parciales > 0 ? area.parciales : 1),
+  const totalColsDynamic = areas.reduce(
+    (sum, area) => sum + areaColSpan(area),
     0
   );
   const filteredAreas = areas.filter(
@@ -1293,12 +1402,20 @@ export default function CloseWorkOrderAuxPage({ params }: Props) {
                               )
                             )}
                             {rem && (
-                              <th
-                                key={`${area.id}-${index}-sub-rem`}
-                                className="p-2 text-center font-normal text-[0.7rem] text-gray-500"
-                              >
-                                Rem
-                              </th>
+                              <>
+                                <th
+                                  key={`${area.id}-${index}-sub-rem`}
+                                  className="p-2 text-center font-normal text-[0.7rem] text-gray-500"
+                                >
+                                  Rem
+                                </th>
+                                <th
+                                  key={`${area.id}-${index}-sub-sum`}
+                                  className="p-2 text-center font-normal text-[0.7rem] text-gray-500"
+                                >
+                                  Σ
+                                </th>
+                              </>
                             )}
                           </Fragment>
                         );
@@ -1382,13 +1499,20 @@ export default function CloseWorkOrderAuxPage({ params }: Props) {
                             operatorById
                           );
                           cells.push(
-                            <td
-                              key={`area-${area.id}-usuario-rem`}
-                              className="text-center font-medium"
-                              title="Remanente"
-                            >
-                              {lastUser}
-                            </td>
+                            <Fragment key={`area-${area.id}-usuario-rem-wrapper`}>
+                              <td
+                                className="text-center font-medium"
+                                title="Remanente"
+                              >
+                                {lastUser}
+                              </td>
+                              <td
+                                className="text-center font-medium"
+                                title="Remanente"
+                              >
+                                {lastUser}
+                              </td>
+                            </Fragment>
                           );
                         }
                         return cells;
@@ -1418,7 +1542,9 @@ export default function CloseWorkOrderAuxPage({ params }: Props) {
                     {areas.flatMap((area, aIdx) => {
                       if (area.parciales > 0) {
                         const reviewers = getPerPartialReviewers(area);
-                        return reviewers.map((name, i) => (
+                        const hasRem = getRemainder(area) > 0;
+
+                        const cells = reviewers.map((name, i) => (
                           <td
                             key={`cell-area-${area.id}-parcial-${i}-calidad`}
                             className="text-center"
@@ -1439,6 +1565,20 @@ export default function CloseWorkOrderAuxPage({ params }: Props) {
                             </span>
                           </td>
                         ));
+
+                        if (hasRem) {
+                          cells.push(
+                            <td
+                              key={`cell-area-${area.id}-calidad-sum`}
+                              className="text-center font-semibold"
+                              title="Suma total (parciales + remanente)"
+                            >
+                              —
+                            </td>
+                          );
+                        }
+
+                        return cells;
                       }
 
                       const lastAns = getLastAnswer(area);
@@ -1469,7 +1609,9 @@ export default function CloseWorkOrderAuxPage({ params }: Props) {
                     {areas.flatMap((area, aIdx) => {
                       if (area.parciales > 0) {
                         const reviewers = getPerPartialAuditors(area);
-                        return reviewers.map((name, i) => (
+                        const hasRem = getRemainder(area) > 0;
+
+                        const cells = reviewers.map((name, i) => (
                           <td
                             key={`cell-area-${area.id}-partial-${i}-auditor`}
                             className="text-center"
@@ -1490,6 +1632,20 @@ export default function CloseWorkOrderAuxPage({ params }: Props) {
                             </span>
                           </td>
                         ));
+
+                        if (hasRem) {
+                          cells.push(
+                            <td
+                              key={`cell-area-${area.id}-auditor-sum`}
+                              className="text-center font-semibold"
+                              title="Suma total (parciales + remanente)"
+                            >
+                              —
+                            </td>
+                          );
+                        }
+
+                        return cells;
                       }
 
                       const auditor = getLastAuditor(area);
@@ -1537,7 +1693,7 @@ export default function CloseWorkOrderAuxPage({ params }: Props) {
                   {/* Producción */}
                   <tr>
                     <td
-                      colSpan={1 + totalCols}
+                      colSpan={1 + totalColsDynamic}
                       className="bg-gray-50 px-3 py-2 font-bold text-gray-500"
                     >
                       📥 Producción
@@ -1553,7 +1709,10 @@ export default function CloseWorkOrderAuxPage({ params }: Props) {
 
                         {areas.flatMap((area, aIndex) => {
                           if (area.parciales > 0 && area.partials?.length) {
-                            const cells: React.ReactNode[] = area.partials.map(
+                            const rem = getRemainder(area);
+                            const hasRem = rem > 0;
+
+                            const cells: ReactNode[] = area.partials.map(
                               (p, pIndex) => {
                                 const value =
                                   field === 'buenas'
@@ -1563,6 +1722,18 @@ export default function CloseWorkOrderAuxPage({ params }: Props) {
                                     : field === 'excedente'
                                     ? toNum(p.excess_quantity)
                                     : toNum(p.noprocess_quantity);
+
+                                const isLastPartialColumn =
+                                  pIndex === area.partials.length - 1 && !hasRem;
+                                const shouldTriggerModal =
+                                  field === 'malas' &&
+                                  area.id >= 6 &&
+                                  area.status === 'Completado' &&
+                                  isLastPartialColumn;
+                                const buttonValue = shouldTriggerModal
+                                  ? toNum(area.malas ?? value)
+                                  : value;
+
                                 return (
                                   <td
                                     key={`area-${area.id}-parcial-${
@@ -1570,33 +1741,42 @@ export default function CloseWorkOrderAuxPage({ params }: Props) {
                                     }-${field}`}
                                     className="text-center"
                                   >
-                                    {value}
+                                    {shouldTriggerModal ? (
+                                      <button
+                                        type="button"
+                                        onClick={() => handleOpenBadQuantityModal(area)}
+                                        style={{
+                                          display: 'inline-block',
+                                          minWidth: '80px',
+                                          padding: '4px',
+                                          textAlign: 'center',
+                                          backgroundColor: '#f9f9f9',
+                                          borderRadius: 8,
+                                          border: '1px solid #d1d5db',
+                                          cursor: 'pointer',
+                                        }}
+                                      >
+                                        {buttonValue}
+                                      </button>
+                                    ) : (
+                                      value
+                                    )}
                                   </td>
                                 );
                               }
                             );
 
-                            const rem = getRemainder(area);
-                            if (rem > 0) {
+                            if (hasRem) {
                               let remValue = 0;
                               switch (field) {
                                 case 'buenas':
-                                  remValue = getRemainderByField(
-                                    area,
-                                    'buenas'
-                                  );
+                                  remValue = getRemainderByField(area, 'buenas');
                                   break;
                                 case 'excedente':
-                                  remValue = getRemainderByField(
-                                    area,
-                                    'excedente'
-                                  );
+                                  remValue = getRemainderByField(area, 'excedente');
                                   break;
                                 case 'noprocess':
-                                  remValue = getRemainderByField(
-                                    area,
-                                    'noprocess'
-                                  );
+                                  remValue = getRemainderByField(area, 'noprocess');
                                   break;
                                 case 'malas':
                                   remValue = getRemainderByField(area, 'malas');
@@ -1605,14 +1785,47 @@ export default function CloseWorkOrderAuxPage({ params }: Props) {
                                   remValue = 0;
                               }
 
+                              const totalSum = getRemainderBySum(area, field);
+                              const isMalasRemTrigger =
+                                field === 'malas' &&
+                                area.id >= 6 &&
+                                area.status === 'Completado';
+                              const buttonRemValue = toNum(area.malas ?? remValue);
+
                               cells.push(
-                                <td
-                                  key={`area-${area.id}-parcial-rem-${field}`}
-                                  className="text-center font-semibold"
-                                  title="Remanente"
-                                >
-                                  {remValue}
-                                </td>
+                                <Fragment key={`area-${area.id}-parcial-rem-wrapper-${field}`}>
+                                  <td
+                                    className="text-center font-semibold"
+                                    title="Remanente"
+                                  >
+                                    {isMalasRemTrigger ? (
+                                      <button
+                                        type="button"
+                                        onClick={() => handleOpenBadQuantityModal(area)}
+                                        style={{
+                                          display: 'inline-block',
+                                          minWidth: '80px',
+                                          padding: '4px',
+                                          textAlign: 'center',
+                                          backgroundColor: '#f9f9f9',
+                                          borderRadius: 8,
+                                          border: '1px solid #d1d5db',
+                                          cursor: 'pointer',
+                                        }}
+                                      >
+                                        {buttonRemValue}
+                                      </button>
+                                    ) : (
+                                      remValue
+                                    )}
+                                  </td>
+                                  <td
+                                    className="text-center font-semibold"
+                                    title="Suma total (parciales + remanente)"
+                                  >
+                                    {totalSum}
+                                  </td>
+                                </Fragment>
                               );
                             }
 
@@ -1635,7 +1848,7 @@ export default function CloseWorkOrderAuxPage({ params }: Props) {
                   {/* Calidad */}
                   <tr>
                     <td
-                      colSpan={1 + totalCols}
+                      colSpan={1 + totalColsDynamic}
                       className="bg-gray-50 px-3 py-2 font-bold text-gray-500"
                     >
                       🔍 Calidad
@@ -1753,7 +1966,7 @@ export default function CloseWorkOrderAuxPage({ params }: Props) {
             </div>
           </TableWrapper>
 
-          {workOrder?.status !== 'En proceso' && (
+          {workOrder?.status == 'En proceso' && (
             <>
               <SectionTitle>Cuadres</SectionTitle>
               <TableWrapper>
@@ -1806,6 +2019,7 @@ export default function CloseWorkOrderAuxPage({ params }: Props) {
               </TableWrapper>
             </>
           )}
+          
 
           <PartialHistory
             workOrder={workOrder}
@@ -1881,9 +2095,11 @@ export default function CloseWorkOrderAuxPage({ params }: Props) {
 
           {workOrder?.status !== 'Cerrado' && (
             <>
-              <SaveButton onClick={() => handleSaveChanges(areas)}>
-                Guardar Cambios
-              </SaveButton>
+              {EDITING_ENABLED && (
+                <SaveButton onClick={() => handleSaveChanges(areas)}>
+                  Guardar Cambios
+                </SaveButton>
+              )}
               <CloseButton
                 onClick={() => {
                   if (lastStatus === 'parcial') {
@@ -1902,14 +2118,19 @@ export default function CloseWorkOrderAuxPage({ params }: Props) {
 
       {showBadQuantity && (
         <BadQuantityModal
-          areas={filteredAreas}
+          areas={modalAreas.length ? modalAreas : filteredAreas}
           areaBadQuantities={areaBadQuantities}
           setAreaBadQuantities={setAreaBadQuantities}
-          onConfirm={(updatedAreas) => {
+          onConfirm={(result: BadQuantityModalResult) => {
             setShowBadQuantity(false);
-            handleSaveChanges(updatedAreas);
+            setModalAreas([]);
+            handleSaveChanges(result?.updatedAreas ?? areas);
           }}
-          onClose={() => setShowBadQuantity(false)}
+          onClose={() => {
+            setShowBadQuantity(false);
+            setModalAreas([]);
+          }}
+          isEditable={EDITING_ENABLED}
         />
       )}
 

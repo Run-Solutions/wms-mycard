@@ -59,6 +59,11 @@ export class FreeWorkOrderService {
       },
       include: {
         partialReleases: true,
+        badQuantityDetails: {
+          include: {
+            targetArea: true,
+          },
+        },
         workOrder: {
           include: {
             user: true,
@@ -68,6 +73,11 @@ export class FreeWorkOrderService {
                 user: true,
                 area: true,
                 partialReleases: true,
+                badQuantityDetails: {
+                  include: {
+                    targetArea: true,
+                  },
+                },
               },
             },
           },
@@ -99,7 +109,12 @@ export class FreeWorkOrderService {
         partialReleases: {
           include: {
             formAuditory: true,
-          }
+          },
+        },
+        badQuantityDetails: {
+          include: {
+            targetArea: true,
+          },
         },
         workOrder: {
           include: {
@@ -113,6 +128,11 @@ export class FreeWorkOrderService {
                 partialReleases: {
                   include: {
                     formAuditory: true,
+                  },
+                },
+                badQuantityDetails: {
+                  include: {
+                    targetArea: true,
                   },
                 },
                 areaResponse: {

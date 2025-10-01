@@ -492,7 +492,7 @@ export default function ImpresionComponent({ workOrder }: Props) {
               onToggle={handleToggleFrenteVuelta}
             />
             <InputGroup style={{ paddingTop: '30px' }}>
-              <Label>Muestras:</Label>
+              <Label style={{ color: '#374151'}}>Muestras:</Label>
               <Input
                 type="number"
                 placeholder="Ej: 2"
@@ -528,7 +528,7 @@ export default function ImpresionComponent({ workOrder }: Props) {
                   onToggle={() => {}} // no hace nada
                   readOnly // <- nuevo prop para deshabilitar
                 />
-                <SectionTitle>Tonos y/o Densidades Contra</SectionTitle>
+                <SectionTitle style={{ color: '#374151'}}>Tonos y/o Densidades Contra</SectionTitle>
                 <RadioGroup>
                   <RadioLabel>
                     <Radio type="radio" name="prueba" value="color" disabled />

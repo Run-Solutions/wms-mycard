@@ -16,6 +16,7 @@ import {
   useNotifications,
   getNotificationRoute,
   shouldShowPlannerAuditorModal,
+  shouldShowPlannerOpersModal,
   shouldShowPlannerCqmModal,
   type AppNotification,
 } from './useNotifications';
@@ -30,6 +31,7 @@ const NotificationsScreen: React.FC = () => {
   // --- estado del modal (planeador + rechazos) ---
   const [modalVisible, setModalVisible] = useState(false);
   const [modalAuditorVisible, setModalAuditorVisible] = useState(false);
+  const [modalOpersVisible, setModalOpersVisible] = useState(false);
   const [selectedNotif, setSelectedNotif] = useState<AppNotification | null>(
     null
   );
@@ -59,6 +61,11 @@ const NotificationsScreen: React.FC = () => {
     } else if (shouldShowPlannerAuditorModal(item, user)) {
       setSelectedNotif(item);
       setModalAuditorVisible(true);
+      if (!item.isRead) markAsRead(item.id);
+      return;
+    } else if (shouldShowPlannerOpersModal(item, user)) {
+      setSelectedNotif(item);
+      setModalOpersVisible(true);
       if (!item.isRead) markAsRead(item.id);
       return;
     }
@@ -93,6 +100,10 @@ const NotificationsScreen: React.FC = () => {
   };
   const handleModalAuditorClose = () => {
     setModalAuditorVisible(false);
+    setSelectedNotif(null);
+  };
+  const handleModalOpersClose = () => {
+    setModalOpersVisible(false);
     setSelectedNotif(null);
   };
 
@@ -217,7 +228,7 @@ const NotificationsScreen: React.FC = () => {
         </Dialog>
       </Portal>
       <Portal>
-        <Dialog visible={modalAuditorVisible} onDismiss={handleModalClose}>
+        <Dialog visible={modalAuditorVisible} onDismiss={handleModalAuditorClose}>
           <Dialog.Title>Inconformidad Auditoría</Dialog.Title>
 
           <Dialog.Content>
@@ -266,6 +277,58 @@ const NotificationsScreen: React.FC = () => {
 
           <Dialog.Actions>
             <Button onPress={handleModalAuditorClose}>Cerrar</Button>
+          </Dialog.Actions>
+        </Dialog>
+      </Portal>
+      <Portal>
+        <Dialog visible={modalOpersVisible} onDismiss={handleModalOpersClose}>
+          <Dialog.Title>Inconformidad Operaciones</Dialog.Title>
+
+          <Dialog.Content>
+            <Text variant="bodyMedium" style={{ marginBottom: 12 }}>
+              {selectedNotif?.body ?? 'Tienes rechazos pendientes de revisión.'}
+            </Text>
+
+            <Text variant="labelLarge" style={{ marginBottom: 6 }}>
+              Comentarios
+            </Text>
+            <TextInput
+              mode="outlined"
+              activeOutlineColor="#000"
+              style={styles.input}
+              theme={{ roundness: 30 }}
+              value={
+                selectedNotif?.inconformity?.comments?.trim()
+                  ? selectedNotif.inconformity!.comments
+                  : 'Sin comentarios'
+              }
+              editable={false}
+              multiline
+            />
+
+            <Text
+              variant="labelLarge"
+              style={{ marginTop: 12, marginBottom: 6 }}
+            >
+              Inconformidad aceptada
+            </Text>
+            <TextInput
+              mode="outlined"
+              activeOutlineColor="#000"
+              style={styles.input}
+              theme={{ roundness: 30 }}
+              value={
+                selectedNotif?.inconformity
+                  ? selectedNotif.inconformity.reviewed
+                    ? 'Sí'
+                    : 'En espera de revisión'
+                  : 'En espera de revisión'
+              }
+              editable={false}
+            />
+          </Dialog.Content>
+          <Dialog.Actions>
+            <Button onPress={handleModalOpersClose}>Cerrar</Button>
           </Dialog.Actions>
         </Dialog>
       </Portal>

@@ -23,9 +23,16 @@ import {
   buildDefaultValuesByArea,
   AreaBlock,
   DefaultValues,
-  toNum
-} from './util/quantityWorkOrder';import { getPrevAreaGoodPlusExcess } from './util/lastWorkOrder';
-
+  toNum,
+} from './util/quantityWorkOrder';
+import { getPrevAreaGoodPlusExcess } from './util/lastWorkOrder';
+import BadQuantityModal from './util/BadQuantityModal';
+import { AreaData } from '../LiberarProducto/PersonalizacionComponent';
+import {
+  blockSupportsMaterial,
+  resolveBlockKey,
+} from '../LiberarProducto/util/areaMappings';
+import { calcularCantidadPorLiberar } from './util/calcularCantidadPorLiberar';
 
 const MillingChipComponentAcceptAuditory: React.FC<{ workOrder: any }> = ({
   workOrder,
@@ -35,11 +42,12 @@ const MillingChipComponentAcceptAuditory: React.FC<{ workOrder: any }> = ({
     bad_quantity: '',
     excess_quantity: '',
     noprocess_quantity: '',
-    cqm_quantity: '',     // <- puede ser '' o número
+    cqm_quantity: '',
     comments: '',
     total_quantity: 0,
     total_execbuen: 0,
   });
+
   const navigation =
     useNavigation<NativeStackNavigationProp<RootStackParamList>>();
   const [showConfirm, setShowConfirm] = useState(false);
@@ -52,23 +60,23 @@ const MillingChipComponentAcceptAuditory: React.FC<{ workOrder: any }> = ({
     if (typeof v === 'boolean') return v ? 1 : 0;
     return v as string | number; // ya restringimos los otros casos
   };
-  
+
   const toAfterCorteData = (
     d: DefaultValues,
     prev?: AfterCorteData
   ): AfterCorteData => {
     return {
       ...(prev ?? ({} as AfterCorteData)),
-  
+
       good_quantity: asStrNum(d.good_quantity),
       bad_quantity: asStrNum(d.bad_quantity),
       excess_quantity: asStrNum(d.excess_quantity),
       noprocess_quantity: asStrNum(d.noprocess_quantity),
       cqm_quantity: asStrNum(d.cqm_quantity),
-  
+
       comments: (d.comments ?? '') as string,
       total_quantity: d.total_quantity ?? 0,
-  
+
       // Si quieres otro criterio, cámbialo aquí
       total_execbuen: toNum(d.good_quantity),
     };
@@ -78,11 +86,25 @@ const MillingChipComponentAcceptAuditory: React.FC<{ workOrder: any }> = ({
     [areaName: string]: string;
   }>({});
 
-  const makeAreaKey = (name?: string) =>
-    (name ?? '').toLowerCase().replace(/\s/g, '');
+  const flowList = useMemo(
+    () => [...(workOrder?.workOrder?.flow ?? [])],
+    [workOrder]
+  );
+
+  const currentIndex = useMemo(
+    () => flowList.findIndex((item) => item?.id === workOrder?.id),
+    [flowList, workOrder?.id]
+  );
+
+  const previousFlows = useMemo(
+    () =>
+      flowList.slice(0, currentIndex + 1).filter((flow) => flow.area_id !== 1),
+    [flowList, currentIndex]
+  );
 
   const areaKeyActual = useMemo(() => {
-    return makeAreaKey(workOrder?.area?.name);
+    const n = workOrder?.area?.name ?? '';
+    return n.toLowerCase().replace(/\s/g, '');
   }, [workOrder?.area?.name]);
 
   const sumaBadQuantity = useMemo(() => {
@@ -97,16 +119,68 @@ const MillingChipComponentAcceptAuditory: React.FC<{ workOrder: any }> = ({
   const areaKey: AreaBlock = 'millingChip';
 
   useEffect(() => {
-    const result = buildDefaultValuesByArea(areaKey, workOrder, sumaBadQuantity, {
-      // filterPartialsByArea: (p) => p.area === areaKey
-    });
-  
+    const result = buildDefaultValuesByArea(
+      areaKey,
+      workOrder,
+      sumaBadQuantity,
+      {
+        // filterPartialsByArea: (p) => p.area === areaKey
+      }
+    );
+
     if (result) {
-      setDefaultValues(prev => toAfterCorteData(result, prev)); 
+      setDefaultValues((prev) => toAfterCorteData(result, prev)); //
     }
   }, [workOrder, sumaBadQuantity]);
 
+  const computeInitialBadQuantities = useCallback(() => {
+    const initialValues: Record<string, string> = {};
+    const makeAreaKey = (name?: string) =>
+      (name ?? '').toLowerCase().replace(/\s/g, '');
+
+    previousFlows.forEach((flow) => {
+      (flow?.badQuantityDetails ?? []).forEach((detail: any) => {
+        // OJO: usa siempre el mismo campo para el área actual (consistencia)
+        // Si tu objeto tiene area_id, úsalo; si no, usa workOrder?.area?.id
+        const currentAreaId = workOrder?.area_id ?? workOrder?.area?.id;
+        if (detail?.source_area_id === currentAreaId) {
+          const areaName = makeAreaKey(detail?.targetArea?.name);
+          initialValues[`${areaName}_bad`] = detail?.bad_quantity
+            ? String(detail.bad_quantity)
+            : '0';
+          initialValues[`${areaName}_material`] = detail?.material_quantity
+            ? String(detail.material_quantity)
+            : '0';
+        }
+      });
+    });
+
+    return initialValues;
+  }, [previousFlows, workOrder?.area_id, workOrder?.area?.id]);
+
+  // 2) Precarga al montar / cambiar workOrder
+  useEffect(() => {
+    const initial = computeInitialBadQuantities();
+    if (Object.keys(initial).length > 0) {
+      setAreaBadQuantities(initial);
+    }
+  }, [computeInitialBadQuantities]);
+
+  const lastCompletedOrPartial = useMemo(
+    () => (currentIndex > 0 ? flowList[currentIndex - 1] : null),
+    [flowList, currentIndex]
+  );
+  
+  const cantidadporliberar = useMemo(
+    () => calcularCantidadPorLiberar(workOrder, lastCompletedOrPartial),
+    [workOrder, lastCompletedOrPartial]
+  );
+  console.log('Cantidad por liberar', cantidadporliberar)
+  console.log('Cantidad total', defaultValues.total_quantity);
+
   const handleOpenModal = async () => {
+    const partialsActual = workOrder?.partialReleases ?? [];
+
     if (!sampleAuditory) {
       alert('Por favor, asegurate de ingresar muestras.');
       return;
@@ -117,16 +191,24 @@ const MillingChipComponentAcceptAuditory: React.FC<{ workOrder: any }> = ({
       (defaultValues.total_quantity ?? 0) + Number(sampleAuditory) > prevAreaSum
     ) {
       alert(
-        'La cantidad total a liberar es mayor a la entregada por parte del área previa.'
+        `La cantidad total a liberar ${
+          (defaultValues.total_quantity ?? 0) + Number(sampleAuditory)
+        } es mayor a la entregada por parte del área previa ${
+          defaultValues.total_quantity
+        }.`
       );
       return;
     } else if (
-      (defaultValues.total_quantity ?? 0) + Number(sampleAuditory) !==
-        prevAreaSum &&
-      workOrder?.areaResponse?.millingChip
+      (partialsActual.length > 0 &&
+        (defaultValues.total_quantity ?? 0) + Number(sampleAuditory) + Number(defaultValues.noprocess_quantity ?? 0)) !==
+      cantidadporliberar
     ) {
       alert(
-        'La cantidad total a liberar es mayor a la entregada por parte del área previa.'
+        `La cantidad total a liberar ${
+          (defaultValues.total_quantity ?? 0) + Number(sampleAuditory)
+        } es diferente a la entregada por parte del la parcialidad previa ${
+          cantidadporliberar
+        }.`
       );
       return;
     }
@@ -175,70 +257,37 @@ const MillingChipComponentAcceptAuditory: React.FC<{ workOrder: any }> = ({
     }
   };
 
-  const currentFlow = workOrder;
-  const flowList = [...workOrder.workOrder.flow];
-  const currentIndex = flowList.findIndex(
-    (item) => item.id === currentFlow?.id
-  );
-  const previousFlows = flowList
-    .slice(0, currentIndex + 1)
-    .filter((flow) => flow.area_id !== 1);
-
-  console.log('Áreas anteriores sin Preprensa:', previousFlows);
-
-  const handleOpenBadQuantityModal = useCallback(() => {
-    if (!isValidArea) return;
-    const initialValues: Record<string, string> = {};
-
-    (previousFlows ?? []).forEach((flow) => {
-      const areaKey = makeAreaKey(flow?.area?.name);
-
-      let badQuantity: number | null | undefined = null;
-      let materialBadQuantity: number | null | undefined = null;
-
-      if (flow.areaResponse?.impression) {
-        badQuantity = flow.areaResponse.impression.bad_quantity;
-      } else if (flow.areaResponse?.serigrafia) {
-        badQuantity = flow.areaResponse.serigrafia.bad_quantity;
-      } else if (flow.areaResponse?.empalme) {
-        badQuantity = flow.areaResponse.empalme.bad_quantity;
-      } else if (flow.areaResponse?.laminacion) {
-        badQuantity = flow.areaResponse.laminacion.bad_quantity;
-      } else if (flow.areaResponse?.corte) {
-        badQuantity = flow.areaResponse.corte.bad_quantity;
-        materialBadQuantity = flow.areaResponse.corte.material_quantity;
-      } else if (flow.areaResponse?.colorEdge) {
-        badQuantity = flow.areaResponse.colorEdge.bad_quantity;
-        materialBadQuantity = flow.areaResponse.colorEdge.material_quantity;
-      } else if (flow.areaResponse?.hotStamping) {
-        badQuantity = flow.areaResponse.hotStamping.bad_quantity;
-        materialBadQuantity = flow.areaResponse.hotStamping.material_quantity;
-      } else if (flow.areaResponse?.millingChip) {
-        badQuantity = flow.areaResponse.millingChip.bad_quantity;
-        materialBadQuantity = flow.areaResponse.millingChip.material_quantity;
-      }
-      // Fallback: sumar parciales
-      if (badQuantity == null && flow.partialReleases?.length > 0) {
-        badQuantity = flow.partialReleases.reduce(
-          (sum: number, r: any) => sum + (r.bad_quantity ?? 0),
-          0
-        );
-        materialBadQuantity = flow.partialReleases.reduce(
-          (sum: number, r: any) => sum + (r.material_quantity ?? 0),
-          0
-        );
-      }
-
-      initialValues[`${areaKey}_bad`] =
-        badQuantity != null ? String(badQuantity) : '';
-      initialValues[`${areaKey}_material`] =
-        materialBadQuantity != null ? String(materialBadQuantity) : '';
-    });
-
-    setAreaBadQuantities(initialValues);
+  const handleOpenBadQuantityModal = () => {
+    const initial = computeInitialBadQuantities();
+    if (Object.keys(initial).length > 0) {
+      setAreaBadQuantities(initial);
+    }
     setShowBadQuantity(true);
-    console.log('Valores iniciales para malas por área:', initialValues);
-  }, [isValidArea, previousFlows]);
+  };
+
+  const normalizedAreas: AreaData[] = useMemo(
+    () =>
+      previousFlows.map((item) => ({
+        supportsMaterial: blockSupportsMaterial(
+          resolveBlockKey(item.area?.name ?? '')
+        ),
+        id: item.area?.id ?? item.id,
+        name: item.area?.name ?? item.name ?? '',
+        malas: item.malas ?? 0,
+        defectuoso: item.defectuoso ?? 0,
+        status: item.status ?? '',
+        response: item.areaResponse ?? {},
+        answers: item.answers ?? [],
+        usuario: item.user?.username ?? '',
+        auditor: '',
+        buenas: 0,
+        cqm: 0,
+        excedente: 0,
+        muestras: 0,
+      })),
+    [previousFlows]
+  );
+  console.log(defaultValues.total_quantity);
 
   return (
     <ScrollView contentContainerStyle={styles.container}>
@@ -325,79 +374,13 @@ const MillingChipComponentAcceptAuditory: React.FC<{ workOrder: any }> = ({
         </TouchableOpacity>
       </View>
       {/* Modal para marcar malas por areas previas al liberar */}
-      <Modal visible={showBadQuantity} transparent animationType="fade">
-        <View style={styles.modalOverlay}>
-          <View style={styles.modalBoxScrollable}>
-            <Text style={styles.modalTitle}>Registrar malas por área</Text>
-
-            <ScrollView style={{ maxHeight: 400 }}>
-              {previousFlows.map((flow, index) => {
-                const areaKey = flow.area.name.toLowerCase();
-                return (
-                  <View key={`${flow.id}-${index}`} style={{ marginTop: 16 }}>
-                    <Text style={styles.areaLabel}>
-                      {flow.area.name.toUpperCase()}
-                    </Text>
-
-                    <View style={styles.areaInputsContainer}>
-                      <View style={[styles.inputGroup, { maxWidth: '40%' }]}>
-                        <Text style={styles.inputLabel}>Malas</Text>
-                        <TextInput
-                          style={styles.input}
-                          theme={{ roundness: 30 }}
-                          mode="outlined"
-                          activeOutlineColor="#000"
-                          keyboardType="numeric"
-                          value={areaBadQuantities[`${areaKey}_bad`] || '0'}
-                          onChangeText={(text) =>
-                            setAreaBadQuantities((prev) => ({
-                              ...prev,
-                              [`${areaKey}_bad`]: text,
-                            }))
-                          }
-                        />
-                      </View>
-
-                      {flow.area_id >= 6 && (
-                        <View style={[styles.inputGroup, { maxWidth: '40%' }]}>
-                          <Text style={styles.inputLabel}>
-                            Materia Prima Defectuosa
-                          </Text>
-                          <TextInput
-                            style={styles.input}
-                            theme={{ roundness: 30 }}
-                            mode="outlined"
-                            activeOutlineColor="#000"
-                            keyboardType="numeric"
-                            value={
-                              areaBadQuantities[`${areaKey}_material`] || '0'
-                            }
-                            onChangeText={(text) =>
-                              setAreaBadQuantities((prev) => ({
-                                ...prev,
-                                [`${areaKey}_material`]: text,
-                              }))
-                            }
-                          />
-                        </View>
-                      )}
-                    </View>
-                  </View>
-                );
-              })}
-            </ScrollView>
-
-            <View style={styles.modalActions}>
-              <TouchableOpacity
-                style={styles.cancelButton}
-                onPress={() => setShowBadQuantity(false)}
-              >
-                <Text style={styles.modalButtonText}>Cancelar</Text>
-              </TouchableOpacity>
-            </View>
-          </View>
-        </View>
-      </Modal>
+      <BadQuantityModal
+        visible={showBadQuantity}
+        areas={normalizedAreas}
+        areaBadQuantities={areaBadQuantities}
+        setAreaBadQuantities={setAreaBadQuantities}
+        onClose={() => setShowBadQuantity(false)}
+      />
       {/* Modal confirmación */}
       <Modal visible={showConfirm} transparent animationType="fade">
         <View style={styles.modalOverlay}>

@@ -1,18 +1,39 @@
-// myorg/apps/frontend-web/src/components/AceptarAuditoria/util/BadQuantityModal.tsx
+// myorg/apps/frontend-web/src/components/LiberarProducto/util/BadQuantityModal.tsx
+import { normalizeAreaKey } from '@/components/LiberarProducto/util/areaMappings';
 import React from 'react';
-import { AreaForBadQty } from '@/components/LiberarProducto/util/BadQuantityModal';
+
+export type AreaForBadQty = {
+  id: number;
+  name: string;
+  malas: number;
+  defectuoso: number;
+  supportsMaterial?: boolean;
+};
+
+type AreaInputLabelValue = {
+  label: string;
+  value: number;
+};
+
+export type BadQuantityModalResult = {
+  updatedAreas: AreaForBadQty[];
+  totalBad: number;
+  totalMaterial: number;
+  lastAreaBad: number;
+  lastAreaMaterial: number;
+  inputsByArea: {
+    areaId: number;
+    areaName: string;
+    values: AreaInputLabelValue[];
+  }[];
+};
 
 interface Props {
   areas: AreaForBadQty[];
   areaBadQuantities: { [key: string]: string };
-  setAreaBadQuantities: React.Dispatch<React.SetStateAction<{ [key: string]: string }>>;
-  onConfirm: (params: {
-    updatedAreas: AreaForBadQty[];      // ✅ shape mínimo
-    totalBad: number;
-    totalMaterial: number;
-    lastAreaBad: number;
-    lastAreaMaterial: number;
-  }) => void;
+  setAreaBadQuantities: React.Dispatch<
+    React.SetStateAction<{ [key: string]: string }>
+  >;
   onClose: () => void;
 }
 
@@ -20,10 +41,8 @@ const BadQuantityModal: React.FC<Props> = ({
   areas,
   areaBadQuantities,
   setAreaBadQuantities,
-  onConfirm,
   onClose,
 }) => {
-  console.log('areas desde componente',areas)
 
   return (
     <div className="fixed inset-0 z-50 bg-black/40 flex items-center justify-center p-4">
@@ -39,7 +58,7 @@ const BadQuantityModal: React.FC<Props> = ({
         <div className="overflow-y-auto px-6 py-4 space-y-6">
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             {areas.map((area, index) => {
-              const areaKey = area.name.toLowerCase().replace(/\s/g, '');
+              const areaKey = normalizeAreaKey(area.name);
               return (
                 <div
                   key={`${area.id}-${index}`}
@@ -58,6 +77,7 @@ const BadQuantityModal: React.FC<Props> = ({
                       <input
                         type="number"
                         min="0"
+                        style={{ color: '#374151'}}
                         className="w-full border border-gray-300 rounded px-3 py-2 text-sm outline-blue-500"
                         value={areaBadQuantities[`${areaKey}_bad`] || '0'}
                         onChange={(e) =>
@@ -70,16 +90,19 @@ const BadQuantityModal: React.FC<Props> = ({
                     </div>
 
                     {/* Defectuoso */}
-                    {area.id >= 6 && (
+                    {area.supportsMaterial && (
                       <div>
                         <label className="block text-sm text-gray-600 font-medium mb-1">
-                        Materia Prima Defectuosa
+                          Malo de fábrica
                         </label>
                         <input
                           type="number"
                           min="0"
+                          style={{ color: '#374151'}}
                           className="w-full border border-gray-300 rounded px-3 py-2 text-sm outline-blue-500"
-                          value={areaBadQuantities[`${areaKey}_material`] || '0'}
+                          value={
+                            areaBadQuantities[`${areaKey}_material`] || '0'
+                          }
                           onChange={(e) =>
                             setAreaBadQuantities((prev) => ({
                               ...prev,

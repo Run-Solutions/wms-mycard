@@ -9,7 +9,7 @@ import {
   StyleSheet,
   ScrollView,
 } from 'react-native';
-import { normalizeAreaKey } from './areaMappings';
+import { normalizeAreaKey } from '../../LiberarProducto/util/areaMappings';
 
 export type AreaForBadQty = {
   id: number;
@@ -43,7 +43,6 @@ interface Props {
   setAreaBadQuantities: React.Dispatch<
     React.SetStateAction<{ [key: string]: string }>
   >;
-  onConfirm: (params: BadQuantityModalResult) => void;
   onClose: () => void;
 }
 
@@ -52,79 +51,9 @@ const BadQuantityModal: React.FC<Props> = ({
   areas,
   areaBadQuantities,
   setAreaBadQuantities,
-  onConfirm,
   onClose,
 }) => {
   console.log(areaBadQuantities, 'areaBadQuantities');
-
-  const handleConfirm = () => {
-    const updatedAreas = areas.map((area) => {
-      const key = normalizeAreaKey(area.name);
-      const supportsMaterial = area.supportsMaterial ?? false;
-      return {
-        ...area,
-        malas: Number(areaBadQuantities[`${key}_bad`] || 0),
-        defectuoso: supportsMaterial
-          ? Number(areaBadQuantities[`${key}_material`] || 0)
-          : area.defectuoso,
-      };
-    });
-
-    const inputsByArea = areas.map((area) => {
-      const baseKey = normalizeAreaKey(area.name);
-      const supportsMaterial = area.supportsMaterial ?? false;
-
-      const values: AreaInputLabelValue[] = [
-        {
-          label: 'Malas',
-          value: Number(areaBadQuantities[`${baseKey}_bad`] || 0),
-        },
-      ];
-
-      if (supportsMaterial) {
-        values.push({
-          label: 'Malo de fábrica',
-          value: Number(areaBadQuantities[`${baseKey}_material`] || 0),
-        });
-      }
-
-      return {
-        areaId: area.id,
-        areaName: area.name,
-        values,
-      };
-    });
-
-    const lastArea = updatedAreas[updatedAreas.length - 1];
-    const lastAreaConfig = areas[areas.length - 1];
-    const areaKey = normalizeAreaKey(lastArea.name);
-    const lastSupportsMaterial = lastAreaConfig?.supportsMaterial ?? false;
-
-    const lastAreaBad = Number(areaBadQuantities[`${areaKey}_bad`] || 0);
-    const lastAreaMaterial = lastSupportsMaterial
-      ? Number(areaBadQuantities[`${areaKey}_material`] || 0)
-      : 0;
-
-    const totalBad = areas.reduce((sum, area) => {
-      const key = normalizeAreaKey(area.name);
-      return sum + Number(areaBadQuantities[`${key}_bad`] || 0);
-    }, 0);
-
-    const totalMaterial = areas.reduce((sum, area) => {
-      if (!area.supportsMaterial) return sum;
-      const key = normalizeAreaKey(area.name);
-      return sum + Number(areaBadQuantities[`${key}_material`] || 0);
-    }, 0);
-
-    onConfirm({
-      updatedAreas,
-      totalBad,
-      totalMaterial,
-      lastAreaBad,
-      lastAreaMaterial,
-      inputsByArea,
-    });
-  };
 
   return (
     <Modal visible={visible} transparent animationType="fade">
@@ -179,12 +108,6 @@ const BadQuantityModal: React.FC<Props> = ({
           <View style={styles.footer}>
             <TouchableOpacity style={styles.cancelButton} onPress={onClose}>
               <Text style={styles.buttonText}>Cancelar</Text>
-            </TouchableOpacity>
-            <TouchableOpacity
-              style={styles.confirmButton}
-              onPress={handleConfirm}
-            >
-              <Text style={styles.buttonText}>Confirmar</Text>
             </TouchableOpacity>
           </View>
         </View>

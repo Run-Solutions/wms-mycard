@@ -658,12 +658,22 @@ export class AcceptWorkOrderService {
             formAuditory: true,
           }
         },
+        badQuantityDetails: {
+          include: {
+            targetArea: true,
+          },
+        },
         workOrder: {
           include: {
             user: true,
             files: true,
             flow: {
               include: {
+                badQuantityDetails: {
+                  include: {
+                    targetArea: true,
+                  },
+                },
                 area: true,
                 areaResponse: {
                   include: {

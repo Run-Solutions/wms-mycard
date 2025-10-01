@@ -113,7 +113,6 @@ export function getCurrentFlowPartialsTotal(
     'quantity',
     'bad_quantity',
     'excess_quantity',
-    'noprocess_quantity',
     'material_quantity',
   ]);
 
@@ -141,7 +140,6 @@ export function getCurrentInputTotal(inputs: {
     lastAreaBadQuantity,
     materialBadQuantity,
     excessQuantity,
-    noProcessQuantity,
   } = inputs;
 
   return (
@@ -149,8 +147,7 @@ export function getCurrentInputTotal(inputs: {
     toNum(goodQuantity) +
     toNum(lastAreaBadQuantity) +
     toNum(materialBadQuantity) +
-    toNum(excessQuantity) +
-    toNum(noProcessQuantity)
+    toNum(excessQuantity) 
   );
 }
 
@@ -166,7 +163,6 @@ export function exceedsPrevAreaSum(params: {
     lastAreaBadQuantity?: NumericLike;
     materialBadQuantity?: NumericLike;
     excessQuantity?: NumericLike;
-    noProcessQuantity?: NumericLike;
   };
   includeUnvalidatedPartials?: boolean;
 }) {

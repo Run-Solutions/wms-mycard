@@ -164,7 +164,6 @@ export function buildDefaultValuesByArea(
       values.excess_quantity,
       values.cqm_quantity,
       values.auditoria_quantity,
-      values.noprocess_quantity
     );
   } else if (areaData && allValidated) {
     // Hay parciales y todos validados: trabajamos con "restantes"
@@ -208,7 +207,6 @@ export function buildDefaultValuesByArea(
       areaData.excess_quantity,
       values.cqm_quantity,
       values.auditoria_quantity,
-      areaData.noprocess_quantity
     );
     totalCalculado = totalResta;
   } else {
@@ -230,9 +228,7 @@ export function buildDefaultValuesByArea(
       values.good_quantity,
       sumaBadQuantity,
       values.excess_quantity,
-      values.auditoria_quantity,
       values.cqm_quantity,
-      values.noprocess_quantity
     );
   }
 

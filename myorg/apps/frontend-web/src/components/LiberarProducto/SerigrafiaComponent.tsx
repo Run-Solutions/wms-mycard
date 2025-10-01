@@ -434,7 +434,7 @@ export default function SerigrafiaComponent({ workOrder }: Props) {
               onToggle={handleToggleRespuesta}
             />
             <InputGroup style={{ paddingTop: '30px' }}>
-              <Label>Muestras:</Label>
+              <Label style={{ color: '#374151'}}>Muestras:</Label>
               <Input
                 type="number"
                 placeholder="Ej: 2"

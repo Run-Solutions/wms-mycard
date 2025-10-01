@@ -45,6 +45,9 @@ const PersonalizacionComponent: React.FC<{ workOrder: any }> = ({
   const releaseBad = lastPartialRelease
     ? lastPartialRelease.bad_quantity
     : workOrder.areaResponse?.personalizacion.bad_quantity;
+  const releaseNoProcess = lastPartialRelease
+    ? lastPartialRelease.noprocess_quantity
+    : workOrder.areaResponse?.personalizacion.noprocess_quantity;
   const releaseExcess = lastPartialRelease
     ? lastPartialRelease.excess_quantity
     : workOrder.areaResponse?.personalizacion.excess_quantity;
@@ -107,6 +110,15 @@ const PersonalizacionComponent: React.FC<{ workOrder: any }> = ({
             style={styles.input}
             editable={false}
             value={String(releaseBad)}
+            mode="outlined"
+            activeOutlineColor="#000"
+            theme={{ roundness: 30 }}
+          />
+          <Text style={styles.subtitle}>Sin procesar:</Text>
+          <TextInput
+            style={styles.input}
+            editable={false}
+            value={String(releaseNoProcess)}
             mode="outlined"
             activeOutlineColor="#000"
             theme={{ roundness: 30 }}

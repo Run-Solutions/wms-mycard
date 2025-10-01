@@ -1,7 +1,7 @@
 'use client';
 
 import { useRouter } from 'next/navigation';
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useState, useCallback } from 'react';
 import styled from 'styled-components';
 
 import {
@@ -15,15 +15,20 @@ import {
   buildDefaultValuesByArea,
   AreaBlock,
   DefaultValues,
-  toNum
+  toNum,
 } from './util/quantityWorkOrder';
 import { getPrevAreaGoodPlusExcess } from './util/lastWorkOrder';
+import BadQuantityModal from './util/BadQuantityModal';
+import { AreaData } from '../LiberarProducto/PersonalizacionComponent';
+import {
+  blockSupportsMaterial,
+  resolveBlockKey,
+} from '../LiberarProducto/util/areaMappings';
+import { calcularCantidadPorLiberar } from './util/calcularCantidadPorLiberar';
 
 interface Props {
   workOrder: any;
 }
-
-
 
 export default function HotStampingComponentAcceptAuditory({
   workOrder,
@@ -41,7 +46,7 @@ export default function HotStampingComponentAcceptAuditory({
     bad_quantity: '',
     excess_quantity: '',
     noprocess_quantity: '',
-    cqm_quantity: '',     // <- puede ser '' o número
+    cqm_quantity: '',
     comments: '',
     total_quantity: 0,
     total_execbuen: 0,
@@ -54,23 +59,23 @@ export default function HotStampingComponentAcceptAuditory({
     if (typeof v === 'boolean') return v ? 1 : 0;
     return v as string | number; // ya restringimos los otros casos
   };
-  
+
   const toAfterCorteData = (
     d: DefaultValues,
     prev?: AfterCorteData
   ): AfterCorteData => {
     return {
       ...(prev ?? ({} as AfterCorteData)),
-  
+
       good_quantity: asStrNum(d.good_quantity),
       bad_quantity: asStrNum(d.bad_quantity),
       excess_quantity: asStrNum(d.excess_quantity),
       noprocess_quantity: asStrNum(d.noprocess_quantity),
       cqm_quantity: asStrNum(d.cqm_quantity),
-  
+
       comments: (d.comments ?? '') as string,
       total_quantity: d.total_quantity ?? 0,
-  
+
       // Si quieres otro criterio, cámbialo aquí
       total_execbuen: toNum(d.good_quantity),
     };
@@ -113,75 +118,111 @@ export default function HotStampingComponentAcceptAuditory({
     return bad + mat;
   }, [areaBadQuantities, areaKeyActual, workOrder?.area?.id]);
 
-  useEffect(() => {
-    if (!isValidArea) return;
-
-    const initialValues: Record<string, string> = {};
-
-    previousFlows.forEach((flow) => {
-      const areaKey = (flow?.area?.name ?? '').toLowerCase().replace(/\s/g, '');
-
-      let badQuantity: number | null | undefined = null;
-      let materialBadQuantity: number | null | undefined = null;
-
-      if (flow.areaResponse?.impression) {
-        badQuantity = flow.areaResponse.impression.bad_quantity;
-      } else if (flow.areaResponse?.serigrafia) {
-        badQuantity = flow.areaResponse.serigrafia.bad_quantity;
-      } else if (flow.areaResponse?.empalme) {
-        badQuantity = flow.areaResponse.empalme.bad_quantity;
-      } else if (flow.areaResponse?.laminacion) {
-        badQuantity = flow.areaResponse.laminacion.bad_quantity;
-      } else if (flow.areaResponse?.corte) {
-        badQuantity = flow.areaResponse.corte.bad_quantity;
-        materialBadQuantity = flow.areaResponse.corte.material_quantity;
-      } else if (flow.areaResponse?.colorEdge) {
-        badQuantity = flow.areaResponse.colorEdge.bad_quantity;
-        materialBadQuantity = flow.areaResponse.colorEdge.material_quantity;
-      } else if (flow.areaResponse?.hotStamping) {
-        badQuantity = flow.areaResponse.hotStamping.bad_quantity;
-        materialBadQuantity = flow.areaResponse.hotStamping.material_quantity;
-      }
-
-      // Fallback: sumar parciales
-      if (badQuantity == null && flow.partialReleases?.length > 0) {
-        badQuantity = flow.partialReleases.reduce(
-          (sum: number, r: any) => sum + (r.bad_quantity ?? 0),
-          0
-        );
-        materialBadQuantity = flow.partialReleases.reduce(
-          (sum: number, r: any) => sum + (r.material_quantity ?? 0),
-          0
-        );
-      }
-
-      initialValues[`${areaKey}_bad`] =
-        badQuantity != null ? String(badQuantity) : '';
-      initialValues[`${areaKey}_material`] =
-        materialBadQuantity != null ? String(materialBadQuantity) : '';
-    });
-
-    setAreaBadQuantities(initialValues);
-  }, [isValidArea, previousFlows]);
-
   const areaKey: AreaBlock = 'hotStamping';
 
   useEffect(() => {
-    const result = buildDefaultValuesByArea(areaKey, workOrder, sumaBadQuantity, {
-      // filterPartialsByArea: (p) => p.area === areaKey
-    });
-  
+    const result = buildDefaultValuesByArea(
+      areaKey,
+      workOrder,
+      sumaBadQuantity,
+      {
+        // filterPartialsByArea: (p) => p.area === areaKey
+      }
+    );
+
     if (result) {
-      setDefaultValues(prev => toAfterCorteData(result, prev)); // 
+      setDefaultValues((prev) => toAfterCorteData(result, prev)); //
     }
   }, [workOrder, sumaBadQuantity]);
 
-  const handleOpenBadQuantityModal = () => setShowBadQuantity(true);
+  const computeInitialBadQuantities = useCallback(() => {
+    const initialValues: Record<string, string> = {};
+    const makeAreaKey = (name?: string) =>
+      (name ?? '').toLowerCase().replace(/\s/g, '');
 
-  const prevAreaSum = useMemo(() => getPrevAreaGoodPlusExcess(workOrder), [workOrder]);
+    previousFlows.forEach((flow) => {
+      (flow?.badQuantityDetails ?? []).forEach((detail: any) => {
+        // OJO: usa siempre el mismo campo para el área actual (consistencia)
+        // Si tu objeto tiene area_id, úsalo; si no, usa workOrder?.area?.id
+        const currentAreaId = workOrder?.area_id ?? workOrder?.area?.id;
+        if (detail?.source_area_id === currentAreaId) {
+          const areaName = makeAreaKey(detail?.targetArea?.name);
+          initialValues[`${areaName}_bad`] = detail?.bad_quantity
+            ? String(detail.bad_quantity)
+            : '0';
+          initialValues[`${areaName}_material`] = detail?.material_quantity
+            ? String(detail.material_quantity)
+            : '0';
+        }
+      });
+    });
+
+    return initialValues;
+  }, [previousFlows, workOrder?.area_id, workOrder?.area?.id]);
+
+  // 2) Precarga al montar / cambiar workOrder
+  useEffect(() => {
+    const initial = computeInitialBadQuantities();
+    if (Object.keys(initial).length > 0) {
+      setAreaBadQuantities(initial);
+    }
+  }, [computeInitialBadQuantities]);
+
+  // 3) Al abrir el modal, sólo asegúrate que el estado esté al día y abre
+  const handleOpenBadQuantityModal = () => {
+    const initial = computeInitialBadQuantities();
+    if (Object.keys(initial).length > 0) {
+      setAreaBadQuantities(initial);
+    }
+    setShowBadQuantity(true);
+  };
+
+  const normalizedAreas: AreaData[] = useMemo(
+    () =>
+      previousFlows.map((item) => ({
+        supportsMaterial: blockSupportsMaterial(
+          resolveBlockKey(item.area?.name ?? '')
+        ),
+        id: item.area?.id ?? item.id,
+        name: item.area?.name ?? item.name ?? '',
+        malas: item.malas ?? 0,
+        defectuoso: item.defectuoso ?? 0,
+        status: item.status ?? '',
+        response: item.areaResponse ?? {},
+        answers: item.answers ?? [],
+        usuario: item.user?.username ?? '',
+        auditor: '',
+        buenas: 0,
+        cqm: 0,
+        excedente: 0,
+        muestras: 0,
+      })),
+    [previousFlows]
+  );
+  console.log(defaultValues.total_quantity);
+
+  const prevAreaSum = useMemo(
+    () => getPrevAreaGoodPlusExcess(workOrder),
+    [workOrder]
+  );
   console.log('prevAreaSum', prevAreaSum);
 
+  const lastCompletedOrPartial = useMemo(
+    () => (currentIndex > 0 ? flowList[currentIndex - 1] : null),
+    [flowList, currentIndex]
+  );
+  
+  const cantidadporliberar = useMemo(
+    () => calcularCantidadPorLiberar(workOrder, lastCompletedOrPartial),
+    [workOrder, lastCompletedOrPartial]
+  );
+  console.log('Cantidad por liberar', cantidadporliberar)
+  console.log('Cantidad total', defaultValues.total_quantity);
+
   const handleOpenModal = async (e: React.FormEvent) => {
+    e.preventDefault();
+    const partialsActual = workOrder?.partialReleases ?? [];
+
     if (!sampleAuditory) {
       alert('Por favor, asegurate de ingresar muestras.');
       return;
@@ -192,26 +233,35 @@ export default function HotStampingComponentAcceptAuditory({
       (defaultValues.total_quantity ?? 0) + Number(sampleAuditory) > prevAreaSum
     ) {
       alert(
-        'La cantidad total a liberar es mayor a la entregada por parte del área previa.'
+        `La cantidad total a liberar ${
+          (defaultValues.total_quantity ?? 0) + Number(sampleAuditory)
+        } es mayor a la entregada por parte del área previa ${
+          defaultValues.total_quantity
+        }.`
       );
       return;
     } else if (
-      (defaultValues.total_quantity ?? 0) + Number(sampleAuditory) !==
-        prevAreaSum &&
-      workOrder?.areaResponse?.hotStamping
+      (partialsActual.length > 0 &&
+        (defaultValues.total_quantity ?? 0) + Number(sampleAuditory) + Number(defaultValues.noprocess_quantity ?? 0)) !==
+      cantidadporliberar
     ) {
       alert(
-        'La cantidad total a liberar --- es mayor a la entregada por parte del área previa.'
+        `La cantidad total a liberar ${
+          (defaultValues.total_quantity ?? 0) + Number(sampleAuditory)
+        } es diferente a la entregada por parte del la parcialidad previa ${
+          cantidadporliberar
+        }.`
       );
       return;
     }
+
     setShowConfirm(true);
-  }
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
-    console.log((defaultValues.total_quantity ?? 0) + Number(sampleAuditory))
+    console.log((defaultValues.total_quantity ?? 0) + Number(sampleAuditory));
     e.preventDefault();
-    
+
     const HotStampingId =
       workOrder?.areaResponse?.hotStamping?.id ?? workOrder.id;
     try {
@@ -321,81 +371,12 @@ export default function HotStampingComponentAcceptAuditory({
 
       {/* Modal: Malas por áreas previas */}
       {showBadQuantity && (
-        <ModalOverlay>
-          <ModalBox>
-            <h4>Registrar malas por área</h4>
-            {previousFlows.map((flow, index) => {
-              const areaKey = (flow.area?.name ?? '')
-                .toLowerCase()
-                .replace(/\s/g, '');
-              return (
-                <div
-                  key={`${flow.id}-${index}`}
-                  style={{
-                    display: 'flex',
-                    flexDirection: 'column',
-                    alignItems: 'flex-start',
-                    gap: '0.5rem',
-                    marginTop: '1rem',
-                  }}
-                >
-                  <Label style={{ fontWeight: 'bold' }}>
-                    {(flow.area?.name ?? '').toUpperCase()}
-                  </Label>
-
-                  <div style={{ display: 'flex', gap: '1rem' }}>
-                    <div>
-                      <Label>Malas</Label>
-                      <InputBad
-                        type="number"
-                        min="0"
-                        readOnly
-                        value={areaBadQuantities[`${areaKey}_bad`] || '0'}
-                        onChange={(e) =>
-                          setAreaBadQuantities((prev) => ({
-                            ...prev,
-                            [`${areaKey}_bad`]: e.target.value,
-                          }))
-                        }
-                      />
-                    </div>
-                    {flow.area_id >= 6 && (
-                      <div>
-                        <Label>Materia Prima Defectuosa</Label>
-                        <InputBad
-                          type="number"
-                          min="0"
-                          readOnly
-                          value={
-                            areaBadQuantities[`${areaKey}_material`] || '0'
-                          }
-                          onChange={(e) =>
-                            setAreaBadQuantities((prev) => ({
-                              ...prev,
-                              [`${areaKey}_material`]: e.target.value,
-                            }))
-                          }
-                        />
-                      </div>
-                    )}
-                  </div>
-                </div>
-              );
-            })}
-            <div
-              style={{
-                display: 'flex',
-                justifyContent: 'flex-end',
-                gap: '1rem',
-                marginTop: '1rem',
-              }}
-            >
-              <CancelButton onClick={() => setShowBadQuantity(false)}>
-                Cerrar
-              </CancelButton>
-            </div>
-          </ModalBox>
-        </ModalOverlay>
+        <BadQuantityModal
+          areas={normalizedAreas}
+          areaBadQuantities={areaBadQuantities}
+          setAreaBadQuantities={setAreaBadQuantities}
+          onClose={() => setShowBadQuantity(false)}
+        />
       )}
 
       {/* Modal: Confirmación de aceptación */}
@@ -483,7 +464,7 @@ const Title = styled.h2`
   font-size: 1.75rem;
   font-weight: 700;
   margin-bottom: 1.5rem;
-  color: #1f2937;
+  color: ${({ theme }) => theme.palette.text.primary};
 `;
 
 const NewData = styled.div``;
@@ -492,12 +473,12 @@ const SectionTitle = styled.h3`
   font-size: 1.25rem;
   font-weight: 600;
   margin: 2rem 0 1rem;
-  color: #374151;
+  color: ${({ theme }) => theme.palette.text.primary};
 `;
 
 const Label = styled.label`
   font-weight: 600;
-  color: #6b7280;
+  color: ${({ theme }) => theme.palette.text.primary};
 `;
 
 const NewDataWrapper = styled.div`
@@ -518,22 +499,6 @@ const Input = styled.input`
   border: 2px solid #d1d5db;
   border-radius: 0.5rem;
   color: black;
-  margin-top: 0.25rem;
-  outline: none;
-  font-size: 1rem;
-  transition: border 0.3s;
-
-  &:focus {
-    border-color: #0038a8;
-  }
-`;
-
-const InputBad = styled.input`
-  width: 100%;
-  color: black;
-  padding: 0.75rem 1rem;
-  border: 2px solid #d1d5db;
-  border-radius: 0.5rem;
   margin-top: 0.25rem;
   outline: none;
   font-size: 1rem;
