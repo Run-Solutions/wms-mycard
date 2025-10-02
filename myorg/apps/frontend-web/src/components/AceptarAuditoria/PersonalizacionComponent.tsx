@@ -23,7 +23,7 @@ import {
   blockSupportsMaterial,
   resolveBlockKey,
 } from '../LiberarProducto/util/areaMappings';
-import { calcularCantidadPorLiberar } from './util/calcularCantidadPorLiberar';
+import { calcularCantidadPorLiberarYParcial } from './util/calcularCantidadPorLiberar';
 import type { AreaForBadQty } from '../LiberarProducto/util/BadQuantityModal';
 import { normalizeAreaKey } from '../LiberarProducto/util/areaMappings';
 
@@ -223,11 +223,12 @@ export default function PersonalizacionComponentAcceptAuditory({
     }
   }, [workOrder, sumaBadQuantity]);
   
-  const cantidadporliberar = useMemo(
-    () => calcularCantidadPorLiberar(workOrder, lastCompletedOrPartial),
+  const { cantidadPorLiberar, lastValidatedPartial } = useMemo(
+    () => calcularCantidadPorLiberarYParcial(workOrder, lastCompletedOrPartial),
     [workOrder, lastCompletedOrPartial]
   );
-  console.log('Cantidad por liberar', cantidadporliberar)
+
+  console.log('Cantidad por liberar', cantidadPorLiberar)
   console.log('Cantidad total', defaultValues.total_quantity);
 
   const handleOpenModal = async (e: React.FormEvent) => {
@@ -252,15 +253,17 @@ export default function PersonalizacionComponentAcceptAuditory({
       );
       return;
     } else if (
-      (partialsActual.length > 0 &&
-        (defaultValues.total_quantity ?? 0) + Number(sampleAuditory) + Number(defaultValues.noprocess_quantity ?? 0)) !==
-      cantidadporliberar
+      partialsActual.length > 0 &&
+      lastValidatedPartial !== null &&
+      (Number(defaultValues.total_quantity ?? 0) +
+        Number(sampleAuditory) +
+        Number(defaultValues.noprocess_quantity ?? 0)) !== cantidadPorLiberar // <- ahora viene del useMemo
     ) {
       alert(
         `La cantidad total a liberar ${
           (defaultValues.total_quantity ?? 0) + Number(sampleAuditory)
         } es diferente a la entregada por parte del la parcialidad previa ${
-          cantidadporliberar
+          cantidadPorLiberar
         }.`
       );
       return;
