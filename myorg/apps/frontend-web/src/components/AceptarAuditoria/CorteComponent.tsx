@@ -180,8 +180,9 @@ export default function CorteComponentAcceptAuditory({ workOrder }: Props) {
   );
 
   const sumaBadQuantity = useMemo(() => {
-    if (!Array.isArray(normalizedAreas) || normalizedAreas.length === 0) return 0;
-  
+    if (!Array.isArray(normalizedAreas) || normalizedAreas.length === 0)
+      return 0;
+
     return normalizedAreas.reduce((acc, area) => {
       const key = normalizeAreaKey(area.name);
       const bad = Number(areaBadQuantities[`${key}_bad`] ?? 0);
@@ -206,44 +207,61 @@ export default function CorteComponentAcceptAuditory({ workOrder }: Props) {
       setDefaultValues((prev) => toAfterCorteData(result, prev)); //
     }
   }, [workOrder, sumaBadQuantity]);
-  
+
   const lastCompletedOrPartial = useMemo(
     () => (currentIndex > 0 ? flowList[currentIndex - 1] : null),
     [flowList, currentIndex]
   );
-  
+
   const { cantidadPorLiberar, lastValidatedPartial } = useMemo(
     () => calcularCantidadPorLiberarYParcial(workOrder, lastCompletedOrPartial),
     [workOrder, lastCompletedOrPartial]
   );
 
-  console.log('Cantidad por liberar', cantidadPorLiberar)
+  console.log('Cantidad por liberar', cantidadPorLiberar);
   console.log('Cantidad total', defaultValues.total_quantity);
 
   const handleOpenModal = async (e: React.FormEvent) => {
     e.preventDefault();
     const partialsActual = workOrder?.partialReleases ?? [];
-  
+
     if (!sampleAuditory) {
       alert('Por favor, asegurate de ingresar muestras.');
       return;
     } else if (
-      ((defaultValues.total_quantity ?? 0) + Number(sampleAuditory)) % 24 !== 0 &&
-      workOrder?.areaResponse?.corte
+      ((defaultValues.total_quantity ?? 0) + Number(sampleAuditory)) % 24 !==
+        0 &&
+      workOrder?.areaResponse?.corte &&
+      partialsActual.length === 0
     ) {
-      alert('Por favor, asegurate de ingresar muestras correctas, ya que la cantidad total no es divisible entre 24.');
+      alert(
+        'Por favor, asegurate de ingresar muestras correctas, ya que la cantidad total no es divisible entre 24.'
+      );
       return;
     } else if (
       partialsActual.length > 0 &&
       lastValidatedPartial !== null &&
-      (Number(defaultValues.total_quantity ?? 0) +
-        Number(sampleAuditory) +
-        Number(defaultValues.noprocess_quantity ?? 0)) !== cantidadPorLiberar // <- ahora viene del useMemo
+      Number(defaultValues.total_quantity ?? 0) + Number(sampleAuditory) !==
+        cantidadPorLiberar
     ) {
-      alert('Por favor, asegurate de ingresar muestras correctas, ya que la cantidad total no es igual a los no procesados del primer parcial.');
+      alert(
+        `La cantidad total a liberar ${
+          (defaultValues.total_quantity ?? 0) + Number(sampleAuditory)
+        } es diferente a la entregada por parte del la parcialidad previa ${cantidadPorLiberar}.`
+      );
+      return;
+    } else if (
+      partialsActual.length > 0 &&
+      lastValidatedPartial === null &&
+      (Number(defaultValues.total_quantity ?? 0) + Number(sampleAuditory)) %
+        24 !==
+        0
+    ) {
+      alert(
+        'Por favor, asegúrate de ingresar muestras correctas, ya que la cantidad total no es divisible entre 24.'
+      );
       return;
     }
-  
     setShowConfirm(true);
   };
 

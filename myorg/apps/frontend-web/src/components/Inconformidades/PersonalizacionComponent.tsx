@@ -1,8 +1,22 @@
 'use client';
 import styled from 'styled-components';
 import { useRouter } from 'next/navigation';
-import { useState } from 'react';
+import { useState, useMemo, useEffect, useCallback } from 'react';
 import { acceptPersonalizacionInconformity } from '@/api/inconformidades';
+import {
+  blockSupportsMaterial,
+  resolveBlockKey,
+} from '../LiberarProducto/util/areaMappings';
+import type { AreaForBadQty } from '../LiberarProducto/util/BadQuantityModal';
+import { normalizeAreaKey } from '../LiberarProducto/util/areaMappings';
+import { AfterCorteData } from '../AceptarAuditoria/CorteComponent';
+import {
+  buildDefaultValuesByArea,
+  DefaultValues,
+  AreaBlock,
+  toNum,
+} from '../AceptarAuditoria/util/quantityWorkOrder';
+import BadQuantityModal from '../AceptarAuditoria/util/BadQuantityModal';
 
 interface Props {
   workOrder: any;
@@ -18,11 +32,52 @@ interface PartialRelease {
 export default function PersonalizacionComponent({ workOrder }: Props) {
   const router = useRouter();
   const [showModal, setShowModal] = useState(false);
+  const [showBadQuantity, setShowBadQuantity] = useState(false);
+  const [areaBadQuantities, setAreaBadQuantities] = useState<
+    Record<string, string>
+  >({});
+  const [defaultValues, setDefaultValues] = useState<AfterCorteData>({
+    good_quantity: '',
+    bad_quantity: '',
+    excess_quantity: '',
+    noprocess_quantity: '',
+    cqm_quantity: '',
+    comments: '',
+    total_quantity: 0,
+    total_execbuen: 0,
+  });
+
   const openModal = () => {
     setShowModal(true);
   };
   const closeModal = () => {
     setShowModal(false);
+  };
+
+  const asStrNum = (v: unknown): string | number => {
+    if (v === null || v === undefined) return '';
+    if (typeof v === 'boolean') return v ? 1 : 0;
+    return v as string | number; // ya restringimos los otros casos
+  };
+  const toAfterCorteData = (
+    d: DefaultValues,
+    prev?: AfterCorteData
+  ): AfterCorteData => {
+    return {
+      ...(prev ?? ({} as AfterCorteData)),
+
+      good_quantity: asStrNum(d.good_quantity),
+      bad_quantity: asStrNum(d.bad_quantity),
+      excess_quantity: asStrNum(d.excess_quantity),
+      noprocess_quantity: asStrNum(d.noprocess_quantity),
+      cqm_quantity: asStrNum(d.cqm_quantity),
+
+      comments: (d.comments ?? '') as string,
+      total_quantity: d.total_quantity ?? 0,
+
+      // Si quieres otro criterio, cámbialo aquí
+      total_execbuen: toNum(d.good_quantity),
+    };
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -53,23 +108,77 @@ export default function PersonalizacionComponent({ workOrder }: Props) {
     (release: PartialRelease) => !release.validated
   );
 
-  // Para los valores mostrados
-  const releaseQuantity = lastPartialRelease
-    ? lastPartialRelease.quantity
-    : workOrder.areaResponse?.personalizacion.good_quantity;
-  const releaseBad = lastPartialRelease
-    ? lastPartialRelease.bad_quantity
-    : workOrder.areaResponse?.personalizacion.bad_quantity;
-  const releaseNoProcess = lastPartialRelease
-    ? lastPartialRelease.noprocess_quantity
-    : workOrder.areaResponse?.personalizacion.noprocess_quantity;
-  const releaseExcess = lastPartialRelease
-    ? lastPartialRelease.excess_quantity
-    : workOrder.areaResponse?.personalizacion.excess_quantity;
+  const flowList = useMemo(
+    () => [...(workOrder?.workOrder?.flow ?? [])],
+    [workOrder]
+  );
 
-  const releaseComments = lastPartialRelease
-    ? lastPartialRelease.observation
-    : workOrder.areaResponse?.personalizacion.comments;
+  const currentIndex = useMemo(
+    () => flowList.findIndex((item) => item?.id === workOrder?.id),
+    [flowList, workOrder?.id]
+  );
+  console.log('flow', currentIndex);
+
+  const previousFlows = useMemo(
+    () =>
+      flowList.slice(0, currentIndex + 1).filter((flow) => flow.area_id !== 1),
+    [flowList, currentIndex]
+  );
+
+  const normalizedAreas: AreaForBadQty[] = useMemo(
+    () =>
+      previousFlows.map((item) => ({
+        supportsMaterial: blockSupportsMaterial(
+          resolveBlockKey(item.area?.name ?? '')
+        ),
+        id: item.area?.id ?? item.id,
+        name: item.area?.name ?? item.name ?? '',
+        malas: item.malas ?? 0,
+        defectuoso: item.defectuoso ?? 0,
+        status: item.status ?? '',
+        response: item.areaResponse ?? {},
+        answers: item.answers ?? [],
+        usuario: item.user?.username ?? '',
+        auditor: '',
+        buenas: 0,
+        cqm: 0,
+        excedente: 0,
+        muestras: 0,
+      })),
+    [previousFlows]
+  );
+  console.log(defaultValues.total_quantity);
+
+  const areaKey: AreaBlock = 'colorEdge';
+
+  const sumaBadQuantity = useMemo(() => {
+    if (!Array.isArray(normalizedAreas) || normalizedAreas.length === 0)
+      return 0;
+
+    return normalizedAreas.reduce((acc, area) => {
+      const key = normalizeAreaKey(area.name);
+      const bad = Number(areaBadQuantities[`${key}_bad`] ?? 0);
+      const mat = area.supportsMaterial
+        ? Number(areaBadQuantities[`${key}_material`] ?? 0)
+        : 0;
+      return acc + bad + mat;
+    }, 0);
+  }, [normalizedAreas, areaBadQuantities]);
+
+  useEffect(() => {
+    const result = buildDefaultValuesByArea(
+      areaKey,
+      workOrder,
+      sumaBadQuantity,
+      {
+        // filterPartialsByArea: (p) => p.area === areaKey
+      }
+    );
+
+    if (result) {
+      setDefaultValues((prev) => toAfterCorteData(result, prev)); //
+    }
+  }, [workOrder, sumaBadQuantity]);
 
   const inconformityList = lastPartialRelease
     ? lastPartialRelease.inconformities
@@ -81,6 +190,46 @@ export default function PersonalizacionComponent({ workOrder }: Props) {
 
   const inconformityUser = lastUnreviewedInconformity?.user.username;
   const inconformityComments = lastUnreviewedInconformity?.comments;
+
+  const computeInitialBadQuantities = useCallback(() => {
+    const initialValues: Record<string, string> = {};
+    const makeAreaKey = (name?: string) =>
+      (name ?? '').toLowerCase().replace(/\s/g, '');
+
+    previousFlows.forEach((flow) => {
+      (flow?.badQuantityDetails ?? []).forEach((detail: any) => {
+        // OJO: usa siempre el mismo campo para el área actual (consistencia)
+        // Si tu objeto tiene area_id, úsalo; si no, usa workOrder?.area?.id
+        const currentAreaId = workOrder?.area_id ?? workOrder?.area?.id;
+        if (detail?.source_area_id === currentAreaId) {
+          const areaName = makeAreaKey(detail?.targetArea?.name);
+          initialValues[`${areaName}_bad`] = detail?.bad_quantity
+            ? String(detail.bad_quantity)
+            : '0';
+          initialValues[`${areaName}_material`] = detail?.material_quantity
+            ? String(detail.material_quantity)
+            : '0';
+        }
+      });
+    });
+
+    return initialValues;
+  }, [previousFlows, workOrder?.area_id, workOrder?.area?.id]);
+
+  useEffect(() => {
+    const initial = computeInitialBadQuantities();
+    if (Object.keys(initial).length > 0) {
+      setAreaBadQuantities(initial);
+    }
+  }, [computeInitialBadQuantities]);
+
+  const handleOpenBadQuantityModal = () => {
+    const initial = computeInitialBadQuantities();
+    if (Object.keys(initial).length > 0) {
+      setAreaBadQuantities(initial);
+    }
+    setShowBadQuantity(true);
+  };
 
   return (
     <>
@@ -94,35 +243,37 @@ export default function PersonalizacionComponent({ workOrder }: Props) {
                 <Input
                   type="number"
                   name="good_quantity"
-                  value={releaseQuantity}
+                  value={defaultValues.good_quantity}
                   disabled
                 />
                 <Label>Malas:</Label>
                 <Input
                   type="number"
                   name="bad_quantity"
-                  value={releaseBad}
-                  disabled
-                />
-                <Label>Sin procesar:</Label>
-                <Input
-                  type="number"
-                  name="excess_quantity"
-                  value={releaseNoProcess}
-                  disabled
+                  value={sumaBadQuantity}
+                  onClick={handleOpenBadQuantityModal}
+                  readOnly
                 />
                 <Label>Excedente:</Label>
                 <Input
                   type="number"
                   name="excess_quantity"
-                  value={releaseExcess}
+                  value={defaultValues.excess_quantity}
+                  disabled
+                />
+
+                <Label>Sin procesar:</Label>
+                <Input
+                  type="number"
+                  name="noprocess_quantity"
+                  value={defaultValues.noprocess_quantity}
                   disabled
                 />
               </InputGroup>
             </NewDataWrapper>
             <InputGroup>
               <Label>Comentarios</Label>
-              <Textarea value={releaseComments} disabled />
+              <Textarea value={defaultValues.comments} disabled />
             </InputGroup>
           </NewData>
         </Container>
@@ -141,6 +292,15 @@ export default function PersonalizacionComponent({ workOrder }: Props) {
         </Container>
       </FlexContainer>
       <CloseButton onClick={openModal}>Aceptar Inconformidad</CloseButton>
+      {/* Modal para marcar malas por areas previas al liberar */}
+      {showBadQuantity && (
+        <BadQuantityModal
+          areas={normalizedAreas}
+          areaBadQuantities={areaBadQuantities}
+          setAreaBadQuantities={setAreaBadQuantities}
+          onClose={() => setShowBadQuantity(false)}
+        />
+      )}
       {showModal && (
         <ModalOverlay>
           <ModalBox>

@@ -52,8 +52,6 @@ import * as DocumentPicker from 'expo-document-picker';
 
 import {
   AreaData,
-  OperatorUser,
-  NumericField,
 } from '../../seguimientoDeOts/[id]/page';
 
 type WorkOrderDetailRouteProp = RouteProp<
@@ -82,6 +80,76 @@ type RNPickedFile = {
   name: string;
   mimeType: string;
 };
+
+export type OperatorUser = {
+  id: number;
+  username: string;
+  areasOperator?: { id: number; name: string };
+};
+
+export type NumericField =
+  | 'buenas'
+  | 'malas'
+  | 'excedente'
+  | 'noprocess'
+  | 'defectuoso'
+  | 'cqm'
+  | 'muestras';
+
+type BlockKey =
+  | 'prepress'
+  | 'impression'
+  | 'serigrafia'
+  | 'empalme'
+  | 'laminacion'
+  | 'corte'
+  | 'colorEdge'
+  | 'hotStamping'
+  | 'millingChip'
+  | 'personalizacion';
+
+const areaBlockMap: Record<number, BlockKey> = {
+  1: 'prepress',
+  2: 'impression',
+  3: 'serigrafia',
+  4: 'empalme',
+  5: 'laminacion',
+  6: 'corte',
+  7: 'colorEdge',
+  8: 'hotStamping',
+  9: 'millingChip',
+  10: 'personalizacion',
+};
+
+const normalizeAreaKey = (name?: string | null) =>
+  (name ?? '')
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .toLowerCase()
+    .replace(/\s/g, '');
+
+const resolveBlockKey = (name?: string | null): BlockKey | null => {
+  const key = normalizeAreaKey(name);
+  const map: Record<string, BlockKey> = {
+    preprensa: 'prepress',
+    impresion: 'impression',
+    serigrafia: 'serigrafia',
+    empalme: 'empalme',
+    laminacion: 'laminacion',
+    corte: 'corte',
+    coloredge: 'colorEdge',
+    'color edge': 'colorEdge',
+    millingchip: 'millingChip',
+    'milling chip': 'millingChip',
+    hotstamping: 'hotStamping',
+    personalizacion: 'personalizacion',
+  };
+  return map[key] ?? null;
+};
+
+const blockSupportsMaterial = (block?: BlockKey | null) =>
+  !!block &&
+  ['corte', 'colorEdge', 'millingChip', 'personalizacion'].includes(block);
 
 // ========================================================
 // Constants & Utils
@@ -201,6 +269,43 @@ const buildAreaTotalsByAreaId = (
   });
 
   return map;
+};
+
+const getRemainderBySum = (
+  area: AreaData,
+  field: 'buenas' | 'malas' | 'excedente' | 'noprocess' | 'defectuoso'
+) => {
+  const block = getAreaBlock(area) as any;
+  if (!block) return 0;
+
+  let total = 0;
+
+  switch (field) {
+    case 'buenas':
+      total = toNum(
+        block.release_quantity ?? block.good_quantity ?? block.plates
+      );
+
+      break;
+    case 'malas':
+      total = toNum(block.bad_quantity);
+
+      break;
+    case 'excedente':
+      total = toNum(block.excess_quantity);
+
+      break;
+    case 'noprocess':
+      total = toNum(block.noprocess_quantity);
+
+      break;
+    case 'defectuoso':
+      total = toNum(block.material_quantity);
+
+      break;
+  }
+
+  return Math.max(total, 0);
 };
 
 const getRemainderByField = (
@@ -476,7 +581,7 @@ const CerrarOrdenDeTrabajoAuxScreen: React.FC = () => {
     let cqm = Number(area.cqm ?? 0);
     let muestras = Number(area.muestras ?? 0);
 
-    if (area.partials?.length) {
+    if (area.partials?.length && area.id > 6) {
       const sums = area.partials.reduce(
         (acc, p) => {
           acc.buenas += Number(p?.quantity ?? 0);

@@ -103,11 +103,6 @@ export default function ColorEdgeComponentAcceptAuditory({ workOrder }: Props) {
     [flowList, currentIndex]
   );
 
-  const areaKeyActual = useMemo(() => {
-    const n = workOrder?.area?.name ?? '';
-    return n.toLowerCase().replace(/\s/g, '');
-  }, [workOrder?.area?.name]);
-
   const areaKey: AreaBlock = 'colorEdge';
 
   const computeInitialBadQuantities = useCallback(() => {
@@ -225,26 +220,24 @@ export default function ColorEdgeComponentAcceptAuditory({ workOrder }: Props) {
       alert('Por favor, asegurate de ingresar muestras.');
       return;
     } else if (
-      ((defaultValues.total_quantity ?? 0) + Number(sampleAuditory) >
+      (defaultValues.total_quantity ?? 0) + Number(sampleAuditory) !==
         prevAreaSum &&
-        workOrder?.areaResponse?.colorEdge) ||
-      (defaultValues.total_quantity ?? 0) + Number(sampleAuditory) > prevAreaSum
+      workOrder?.areaResponse?.colorEdge &&
+      partialsActual.length === 0
     ) {
       alert(
         `La cantidad total a liberar ${
           (defaultValues.total_quantity ?? 0) + Number(sampleAuditory)
         } es mayor a la entregada por parte del área previa ${
-          defaultValues.total_quantity
+          prevAreaSum
         }.`
       );
       return;
     } else if (
       partialsActual.length > 0 &&
       lastValidatedPartial !== null &&
-      Number(defaultValues.total_quantity ?? 0) +
-        Number(sampleAuditory) +
-        Number(defaultValues.noprocess_quantity ?? 0) !==
-        cantidadPorLiberar // <- ahora viene del useMemo
+      Number(defaultValues.total_quantity ?? 0) + Number(sampleAuditory) !==
+        cantidadPorLiberar
     ) {
       alert(
         `La cantidad total a liberar ${
@@ -252,8 +245,21 @@ export default function ColorEdgeComponentAcceptAuditory({ workOrder }: Props) {
         } es diferente a la entregada por parte del la parcialidad previa ${cantidadPorLiberar}.`
       );
       return;
+    } else if (
+      partialsActual.length > 0 &&
+      lastValidatedPartial === null &&
+      Number(defaultValues.total_quantity ?? 0) + Number(sampleAuditory) !==
+        prevAreaSum
+    ) {
+      alert(
+        `La cantidad total a liberar ${
+          (defaultValues.total_quantity ?? 0) + Number(sampleAuditory)
+        } es mayor a la entregada por parte del área previa ${
+          prevAreaSum
+        }.`
+      );
+      return;
     }
-
     setShowConfirm(true);
   };
 
@@ -466,7 +472,7 @@ const Title = styled.h2`
   font-size: 1.75rem;
   font-weight: 700;
   margin-bottom: 1.5rem;
-  color: #1f2937;
+  color: ${({ theme }) => theme.palette.text.primary};
 `;
 
 const NewData = styled.div``;
@@ -480,7 +486,7 @@ const SectionTitle = styled.h3`
 
 const Label = styled.label`
   font-weight: 600;
-  color: #6b7280;
+  color: ${({ theme }) => theme.palette.text.primary};
 `;
 
 const NewDataWrapper = styled.div`

@@ -1,4 +1,4 @@
-// myorg/apps/frontend-mobile/src/components/AceptarAuditoria/util/quantityWorkOrder.ts
+// myorg/apps/frontend-web/src/components/AceptarAuditoria/util/quantityWorkOrder.ts
 
 // --- Tipos base compartidos ---
 export type Numericish = number | string | boolean | null | undefined;
@@ -131,7 +131,7 @@ export function buildDefaultValuesByArea(
 
   const areaData = workOrder.areaResponse?.[areaKey];
   const allPartials = getAllPartials(workOrder);
-  console.log(allPartials)
+  console.log(allPartials);
   const partials = options?.filterPartialsByArea
     ? allPartials.filter(options.filterPartialsByArea)
     : allPartials;
@@ -162,8 +162,9 @@ export function buildDefaultValuesByArea(
       values.good_quantity,
       sumaBadQuantity,
       values.excess_quantity,
+      values.noprocess_quantity,
       values.cqm_quantity,
-      values.auditoria_quantity,
+      values.auditoria_quantity
     );
   } else if (areaData && allValidated) {
     // Hay parciales y todos validados: trabajamos con "restantes"
@@ -173,6 +174,15 @@ export function buildDefaultValuesByArea(
       for (const pr of partials) total += toNum(pr?.[k]);
       return total;
     };
+
+    // ✅ CQM: desde el primer answer del área
+    const firstCqmFromAnswers = toNum(workOrder?.answers[0].sample_quantity);
+
+    // ✅ Auditoría: solo del primer parcial
+    const firstPartial = partials?.[0];
+    const firstAuditoria = toNum(
+      firstPartial?.formAuditory?.sample_auditory ?? 0
+    );
 
     const totalParciales = sumPR('quantity');
     const totalParcialesBad = sumPR('bad_quantity');
@@ -205,13 +215,23 @@ export function buildDefaultValuesByArea(
       areaData.good_quantity,
       sumaBadQuantity,
       areaData.excess_quantity,
-      values.cqm_quantity,
-      values.auditoria_quantity,
+      areaData.noprocess_quantity,
+      firstCqmFromAnswers,
+      firstAuditoria
     );
     totalCalculado = totalResta;
   } else {
     // Tomar el primer parcial sin validar
     const firstUnvalidated = partials.find((p) => !p.validated) || {};
+
+    // ✅ CQM: desde el primer answer del área
+    const firstCqmFromAnswers = toNum(workOrder?.answers[0].sample_quantity);
+
+    // ✅ Auditoría: solo del primer parcial
+    const firstPartial = partials?.[0];
+    const firstAuditoria = toNum(
+      firstPartial?.formAuditory?.sample_auditory ?? 0
+    );
 
     values = {
       good_quantity: firstUnvalidated.quantity ?? '',
@@ -223,12 +243,16 @@ export function buildDefaultValuesByArea(
       auditoria_quantity: auditory_quantity || '',
       comments: firstUnvalidated.observation ?? '',
     };
+    console.log('Suma bad quantity', sumaBadQuantity);
 
     totalCalculado = addN(
       values.good_quantity,
       sumaBadQuantity,
       values.excess_quantity,
+      values.noprocess_quantity,
       values.cqm_quantity,
+      firstAuditoria,
+      firstCqmFromAnswers
     );
   }
 

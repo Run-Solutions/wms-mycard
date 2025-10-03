@@ -150,7 +150,8 @@ const AREA_KEY_BY_ID: Record<number, string> = {
 const getAreaKey = (area: AreaData) => AREA_KEY_BY_ID[area.id] ?? null;
 
 const blockSupportsMaterial = (block?: string | null) =>
-  !!block && ['corte', 'colorEdge', 'millingChip', 'personalizacion'].includes(block);
+  !!block &&
+  ['corte', 'colorEdge', 'millingChip', 'personalizacion'].includes(block);
 
 const toNum = (v: any) =>
   v == null ? 0 : typeof v === 'number' ? v : Number(v) || 0;
@@ -274,8 +275,7 @@ const getRemainderBySum = (
       break;
   }
   return Math.max(total, 0);
-
-}
+};
 
 const getRemainder = (area: AreaData) => getRemainderByField(area, 'buenas');
 
@@ -446,47 +446,41 @@ const getAreaData = (
   }
 };
 
-const getAreaReleaseTotal = (area: AreaData) => {
-  const key = getAreaKey(area);
-  const block: any = key ? (area.response as any)?.[key] : null;
-  if (!block) return 0;
-  return block.release_quantity ?? block.good_quantity ?? block.plates ?? 0;
-};
-const getSumParciales = (area: AreaData) =>
-  (area.partials ?? []).reduce((acc, p) => acc + (p?.quantity ?? 0), 0);
-
 const getAreaSumaTotal = (area: AreaData) => {
-  let buenas = Number(area.buenas ?? 0);
-  let malas = Number(area.malas ?? 0);
-  let excedente = Number(area.excedente ?? 0);
-  let noprocess = Number(area.noprocess ?? 0);
-  let defectuoso = Number(area.defectuoso ?? 0);
-  let cqm = Number(area.cqm ?? 0);
-  let muestras = Number(area.muestras ?? 0);
+  // Si existen parciales -> sumar SOLO el primer parcial
+  if (area.partials?.length && area.id >= 6) {
+    const p = area.partials[0];
+    const firstAnswer = area.answers?.[0];
 
-  if (area.partials?.length) {
-    const sums = area.partials.reduce(
-      (acc, p) => {
-        acc.buenas += Number(p?.quantity ?? 0);
-        acc.muestras += Number(p?.formAuditory?.sample_auditory ?? 0);
-        return acc;
-      },
-      { buenas: 0, muestras: 0 }
+    const buenas = Number(p?.quantity ?? 0);
+    const malas = Number(p?.bad_quantity ?? 0);
+    const excedente = Number(p?.excess_quantity ?? 0);
+    const defectuoso = Number(p?.material_quantity ?? 0);
+    const muestras = Number(p?.formAuditory?.sample_auditory ?? 0);
+    const cqm = Number(firstAnswer?.sample_quantity ?? 0);
+
+    // noprocess SOLO del primer parcial (con alias defensivos por si cambia el nombre)
+    const noprocess = Number(
+      (p as any)?.noprocess ??
+        (p as any)?.no_process ??
+        (p as any)?.not_processed ??
+        (p as any)?.notProcessed ??
+        0
     );
 
-    const rem = getRemainder(area);
-    buenas = sums.buenas + rem;
-
-    const answersCqm = (area.answers ?? []).reduce(
-      (s, a) => s + Number(a?.sample_quantity ?? 0),
-      0
-    );
-    cqm = answersCqm;
-
-    muestras = Number(area.muestras ?? 0) + sums.muestras;
+    return buenas + malas + excedente + defectuoso + cqm + muestras + noprocess;
   }
 
-  return buenas + malas + excedente + noprocess + defectuoso + cqm + muestras;
+  // Si NO hay parciales -> usar los valores del área completos
+  const buenas = Number(area.buenas ?? 0);
+  const malas = Number(area.malas ?? 0);
+  const excedente = Number(area.excedente ?? 0);
+  const defectuoso = Number(area.defectuoso ?? 0);
+  const cqm = Number(area.cqm ?? 0);
+  const muestras = Number(area.muestras ?? 0);
+  const noprocess = Number(area.noprocess ?? 0);
+
+  return buenas + malas + excedente + defectuoso + cqm + muestras + noprocess;
 };
 
 const WorkOrderDetailScreen: React.FC = () => {
@@ -827,9 +821,12 @@ const WorkOrderDetailScreen: React.FC = () => {
   }, [id]);
 
   const badAgg = useMemo(() => {
-    const byTarget = new Map<number, number>();        // opcional: acumulados por target
-    const byTargetMat = new Map<number, number>();     // opcional: material por target
-    const bySourceTarget = new Map<number, Map<number, { bad: number; mat: number }>>();
+    const byTarget = new Map<number, number>(); // opcional: acumulados por target
+    const byTargetMat = new Map<number, number>(); // opcional: material por target
+    const bySourceTarget = new Map<
+      number,
+      Map<number, { bad: number; mat: number }>
+    >();
 
     const flows = workOrder?.flow ?? [];
     flows.forEach((f: any) => {
@@ -928,10 +925,10 @@ const WorkOrderDetailScreen: React.FC = () => {
       prev.map((a) =>
         a.id === area.id
           ? {
-            ...a,
-            assigned_user_id: newUserId,
-            usuario: operatorById.get(newUserId) ?? a.usuario,
-          }
+              ...a,
+              assigned_user_id: newUserId,
+              usuario: operatorById.get(newUserId) ?? a.usuario,
+            }
           : a
       )
     );
@@ -1106,7 +1103,10 @@ const WorkOrderDetailScreen: React.FC = () => {
 
   const handleSaveChanges = async (modalResult?: BadQuantityModalResult) => {
     if (!workOrder) {
-      Alert.alert('Error', 'No se encontró información de la orden de trabajo.');
+      Alert.alert(
+        'Error',
+        'No se encontró información de la orden de trabajo.'
+      );
       return;
     }
 
@@ -1120,16 +1120,16 @@ const WorkOrderDetailScreen: React.FC = () => {
 
     const effectiveAreas = updatedAreasFromModal
       ? areas.map((area) => {
-        const replacement = updatedAreasFromModal.find(
-          (item) => item.id === area.id
-        );
-        if (!replacement) return area;
-        return {
-          ...area,
-          malas: Number(replacement.malas ?? area.malas ?? 0),
-          defectuoso: Number(replacement.defectuoso ?? area.defectuoso ?? 0),
-        };
-      })
+          const replacement = updatedAreasFromModal.find(
+            (item) => item.id === area.id
+          );
+          if (!replacement) return area;
+          return {
+            ...area,
+            malas: Number(replacement.malas ?? area.malas ?? 0),
+            defectuoso: Number(replacement.defectuoso ?? area.defectuoso ?? 0),
+          };
+        })
       : areas;
 
     if (updatedAreasFromModal) {
@@ -1178,7 +1178,9 @@ const WorkOrderDetailScreen: React.FC = () => {
         if (block === 'prepress') {
           data = { plates: Number(area.buenas ?? 0) };
         }
-        if (['impression', 'serigrafia', 'laminacion', 'empalme'].includes(block)) {
+        if (
+          ['impression', 'serigrafia', 'laminacion', 'empalme'].includes(block)
+        ) {
           data = {
             release_quantity: Number(area.buenas ?? 0),
             bad_quantity: Number(area.malas ?? 0),
@@ -1197,15 +1199,19 @@ const WorkOrderDetailScreen: React.FC = () => {
           sample_data,
         };
       })
-      .filter((item): item is {
-        areaId: number;
-        block: string;
-        blockId: number;
-        formId: number | null;
-        cqmId: number | null;
-        data: Record<string, number>;
-        sample_data: Record<string, number>;
-      } => item !== null);
+      .filter(
+        (
+          item
+        ): item is {
+          areaId: number;
+          block: string;
+          blockId: number;
+          formId: number | null;
+          cqmId: number | null;
+          data: Record<string, number>;
+          sample_data: Record<string, number>;
+        } => item !== null
+      );
 
     let areasFromBadModal: Array<{
       areaId: number;
@@ -1235,7 +1241,9 @@ const WorkOrderDetailScreen: React.FC = () => {
         const formId = blockData?.form_auditory_id ?? null;
         const cqmId = blockData?.form_answer_id ?? null;
 
-        const areaKey = (flow.area?.name ?? '').toLowerCase().replace(/\s/g, '');
+        const areaKey = (flow.area?.name ?? '')
+          .toLowerCase()
+          .replace(/\s/g, '');
         const supportsMaterial = blockSupportsMaterial(block);
         const badKey = `${areaKey}_bad`;
         const materialKey = `${areaKey}_material`;
@@ -1263,8 +1271,8 @@ const WorkOrderDetailScreen: React.FC = () => {
 
     const sourceAreaId = badModalOwner?.id ?? null;
     const sourceWorkOrderFlowId =
-      workOrder?.flow?.find((f: any) => Number(f?.area_id) === sourceAreaId)?.id ??
-      null;
+      workOrder?.flow?.find((f: any) => Number(f?.area_id) === sourceAreaId)
+        ?.id ?? null;
 
     const combinedAreas = [...areasFromTable, ...areasFromBadModal];
 
@@ -1346,14 +1354,14 @@ const WorkOrderDetailScreen: React.FC = () => {
         return entry;
       })
       .filter(Boolean) as Array<{
-        areaId: number;
-        block: string;
-        blockId: number;
-        formId?: number;
-        cqmId?: number;
-        data: Record<string, number>;
-        sample_data?: Record<string, number>;
-      }>;
+      areaId: number;
+      block: string;
+      blockId: number;
+      formId?: number;
+      cqmId?: number;
+      data: Record<string, number>;
+      sample_data?: Record<string, number>;
+    }>;
 
     const summary = modalInputs
       .map((item) => {
@@ -1381,7 +1389,7 @@ const WorkOrderDetailScreen: React.FC = () => {
         (entry) =>
           Number.isFinite(entry.areaId) &&
           !!entry.areaName &&
-          entry.values.length > 0,
+          entry.values.length > 0
       );
 
     if (areasForDataUpdate.length === 0 && summary.length === 0) {
@@ -1587,9 +1595,9 @@ const WorkOrderDetailScreen: React.FC = () => {
         </InfoCard>
         <InfoCard label="Evidencias de destrucción">
           {Array.isArray(workOrder?.files) &&
-            workOrder.files.some(
-              (f: any) => f.type === 'DESTRUCTION_EVIDENCE'
-            ) ? (
+          workOrder.files.some(
+            (f: any) => f.type === 'DESTRUCTION_EVIDENCE'
+          ) ? (
             <ScrollView
               horizontal
               showsHorizontalScrollIndicator={false}
@@ -1639,8 +1647,9 @@ const WorkOrderDetailScreen: React.FC = () => {
                         {area.name}{' '}
                         {area.isCollator && area.id === 4 ? '(C)' : ''}
                         {'\n'}
-                        <Text style={{ fontSize: 11, color: '#6b7280' }}>{`P${i + 1
-                          }`}</Text>
+                        <Text style={{ fontSize: 11, color: '#6b7280' }}>{`P${
+                          i + 1
+                        }`}</Text>
                       </Text>
                     ))}
                     {getRemainder(area) > 0 && (
@@ -1714,6 +1723,20 @@ const WorkOrderDetailScreen: React.FC = () => {
                 </TouchableOpacity>
               ));
 
+              // 👉 Si hay Rem, fuerza también la celda Σ para alinear con el header
+              const hasRem = getRemainder(area) > 0;
+              if ((area.parciales || 0) > 0 && hasRem) {
+                const expected = (area.parciales || 0) + 2; // P... + Rem + Σ
+                while (cells.length < expected) {
+                  cells.push(
+                    <Text
+                      key={`enc-${area.id}-sum`}
+                      style={[styles.cellUser]}
+                    />
+                  );
+                }
+              }
+
               return (
                 <React.Fragment key={`enc-${area.id}`}>{cells}</React.Fragment>
               );
@@ -1750,12 +1773,24 @@ const WorkOrderDetailScreen: React.FC = () => {
                     area,
                     operatorById
                   );
+
+                  // Rem
                   cells.push(
                     <Text
                       key={`area-${area.id}-usuario-rem`}
                       style={[styles.cellUser, { fontWeight: '600' }]}
                     >
                       {lastUser}
+                    </Text>
+                  );
+
+                  // Σ (placeholder para alinear; si quieres, muestra también el usuario del total)
+                  cells.push(
+                    <Text
+                      key={`area-${area.id}-usuario-sum`}
+                      style={[styles.cellUser]}
+                    >
+                      {/* vacío para alinear o algún resumen */}
                     </Text>
                   );
                 }
@@ -1858,8 +1893,8 @@ const WorkOrderDetailScreen: React.FC = () => {
             <Text style={styles.cellLabel}>Auditor</Text>
             {areas.flatMap((area, aIdx) => {
               if (area.parciales > 0) {
-                const reviewers = getPerPartialAuditors(area);
-                return reviewers.map((name, i) => (
+                const reviewers = getPerPartialAuditors(area) || [];
+                const cells = reviewers.map((name, i) => (
                   <Text
                     key={`cell-area-${area.id}-partial-${i}-auditor`}
                     style={styles.cellUser}
@@ -1867,6 +1902,19 @@ const WorkOrderDetailScreen: React.FC = () => {
                     {name || '-'}
                   </Text>
                 ));
+
+                if (getRemainder(area) > 0) {
+                  cells.push(
+                    <Text
+                      key={`cell-area-${area.id}-auditor-sum`}
+                      style={styles.cellUser}
+                    >
+                      {/* vacío o total de auditor si aplica */}
+                    </Text>
+                  );
+                }
+
+                return cells;
               }
               const auditor = getLastAuditor(area); // MiniAud | null
               const auditorName = auditor?.username ?? '—'; // <- normalizas a string
@@ -1947,10 +1995,11 @@ const WorkOrderDetailScreen: React.FC = () => {
                       field === 'buenas'
                         ? toNum(p.quantity)
                         : field === 'malas'
-                          ? toNum(p.bad_quantity)
-                          : field === 'excedente'
-                            ? toNum(p.excess_quantity)
-                            : toNum(p.noprocess_quantity);
+                        ? toNum(p.bad_quantity)
+                        : field === 'excedente'
+                        ? toNum(p.excess_quantity)
+                        : toNum(p.noprocess_quantity);
+
                     return (
                       <Text
                         key={`area-${area.id}-parcial-${p.id}-${field}-${pIndex}`}
@@ -1960,12 +2009,16 @@ const WorkOrderDetailScreen: React.FC = () => {
                       </Text>
                     );
                   });
-                  const rem = getRemainder(area);
-                  if (rem > 0) {
-                    let remValue = 0;
+
+                  const hasRem = getRemainder(area) > 0;
+                  let remValue = 0;
+                  if (hasRem) {
                     switch (field) {
                       case 'buenas':
                         remValue = getRemainderByField(area, 'buenas');
+                        break;
+                      case 'malas':
+                        remValue = getRemainderByField(area, 'malas');
                         break;
                       case 'excedente':
                         remValue = getRemainderByField(area, 'excedente');
@@ -1973,12 +2026,11 @@ const WorkOrderDetailScreen: React.FC = () => {
                       case 'noprocess':
                         remValue = getRemainderByField(area, 'noprocess');
                         break;
-                      case 'malas':
-                        remValue = getRemainderByField(area, 'malas');
-                        break;
                       default:
                         remValue = 0;
                     }
+
+                    // Rem
                     cells.push(
                       <Text
                         key={`prod-${area.id}-${field}-rem`}
@@ -1987,7 +2039,26 @@ const WorkOrderDetailScreen: React.FC = () => {
                         {remValue}
                       </Text>
                     );
+
+                    // Σ = suma de parciales + rem
+                    const sumVal =
+                      cells
+                        .slice(0, area.parciales) // solo parciales (los primeros N)
+                        .reduce(
+                          (acc, el) => acc + toNum((el as any).props.children),
+                          0
+                        ) + toNum(remValue);
+
+                    cells.push(
+                      <Text
+                        key={`prod-${area.id}-${field}-sum`}
+                        style={[styles.cellUser, { fontWeight: '700' }]}
+                      >
+                        {renderCell(area, field)}
+                      </Text>
+                    );
                   }
+
                   return cells;
                 }
                 return (
@@ -2027,9 +2098,9 @@ const WorkOrderDetailScreen: React.FC = () => {
                     field === 'cqm'
                       ? getPerPartialCqm(area) // incluye Rem como último índice si lo manejas así
                       : getPerPartialValues(
-                        area,
-                        field as 'defectuoso' | 'muestras'
-                      );
+                          area,
+                          field as 'defectuoso' | 'muestras'
+                        );
 
                   const cells = vals.map((v, i) => (
                     <Text
@@ -2052,7 +2123,7 @@ const WorkOrderDetailScreen: React.FC = () => {
                         key={`cell-area-${area.id}-sum-${field}`}
                         style={[styles.cellUser, { fontWeight: '700' }]}
                       >
-                        {sumVal}
+                        {renderCell(area, field)}
                       </Text>
                     );
                   }
@@ -2063,7 +2134,7 @@ const WorkOrderDetailScreen: React.FC = () => {
                   field === 'cqm'
                     ? getSingleCqm(area)
                     : renderCell?.(area, field as any) ??
-                    getAnswerValue(undefined, field as any, area);
+                      getAnswerValue(undefined, field as any, area);
 
                 return (
                   <View
@@ -2532,8 +2603,8 @@ const fileStyles = StyleSheet.create({
 const pillStyles = {
   pill: {
     paddingHorizontal: 8, // px-2
-    paddingVertical: 4,   // py-1
-    borderRadius: 10,     // rounded-lg
+    paddingVertical: 4, // py-1
+    borderRadius: 10, // rounded-lg
     alignItems: 'center',
     justifyContent: 'center',
   },
@@ -2541,11 +2612,11 @@ const pillStyles = {
     backgroundColor: '#FEF3C7', // bg-yellow-100
   },
   pillText: {
-    fontSize: 12,         // text-sm
-    fontWeight: '500',    // font-medium
+    fontSize: 12, // text-sm
+    fontWeight: '500', // font-medium
   },
   pillTextHighlighted: {
-    color: '#92400E',     // text-yellow-800
+    color: '#92400E', // text-yellow-800
     fontWeight: '600',
   },
 } as const;

@@ -222,13 +222,13 @@ export default function PersonalizacionComponentAcceptAuditory({
       setDefaultValues((prev) => toAfterCorteData(result, prev)); //
     }
   }, [workOrder, sumaBadQuantity]);
-  
+
   const { cantidadPorLiberar, lastValidatedPartial } = useMemo(
     () => calcularCantidadPorLiberarYParcial(workOrder, lastCompletedOrPartial),
     [workOrder, lastCompletedOrPartial]
   );
 
-  console.log('Cantidad por liberar', cantidadPorLiberar)
+  console.log('Cantidad por liberar', cantidadPorLiberar);
   console.log('Cantidad total', defaultValues.total_quantity);
 
   const handleOpenModal = async (e: React.FormEvent) => {
@@ -239,10 +239,10 @@ export default function PersonalizacionComponentAcceptAuditory({
       alert('Por favor, asegurate de ingresar muestras.');
       return;
     } else if (
-      ((defaultValues.total_quantity ?? 0) + Number(sampleAuditory) >
+      (defaultValues.total_quantity ?? 0) + Number(sampleAuditory) !==
         prevAreaSum &&
-        workOrder?.areaResponse?.personalizacion) ||
-      (defaultValues.total_quantity ?? 0) + Number(sampleAuditory) > prevAreaSum
+      workOrder?.areaResponse?.personalizacion &&
+      partialsActual.length === 0
     ) {
       alert(
         `La cantidad total a liberar ${
@@ -255,23 +255,33 @@ export default function PersonalizacionComponentAcceptAuditory({
     } else if (
       partialsActual.length > 0 &&
       lastValidatedPartial !== null &&
-      (Number(defaultValues.total_quantity ?? 0) +
-        Number(sampleAuditory) +
-        Number(defaultValues.noprocess_quantity ?? 0)) !== cantidadPorLiberar // <- ahora viene del useMemo
+      Number(defaultValues.total_quantity ?? 0) + Number(sampleAuditory) !==
+        cantidadPorLiberar
     ) {
       alert(
         `La cantidad total a liberar ${
           (defaultValues.total_quantity ?? 0) + Number(sampleAuditory)
-        } es diferente a la entregada por parte del la parcialidad previa ${
-          cantidadPorLiberar
+        } es diferente a la entregada por parte del la parcialidad previa ${cantidadPorLiberar}.`
+      );
+      return;
+    } else if (
+      partialsActual.length > 0 &&
+      lastValidatedPartial === null &&
+      Number(defaultValues.total_quantity ?? 0) + Number(sampleAuditory) !==
+        prevAreaSum
+    ) {
+      alert(
+        `La cantidad total a liberar ${
+          (defaultValues.total_quantity ?? 0) + Number(sampleAuditory)
+        } es mayor a la entregada por parte del área previa ${
+          prevAreaSum
         }.`
       );
       return;
     }
-
     setShowConfirm(true);
   };
-
+  
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     const personalizacionId =
