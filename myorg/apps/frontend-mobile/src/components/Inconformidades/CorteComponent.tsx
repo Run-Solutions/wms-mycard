@@ -130,7 +130,7 @@ const CorteComponent: React.FC<{ workOrder: any }> = ({ workOrder }) => {
   );
   console.log(defaultValues.total_quantity);
 
-  const areaKey: AreaBlock = 'colorEdge';
+  const areaKey: AreaBlock = 'corte';
 
   const sumaBadQuantity = useMemo(() => {
     if (!Array.isArray(normalizedAreas) || normalizedAreas.length === 0)

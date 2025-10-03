@@ -1091,7 +1091,6 @@ export default function SeguimientoDeOtsAuxPage({ params }: Props) {
   const totalGeneral =
     totalUltimaBuenas +
     totalUltimaExcedente +
-    totalUltimaNoProcess +
     totalMalas +
     totalDefectuoso +
     totalCqm +

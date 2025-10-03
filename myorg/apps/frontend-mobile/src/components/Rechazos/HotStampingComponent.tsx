@@ -16,11 +16,12 @@ import { RootStackParamList } from '../../navigation/types';
 import { acceptHotStampingInconformityAuditory } from '../../api/rechazos';
 import { InconformityData } from './CorteComponent';
 import BadQuantityModal from '../AceptarAuditoria/util/BadQuantityModal';
-import { AreaData } from '../LiberarProducto/PersonalizacionComponent';
 import {
   blockSupportsMaterial,
   resolveBlockKey,
 } from '../LiberarProducto/util/areaMappings';
+import { normalizeAreaKey } from '../LiberarProducto/util/areaMappings';
+import type { AreaForBadQty } from '../LiberarProducto/util/BadQuantityModal';
 
 interface Props {
   workOrder: any;
@@ -224,7 +225,7 @@ const HotStampingComponent: React.FC<Props> = ({ workOrder, currentFlow }) => {
     setShowBadQuantity(true);
   };
 
-  const normalizedAreas: AreaData[] = useMemo(
+  const normalizedAreas: AreaForBadQty[] = useMemo(
     () =>
       previousFlows.map((item: any) => ({
         supportsMaterial: blockSupportsMaterial(
@@ -247,27 +248,19 @@ const HotStampingComponent: React.FC<Props> = ({ workOrder, currentFlow }) => {
     [previousFlows]
   );
 
-  const sumaBadQuantity = previousFlows.reduce((sum: any, flow: any) => {
-    let bad = 0;
+  const sumaBadQuantity = useMemo(() => {
+    if (!Array.isArray(normalizedAreas) || normalizedAreas.length === 0)
+      return 0;
 
-    if (flow.areaResponse?.hotStamping) {
-      const hotStamping = flow.areaResponse.hotStamping;
-      const hotStampingBad = hotStamping.bad_quantity || 0;
-      const hotStampingMaterial = hotStamping.material_quantity || 0; // ← suma también este
-      bad = hotStampingBad + hotStampingMaterial;
-    }
-
-    // Si no hay respuesta y sí hay parciales
-    if (bad === 0 && flow.partialReleases?.length > 0) {
-      bad = flow.partialReleases.reduce((partialSum: number, release: any) => {
-        const badQty = release.bad_quantity ?? 0;
-        const materialQty = release.material_quantity ?? 0;
-        return partialSum + badQty + materialQty; // ← también suma material aquí
-      }, 0);
-    }
-
-    return sum + bad;
-  }, 0);
+    return normalizedAreas.reduce((acc, area) => {
+      const key = normalizeAreaKey(area.name);
+      const bad = Number(areaBadQuantities[`${key}_bad`] ?? 0);
+      const mat = area.supportsMaterial
+        ? Number(areaBadQuantities[`${key}_material`] ?? 0)
+        : 0;
+      return acc + bad + mat;
+    }, 0);
+  }, [normalizedAreas, areaBadQuantities]);
 
   return (
     <View style={{ paddingBottom: 16 }}>

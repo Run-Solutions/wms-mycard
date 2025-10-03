@@ -150,7 +150,7 @@ export default function CorteComponent({ workOrder }: Props) {
   );
   console.log(defaultValues.total_quantity);
 
-  const areaKey: AreaBlock = 'colorEdge';
+  const areaKey: AreaBlock = 'corte';
 
   const sumaBadQuantity = useMemo(() => {
     if (!Array.isArray(normalizedAreas) || normalizedAreas.length === 0)

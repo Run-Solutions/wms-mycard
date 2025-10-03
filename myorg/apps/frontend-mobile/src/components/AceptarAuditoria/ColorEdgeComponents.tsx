@@ -129,20 +129,21 @@ const ColorEdgeComponentAcceptAuditory: React.FC<{ workOrder: any }> = ({
         excedente: 0,
         muestras: 0,
       })),
-      [previousFlows]
-    );
-    const sumaBadQuantity = useMemo(() => {
-      if (!Array.isArray(normalizedAreas) || normalizedAreas.length === 0) return 0;
-    
-      return normalizedAreas.reduce((acc, area:any) => {
-        const key = normalizeAreaKey(area.name);
-        const bad = Number(areaBadQuantities[`${key}_bad`] ?? 0);
-        const mat = area.supportsMaterial
-          ? Number(areaBadQuantities[`${key}_material`] ?? 0)
-          : 0;
-        return acc + bad + mat;
-      }, 0);
-    }, [normalizedAreas, areaBadQuantities]);
+    [previousFlows]
+  );
+  const sumaBadQuantity = useMemo(() => {
+    if (!Array.isArray(normalizedAreas) || normalizedAreas.length === 0)
+      return 0;
+
+    return normalizedAreas.reduce((acc, area: any) => {
+      const key = normalizeAreaKey(area.name);
+      const bad = Number(areaBadQuantities[`${key}_bad`] ?? 0);
+      const mat = area.supportsMaterial
+        ? Number(areaBadQuantities[`${key}_material`] ?? 0)
+        : 0;
+      return acc + bad + mat;
+    }, 0);
+  }, [normalizedAreas, areaBadQuantities]);
 
   const areaKey: AreaBlock = 'colorEdge';
 
@@ -198,7 +199,7 @@ const ColorEdgeComponentAcceptAuditory: React.FC<{ workOrder: any }> = ({
     () => (currentIndex > 0 ? flowList[currentIndex - 1] : null),
     [flowList, currentIndex]
   );
-  
+
   const { cantidadPorLiberar, lastValidatedPartial } = useMemo(
     () => calcularCantidadPorLiberarYParcial(workOrder, lastCompletedOrPartial),
     [workOrder, lastCompletedOrPartial]
@@ -221,9 +222,7 @@ const ColorEdgeComponentAcceptAuditory: React.FC<{ workOrder: any }> = ({
       alert(
         `La cantidad total a liberar ${
           (defaultValues.total_quantity ?? 0) + Number(sampleAuditory)
-        } es mayor a la entregada por parte del área previa ${
-          defaultValues.total_quantity
-        }.`
+        } es mayor a la entregada por parte del área previa ${prevAreaSum}.`
       );
       return;
     } else if (
@@ -235,9 +234,7 @@ const ColorEdgeComponentAcceptAuditory: React.FC<{ workOrder: any }> = ({
       alert(
         `La cantidad total a liberar ${
           (defaultValues.total_quantity ?? 0) + Number(sampleAuditory)
-        } es diferente a la entregada por parte del la parcialidad previa ${
-          cantidadPorLiberar
-        }.`
+        } es diferente a la entregada por parte del la parcialidad previa ${cantidadPorLiberar}.`
       );
       return;
     } else if (
@@ -247,7 +244,9 @@ const ColorEdgeComponentAcceptAuditory: React.FC<{ workOrder: any }> = ({
         prevAreaSum
     ) {
       alert(
-        'Por favor, asegurate de ingresar muestras correctas, ya que la cantidad total no es divisible entre 24.'
+        `La cantidad total a liberar ${
+          (defaultValues.total_quantity ?? 0) + Number(sampleAuditory)
+        } es mayor a la entregada por parte del área previa ${prevAreaSum}.`
       );
       return;
     }

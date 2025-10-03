@@ -246,7 +246,11 @@ const MillingChipComponentAcceptAuditory: React.FC<{ workOrder: any }> = ({
         prevAreaSum
     ) {
       alert(
-        'Por favor, asegurate de ingresar muestras correctas, ya que la cantidad total no es divisible entre 24.'
+        `La cantidad total a liberar ${
+          (defaultValues.total_quantity ?? 0) + Number(sampleAuditory)
+        } es mayor a la entregada por parte del área previa ${
+          prevAreaSum
+        }.`
       );
       return;
     }

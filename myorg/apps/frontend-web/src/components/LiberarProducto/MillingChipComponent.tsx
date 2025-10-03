@@ -505,10 +505,10 @@ export default function MillingChipComponent({ workOrder }: Props) {
       );
       return;
     } else if (
-      Number(goodQuantity) < workOrder.workOrder.quantity && Number(excessQuantity) === 0
+      Number(goodQuantity) < workOrder.workOrder.quantity && Number(noProcessQuantity) === 0
     ) {
       alert(
-        `La cantidad de excedente ${Number(excessQuantity)} es invalida.`
+        `La cantidad de excedente ${Number(noProcessQuantity)} es invalida.`
       );
       return;
     }

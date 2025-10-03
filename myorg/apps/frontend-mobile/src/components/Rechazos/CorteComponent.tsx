@@ -15,11 +15,12 @@ import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { RootStackParamList } from '../../navigation/types';
 import { acceptCorteInconformityAuditory } from '../../api/rechazos';
 import BadQuantityModal from '../AceptarAuditoria/util/BadQuantityModal';
-import { AreaData } from '../LiberarProducto/PersonalizacionComponent';
 import {
   blockSupportsMaterial,
   resolveBlockKey,
 } from '../LiberarProducto/util/areaMappings';
+import { normalizeAreaKey } from '../LiberarProducto/util/areaMappings';
+import type { AreaForBadQty } from '../LiberarProducto/util/BadQuantityModal';
 
 interface Props {
   workOrder: any;
@@ -232,7 +233,7 @@ const CorteComponent: React.FC<Props> = ({ workOrder, currentFlow }) => {
     setShowBadQuantity(true);
   };
 
-  const normalizedAreas: AreaData[] = useMemo(
+  const normalizedAreas: AreaForBadQty[] = useMemo(
     () =>
       previousFlows.map((item: any) => ({
         supportsMaterial: blockSupportsMaterial(
@@ -255,40 +256,19 @@ const CorteComponent: React.FC<Props> = ({ workOrder, currentFlow }) => {
     [previousFlows]
   );
 
-  const sumaBadQuantity = previousFlows.reduce((sum: any, flow: any) => {
-    let bad = 0;
+  const sumaBadQuantity = useMemo(() => {
+    if (!Array.isArray(normalizedAreas) || normalizedAreas.length === 0)
+      return 0;
 
-    if (flow.areaResponse?.impression) {
-      bad = flow.areaResponse.impression.bad_quantity || 0;
-    } else if (flow.areaResponse?.serigrafia) {
-      bad = flow.areaResponse.serigrafia.bad_quantity || 0;
-    } else if (flow.areaResponse?.empalme) {
-      bad = flow.areaResponse.empalme.bad_quantity || 0;
-    } else if (flow.areaResponse?.laminacion) {
-      bad = flow.areaResponse.laminacion.bad_quantity || 0;
-    } else if (flow.areaResponse?.corte) {
-      const corte = flow.areaResponse.corte;
-      const corteBad = corte.bad_quantity || 0;
-      const corteMaterial = corte.material_quantity || 0; // ← suma también este
-      bad = corteBad + corteMaterial;
-    } else if (flow.areaResponse?.colorEdge) {
-      const colorEdge = flow.areaResponse.colorEdge;
-      const colorEdgeBad = colorEdge.bad_quantity || 0;
-      const colorEdgeMaterial = colorEdge.material_quantity || 0; // ← suma también este
-      bad = colorEdgeBad + colorEdgeMaterial;
-    }
-
-    // Si no hay respuesta y sí hay parciales
-    if (bad === 0 && flow.partialReleases?.length > 0) {
-      bad = flow.partialReleases.reduce((partialSum: number, release: any) => {
-        const badQty = release.bad_quantity ?? 0;
-        const materialQty = release.material_quantity ?? 0;
-        return partialSum + badQty + materialQty; // ← también suma material aquí
-      }, 0);
-    }
-
-    return sum + bad;
-  }, 0);
+    return normalizedAreas.reduce((acc, area) => {
+      const key = normalizeAreaKey(area.name);
+      const bad = Number(areaBadQuantities[`${key}_bad`] ?? 0);
+      const mat = area.supportsMaterial
+        ? Number(areaBadQuantities[`${key}_material`] ?? 0)
+        : 0;
+      return acc + bad + mat;
+    }, 0);
+  }, [normalizedAreas, areaBadQuantities]);
 
   return (
     <View style={{ paddingBottom: 16 }}>

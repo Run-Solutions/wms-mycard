@@ -1012,7 +1012,6 @@ export default function CloseWorkOrderAuxPage({ params }: Props) {
   const totalGeneral =
     totalUltimaBuenas +
     totalUltimaExcedente +
-    totalUltimaNoProcess +
     totalMalas +
     totalDefectuoso +
     totalCqm +

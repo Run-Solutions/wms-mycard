@@ -459,7 +459,7 @@ const ColorEdgeComponent = ({ workOrder }: { workOrder: any }) => {
           Number(lastAreaBadQuantity) +
           Number(materialBadQuantity) +
           Number(excessQuantity) +
-        totalParcialesActuales) >
+          totalParcialesActuales) >
       prevAreaSum
     ) {
       Alert.alert(
@@ -475,6 +475,13 @@ const ColorEdgeComponent = ({ workOrder }: { workOrder: any }) => {
     ) {
       Alert.alert(
         `La cantidad total a liberar es diferente a la entregada no procesada por la parcialidad anterior ${cantidadporliberar}.`
+      );
+      return;
+    } else if (
+      Number(goodQuantity) < workOrder.workOrder.quantity && Number(excessQuantity) === 0
+    ) {
+      alert(
+        `La cantidad de excedente ${Number(excessQuantity)} es invalida.`
       );
       return;
     }
@@ -762,7 +769,7 @@ const ColorEdgeComponent = ({ workOrder }: { workOrder: any }) => {
       return bad + mat;
     }
 
-    return normalizedAreas.reduce((acc, area:any) => {
+    return normalizedAreas.reduce((acc, area: any) => {
       const key = normalizeAreaKey(area.name);
       const bad = Number(areaBadQuantities[`${key}_bad`] ?? 0);
       const mat = area.supportsMaterial

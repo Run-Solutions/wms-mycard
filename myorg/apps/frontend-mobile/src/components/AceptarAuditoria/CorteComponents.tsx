@@ -211,16 +211,7 @@ const CorteComponentAcceptAuditory: React.FC<{ workOrder: any }> = ({
 
   const handleOpenModal = async () => {
     const partialsActual = workOrder?.partialReleases ?? [];
-    console.log(
-      '(defaultValues.total_quantity ?? 0) + Number(sampleAuditory))',
-      (defaultValues.total_quantity ?? 0) + Number(sampleAuditory)
-    );
-    console.log(
-      "(total_quantity + sampleAuditory + noprocess_quantity)",
-      (Number(defaultValues.total_quantity ?? 0) +
-        Number(sampleAuditory) +
-        Number(defaultValues.noprocess_quantity ?? 0))
-    );
+
     if (!sampleAuditory) {
       alert('Por favor, asegurate de ingresar muestras.');
       return;
@@ -241,7 +232,9 @@ const CorteComponentAcceptAuditory: React.FC<{ workOrder: any }> = ({
         cantidadPorLiberar
     ) {
       alert(
-        'Por favor, asegurate de ingresar muestras correctas, ya que la cantidad total no es igual a los no procesados del primer parcial.'
+        `La cantidad total a liberar ${
+          (defaultValues.total_quantity ?? 0) + Number(sampleAuditory)
+        } es diferente a la entregada por parte del la parcialidad previa ${cantidadPorLiberar}.`
       );
       return;
     } else if (

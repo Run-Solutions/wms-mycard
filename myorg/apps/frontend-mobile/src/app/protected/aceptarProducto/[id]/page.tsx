@@ -56,39 +56,51 @@ const AceptarProductoAuxScreen: React.FC = () => {
   const renderComponentByArea = () => {
     if (!workOrder || !workOrder.workOrder?.flow) return null;
 
-    let lastStep;
+    const flow = workOrder.workOrder.flow ?? [];
+    const reversed = [...flow].reverse();
+    const hasAnyPartialRelease = flow.some(
+      (f: { partialReleases?: unknown[] }) =>
+        (f.partialReleases?.length ?? 0) > 0
+    );
+
+    let lastCompletedOrPartial:
+      | { status: string; area_id: number; area: { id: number } }
+      | undefined;
 
     if (workOrder.status === 'Pendiente') {
-      lastStep = [...workOrder.workOrder.flow]
-        .reverse()
-        .find((step) => step.status === 'Completado');
-    } else if (
-      workOrder.status === 'Pendiente' &&
-      workOrder.workOrder.flow.partialReleases?.length > 0
-    ) {
-      lastStep = [...workOrder.workOrder.flow]
-        .reverse()
-        .find((step) =>
-          ['Listo', 'Enviado a CQM', 'En calidad', 'Parcial'].includes(
-            step.status
-          )
-        );
+      // último completado hacia atrás
+      lastCompletedOrPartial = reversed.find(
+        (item) => item.status === 'Completado'
+      );
+    } else if (workOrder.status === 'En proceso' && hasAnyPartialRelease) {
+      // si querías esta lógica para "En proceso" con parciales
+      lastCompletedOrPartial = reversed.find((item) =>
+        [
+          'Listo',
+          'Enviado a CQM',
+          'En Calidad',
+          'Parcial',
+          'Completado',
+        ].includes(item.status)
+      );
     } else if (workOrder.status === 'Pendiente parcial') {
-      lastStep = [...workOrder.workOrder.flow]
-        .reverse()
-        .find((step) =>
-          [
-            'Listo',
-            'Enviado a CQM',
-            'En calidad',
-            'Parcial',
-            'En proceso',
-          ].includes(step.status)
-        );
+      // *** clave: incluir 'Pendiente parcial' ***
+      lastCompletedOrPartial = reversed.find((item) =>
+        [
+          'Pendiente parcial',
+          'Parcial',
+          'Listo',
+          'Enviado a CQM',
+          'En Calidad',
+          'En proceso',
+          'Completado',
+        ].includes(item.status)
+      );
     }
-    console.log(lastStep);
 
-    switch (lastStep?.area_id) {
+    console.log('Area previa', lastCompletedOrPartial);
+
+    switch (lastCompletedOrPartial?.area_id) {
       case 1:
         return <PrepressComponentAccept workOrder={workOrder} />;
       case 2:

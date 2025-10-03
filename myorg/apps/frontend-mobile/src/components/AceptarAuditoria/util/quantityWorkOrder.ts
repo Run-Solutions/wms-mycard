@@ -212,12 +212,10 @@ export function buildDefaultValuesByArea(
     console.log('Auditoria', auditory_quantity);
     // Total “resta”: usa addN para evitar unions con '+'
     const totalResta = addN(
-      areaData.good_quantity,
+      values.good_quantity,
       sumaBadQuantity,
-      areaData.excess_quantity,
-      areaData.noprocess_quantity,
-      firstCqmFromAnswers,
-      firstAuditoria
+      values.excess_quantity,
+      values.noprocess_quantity,
     );
     totalCalculado = totalResta;
   } else {

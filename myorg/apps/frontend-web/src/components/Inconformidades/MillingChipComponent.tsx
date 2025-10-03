@@ -149,7 +149,7 @@ export default function MillingChipComponent({ workOrder }: Props) {
   );
   console.log(defaultValues.total_quantity);
 
-  const areaKey: AreaBlock = 'colorEdge';
+  const areaKey: AreaBlock = 'millingChip';
 
   const sumaBadQuantity = useMemo(() => {
     if (!Array.isArray(normalizedAreas) || normalizedAreas.length === 0)

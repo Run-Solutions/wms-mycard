@@ -149,7 +149,7 @@ export default function PersonalizacionComponent({ workOrder }: Props) {
   );
   console.log(defaultValues.total_quantity);
 
-  const areaKey: AreaBlock = 'colorEdge';
+  const areaKey: AreaBlock = 'personalizacion';
 
   const sumaBadQuantity = useMemo(() => {
     if (!Array.isArray(normalizedAreas) || normalizedAreas.length === 0)
