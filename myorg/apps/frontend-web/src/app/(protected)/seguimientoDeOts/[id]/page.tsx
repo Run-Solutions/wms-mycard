@@ -1,7 +1,7 @@
 // myorg/apps/frontend-web/src/app/(protected)/seguimientoDeOts/[id]/page.tsx
 'use client';
 
-import React, { use, useState, Fragment, useEffect, useMemo, } from 'react';
+import React, { use, useState, Fragment, useEffect, useMemo } from 'react';
 import { useRouter } from 'next/navigation';
 import styled from 'styled-components';
 
@@ -51,6 +51,34 @@ type BlockKey =
   | 'millingChip'
   | 'personalizacion';
 
+const areaBlockMap: Record<number, BlockKey> = {
+  1: 'prepress',
+  2: 'impression',
+  3: 'serigrafia',
+  4: 'empalme',
+  5: 'laminacion',
+  6: 'corte',
+  7: 'colorEdge',
+  8: 'hotStamping',
+  9: 'millingChip',
+  10: 'personalizacion',
+};
+
+type ResponseBlock = {
+  id: number;
+  bad_quantity?: number;
+  material_quantity?: number;
+};
+
+
+const pickBlock = (
+  resp: any, // si tienes tipo Area['response'], úsalo aquí
+  key: BlockKey | undefined
+): ResponseBlock | undefined => {
+  if (!resp || !key) return undefined;
+  return (resp as Partial<Record<BlockKey, ResponseBlock>>)[key];
+};
+
 const normalizeAreaKey = (name?: string | null) =>
   (name ?? '')
     .normalize('NFD')
@@ -78,9 +106,8 @@ const resolveBlockKey = (name?: string | null): BlockKey | null => {
 };
 
 const blockSupportsMaterial = (block?: BlockKey | null) =>
-  !!block && ['corte', 'colorEdge', 'millingChip', 'personalizacion'].includes(block);
-
-
+  !!block &&
+  ['corte', 'colorEdge', 'millingChip', 'personalizacion'].includes(block);
 
 interface Props {
   params: Promise<{ id: string }>;
@@ -92,16 +119,44 @@ export type AreaData = {
   status: string;
   isCollator: boolean;
   response: {
-    prepress: { id: number };
-    impression: { id: number };
-    serigrafia: { id: number };
-    empalme: { id: number };
-    laminacion: { id: number };
-    corte: { id: number };
-    colorEdge: { id: number };
-    millingChip: { id: number };
-    hotStamping: { id: number };
-    personalizacion: { id: number };
+    prepress: { id: number; bad_quantity?: number; material_quantity?: number };
+    impression: {
+      id: number;
+      bad_quantity?: number;
+      material_quantity?: number;
+    };
+    serigrafia: {
+      id: number;
+      bad_quantity?: number;
+      material_quantity?: number;
+    };
+    empalme: { id: number; bad_quantity?: number; material_quantity?: number };
+    laminacion: {
+      id: number;
+      bad_quantity?: number;
+      material_quantity?: number;
+    };
+    corte: { id: number; bad_quantity?: number; material_quantity?: number };
+    colorEdge: {
+      id: number;
+      bad_quantity?: number;
+      material_quantity?: number;
+    };
+    millingChip: {
+      id: number;
+      bad_quantity?: number;
+      material_quantity?: number;
+    };
+    hotStamping: {
+      id: number;
+      bad_quantity?: number;
+      material_quantity?: number;
+    };
+    personalizacion: {
+      id: number;
+      bad_quantity?: number;
+      material_quantity?: number;
+    };
     user: {
       username: string;
     };
@@ -830,9 +885,12 @@ export default function SeguimientoDeOtsAuxPage({ params }: Props) {
   };
 
   const badAgg = useMemo(() => {
-    const byTarget = new Map<number, number>();        // opcional: acumulados por target
-    const byTargetMat = new Map<number, number>();     // opcional: material por target
-    const bySourceTarget = new Map<number, Map<number, { bad: number; mat: number }>>();
+    const byTarget = new Map<number, number>(); // opcional: acumulados por target
+    const byTargetMat = new Map<number, number>(); // opcional: material por target
+    const bySourceTarget = new Map<
+      number,
+      Map<number, { bad: number; mat: number }>
+    >();
 
     const flows = workOrder?.flow ?? [];
     flows.forEach((f: any) => {
@@ -858,21 +916,34 @@ export default function SeguimientoDeOtsAuxPage({ params }: Props) {
     return { byTarget, byTargetMat, bySourceTarget };
   }, [workOrder]);
 
-  const sumBadBySource = (sourceId: number, { includeSelf = false } = {}) => {
-    const m = badAgg.bySourceTarget.get(sourceId);
+  const sumBadBySource = (sourceId: number, includeSelf: boolean) => {
+    const m = badAgg.bySourceTarget.get(Number(sourceId));
     if (!m) return 0;
     let total = 0;
     m.forEach((v, tId) => {
-      if (!includeSelf && tId === sourceId) return;
+      if (!includeSelf && Number(tId) === Number(sourceId)) return;
       total += toNum(v.bad);
     });
     return total;
   };
 
+  const getBlockKey = (areaId: number): BlockKey | undefined =>
+    areaBlockMap[Number(areaId)];
+
+  const getSelfBadAndMat = (area: AreaData) => {
+    const block = getBlockKey(Number(area.id));
+    const bad = toNum(area?.response?.[block as BlockKey]?.bad_quantity ?? 0);
+    // si manejas material en response (p.ej. corte), úsalo; si no, 0.
+    const mat = toNum(
+      area?.response?.[block as BlockKey]?.material_quantity ?? 0
+    );
+    return { bad, mat };
+  };
+
   const handleOpenBadQuantityModal = (ownerArea: AreaData) => {
     const initialValues: Record<string, string> = {};
 
-    const TARGET_AREA_IDS = [2, 3, 4, 5, 6];
+    const TARGET_AREA_IDS = [2, 3, 4, 5, 6, 7];
 
     const orderedAreas: AreaData[] = [];
     const pushUnique = (candidate: AreaData | undefined | null) => {
@@ -886,16 +957,31 @@ export default function SeguimientoDeOtsAuxPage({ params }: Props) {
       pushUnique(match);
     });
 
+    // asegura que el owner esté presente (queda al final si ya estaba)
     pushUnique(ownerArea);
 
-    const perTarget = badAgg.bySourceTarget.get(ownerArea.id) ?? new Map();
+    // mapa agregado (source -> (target -> {bad, mat}))
+    const perTarget =
+      badAgg.bySourceTarget.get(ownerArea.id) ??
+      new Map<number, { bad: number; mat: number }>();
 
     orderedAreas.forEach((area) => {
       const key = normalizeAreaKey(area.name);
-      const agg = perTarget.get(area.id) ?? { bad: 0, mat: 0 };
-      initialValues[`${key}_bad`] = String(Number(agg.bad ?? 0));
-      if (area.id >= 6) {
-        initialValues[`${key}_material`] = String(Number(agg.mat ?? 0));
+
+      if (Number(area.id) === Number(ownerArea.id)) {
+        // SELF: traer de response.[block]
+        const { bad, mat } = getSelfBadAndMat(ownerArea);
+        initialValues[`${key}_bad`] = String(toNum(bad));
+        if (area.id >= 6) {
+          initialValues[`${key}_material`] = String(toNum(mat));
+        }
+      } else {
+        // OTROS TARGETS: usar agregados desde badQuantityDetails
+        const agg = perTarget.get(Number(area.id)) ?? { bad: 0, mat: 0 };
+        initialValues[`${key}_bad`] = String(toNum(agg.bad));
+        if (area.id >= 6) {
+          initialValues[`${key}_material`] = String(toNum(agg.mat));
+        }
       }
     });
 
@@ -906,37 +992,52 @@ export default function SeguimientoDeOtsAuxPage({ params }: Props) {
   };
 
   const getAreaSumaTotal = (area: AreaData) => {
-    let buenas = Number(area.buenas ?? 0);
-    let malas = Number(area.malas ?? 0);
-    let excedente = Number(area.excedente ?? 0);
-    let noprocess = Number(area.noprocess ?? 0);
-    let defectuoso = Number(area.defectuoso ?? 0);
-    let cqm = Number(area.cqm ?? 0);
-    let muestras = Number(area.muestras ?? 0);
+    // Si existen parciales -> sumar SOLO el primer parcial
+    if (area.partials?.length && area.id >= 6) {
+      const p = area.partials[0];
+      const firstAnswer = area.answers?.[0];
 
-    if (area.partials?.length) {
-      const sums = area.partials.reduce(
-        (acc, p) => {
-          acc.buenas += Number(p?.quantity ?? 0);
-          acc.muestras += Number(p?.formAuditory?.sample_auditory ?? 0);
-          return acc;
-        },
-        { buenas: 0, muestras: 0 }
+      const buenas = Number(p?.quantity ?? 0);
+      const malas = Number(p?.bad_quantity ?? 0);
+      const noprocess = Number(p?.noprocess_quantity ?? 0);
+      const excedente = Number(p?.excess_quantity ?? 0);
+      const defectuoso = Number(p?.material_quantity ?? 0);
+      const muestras = Number(p?.formAuditory?.sample_auditory ?? 0);
+      const cqm = Number(firstAnswer?.sample_quantity ?? 0);
+      const badToOthers = sumBadBySource(Number(area.id), false);
+
+      return (
+        buenas +
+        malas +
+        excedente +
+        badToOthers +
+        defectuoso +
+        cqm +
+        muestras +
+        noprocess
       );
-
-      const rem = getRemainder(area);
-      buenas = sums.buenas + rem;
-
-      const answersCqm = (area.answers ?? []).reduce(
-        (s, a) => s + Number(a?.sample_quantity ?? 0),
-        0
-      );
-      cqm = answersCqm;
-
-      muestras = Number(area.muestras ?? 0) + sums.muestras;
     }
 
-    return buenas + malas + excedente + defectuoso + cqm + muestras;
+    // Si NO hay parciales -> usar los valores del área completos
+    const buenas = Number(area.buenas ?? 0);
+    const malas = Number(area.malas ?? 0);
+    const excedente = Number(area.excedente ?? 0);
+    const defectuoso = Number(area.defectuoso ?? 0);
+    const cqm = Number(area.cqm ?? 0);
+    const muestras = Number(area.muestras ?? 0);
+    const noprocess = Number(area.noprocess ?? 0);
+    const badToOthers = sumBadBySource(Number(area.id), false);
+
+    return (
+      buenas +
+      malas +
+      excedente +
+      badToOthers +
+      defectuoso +
+      cqm +
+      muestras +
+      noprocess
+    );
   };
 
   const cantidadHojasRaw = Number(workOrder?.quantity) / 24;
@@ -944,7 +1045,28 @@ export default function SeguimientoDeOtsAuxPage({ params }: Props) {
   const totalSheetsEffective = workOrder?.total_sheets ?? cantidadHojas;
 
   const ultimaArea = areas[areas.length - 1];
-  const totalMalas = areas.reduce((acc, area) => acc + (area.malas || 0), 0);
+  const totalMalas = areas.reduce((acc, area) => {
+    if (area.id < 6) {
+      return 0; // ignora áreas menores a 6
+    }
+  
+    const blockKey = getBlockKey(area.id);
+    const badToOthers = toNum(sumBadBySource(area.id, false));
+    const selfBad = toNum(pickBlock(area.response, blockKey)?.bad_quantity ?? 0);
+  
+    // parciales malas (solo si no hay selfBad)
+    const partialsBad =
+      selfBad > 0
+        ? 0
+        : (area.partials ?? []).reduce(
+            (pAcc, p) => pAcc + toNum(p.bad_quantity),
+            0
+          );
+  
+    const areaTotalBad = badToOthers + selfBad + partialsBad;
+  
+    return acc + areaTotalBad;
+  }, 0);
   const totalDefectuoso = areas.reduce(
     (acc, area) => acc + (area.defectuoso || 0),
     0
@@ -952,19 +1074,16 @@ export default function SeguimientoDeOtsAuxPage({ params }: Props) {
   const totalCqm = areas
     .filter((area) => area.id >= 6)
     .reduce((acc, area) => acc + (area.cqm || 0), 0);
-  const totalMuestras = areas.reduce(
-    (acc, area) => {
-      if (area.partials.length > 0) {
-        acc += area.partials.reduce(
-          (pAcc, p) => pAcc + Number(p?.formAuditory?.sample_auditory ?? 0),
-          0
-        );
-      }
-      acc += (area.muestras || 0)
-      return acc;
-    },
-    0
-  );
+  const totalMuestras = areas.reduce((acc, area) => {
+    if (area.partials.length > 0) {
+      acc += area.partials.reduce(
+        (pAcc, p) => pAcc + Number(p?.formAuditory?.sample_auditory ?? 0),
+        0
+      );
+    }
+    acc += area.muestras || 0;
+    return acc;
+  }, 0);
   const totalUltimaBuenas = ultimaArea?.buenas || 0;
   const totalUltimaExcedente = ultimaArea?.excedente || 0;
   const totalUltimaNoProcess = ultimaArea?.noprocess || 0;
@@ -972,7 +1091,6 @@ export default function SeguimientoDeOtsAuxPage({ params }: Props) {
   const totalGeneral =
     totalUltimaBuenas +
     totalUltimaExcedente +
-    totalUltimaNoProcess +
     totalMalas +
     totalDefectuoso +
     totalCqm +
@@ -1023,10 +1141,10 @@ export default function SeguimientoDeOtsAuxPage({ params }: Props) {
       prev.map((a) =>
         a.id === area.id
           ? {
-            ...a,
-            assigned_user_id: newUserId,
-            usuario: operatorById.get(newUserId) ?? a.usuario,
-          }
+              ...a,
+              assigned_user_id: newUserId,
+              usuario: operatorById.get(newUserId) ?? a.usuario,
+            }
           : a
       )
     );
@@ -1060,17 +1178,17 @@ export default function SeguimientoDeOtsAuxPage({ params }: Props) {
 
     // 3. Preprensa → solo 'buenas' editable
 
-      if (['buenas', 'excedente', 'noprocess'].includes(field)) {
-        return (
-          <input
-            type="number"
-            value={Number(area[field] ?? 0)}
-            min={0}
-            onChange={(e) => handleValueChange(area.id, field, e.target.value)}
-            style={{ width: '80px', padding: '4px', textAlign: 'center' }}
-          />
-        );
-      }
+    if (['buenas', 'excedente', 'noprocess'].includes(field)) {
+      return (
+        <input
+          type="number"
+          value={Number(area[field] ?? 0)}
+          min={0}
+          onChange={(e) => handleValueChange(area.id, field, e.target.value)}
+          style={{ width: '80px', padding: '4px', textAlign: 'center' }}
+        />
+      );
+    }
 
     // 4. CQM editable desde Impresión (id >= 2)
     if (field === 'cqm') {
@@ -1107,10 +1225,19 @@ export default function SeguimientoDeOtsAuxPage({ params }: Props) {
     // 6. Malas: desde Corte en adelante se gestiona via modal acumulado
     if (field === 'malas') {
       if (area.id >= 6) {
+        const blockKey = areaBlockMap[area.id];
+        console.log(blockKey, 'blovkkey');
+        const selfBad = toNum(area?.response?.[blockKey]?.bad_quantity ?? 0);
+        console.log(area);
+        console.log(selfBad, 'selfBad');
+
+        const badToOthers = sumBadBySource(Number(area.id), false);
+        const displayBad = selfBad + badToOthers;
+
         return (
           <input
             type="number"
-            value={sumBadBySource(area.id)}
+            value={displayBad}
             min={0}
             onClick={() => handleOpenBadQuantityModal(area)}
             readOnly
@@ -1124,6 +1251,7 @@ export default function SeguimientoDeOtsAuxPage({ params }: Props) {
           />
         );
       }
+
       return (
         <input
           type="number"
@@ -1175,16 +1303,16 @@ export default function SeguimientoDeOtsAuxPage({ params }: Props) {
 
     const effectiveAreas = updatedAreasFromModal
       ? areas.map((area) => {
-        const replacement = updatedAreasFromModal.find(
-          (item) => item.id === area.id
-        );
-        if (!replacement) return area;
-        return {
-          ...area,
-          malas: Number(replacement.malas ?? area.malas ?? 0),
-          defectuoso: Number(replacement.defectuoso ?? area.defectuoso ?? 0),
-        };
-      })
+          const replacement = updatedAreasFromModal.find(
+            (item) => item.id === area.id
+          );
+          if (!replacement) return area;
+          return {
+            ...area,
+            malas: Number(replacement.malas ?? area.malas ?? 0),
+            defectuoso: Number(replacement.defectuoso ?? area.defectuoso ?? 0),
+          };
+        })
       : areas;
 
     if (updatedAreasFromModal) {
@@ -1208,7 +1336,9 @@ export default function SeguimientoDeOtsAuxPage({ params }: Props) {
       .filter((area) => area.status === 'Completado')
       .map((area) => {
         const normalizedName = area.name.toLowerCase().replace(/\s/g, '');
-        const block = (blockMap[normalizedName] || 'otros') as BlockKey | 'otros';
+        const block = (blockMap[normalizedName] || 'otros') as
+          | BlockKey
+          | 'otros';
 
         const blockId = (area.response as any)?.[block]?.id;
         const formId = (area.response as any)?.[block]?.form_auditory_id;
@@ -1229,7 +1359,9 @@ export default function SeguimientoDeOtsAuxPage({ params }: Props) {
         if (block === 'prepress') {
           data = { plates: Number(area.buenas ?? 0) };
         }
-        if (['impression', 'serigrafia', 'laminacion', 'empalme'].includes(block)) {
+        if (
+          ['impression', 'serigrafia', 'laminacion', 'empalme'].includes(block)
+        ) {
           data = {
             release_quantity: Number(area.buenas ?? 0),
             bad_quantity: Number(area.malas ?? 0),
@@ -1316,8 +1448,8 @@ export default function SeguimientoDeOtsAuxPage({ params }: Props) {
 
     const sourceAreaId = badModalOwner?.id ?? null;
     const sourceWorkOrderFlowId =
-      workOrder?.flow?.find((f: any) => Number(f?.area_id) === sourceAreaId)?.id ??
-      null;
+      workOrder?.flow?.find((f: any) => Number(f?.area_id) === sourceAreaId)
+        ?.id ?? null;
 
     const combinedAreas = [...areasFromTable, ...areasFromBadModal];
 
@@ -1400,14 +1532,14 @@ export default function SeguimientoDeOtsAuxPage({ params }: Props) {
         return entry;
       })
       .filter(Boolean) as Array<{
-        areaId: number;
-        block: BlockKey;
-        blockId: number;
-        formId?: number;
-        cqmId?: number;
-        data: Record<string, number>;
-        sample_data?: Record<string, number>;
-      }>;
+      areaId: number;
+      block: BlockKey;
+      blockId: number;
+      formId?: number;
+      cqmId?: number;
+      data: Record<string, number>;
+      sample_data?: Record<string, number>;
+    }>;
 
     const summary = modalInputs
       .map((item) => {
@@ -1435,7 +1567,7 @@ export default function SeguimientoDeOtsAuxPage({ params }: Props) {
         (entry) =>
           Number.isFinite(entry.areaId) &&
           !!entry.areaName &&
-          entry.values.length > 0,
+          entry.values.length > 0
       );
 
     if (areasForDataUpdate.length === 0 && summary.length === 0) {
@@ -1632,12 +1764,12 @@ export default function SeguimientoDeOtsAuxPage({ params }: Props) {
                       file.type === 'OT'
                         ? 'Ver OT'
                         : file.type === 'SKU'
-                          ? 'Ver SKU'
-                          : file.type === 'OP'
-                            ? 'Ver OP'
-                            : file.type === 'CARD_IMAGE'
-                              ? 'Ver TARJETA'
-                              : 'Adjunto';
+                        ? 'Ver SKU'
+                        : file.type === 'OP'
+                        ? 'Ver OP'
+                        : file.type === 'CARD_IMAGE'
+                        ? 'Ver TARJETA'
+                        : 'Adjunto';
                     return (
                       <button
                         key={file.id}
@@ -1859,7 +1991,6 @@ export default function SeguimientoDeOtsAuxPage({ params }: Props) {
                               </td>
                             </React.Fragment>
                           );
-
                         }
                         return cells;
                       }
@@ -1901,10 +2032,11 @@ export default function SeguimientoDeOtsAuxPage({ params }: Props) {
                             }
                           >
                             <span
-                              className={`px-2 py-1 rounded-lg text-sm font-medium ${name && name !== '—'
-                                ? 'bg-yellow-100 text-yellow-800'
-                                : ''
-                                }`}
+                              className={`px-2 py-1 rounded-lg text-sm font-medium ${
+                                name && name !== '—'
+                                  ? 'bg-yellow-100 text-yellow-800'
+                                  : ''
+                              }`}
                             >
                               {name || '—'}
                             </span>
@@ -1938,10 +2070,11 @@ export default function SeguimientoDeOtsAuxPage({ params }: Props) {
                           className="text-center"
                         >
                           <span
-                            className={`px-2 py-1 rounded-lg text-sm font-medium ${reviewerName && reviewerName !== '—'
-                              ? 'bg-yellow-100 text-yellow-800'
-                              : ''
-                              }`}
+                            className={`px-2 py-1 rounded-lg text-sm font-medium ${
+                              reviewerName && reviewerName !== '—'
+                                ? 'bg-yellow-100 text-yellow-800'
+                                : ''
+                            }`}
                           >
                             {reviewerName || '—'}
                           </span>
@@ -1969,10 +2102,11 @@ export default function SeguimientoDeOtsAuxPage({ params }: Props) {
                             }
                           >
                             <span
-                              className={`px-2 py-1 rounded-lg text-sm font-medium ${name && name !== '—'
-                                ? 'bg-purple-100 text-purple-800'
-                                : ''
-                                }`}
+                              className={`px-2 py-1 rounded-lg text-sm font-medium ${
+                                name && name !== '—'
+                                  ? 'bg-purple-100 text-purple-800'
+                                  : ''
+                              }`}
                             >
                               {name || '—'}
                             </span>
@@ -2005,10 +2139,11 @@ export default function SeguimientoDeOtsAuxPage({ params }: Props) {
                           className="text-center"
                         >
                           <span
-                            className={`px-2 py-1 rounded-lg text-sm font-medium ${auditorName !== '—'
-                              ? 'bg-purple-100 text-purple-800'
-                              : ''
-                              }`}
+                            className={`px-2 py-1 rounded-lg text-sm font-medium ${
+                              auditorName !== '—'
+                                ? 'bg-purple-100 text-purple-800'
+                                : ''
+                            }`}
                           >
                             {auditorName}
                           </span>
@@ -2055,12 +2190,23 @@ export default function SeguimientoDeOtsAuxPage({ params }: Props) {
 
                         {areas.flatMap((area, aIndex) => {
                           if (area.parciales > 0 && area.partials?.length) {
-                            const aggregatedBad = toNum(sumBadBySource(area.id));
                             const rem = getRemainder(area);
-                            const aggregatedFieldValue = Number(area[field] ?? 0);
+                            const aggregatedFieldValue = Number(
+                              area[field] ?? 0
+                            );
                             const isEditableAggregateField =
                               ['excedente', 'noprocess'].includes(field) &&
                               area.status === 'Completado';
+
+                            // ⭐ Calcula una vez por área:
+                            const badToOthers = toNum(
+                              sumBadBySource(area.id, false)
+                            );
+                            const blockKey = areaBlockMap[area.id];
+                            const selfBad = toNum(
+                              area?.response?.[blockKey]?.bad_quantity ?? 0
+                            );
+                            const totalBad = badToOthers + selfBad;
 
                             const cells: React.ReactNode[] = area.partials.map(
                               (p, pIndex) => {
@@ -2068,14 +2214,15 @@ export default function SeguimientoDeOtsAuxPage({ params }: Props) {
                                   field === 'buenas'
                                     ? toNum(p.quantity)
                                     : field === 'malas'
-                                      ? toNum(p.bad_quantity)
-                                      : field === 'excedente'
-                                        ? toNum(p.excess_quantity)
-                                        : toNum(p.noprocess_quantity);
+                                    ? toNum(p.bad_quantity)
+                                    : field === 'excedente'
+                                    ? toNum(p.excess_quantity)
+                                    : toNum(p.noprocess_quantity);
 
                                 const isLastPartial =
                                   rem <= 0 &&
                                   pIndex === area.partials.length - 1;
+
                                 const shouldShowModalTrigger =
                                   field === 'malas' &&
                                   area.id >= 6 &&
@@ -2083,12 +2230,27 @@ export default function SeguimientoDeOtsAuxPage({ params }: Props) {
                                   isLastPartial;
 
                                 const shouldRenderAggregateInput =
-                                  isEditableAggregateField && isLastPartial && rem <= 0;
+                                  isEditableAggregateField &&
+                                  isLastPartial &&
+                                  rem <= 0;
+
+                                // (Logs coherentes con el botón)
+                                if (
+                                  field === 'malas' &&
+                                  shouldShowModalTrigger
+                                ) {
+                                  console.log({
+                                    badToOthers,
+                                    selfBad,
+                                    totalBad,
+                                  });
+                                }
 
                                 return (
                                   <td
-                                    key={`area-${area.id}-parcial-${p.id ?? pIndex
-                                      }-${field}`}
+                                    key={`area-${area.id}-parcial-${
+                                      p.id ?? pIndex
+                                    }-${field}`}
                                     className="text-center"
                                   >
                                     {field === 'malas' ? (
@@ -2096,10 +2258,12 @@ export default function SeguimientoDeOtsAuxPage({ params }: Props) {
                                         <button
                                           type="button"
                                           className="inline-flex min-w-[64px] justify-center rounded border border-gray-200 bg-gray-50 px-2 py-1 text-sm text-gray-700 hover:bg-gray-100 focus:outline-none focus:ring-1 focus:ring-blue-400"
-                                          onClick={() => handleOpenBadQuantityModal(area)}
-                                          title={`Cantidad mala total: ${aggregatedBad}`}
+                                          onClick={() =>
+                                            handleOpenBadQuantityModal(area)
+                                          }
+                                          title={`Cantidad mala total: ${totalBad}`}
                                         >
-                                          {aggregatedBad}
+                                          {totalBad}{' '}
                                         </button>
                                       ) : (
                                         value
@@ -2165,38 +2329,40 @@ export default function SeguimientoDeOtsAuxPage({ params }: Props) {
                                 area.status === 'Completado';
 
                               const remainderAggregateContent =
-                                field === 'malas' && area.status === 'Completado'
-                                  ? shouldShowModalTrigger && remSum > 0
-                                    ? (
-                                        <button
-                                          type="button"
-                                          className="inline-flex min-w-[64px] justify-center rounded border border-gray-200 bg-gray-50 px-2 py-1 text-sm text-gray-700 hover:bg-gray-100 focus:outline-none focus:ring-1 focus:ring-blue-400"
-                                          onClick={() => handleOpenBadQuantityModal(area)}
-                                          title={`Cantidad mala total: ${aggregatedBad}`}
-                                        >
-                                          {aggregatedBad}
-                                        </button>
+                                field === 'malas' &&
+                                area.status === 'Completado' ? (
+                                  shouldShowModalTrigger && remSum > 0 ? (
+                                    <button
+                                      type="button"
+                                      className="inline-flex min-w-[64px] justify-center rounded border border-gray-200 bg-gray-50 px-2 py-1 text-sm text-gray-700 hover:bg-gray-100 focus:outline-none focus:ring-1 focus:ring-blue-400"
+                                      onClick={() =>
+                                        handleOpenBadQuantityModal(area)
+                                      }
+                                      title={`Cantidad mala total: ${totalBad}`}
+                                    >
+                                      {aggregatedFieldValue}{' '}
+                                      {/* ⭐ aquí también totalBad; NO aggregatedBad + defectuoso */}
+                                    </button>
+                                  ) : (
+                                    remSum
+                                  )
+                                ) : isEditableAggregateField ? (
+                                  <input
+                                    type="number"
+                                    value={aggregatedFieldValue}
+                                    min={0}
+                                    onChange={(e) =>
+                                      handleValueChange(
+                                        area.id,
+                                        field,
+                                        e.target.value
                                       )
-                                    : (
-                                        remSum
-                                      )
-                                  : isEditableAggregateField
-                                  ? (
-                                      <input
-                                        type="number"
-                                        value={aggregatedFieldValue}
-                                        min={0}
-                                        onChange={(e) =>
-                                          handleValueChange(
-                                            area.id,
-                                            field,
-                                            e.target.value
-                                          )
-                                        }
-                                        className="w-20 rounded border border-gray-200 px-2 py-1 text-center"
-                                      />
-                                    )
-                                  : remSum;
+                                    }
+                                    className="w-20 rounded border border-gray-200 px-2 py-1 text-center"
+                                  />
+                                ) : (
+                                  remSum
+                                );
 
                               cells.push(
                                 <React.Fragment
@@ -2305,7 +2471,7 @@ export default function SeguimientoDeOtsAuxPage({ params }: Props) {
                           field === 'cqm'
                             ? getSingleCqm(area)
                             : renderCell?.(area, field as any) ??
-                            getAnswerValue(undefined, field as any, area);
+                              getAnswerValue(undefined, field as any, area);
 
                         return (
                           <td
@@ -2484,8 +2650,9 @@ export default function SeguimientoDeOtsAuxPage({ params }: Props) {
                           onClick={() =>
                             setOpModal((s) => ({ ...s, selectedUserId: u.id }))
                           }
-                          className={`w-full text-left px-3 py-2 border-b last:border-b-0 ${selected ? 'bg-blue-100' : 'hover:bg-gray-50'
-                            }`}
+                          className={`w-full text-left px-3 py-2 border-b last:border-b-0 ${
+                            selected ? 'bg-blue-100' : 'hover:bg-gray-50'
+                          }`}
                         >
                           {u.username}
                         </button>

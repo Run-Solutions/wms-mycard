@@ -514,8 +514,14 @@ export default function HotStampingComponent({ workOrder }: Props) {
         `La cantidad total a liberar es mayor a la entregada no procesada por la parcialidad anterior ${cantidadporliberar}.`
       );
       return;
+    } else if (
+      Number(goodQuantity) < workOrder.workOrder.quantity && Number(excessQuantity) === 0
+    ) {
+      alert(
+        `La cantidad de excedente ${Number(excessQuantity)} es invalida.`
+      );
+      return;
     }
-
     const partials = lastCompletedOrPartial?.partialReleases ?? [];
     if (Array.isArray(partials) && partials.length > 0) {
       const totalValidatedQuantity = partials

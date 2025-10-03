@@ -23,7 +23,7 @@ import {
   blockSupportsMaterial,
   resolveBlockKey,
 } from '../LiberarProducto/util/areaMappings';
-import { calcularCantidadPorLiberar } from './util/calcularCantidadPorLiberar';
+import { calcularCantidadPorLiberarYParcial } from './util/calcularCantidadPorLiberar';
 import type { AreaForBadQty } from '../LiberarProducto/util/BadQuantityModal';
 import { normalizeAreaKey } from '../LiberarProducto/util/areaMappings';
 
@@ -102,11 +102,6 @@ export default function ColorEdgeComponentAcceptAuditory({ workOrder }: Props) {
       flowList.slice(0, currentIndex + 1).filter((flow) => flow.area_id !== 1),
     [flowList, currentIndex]
   );
-
-  const areaKeyActual = useMemo(() => {
-    const n = workOrder?.area?.name ?? '';
-    return n.toLowerCase().replace(/\s/g, '');
-  }, [workOrder?.area?.name]);
 
   const areaKey: AreaBlock = 'colorEdge';
 
@@ -210,11 +205,11 @@ export default function ColorEdgeComponentAcceptAuditory({ workOrder }: Props) {
     }
   }, [workOrder, sumaBadQuantity]);
 
-  const cantidadporliberar = useMemo(
-    () => calcularCantidadPorLiberar(workOrder, lastCompletedOrPartial),
+  const { cantidadPorLiberar, lastValidatedPartial } = useMemo(
+    () => calcularCantidadPorLiberarYParcial(workOrder, lastCompletedOrPartial),
     [workOrder, lastCompletedOrPartial]
   );
-  console.log('Cantidad por liberar', cantidadporliberar);
+  console.log('Cantidad por liberar', cantidadPorLiberar);
   console.log('Cantidad total', defaultValues.total_quantity);
 
   const handleOpenModal = async (e: React.FormEvent) => {
@@ -225,33 +220,46 @@ export default function ColorEdgeComponentAcceptAuditory({ workOrder }: Props) {
       alert('Por favor, asegurate de ingresar muestras.');
       return;
     } else if (
-      ((defaultValues.total_quantity ?? 0) + Number(sampleAuditory) >
+      (defaultValues.total_quantity ?? 0) + Number(sampleAuditory) !==
         prevAreaSum &&
-        workOrder?.areaResponse?.colorEdge) ||
-      (defaultValues.total_quantity ?? 0) + Number(sampleAuditory) > prevAreaSum
+      workOrder?.areaResponse?.colorEdge &&
+      partialsActual.length === 0
     ) {
       alert(
         `La cantidad total a liberar ${
           (defaultValues.total_quantity ?? 0) + Number(sampleAuditory)
         } es mayor a la entregada por parte del área previa ${
-          defaultValues.total_quantity
+          prevAreaSum
         }.`
       );
       return;
     } else if (
-      (partialsActual.length > 0 &&
-        (defaultValues.total_quantity ?? 0) +
-          Number(sampleAuditory) +
-          Number(defaultValues.noprocess_quantity ?? 0)) !== cantidadporliberar
+      partialsActual.length > 0 &&
+      lastValidatedPartial !== null &&
+      Number(defaultValues.total_quantity ?? 0) + Number(sampleAuditory) !==
+        cantidadPorLiberar
     ) {
       alert(
         `La cantidad total a liberar ${
           (defaultValues.total_quantity ?? 0) + Number(sampleAuditory)
-        } es diferente a la entregada por parte del la parcialidad previa ${cantidadporliberar}.`
+        } es diferente a la entregada por parte del la parcialidad previa ${cantidadPorLiberar}.`
+      );
+      return;
+    } else if (
+      partialsActual.length > 0 &&
+      lastValidatedPartial === null &&
+      Number(defaultValues.total_quantity ?? 0) + Number(sampleAuditory) !==
+        prevAreaSum
+    ) {
+      alert(
+        `La cantidad total a liberar ${
+          (defaultValues.total_quantity ?? 0) + Number(sampleAuditory)
+        } es mayor a la entregada por parte del área previa ${
+          prevAreaSum
+        }.`
       );
       return;
     }
-
     setShowConfirm(true);
   };
 
@@ -464,7 +472,7 @@ const Title = styled.h2`
   font-size: 1.75rem;
   font-weight: 700;
   margin-bottom: 1.5rem;
-  color: #1f2937;
+  color: ${({ theme }) => theme.palette.text.primary};
 `;
 
 const NewData = styled.div``;
@@ -478,7 +486,7 @@ const SectionTitle = styled.h3`
 
 const Label = styled.label`
   font-weight: 600;
-  color: #6b7280;
+  color: ${({ theme }) => theme.palette.text.primary};
 `;
 
 const NewDataWrapper = styled.div`

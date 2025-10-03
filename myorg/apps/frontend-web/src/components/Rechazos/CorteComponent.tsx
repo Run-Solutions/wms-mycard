@@ -3,6 +3,8 @@ import styled from 'styled-components';
 import { useRouter } from 'next/navigation';
 import { useState, useEffect, useCallback, useMemo } from 'react';
 import { acceptCorteInconformityAuditory } from '@/api/rechazos';
+import { normalizeAreaKey } from '../LiberarProducto/util/areaMappings';
+import type { AreaForBadQty } from '../LiberarProducto/util/BadQuantityModal';
 import BadQuantityModal from '../AceptarAuditoria/util/BadQuantityModal';
 import { AreaData } from '../LiberarProducto/PersonalizacionComponent';
 import {
@@ -218,7 +220,7 @@ useEffect(() => {
     setShowBadQuantity(true);
   };
 
-  const normalizedAreas: AreaData[] = useMemo(
+  const normalizedAreas: AreaForBadQty[] = useMemo(
     () =>
       previousFlows.map((item: any) => ({
         supportsMaterial: blockSupportsMaterial(
@@ -241,27 +243,19 @@ useEffect(() => {
     [previousFlows]
   );
 
-  const sumaBadQuantity = previousFlows.reduce((sum: any, flow: any) => {
-    let bad = 0;
+  const sumaBadQuantity = useMemo(() => {
+    if (!Array.isArray(normalizedAreas) || normalizedAreas.length === 0)
+      return 0;
 
-    if (flow.areaResponse?.corte) {
-      const corte = flow.areaResponse.corte;
-      const corteBad = corte.bad_quantity || 0;
-      const corteMaterial = corte.material_quantity || 0; // ← suma también este
-      bad = corteBad + corteMaterial;
-    }
-
-    // Si no hay respuesta y sí hay parciales
-    if (bad === 0 && flow.partialReleases?.length > 0) {
-      bad = flow.partialReleases.reduce((partialSum: number, release: any) => {
-        const badQty = release.bad_quantity ?? 0;
-        const materialQty = release.material_quantity ?? 0;
-        return partialSum + badQty + materialQty; // ← también suma material aquí
-      }, 0);
-    }
-
-    return sum + bad;
-  }, 0);
+    return normalizedAreas.reduce((acc, area) => {
+      const key = normalizeAreaKey(area.name);
+      const bad = Number(areaBadQuantities[`${key}_bad`] ?? 0);
+      const mat = area.supportsMaterial
+        ? Number(areaBadQuantities[`${key}_material`] ?? 0)
+        : 0;
+      return acc + bad + mat;
+    }, 0);
+  }, [normalizedAreas, areaBadQuantities]);
 
   return (
     <>

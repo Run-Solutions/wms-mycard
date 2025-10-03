@@ -276,8 +276,7 @@ const SectionTitle = styled.h3`
 
 const Label = styled.label`
   font-weight: 600;
-  color:  color: ${({ theme }) => theme.palette.text.primary};
-#6b7280;
+  color: ${({ theme }) => theme.palette.text.primary};
 `;
 
 const NewDataWrapper = styled.div`

@@ -504,6 +504,13 @@ export default function MillingChipComponent({ workOrder }: Props) {
         `La cantidad total a liberar es mayor a la entregada no procesada por la parcialidad anterior ${cantidadporliberar}.`
       );
       return;
+    } else if (
+      Number(goodQuantity) < workOrder.workOrder.quantity && Number(noProcessQuantity) === 0
+    ) {
+      alert(
+        `La cantidad de excedente ${Number(noProcessQuantity)} es invalida.`
+      );
+      return;
     }
 
     const partials = lastCompletedOrPartial?.partialReleases ?? [];

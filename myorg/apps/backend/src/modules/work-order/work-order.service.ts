@@ -460,6 +460,87 @@ export class WorkOrderService {
                 targetArea: true,
               },
             },
+            workOrder: {
+              include: {
+                user: true,
+                files: true,
+                flow: {
+                  include: {
+                    badQuantityDetails: {
+                      include: {
+                        targetArea: true,
+                      },
+                    },
+                    area: true,
+                    areaResponse: {
+                      include: {
+                        prepress: true,
+                        serigrafia: true,
+                        impression: true,
+                        empalme: true,
+                        laminacion: true,
+                        corte: {
+                          include: {
+                            formAuditory: {
+                              include: {
+                                user: true,
+                              },
+                            },
+                          },
+                        },
+                        colorEdge: {
+                          include: {
+                            formAuditory: {
+                              include: {
+                                user: true,
+                              },
+                            },
+                          },
+                        },
+                        hotStamping: {
+                          include: {
+                            formAuditory: {
+                              include: {
+                                user: true,
+                              },
+                            },
+                          },
+                        },
+                        millingChip: {
+                          include: {
+                            formAuditory: {
+                              include: {
+                                user: true,
+                              },
+                            },
+                          },
+                        },
+                        personalizacion: {
+                          include: {
+                            formAuditory: {
+                              include: {
+                                user: true,
+                              },
+                            },
+                          },
+                        },
+                      },
+                    },
+                    answers: true,
+                    partialReleases: {
+                      include: {
+                        formAuditory: {
+                          include: {
+                            user: true,
+                          },
+                        },
+                      },
+                    },
+                    user: true,
+                  },
+                },
+              },
+            },
             partialReleases: {
               include: {
                 user: true,

@@ -33,7 +33,7 @@ import {
   normalizeAreaKey,
   resolveBlockKey,
 } from '../LiberarProducto/util/areaMappings';
-import { calcularCantidadPorLiberar } from './util/calcularCantidadPorLiberar';
+import { calcularCantidadPorLiberarYParcial } from './util/calcularCantidadPorLiberar';
 
 const PersonalizacionComponentAcceptAuditory: React.FC<{ workOrder: any }> = ({
   workOrder,
@@ -199,11 +199,12 @@ const PersonalizacionComponentAcceptAuditory: React.FC<{ workOrder: any }> = ({
     [flowList, currentIndex]
   );
   
-  const cantidadporliberar = useMemo(
-    () => calcularCantidadPorLiberar(workOrder, lastCompletedOrPartial),
+  const { cantidadPorLiberar, lastValidatedPartial } = useMemo(
+    () => calcularCantidadPorLiberarYParcial(workOrder, lastCompletedOrPartial),
     [workOrder, lastCompletedOrPartial]
   );
-  console.log('Cantidad por liberar', cantidadporliberar)
+
+  console.log('Cantidad por liberar', cantidadPorLiberar);
   console.log('Cantidad total', defaultValues.total_quantity);
 
   const handleOpenModal = async () => {
@@ -213,10 +214,10 @@ const PersonalizacionComponentAcceptAuditory: React.FC<{ workOrder: any }> = ({
       alert('Por favor, asegurate de ingresar muestras.');
       return;
     } else if (
-      ((defaultValues.total_quantity ?? 0) + Number(sampleAuditory) >
+      (defaultValues.total_quantity ?? 0) + Number(sampleAuditory) !==
         prevAreaSum &&
-        workOrder?.areaResponse?.personalizacion) ||
-      (defaultValues.total_quantity ?? 0) + Number(sampleAuditory) > prevAreaSum
+      workOrder?.areaResponse?.personalizacion &&
+      partialsActual.length === 0
     ) {
       alert(
         `La cantidad total a liberar ${
@@ -227,20 +228,32 @@ const PersonalizacionComponentAcceptAuditory: React.FC<{ workOrder: any }> = ({
       );
       return;
     } else if (
-      (partialsActual.length > 0 &&
-        (defaultValues.total_quantity ?? 0) + Number(sampleAuditory) + Number(defaultValues.noprocess_quantity ?? 0)) !==
-      cantidadporliberar
+      partialsActual.length > 0 &&
+      lastValidatedPartial !== null &&
+      Number(defaultValues.total_quantity ?? 0) + Number(sampleAuditory) !==
+        cantidadPorLiberar
     ) {
       alert(
         `La cantidad total a liberar ${
           (defaultValues.total_quantity ?? 0) + Number(sampleAuditory)
-        } es diferente a la entregada por parte del la parcialidad previa ${
-          cantidadporliberar
+        } es diferente a la entregada por parte del la parcialidad previa ${cantidadPorLiberar}.`
+      );
+      return;
+    } else if (
+      partialsActual.length > 0 &&
+      lastValidatedPartial === null &&
+      Number(defaultValues.total_quantity ?? 0) + Number(sampleAuditory) !==
+        prevAreaSum
+    ) {
+      alert(
+        `La cantidad total a liberar ${
+          (defaultValues.total_quantity ?? 0) + Number(sampleAuditory)
+        } es mayor a la entregada por parte del área previa ${
+          prevAreaSum
         }.`
       );
       return;
     }
-
     setShowConfirm(true);
   };
 
