@@ -523,6 +523,19 @@ const PersonalizacionComponent = ({ workOrder }: { workOrder: any }) => {
 
   const handleLiberarClick = async () => {
     const numValue = Number(goodQuantity);
+
+    const orderQty = Number(workOrder?.workOrder?.quantity ?? 0);
+    const goodQty = Number(goodQuantity ?? 0);
+    const noProc = Number(noProcessQuantity ?? 0);
+
+    // Suma de quantities de los partial releases del flujo actual
+    const sumPartialQty = (currentFlow?.partialReleases ?? []).reduce(
+      (acc: any, pr: any) => acc + Number(pr?.quantity ?? 0),
+      0
+    );
+
+    // Producción considerada para la validación
+    const producedSoFar = goodQty + sumPartialQty;
     const partialsActual = currentFlow?.partialReleases ?? [];
     if (isNaN(numValue) || !Number.isInteger(numValue) || numValue <= 0) {
       Alert.alert('Por favor, ingresa una cantidad válida para Buenas.');
@@ -552,11 +565,11 @@ const PersonalizacionComponent = ({ workOrder }: { workOrder: any }) => {
       );
       return;
     } else if (
-      Number(goodQuantity) < workOrder.workOrder.quantity && Number(excessQuantity) === 0
+      producedSoFar < orderQty &&
+      noProc === 0 &&
+      currentFlow?.areaResponse == null
     ) {
-      alert(
-        `La cantidad de excedente ${Number(excessQuantity)} es invalida.`
-      );
+      alert(`La cantidad de excedente ${Number(excessQuantity)} es invalida.`);
       return;
     }
 
@@ -850,7 +863,7 @@ const PersonalizacionComponent = ({ workOrder }: { workOrder: any }) => {
       return bad + mat;
     }
 
-    return normalizedAreas.reduce((acc, area:any) => {
+    return normalizedAreas.reduce((acc, area: any) => {
       const key = normalizeAreaKey(area.name);
       const bad = Number(areaBadQuantities[`${key}_bad`] ?? 0);
       const mat = area.supportsMaterial
@@ -1019,8 +1032,7 @@ const PersonalizacionComponent = ({ workOrder }: { workOrder: any }) => {
 
             const findValue = (label: string) =>
               currentAreaInputs.values.find(
-                (entry) =>
-                  normalizeLabel(entry.label) === normalizeLabel(label)
+                (entry) => normalizeLabel(entry.label) === normalizeLabel(label)
               )?.value ?? 0;
 
             setLastBadQuantity(String(findValue('Malas')));

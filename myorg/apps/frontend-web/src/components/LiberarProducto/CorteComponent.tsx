@@ -432,6 +432,19 @@ export default function CorteComponent({ workOrder }: Props) {
 
   const handleLiberarClick = () => {
     const numValue = Number(goodQuantity);
+
+    const orderQty = Number(workOrder?.workOrder?.quantity ?? 0);
+    const goodQty = Number(goodQuantity ?? 0);
+    const noProc = Number(noProcessQuantity ?? 0);
+
+    // Suma de quantities de los partial releases del flujo actual
+    const sumPartialQty = (currentFlow?.partialReleases ?? []).reduce(
+      (acc: any, pr: any) => acc + Number(pr?.quantity ?? 0),
+      0
+    );
+
+    // Producción considerada para la validación
+    const producedSoFar = goodQty + sumPartialQty;
     const partialsActual = currentFlow?.partialReleases ?? [];
     if (isNaN(numValue) || !Number.isInteger(numValue) || numValue <= 0) {
       alert('Por favor, ingresa una cantidad de muestra válida.');
@@ -448,10 +461,13 @@ export default function CorteComponent({ workOrder }: Props) {
       );
       return;
     } else if (
-      Number(goodQuantity) < workOrder.workOrder.quantity &&
-      Number(noProcessQuantity) === 0
+      producedSoFar < orderQty &&
+      noProc === 0 &&
+      currentFlow?.areaResponse == null
     ) {
-      alert(`La cantidad de excedente ${Number(noProcessQuantity)} es invalida.`);
+      alert(
+        `La cantidad de excedente ${Number(noProcessQuantity)} es invalida.`
+      );
       return;
     }
 
