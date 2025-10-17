@@ -4,6 +4,7 @@ import { View, Text, TouchableOpacity, ActivityIndicator, Image, StyleSheet } fr
 import * as FileSystem from 'expo-file-system';
 import FileViewer from 'react-native-file-viewer';
 import { guessMimeFromName, normalizeToBase64, sniffImageMime, extFromMime, writeBase64 } from './file';
+import PdfThumbnail from 'react-native-pdf-thumbnail';
 
 type FileItem = { id: number; type: string; file_path: string };
 
@@ -21,59 +22,59 @@ const isCardImageFile = (f: FileItem) => {
 const isSkuPdfFile = (f: FileItem) => {
   const t = (f.type || '').toLowerCase();
   const p = (f.file_path || '').toLowerCase();
-  return t.includes('sku') || p.endsWith('.pdf') || p.includes('/sku');
+  return t.includes('sku') || p.includes('sku');
 };
 
 export const MobileCardPreview: React.FC<{
   files: FileItem[];
-  getFile: (filename: string) => Promise<any>; // lo que devuelva tu API
+  getFile: (filename: string) => Promise<any>;
 }> = ({ files, getFile }) => {
-  const [thumbUri, setThumbUri] = React.useState<string | null>(null); // image file://
-  const [openUri, setOpenUri] = React.useState<string | null>(null);    // para FileViewer
+  const [thumbUri, setThumbUri] = React.useState<string | null>(null); // imagen para <Image />
+  const [openUri, setOpenUri] = React.useState<string | null>(null);    // pdf para FileViewer
   const [loading, setLoading] = React.useState(true);
 
   React.useEffect(() => {
     let mounted = true;
     (async () => {
       try {
-        // 1) Imagen de tarjeta
+        // 1) CARD IMAGE (prioridad)
         const card = files.find(isCardImageFile);
         if (card) {
           const raw = await getFile(card.file_path);
           const { base64, bytes } = normalizeToBase64(raw);
-
-          // MIME por nombre o por “sniffing”
           let mime = guessMimeFromName(card.file_path);
           const sniff = sniffImageMime(bytes);
           if (!mime.startsWith('image/') && sniff) mime = sniff;
           if (!mime.startsWith('image/')) mime = 'image/jpeg';
 
-          const ext = extFromMime(mime); // jpg/png/webp
+          const ext = extFromMime(mime);
           const baseName = (card.file_path.split('/').pop() || 'card_image').replace(/\.[^.]+$/, '');
           const fileName = `${baseName}.${ext}`;
           const fileUri = (FileSystem.cacheDirectory || FileSystem.documentDirectory!) + fileName;
-
           await writeBase64(fileUri, base64);
 
           if (!mounted) return;
-          setThumbUri(fileUri);   // <Image uri />
-          setOpenUri(fileUri);    // abrir con FileViewer si tocás
+          setThumbUri(fileUri);   // miniatura
+          setOpenUri(fileUri);    // “abrir con…”
           setLoading(false);
           return;
         }
 
-        // 2) PDF SKU
+        // 2) SKU.pdf => generar thumbnail (1ª página) y guardar pdf para abrir
         const sku = files.find(isSkuPdfFile);
         if (sku) {
           const raw = await getFile(sku.file_path);
           const { base64 } = normalizeToBase64(raw);
           const baseName = (sku.file_path.split('/').pop() || 'sku').replace(/\.[^.]+$/, '');
-          const fileUri = (FileSystem.cacheDirectory || FileSystem.documentDirectory!) + `${baseName}.pdf`;
-          await writeBase64(fileUri, base64);
+          const pdfUri = (FileSystem.cacheDirectory || FileSystem.documentDirectory!) + `${baseName}.pdf`;
+          await writeBase64(pdfUri, base64);
+
+          // 👇 genera PNG de la primera página
+          const { uri: thumbPng } = await PdfThumbnail.generate(pdfUri, 0); // pageIndex 0
 
           if (!mounted) return;
-          setThumbUri(null);
-          setOpenUri(fileUri);
+          setThumbUri(thumbPng);  // <Image /> igual que web
+          setOpenUri(pdfUri);     // abrir con FileViewer
           setLoading(false);
           return;
         }
@@ -104,19 +105,11 @@ export const MobileCardPreview: React.FC<{
     );
   }
 
+  // Mostrar SIEMPRE imagen (card o thumbnail del PDF), igual que web
   if (thumbUri) {
     return (
       <TouchableOpacity onPress={onPress} activeOpacity={0.9} style={styles.box}>
         <Image source={{ uri: thumbUri }} style={{ width: '100%', height: '100%' }} resizeMode="cover" />
-      </TouchableOpacity>
-    );
-  }
-
-  if (openUri && openUri.toLowerCase().endsWith('.pdf')) {
-    return (
-      <TouchableOpacity onPress={onPress} activeOpacity={0.9} style={[styles.box, styles.pdfBox]}>
-        <Text style={{ fontWeight: '700' }}>SKU.pdf</Text>
-        <Text style={{ color: '#555' }}>Tocar para abrir</Text>
       </TouchableOpacity>
     );
   }
@@ -130,7 +123,7 @@ export const MobileCardPreview: React.FC<{
 
 const styles = StyleSheet.create({
   box: {
-    height: 180,
+    height: 180,             // 👈 misma altura que en web
     borderRadius: 16,
     overflow: 'hidden',
     backgroundColor: '#fff',
