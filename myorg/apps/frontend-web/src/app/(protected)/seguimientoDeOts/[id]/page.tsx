@@ -193,6 +193,15 @@ export type AreaData = {
       user?: { username?: string | null } | null;
     } | null;
     created_at: string;
+    badQuantityDetails?: Array<{
+      id: number;
+      target_area_id: number;
+      source_area_id: number;
+      bad_quantity?: number;
+      material_quantity?: number;
+      targetArea?: { id: number; name: string } | null;
+      sourceArea?: { id: number; name: string } | null;
+    }>;
   }>;
 };
 
@@ -596,6 +605,9 @@ export default function SeguimientoDeOtsAuxPage({ params }: Props) {
   const [inconformitySectionOpen, setInconformitySectionOpen] = useState(false);
 
   const [badModalOwner, setBadModalOwner] = useState<AreaData | null>(null);
+  const [badModalPartial, setBadModalPartial] = useState<
+    AreaData['partials'][number] | null
+  >(null);
   const [modalAreas, setModalAreas] = useState<AreaData[]>([]);
 
   // ---- Operators maps ----
@@ -719,7 +731,6 @@ export default function SeguimientoDeOtsAuxPage({ params }: Props) {
 
         const data = await fetchWorkOrderById(id);
         const users = await fetchAllUsers();
-
         setOperatorUsers(users || []);
         setWorkOrder(data);
 
@@ -940,7 +951,10 @@ export default function SeguimientoDeOtsAuxPage({ params }: Props) {
     return { bad, mat };
   };
 
-  const handleOpenBadQuantityModal = (ownerArea: AreaData) => {
+const handleOpenBadQuantityModal = (
+  ownerArea: AreaData,
+  partial?: AreaData['partials'][number] | null
+) => {
     const initialValues: Record<string, string> = {};
 
     const TARGET_AREA_IDS = [2, 3, 4, 5, 6, 7];
@@ -965,29 +979,52 @@ export default function SeguimientoDeOtsAuxPage({ params }: Props) {
       badAgg.bySourceTarget.get(ownerArea.id) ??
       new Map<number, { bad: number; mat: number }>();
 
+    const partialDetails = partial?.badQuantityDetails ?? [];
+
     orderedAreas.forEach((area) => {
       const key = normalizeAreaKey(area.name);
+      const isOwnerArea = Number(area.id) === Number(ownerArea.id);
 
-      if (Number(area.id) === Number(ownerArea.id)) {
-        // SELF: traer de response.[block]
+      let badValue = 0;
+      let materialValue = 0;
+
+      if (partial) {
+        if (isOwnerArea) {
+          badValue = toNum(partial.bad_quantity);
+          materialValue = toNum(partial.material_quantity);
+        } else {
+          const detail = partialDetails.find(
+            (d) => Number(d?.target_area_id) === Number(area.id)
+          );
+          if (detail) {
+            badValue = toNum(detail?.bad_quantity);
+            materialValue = toNum(detail?.material_quantity);
+          } else {
+            const agg = perTarget.get(Number(area.id)) ?? { bad: 0, mat: 0 };
+            badValue = toNum(agg.bad);
+            materialValue = toNum(agg.mat);
+          }
+        }
+      } else if (isOwnerArea) {
         const { bad, mat } = getSelfBadAndMat(ownerArea);
-        initialValues[`${key}_bad`] = String(toNum(bad));
-        if (area.id >= 6) {
-          initialValues[`${key}_material`] = String(toNum(mat));
-        }
+        badValue = toNum(bad);
+        materialValue = toNum(mat);
       } else {
-        // OTROS TARGETS: usar agregados desde badQuantityDetails
         const agg = perTarget.get(Number(area.id)) ?? { bad: 0, mat: 0 };
-        initialValues[`${key}_bad`] = String(toNum(agg.bad));
-        if (area.id >= 6) {
-          initialValues[`${key}_material`] = String(toNum(agg.mat));
-        }
+        badValue = toNum(agg.bad);
+        materialValue = toNum(agg.mat);
+      }
+
+      initialValues[`${key}_bad`] = String(badValue);
+      if (area.id >= 6) {
+        initialValues[`${key}_material`] = String(materialValue);
       }
     });
 
     setModalAreas(orderedAreas);
     setAreaBadQuantities(initialValues);
     setBadModalOwner(ownerArea);
+    setBadModalPartial(partial ?? null);
     setShowBadQuantity(true);
   };
 
@@ -2219,32 +2256,55 @@ export default function SeguimientoDeOtsAuxPage({ params }: Props) {
                                     ? toNum(p.excess_quantity)
                                     : toNum(p.noprocess_quantity);
 
+                                const partialBadDetailsSum = (p.badQuantityDetails ?? []).reduce(
+                                  (acc, detail) => acc + toNum(detail?.bad_quantity),
+                                  0
+                                );
+                                const partialTotalBad = toNum(p.bad_quantity) + partialBadDetailsSum;
+
                                 const isLastPartial =
                                   rem <= 0 &&
                                   pIndex === area.partials.length - 1;
 
-                                const shouldShowModalTrigger =
+                                const allowBadQuantityModal =
                                   field === 'malas' &&
                                   area.id >= 6 &&
-                                  area.status === 'Completado' &&
-                                  isLastPartial;
+                                  area.status === 'Completado';
 
                                 const shouldRenderAggregateInput =
                                   isEditableAggregateField &&
                                   isLastPartial &&
                                   rem <= 0;
 
-                                // (Logs coherentes con el botón)
-                                if (
-                                  field === 'malas' &&
-                                  shouldShowModalTrigger
-                                ) {
-                                  console.log({
-                                    badToOthers,
-                                    selfBad,
-                                    totalBad,
-                                  });
-                                }
+                                const displayValue =
+                                  field === 'malas' ? partialTotalBad : value;
+
+                                const partialContent = allowBadQuantityModal ? (
+                                  <button
+                                    type="button"
+                                    className="inline-flex min-w-[64px] justify-center rounded border border-gray-200 bg-gray-50 px-2 py-1 text-sm text-gray-700 hover:bg-gray-100 focus:outline-none focus:ring-1 focus:ring-blue-400"
+                                    onClick={() => handleOpenBadQuantityModal(area, p)}
+                                    title={`Cantidad mala total del parcial: ${partialTotalBad}`}
+                                  >
+                                    {displayValue}
+                                  </button>
+                                ) : shouldRenderAggregateInput ? (
+                                  <input
+                                    type="number"
+                                    value={aggregatedFieldValue}
+                                    min={0}
+                                    onChange={(e) =>
+                                      handleValueChange(
+                                        area.id,
+                                        field,
+                                        e.target.value
+                                      )
+                                    }
+                                    className="w-20 rounded border border-gray-200 px-2 py-1 text-center"
+                                  />
+                                ) : (
+                                  displayValue
+                                );
 
                                 return (
                                   <td
@@ -2253,38 +2313,7 @@ export default function SeguimientoDeOtsAuxPage({ params }: Props) {
                                     }-${field}`}
                                     className="text-center"
                                   >
-                                    {field === 'malas' ? (
-                                      shouldShowModalTrigger ? (
-                                        <button
-                                          type="button"
-                                          className="inline-flex min-w-[64px] justify-center rounded border border-gray-200 bg-gray-50 px-2 py-1 text-sm text-gray-700 hover:bg-gray-100 focus:outline-none focus:ring-1 focus:ring-blue-400"
-                                          onClick={() =>
-                                            handleOpenBadQuantityModal(area)
-                                          }
-                                          title={`Cantidad mala total: ${totalBad}`}
-                                        >
-                                          {totalBad}{' '}
-                                        </button>
-                                      ) : (
-                                        value
-                                      )
-                                    ) : shouldRenderAggregateInput ? (
-                                      <input
-                                        type="number"
-                                        value={aggregatedFieldValue}
-                                        min={0}
-                                        onChange={(e) =>
-                                          handleValueChange(
-                                            area.id,
-                                            field,
-                                            e.target.value
-                                          )
-                                        }
-                                        className="w-20 rounded border border-gray-200 px-2 py-1 text-center"
-                                      />
-                                    ) : (
-                                      value
-                                    )}
+                                    {field === 'malas' ? partialContent : value}
                                   </td>
                                 );
                               }
@@ -2323,30 +2352,15 @@ export default function SeguimientoDeOtsAuxPage({ params }: Props) {
                                   remValue = 0;
                               }
 
-                              const shouldShowModalTrigger =
+                              const allowBadQuantityModalRem =
                                 field === 'malas' &&
                                 area.id >= 6 &&
                                 area.status === 'Completado';
 
                               const remainderAggregateContent =
-                                field === 'malas' &&
-                                area.status === 'Completado' ? (
-                                  shouldShowModalTrigger && remSum > 0 ? (
-                                    <button
-                                      type="button"
-                                      className="inline-flex min-w-[64px] justify-center rounded border border-gray-200 bg-gray-50 px-2 py-1 text-sm text-gray-700 hover:bg-gray-100 focus:outline-none focus:ring-1 focus:ring-blue-400"
-                                      onClick={() =>
-                                        handleOpenBadQuantityModal(area)
-                                      }
-                                      title={`Cantidad mala total: ${totalBad}`}
-                                    >
-                                      {aggregatedFieldValue}{' '}
-                                      {/* ⭐ aquí también totalBad; NO aggregatedBad + defectuoso */}
-                                    </button>
-                                  ) : (
-                                    remSum
-                                  )
-                                ) : isEditableAggregateField ? (
+                                field === 'malas'
+                                  ? aggregatedFieldValue
+                                  : isEditableAggregateField ? (
                                   <input
                                     type="number"
                                     value={aggregatedFieldValue}
@@ -2360,9 +2374,22 @@ export default function SeguimientoDeOtsAuxPage({ params }: Props) {
                                     }
                                     className="w-20 rounded border border-gray-200 px-2 py-1 text-center"
                                   />
-                                ) : (
-                                  remSum
-                                );
+                                  ) : (
+                                    remSum
+                                  );
+
+                              const remainderPartialContent = allowBadQuantityModalRem ? (
+                                <button
+                                  type="button"
+                                  className="inline-flex min-w-[64px] justify-center rounded border border-gray-200 bg-gray-50 px-2 py-1 text-sm text-gray-700 hover:bg-gray-100 focus:outline-none focus:ring-1 focus:ring-blue-400"
+                                  onClick={() => handleOpenBadQuantityModal(area)}
+                                  title={`Cantidad mala total del área: ${totalBad}`}
+                                >
+                                  {remValue}
+                                </button>
+                              ) : (
+                                remValue
+                              );
 
                               cells.push(
                                 <React.Fragment
@@ -2373,7 +2400,7 @@ export default function SeguimientoDeOtsAuxPage({ params }: Props) {
                                     className="text-center font-semibold"
                                     title="Remanente"
                                   >
-                                    {remValue}
+                                    {remainderPartialContent}
                                   </td>
 
                                   <td
@@ -2697,12 +2724,15 @@ export default function SeguimientoDeOtsAuxPage({ params }: Props) {
             handleSaveChanges(result);
             setModalAreas([]);
             setBadModalOwner(null);
+            setBadModalPartial(null);
           }}
           onClose={() => {
             setShowBadQuantity(false);
             setModalAreas([]);
             setBadModalOwner(null);
+            setBadModalPartial(null);
           }}
+          isEditable={badModalPartial == null}
         />
       )}
       {showConfirm && (

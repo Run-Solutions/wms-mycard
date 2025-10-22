@@ -1,5 +1,5 @@
 // myorg/apps/frontend-web/src/components/LiberarProducto/util/BadQuantityModal.tsx
-import React from 'react';
+import React, { useEffect } from 'react';
 import { normalizeAreaKey } from './areaMappings';
 
 export type AreaForBadQty = {
@@ -46,6 +46,31 @@ const BadQuantityModal: React.FC<Props> = ({
   onClose,
 }) => {
   console.log(areaBadQuantities, "areaBadQuantities");
+
+  useEffect(() => {
+    setAreaBadQuantities((prev) => {
+      let hasChanges = false;
+      const next = { ...prev };
+
+      areas.forEach((area) => {
+        const areaKey = normalizeAreaKey(area.name);
+        const badKey = `${areaKey}_bad`;
+        const materialKey = `${areaKey}_material`;
+
+        if (!Object.prototype.hasOwnProperty.call(next, badKey)) {
+          next[badKey] = String(area.malas ?? 0);
+          hasChanges = true;
+        }
+
+        if ((area.supportsMaterial ?? false) && !Object.prototype.hasOwnProperty.call(next, materialKey)) {
+          next[materialKey] = String(area.defectuoso ?? 0);
+          hasChanges = true;
+        }
+      });
+
+      return hasChanges ? next : prev;
+    });
+  }, [areas, setAreaBadQuantities]);
   
   const handleConfirm = () => {
     const updatedAreas = areas.map((area) => {

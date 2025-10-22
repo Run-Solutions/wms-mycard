@@ -96,6 +96,9 @@ export default function CorteComponent({ workOrder }: Props) {
   const [areaBadQuantities, setAreaBadQuantities] = useState<
     Record<string, string>
   >({});
+  const [pendingBadQuantityInputs, setPendingBadQuantityInputs] = useState<
+    BadQuantityModalResult['inputsByArea'] | null
+  >(null);
 
   const [goodQuantity, setGoodQuantity] = useState<number | string>('');
   const [excessQuantity, setExcessQuantity] = useState<number | string>('');
@@ -487,6 +490,21 @@ export default function CorteComponent({ workOrder }: Props) {
   };
 
   const handleCorteSubmit = async () => {
+    if (pendingBadQuantityInputs) {
+      const saved = await handleSaveChanges(pendingBadQuantityInputs, {
+        silent: true,
+      });
+
+      if (!saved) {
+        alert(
+          'No se pudieron guardar las cantidades por área. Intenta nuevamente.'
+        );
+        return;
+      }
+
+      setPendingBadQuantityInputs(null);
+    }
+
     const payload = {
       workOrderId: workOrder.workOrder.id,
       workOrderFlowId: currentFlow.id,
@@ -561,8 +579,10 @@ export default function CorteComponent({ workOrder }: Props) {
   );
 
   const handleSaveChanges = async (
-    modalInputs?: BadQuantityModalResult['inputsByArea']
+    modalInputs?: BadQuantityModalResult['inputsByArea'],
+    options?: { silent?: boolean }
   ) => {
+    const { silent = false } = options ?? {};
     const toInt = (v: any) => {
       const n = parseInt(String(v ?? '0').trim(), 10);
       return Number.isFinite(n) ? n : 0;
@@ -739,10 +759,18 @@ export default function CorteComponent({ workOrder }: Props) {
         }
       }
 
-      alert('Cambios guardados correctamente');
+      if (!silent) {
+        alert('Cambios guardados correctamente');
+      }
+
+      return true;
     } catch (err) {
       console.error('Error al guardar los cambios', err);
-      alert('Error al guardar los cambios');
+      if (!silent) {
+        alert('Error al guardar los cambios');
+      }
+
+      return false;
     }
   };
 
@@ -891,7 +919,7 @@ export default function CorteComponent({ workOrder }: Props) {
             }
 
             setShowBadQuantity(false);
-            void handleSaveChanges(inputsByArea);
+            setPendingBadQuantityInputs(inputsByArea);
           }}
           onClose={() => setShowBadQuantity(false)}
         />

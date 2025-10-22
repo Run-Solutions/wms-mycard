@@ -41,12 +41,25 @@ type DelegateKey =
 
 type ResultBlockKey = BlockKey | 'partialRelease';
 
-type BadQuantityDetailSnapshot = {
+type DetailSnapshot = {
   id: number;
   bad_quantity: number | Prisma.Decimal | null;
   material_quantity: number | Prisma.Decimal | null;
   values: Prisma.JsonValue | null;
 };
+
+type DetailPersistenceContext =
+  | {
+      type: 'workOrder';
+      where: Prisma.BadQuantityDetailWhereUniqueInput;
+      existing: DetailSnapshot | null;
+    }
+  | {
+      type: 'partial';
+      partialReleaseId: number;
+      where: Prisma.PartialReleaseBadQuantityDetailWhereUniqueInput;
+      existing: DetailSnapshot | null;
+    };
 
 const AREA_NAME_TO_BLOCK: Record<string, BlockKey> = {
   preprensa: 'prepress',
@@ -458,6 +471,24 @@ export class WorkOrderService {
             badQuantityDetails: {
               include: {
                 targetArea: true,
+                sourceArea: true,
+              },
+            },
+            partialReleaseBadQuantityDetails: {
+              include: {
+                targetArea: true,
+                sourceArea: true,
+                partialRelease: {
+                  select: {
+                    id: true,
+                    user: {
+                      select: {
+                        id: true,
+                        username: true,
+                      },
+                    },
+                  },
+                },
               },
             },
             workOrder: {
@@ -469,6 +500,24 @@ export class WorkOrderService {
                     badQuantityDetails: {
                       include: {
                         targetArea: true,
+                        sourceArea: true,
+                      },
+                    },
+                    partialReleaseBadQuantityDetails: {
+                      include: {
+                        targetArea: true,
+                        sourceArea: true,
+                        partialRelease: {
+                          select: {
+                            id: true,
+                            user: {
+                              select: {
+                                id: true,
+                                username: true,
+                              },
+                            },
+                          },
+                        },
                       },
                     },
                     area: true,
@@ -534,6 +583,12 @@ export class WorkOrderService {
                             user: true,
                           },
                         },
+                        badQuantityDetails: {
+                          include: {
+                            targetArea: true,
+                            sourceArea: true,
+                          },
+                        },
                       },
                     },
                     user: true,
@@ -557,6 +612,12 @@ export class WorkOrderService {
                 inconformities: {
                   include: {
                     user: true,
+                  },
+                },
+                badQuantityDetails: {
+                  include: {
+                    targetArea: true,
+                    sourceArea: true,
                   },
                 },
               },
@@ -1145,6 +1206,11 @@ export class WorkOrderService {
       partialReleaseByAreaId.get(areaId)!.push(partial);
     }
 
+    const ownerPartialList =
+      resolvedSourceAreaId != null
+        ? partialReleaseByAreaId.get(resolvedSourceAreaId) ?? []
+        : [];
+
     const updatedAreas: Array<{
       areaId: number;
       block: ResultBlockKey;
@@ -1162,26 +1228,63 @@ export class WorkOrderService {
         const areaRecord = areaResponseByAreaId.get(summary.areaId);
         const blockKey = resolveBlockKey(summary.areaName);
 
-        let handledByAreaResponse = false;
         let detailBlock: ResultBlockKey | null = blockKey ?? null;
 
-        let detailWhereInput: Prisma.BadQuantityDetailWhereUniqueInput | null =
-          null;
-        let existingDetail: BadQuantityDetailSnapshot | null = null;
+        const detailContexts: DetailPersistenceContext[] = [];
+        let recordedDetail: DetailSnapshot | null = null;
 
-        if (
+        const relevantPartialList =
+          ownerPartialList.length > 0
+            ? ownerPartialList
+            : partialReleaseByAreaId.get(summary.areaId) ?? [];
+
+        const targetPartial =
+          relevantPartialList.length > 0
+            ? relevantPartialList[relevantPartialList.length - 1]
+            : null;
+
+        if (targetPartial) {
+          const partialDetailWhereInput: Prisma.PartialReleaseBadQuantityDetailWhereUniqueInput =
+            {
+              partial_release_id_target_area_id: {
+                partial_release_id: targetPartial.id,
+                target_area_id: summary.areaId,
+              },
+            };
+
+          const existingPartialDetail =
+            (await tx.partialReleaseBadQuantityDetail.findUnique({
+              where: partialDetailWhereInput,
+              select: {
+                id: true,
+                bad_quantity: true,
+                material_quantity: true,
+                values: true,
+              },
+            })) as DetailSnapshot | null;
+
+          detailContexts.push({
+            type: 'partial',
+            partialReleaseId: targetPartial.id,
+            where: partialDetailWhereInput,
+            existing: existingPartialDetail,
+          });
+
+          recordedDetail = existingPartialDetail;
+          detailBlock = blockKey ?? 'partialRelease';
+        } else if (
           canPersistDetails &&
           resolvedSourceFlowId !== null &&
           resolvedSourceAreaId !== null
         ) {
-          detailWhereInput = {
+          const detailWhereInput: Prisma.BadQuantityDetailWhereUniqueInput = {
             source_work_order_flow_id_target_area_id: {
               source_work_order_flow_id: resolvedSourceFlowId,
               target_area_id: summary.areaId,
             },
           };
 
-          existingDetail = (await tx.badQuantityDetail.findUnique({
+          const existingDetail = (await tx.badQuantityDetail.findUnique({
             where: detailWhereInput,
             select: {
               id: true,
@@ -1189,10 +1292,18 @@ export class WorkOrderService {
               material_quantity: true,
               values: true,
             },
-          })) as BadQuantityDetailSnapshot | null;
+          })) as DetailSnapshot | null;
+
+          detailContexts.push({
+            type: 'workOrder',
+            where: detailWhereInput,
+            existing: existingDetail,
+          });
+
+          recordedDetail = existingDetail;
         }
 
-        const detailTotals = extractDetailTotals(existingDetail);
+        const detailTotals = extractDetailTotals(recordedDetail);
         const { deltas: summaryDeltas, totals: normalizedTotals } =
           computeDetailAdjustments(aggregated, detailTotals);
 
@@ -1204,10 +1315,9 @@ export class WorkOrderService {
         
           if (!shouldAccumulate) {
             // CUALQUIER OTRO BLOQUE (p.ej. 'corte', 'colorEdge', etc.)
-            // -> no acumular; solo detalle y sin fallback a partialRelease
-            handledByAreaResponse = true;      // evita fallback
-            detailBlock = blockKey;            // el detalle queda marcado con su bloque real (p.ej. 'corte')
-            // No delegate.update, no updatedAreas.push
+            // -> sólo detalle; permitir fallback a parcialidad si existe
+            detailBlock = blockKey; // el detalle queda marcado con su bloque real (p.ej. 'corte')
+            // No delegate.update, no updatedAreas.push (se gestiona vía parciales)
           } else {
             const blockData = areaRecord[blockKey];
             if (blockData?.id) {
@@ -1290,106 +1400,96 @@ export class WorkOrderService {
                     }
                   }
 
-                  handledByAreaResponse = true;
                 }
               }
             }
           }
         }
 
-        // --------------------------
-        // FALLBACK: partialRelease
-        // --------------------------
-        if (!handledByAreaResponse) {
-          const partialList = partialReleaseByAreaId.get(summary.areaId);
-          if (partialList && partialList.length > 0) {
-            const targetPartial = partialList[partialList.length - 1];
-            const existingPartial = await tx.partialRelease.findUnique({
-              where: { id: targetPartial.id },
-            });
+        const isOwnerArea =
+          resolvedSourceAreaId !== null &&
+          summary.areaId === resolvedSourceAreaId;
 
-            if (existingPartial) {
-              const {
-                deltas: partialDeltas,
-                logs: partialLogs,
-                nextValues: partialNextValues,
-              } = buildNumericChanges(
-                existingPartial,
-                summaryDeltas,
-                PARTIAL_RELEASE_FIELDS,
-              );
+        if (targetPartial && isOwnerArea) {
+          const existingPartial = await tx.partialRelease.findUnique({
+            where: { id: targetPartial.id },
+          });
 
-              // NUEVO: set si previo es NULL; increment si es numérico
-              const updatePayload: Record<string, any> = {};
+          if (existingPartial) {
+            const {
+              deltas: partialDeltas,
+              logs: partialLogs,
+              nextValues: partialNextValues,
+            } = buildNumericChanges(
+              existingPartial,
+              summaryDeltas,
+              PARTIAL_RELEASE_FIELDS,
+            );
 
-              // bad_quantity
-              if (summaryDeltas.bad_quantity !== undefined) {
-                const prevBad = coerceToNumber(existingPartial?.bad_quantity);
-                if (prevBad === null) {
-                  updatePayload.bad_quantity = Number(
-                    partialNextValues.bad_quantity ?? 0,
-                  );
-                } else if (
-                  partialDeltas.bad_quantity !== undefined &&
-                  partialDeltas.bad_quantity !== 0
-                ) {
-                  updatePayload.bad_quantity = {
-                    increment: partialDeltas.bad_quantity,
-                  };
-                }
-              }
+            const updatePayload: Record<string, any> = {};
 
-              // material_quantity
-              if (summaryDeltas.material_quantity !== undefined) {
-                const prevMat = coerceToNumber(
-                  existingPartial?.material_quantity,
+            if (summaryDeltas.bad_quantity !== undefined) {
+              const prevBad = coerceToNumber(existingPartial?.bad_quantity);
+              if (prevBad === null) {
+                updatePayload.bad_quantity = Number(
+                  partialNextValues.bad_quantity ?? 0,
                 );
-                if (prevMat === null) {
-                  updatePayload.material_quantity = Number(
-                    partialNextValues.material_quantity ?? 0,
-                  );
-                } else if (
-                  partialDeltas.material_quantity !== undefined &&
-                  partialDeltas.material_quantity !== 0
-                ) {
-                  updatePayload.material_quantity = {
-                    increment: partialDeltas.material_quantity,
-                  };
-                }
+              } else if (
+                partialDeltas.bad_quantity !== undefined &&
+                partialDeltas.bad_quantity !== 0
+              ) {
+                updatePayload.bad_quantity = {
+                  increment: partialDeltas.bad_quantity,
+                };
               }
-
-              if (Object.keys(updatePayload).length > 0) {
-                await tx.partialRelease.update({
-                  where: { id: targetPartial.id },
-                  data: updatePayload,
-                });
-
-                updatedAreas.push({
-                  areaId: summary.areaId,
-                  block: 'partialRelease',
-                  blockId: targetPartial.id,
-                  data: partialNextValues,
-                });
-
-                for (const entry of partialLogs) {
-                  logsBuffer.push({
-                    work_order_id: workOrderId,
-                    area_id: summary.areaId,
-                    area_name: summary.areaName ?? 'partialRelease',
-                    block: 'partialRelease',
-                    field: entry.field,
-                    old_value: stringifyValue(entry.oldValue),
-                    new_value: stringifyValue(entry.newValue),
-                    user_id: userId,
-                  });
-                }
-              }
-
-              detailBlock = 'partialRelease';
             }
-          } else if (!blockKey) {
-            detailBlock = null;
+
+            if (summaryDeltas.material_quantity !== undefined) {
+              const prevMat = coerceToNumber(existingPartial?.material_quantity);
+              if (prevMat === null) {
+                updatePayload.material_quantity = Number(
+                  partialNextValues.material_quantity ?? 0,
+                );
+              } else if (
+                partialDeltas.material_quantity !== undefined &&
+                partialDeltas.material_quantity !== 0
+              ) {
+                updatePayload.material_quantity = {
+                  increment: partialDeltas.material_quantity,
+                };
+              }
+            }
+
+            if (Object.keys(updatePayload).length > 0) {
+              await tx.partialRelease.update({
+                where: { id: targetPartial.id },
+                data: updatePayload,
+              });
+
+              updatedAreas.push({
+                areaId: summary.areaId,
+                block: 'partialRelease',
+                blockId: targetPartial.id,
+                data: partialNextValues,
+              });
+
+              for (const entry of partialLogs) {
+                logsBuffer.push({
+                  work_order_id: workOrderId,
+                  area_id: summary.areaId,
+                  area_name: summary.areaName ?? 'partialRelease',
+                  block: 'partialRelease',
+                  field: entry.field,
+                  old_value: stringifyValue(entry.oldValue),
+                  new_value: stringifyValue(entry.newValue),
+                  user_id: userId,
+                });
+              }
+            }
+
           }
+        } else if (!targetPartial && !blockKey) {
+          detailBlock = null;
         }
 
         // --------------------------
@@ -1400,7 +1500,7 @@ export class WorkOrderService {
           detailBlock &&
           resolvedSourceFlowId !== null &&
           resolvedSourceAreaId !== null &&
-          detailWhereInput
+          detailContexts.length > 0
         ) {
           const valuesPayload = Array.isArray(summary.values)
             ? summary.values
@@ -1412,58 +1512,111 @@ export class WorkOrderService {
             : [];
 
           const incomingValues = valuesPayload;
-          const previousValues = Array.isArray(existingDetail?.values)
-            ? (existingDetail.values as Array<{ label: string; value: number }>)
-            : [];
-          const mergedValues =
-            incomingValues.length > 0
-              ? mergeDetailValues(previousValues, incomingValues)
-              : null;
+          for (const context of detailContexts) {
+            const previousValues = Array.isArray(context.existing?.values)
+              ? (context.existing!.values as Array<{
+                  label: string;
+                  value: number;
+                }>)
+              : [];
+            const mergedValues =
+              incomingValues.length > 0
+                ? mergeDetailValues(previousValues, incomingValues)
+                : null;
 
-          if (existingDetail) {
-            const updateData: Prisma.BadQuantityDetailUpdateInput = {
-              block: detailBlock,
-              updated_at: new Date(),
-            };
+            if (context.type === 'workOrder') {
+              if (context.existing) {
+                const updateData: Prisma.BadQuantityDetailUpdateInput = {
+                  block: detailBlock,
+                  updated_at: new Date(),
+                };
 
-            if (normalizedTotals.bad_quantity !== undefined) {
-              updateData.bad_quantity = Number(normalizedTotals.bad_quantity);
+                if (normalizedTotals.bad_quantity !== undefined) {
+                  updateData.bad_quantity = Number(normalizedTotals.bad_quantity);
+                }
+
+                if (normalizedTotals.material_quantity !== undefined) {
+                  updateData.material_quantity = Number(
+                    normalizedTotals.material_quantity,
+                  );
+                }
+
+                if (mergedValues) {
+                  updateData.values = mergedValues;
+                }
+
+                await tx.badQuantityDetail.update({
+                  where: context.where,
+                  data: updateData,
+                });
+              } else {
+                await tx.badQuantityDetail.create({
+                  data: {
+                    work_order_id: workOrderId,
+                    source_work_order_flow_id: resolvedSourceFlowId,
+                    source_area_id: resolvedSourceAreaId,
+                    target_area_id: summary.areaId,
+                    block: detailBlock,
+                    bad_quantity:
+                      normalizedTotals.bad_quantity !== undefined
+                        ? Number(normalizedTotals.bad_quantity)
+                        : undefined,
+                    material_quantity:
+                      normalizedTotals.material_quantity !== undefined
+                        ? Number(normalizedTotals.material_quantity)
+                        : undefined,
+                    values: incomingValues,
+                    created_by: userId,
+                  },
+                });
+              }
+            } else {
+              if (context.existing) {
+                const updateData: Prisma.PartialReleaseBadQuantityDetailUpdateInput = {
+                  block: detailBlock,
+                  updated_at: new Date(),
+                };
+
+                if (normalizedTotals.bad_quantity !== undefined) {
+                  updateData.bad_quantity = Number(normalizedTotals.bad_quantity);
+                }
+
+                if (normalizedTotals.material_quantity !== undefined) {
+                  updateData.material_quantity = Number(
+                    normalizedTotals.material_quantity,
+                  );
+                }
+
+                if (mergedValues) {
+                  updateData.values = mergedValues;
+                }
+
+                await tx.partialReleaseBadQuantityDetail.update({
+                  where: context.where,
+                  data: updateData,
+                });
+              } else {
+                await tx.partialReleaseBadQuantityDetail.create({
+                  data: {
+                    partial_release_id: context.partialReleaseId,
+                    source_work_order_flow_id: resolvedSourceFlowId,
+                    source_area_id: resolvedSourceAreaId,
+                    target_area_id: summary.areaId,
+                    block: detailBlock,
+                    bad_quantity:
+                      normalizedTotals.bad_quantity !== undefined
+                        ? Number(normalizedTotals.bad_quantity)
+                        : undefined,
+                    material_quantity:
+                      normalizedTotals.material_quantity !== undefined
+                        ? Number(normalizedTotals.material_quantity)
+                        : undefined,
+                    values: incomingValues,
+                    created_by: userId,
+                  },
+                });
+              }
             }
-
-            if (normalizedTotals.material_quantity !== undefined) {
-              updateData.material_quantity = Number(
-                normalizedTotals.material_quantity,
-              );
-            }
-
-            if (mergedValues) {
-              updateData.values = mergedValues;
-            }
-
-            await tx.badQuantityDetail.update({
-              where: detailWhereInput,
-              data: updateData,
-            });
-          } else {
-            await tx.badQuantityDetail.create({
-              data: {
-                work_order_id: workOrderId,
-                source_work_order_flow_id: resolvedSourceFlowId,
-                source_area_id: resolvedSourceAreaId,
-                target_area_id: summary.areaId,
-                block: detailBlock,
-                bad_quantity:
-                  normalizedTotals.bad_quantity !== undefined
-                    ? Number(normalizedTotals.bad_quantity)
-                    : undefined,
-                material_quantity:
-                  normalizedTotals.material_quantity !== undefined
-                    ? Number(normalizedTotals.material_quantity)
-                    : undefined,
-                values: incomingValues,
-                created_by: userId,
-              },
-            });
           }
         }
       }
@@ -1554,7 +1707,7 @@ function coerceToNumber(value: unknown): number | null {
 }
 
 function extractDetailTotals(
-  detail: BadQuantityDetailSnapshot | null,
+  detail: DetailSnapshot | null,
 ): Partial<Record<UpdatableField, number>> | null {
   if (!detail) return null;
 
