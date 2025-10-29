@@ -1,6 +1,11 @@
 // myorg/apps/frontend-web/src/api/liberarProducto.ts
 import API from './http';
 
+export type ReleaseResponse = {
+  message: string;
+  partialReleaseId?: number; // solo viene en PARCIAL
+};
+
 export const fetchWorkOrdersInProgress = async () => {
   const estados = [
     'En proceso',
@@ -261,9 +266,10 @@ export const releaseProductFromLaminacion = async (
 };
 export const releaseProductFromCorte = async (
   payload: ReleasePayloadForAuditory
-): Promise<void> => {
+): Promise<ReleaseResponse> => {
   try {
-    await API.post('/free-order-flow/corte', payload);
+    const res = await API.post('/free-order-flow/corte', payload);
+    return res.data as ReleaseResponse;
   } catch (error: any) {
     console.error(
       'Error en releaseProductFromCorte',
@@ -277,6 +283,7 @@ export const releaseProductFromColorEdge = async (
 ): Promise<void> => {
   try {
     await API.post('/free-order-flow/color-edge', payload);
+    
   } catch (error: any) {
     console.error(
       'Error en releaseProductFromColorEdge',

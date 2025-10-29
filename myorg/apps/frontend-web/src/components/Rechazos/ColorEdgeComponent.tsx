@@ -178,8 +178,7 @@ export default function ColorEdgeComponent({ workOrder, currentFlow }: Props) {
   // 3) Arregla las deps y evita setState si no cambió
   const computeInitialBadQuantities = useCallback(() => {
     const initialValues: Record<string, string> = {};
-    const makeAreaKey = (name?: string) =>
-      (name ?? '').toLowerCase().replace(/\s/g, '');
+    const makeAreaKey = (name?: string) => normalizeAreaKey(name ?? '');
 
     previousFlows.forEach((flow: any) => {
       (flow?.badQuantityDetails ?? []).forEach((detail: any) => {

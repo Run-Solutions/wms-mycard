@@ -1,6 +1,14 @@
 // myorg/apps/frontend-web/src/components/SeguimientoDeOts/BadQuantityModal.tsx
-import React from 'react';
-import { AreaData } from '@/app/(protected)/seguimientoDeOts/[id]/page';
+import React, { useEffect } from 'react';
+import { normalizeAreaKey } from '@/components/LiberarProducto/util/areaMappings';
+
+export type AreaForBadQty = {
+  id: number;
+  name: string;
+  malas: number;
+  defectuoso: number;
+  supportsMaterial?: boolean;
+};
 
 export interface BadQuantityModalResult {
   inputsByArea: Array<{
@@ -8,13 +16,19 @@ export interface BadQuantityModalResult {
     areaName: string;
     values: Array<{ label: string; value: number }>;
   }>;
-  updatedAreas: AreaData[];
+  updatedAreas: AreaForBadQty[];
+  totalBad: number;
+  totalMaterial: number;
+  lastAreaBad: number;
+  lastAreaMaterial: number;
 }
 
 interface Props {
-  areas: AreaData[];
+  areas: AreaForBadQty[];
   areaBadQuantities: { [key: string]: string };
-  setAreaBadQuantities: React.Dispatch<React.SetStateAction<{ [key: string]: string }>>;
+  setAreaBadQuantities: React.Dispatch<
+    React.SetStateAction<{ [key: string]: string }>
+  >;
   onConfirm: (result: BadQuantityModalResult) => void;
   onClose: () => void;
   isEditable?: boolean;
@@ -28,42 +42,71 @@ const BadQuantityModal: React.FC<Props> = ({
   onClose,
   isEditable = true,
 }) => {
-  const normalizeKey = (value: string | undefined | null) =>
-    (value ?? '')
-      .normalize('NFD')
-      .replace(/[\u0300-\u036f]/g, '')
-      .toLowerCase()
-      .replace(/\s/g, '');
+  useEffect(() => {
+    setAreaBadQuantities((prev) => {
+      let hasChanges = false;
+      const next = { ...prev };
+
+      areas.forEach((area) => {
+        const areaKey = normalizeAreaKey(area.name);
+        const badKey = `${areaKey}_bad`;
+        const materialKey = `${areaKey}_material`;
+
+        if (!Object.prototype.hasOwnProperty.call(next, badKey)) {
+          next[badKey] = String(area.malas ?? 0);
+          hasChanges = true;
+        }
+
+        if (
+          (area.supportsMaterial ?? false) &&
+          !Object.prototype.hasOwnProperty.call(next, materialKey)
+        ) {
+          next[materialKey] = String(area.defectuoso ?? 0);
+          hasChanges = true;
+        }
+      });
+
+      return hasChanges ? next : prev;
+    });
+  }, [areas, setAreaBadQuantities]);
+
+  const parseValue = (value: string | number | undefined) => {
+    const numeric = Number(value);
+    return Number.isFinite(numeric) ? Math.max(0, Math.trunc(numeric)) : 0;
+  };
 
   const handleConfirm = () => {
-    const parseValue = (value: string | number | undefined) => {
-      const numeric = Number(value);
-      return Number.isFinite(numeric) ? Math.max(0, Math.trunc(numeric)) : 0;
-    };
+    if (!isEditable) return;
 
     const updatedAreas = areas.map((area) => {
-      const key = normalizeKey(area.name);
+      const key = normalizeAreaKey(area.name);
+      const supportsMaterial = area.supportsMaterial ?? false;
       const badValue = parseValue(areaBadQuantities[`${key}_bad`]);
-      const materialValue = parseValue(areaBadQuantities[`${key}_material`]);
+      const materialValue = supportsMaterial
+        ? parseValue(areaBadQuantities[`${key}_material`])
+        : area.defectuoso;
 
       return {
         ...area,
         malas: badValue,
-        defectuoso: area.id >= 6 ? materialValue : area.defectuoso,
+        defectuoso: supportsMaterial ? materialValue : area.defectuoso,
       };
     });
 
     const inputsByArea = areas.map((area) => {
-      const key = normalizeKey(area.name);
+      const key = normalizeAreaKey(area.name);
+      const supportsMaterial = area.supportsMaterial ?? false;
       const badValue = parseValue(areaBadQuantities[`${key}_bad`]);
 
       const values: Array<{ label: string; value: number }> = [
         { label: 'Malas', value: badValue },
       ];
 
-      if (area.id >= 6) {
-        const materialValue = parseValue(areaBadQuantities[`${key}_material`]);
-        values.push({ label: 'Malo de fábrica', value: materialValue });
+      if (supportsMaterial) {
+        values.push({
+          label: 'Malo de fábrica',
+          value: parseValue(areaBadQuantities[`${key}_material`]),
+        });
       }
 
       return {
@@ -73,7 +116,36 @@ const BadQuantityModal: React.FC<Props> = ({
       };
     });
 
-    onConfirm({ updatedAreas, inputsByArea });
+    const lastArea = areas[areas.length - 1];
+    const lastKey = normalizeAreaKey(lastArea?.name ?? '');
+    const lastSupportsMaterial = lastArea?.supportsMaterial ?? false;
+
+    const lastAreaBad = lastArea
+      ? parseValue(areaBadQuantities[`${lastKey}_bad`])
+      : 0;
+    const lastAreaMaterial = lastSupportsMaterial
+      ? parseValue(areaBadQuantities[`${lastKey}_material`])
+      : 0;
+
+    const totalBad = areas.reduce((sum, area) => {
+      const key = normalizeAreaKey(area.name);
+      return sum + parseValue(areaBadQuantities[`${key}_bad`]);
+    }, 0);
+
+    const totalMaterial = areas.reduce((sum, area) => {
+      if (!(area.supportsMaterial ?? false)) return sum;
+      const key = normalizeAreaKey(area.name);
+      return sum + parseValue(areaBadQuantities[`${key}_material`]);
+    }, 0);
+
+    onConfirm({
+      updatedAreas,
+      inputsByArea,
+      totalBad,
+      totalMaterial,
+      lastAreaBad,
+      lastAreaMaterial,
+    });
   };
 
   return (
@@ -90,7 +162,8 @@ const BadQuantityModal: React.FC<Props> = ({
         <div className="overflow-y-auto px-6 py-4 space-y-6">
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             {areas.map((area, index) => {
-              const areaKey = normalizeKey(area.name);
+              const areaKey = normalizeAreaKey(area.name);
+              const supportsMaterial = area.supportsMaterial ?? area.id >= 6;
               return (
                 <div
                   key={`${area.id}-${index}`}
@@ -109,7 +182,10 @@ const BadQuantityModal: React.FC<Props> = ({
                       <input
                         type="number"
                         min="0"
+                        style={{ color: '#374151' }}
                         className="w-full border border-gray-300 rounded px-3 py-2 text-sm outline-blue-500"
+                        disabled={!isEditable}
+                        readOnly={!isEditable}
                         value={areaBadQuantities[`${areaKey}_bad`] || '0'}
                         onChange={(e) =>
                           setAreaBadQuantities((prev) => ({
@@ -121,15 +197,18 @@ const BadQuantityModal: React.FC<Props> = ({
                     </div>
 
                     {/* Defectuoso */}
-                    {area.id >= 6 && (
+                    {supportsMaterial && (
                       <div>
                         <label className="block text-sm text-gray-600 font-medium mb-1">
-                          Materia Prima Defectuosa
+                          Malo de fábrica
                         </label>
                         <input
                           type="number"
                           min="0"
+                          style={{ color: '#374151' }}
                           className="w-full border border-gray-300 rounded px-3 py-2 text-sm outline-blue-500"
+                          disabled={!isEditable}
+                          readOnly={!isEditable}
                           value={areaBadQuantities[`${areaKey}_material`] || '0'}
                           onChange={(e) =>
                             setAreaBadQuantities((prev) => ({
@@ -155,12 +234,18 @@ const BadQuantityModal: React.FC<Props> = ({
           >
             Cancelar
           </button>
-          {isEditable &&(<button
+          <button
+            type="button"
             onClick={handleConfirm}
-            className="bg-blue-600 hover:bg-blue-700 text-white font-semibold px-5 py-2 rounded-lg"
+            disabled={!isEditable}
+            className={`px-5 py-2 rounded-lg font-semibold text-white transition-colors ${
+              isEditable
+                ? 'bg-blue-600 hover:bg-blue-700'
+                : 'bg-blue-300 cursor-not-allowed'
+            }`}
           >
             Confirmar
-          </button>)}
+          </button>
         </div>
       </div>
     </div>

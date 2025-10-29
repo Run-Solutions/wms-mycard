@@ -7,6 +7,7 @@ import styled from 'styled-components';
 import {
   submitToCQMCorte,
   releaseProductFromCorte,
+  type ReleaseResponse,
 } from '@/api/liberarProducto';
 import { updateWorkOrderAreas } from '@/api/seguimientoDeOts';
 
@@ -82,6 +83,41 @@ const NEXT_INVALID_FOR_PARTIAL = [
 
 const NEXT_CORTE_STATUSES = ['Enviado a auditoria parcial'] as const;
 
+type UpdateWorkOrderAreasBody = {
+  sourceAreaId: number | null;
+  sourceWorkOrderFlowId: number | null;
+  badQuantitySummary: BadQuantityModalResult['inputsByArea'];
+  partialReleaseId?: number | null;
+};
+
+const pendingBQKey = (otId: string, flowId: number | null) =>
+  `pending_bq:${otId}:${flowId ?? 'none'}`;
+
+const savePendingBadQty = (
+  otId: string,
+  flowId: number | null,
+  body: UpdateWorkOrderAreasBody
+) => {
+  localStorage.setItem(pendingBQKey(otId, flowId), JSON.stringify(body));
+};
+
+const loadPendingBadQty = (
+  otId: string,
+  flowId: number | null
+): UpdateWorkOrderAreasBody | null => {
+  const raw = localStorage.getItem(pendingBQKey(otId, flowId));
+  if (!raw) return null;
+  try {
+    return JSON.parse(raw);
+  } catch {
+    return null;
+  }
+};
+
+const clearPendingBadQty = (otId: string, flowId: number | null) => {
+  localStorage.removeItem(pendingBQKey(otId, flowId));
+};
+
 export default function CorteComponent({ workOrder }: Props) {
   const router = useRouter();
   const { user } = useAuthContext();
@@ -91,14 +127,13 @@ export default function CorteComponent({ workOrder }: Props) {
 
   const [showModal, setShowModal] = useState(false);
   const [showBadQuantity, setShowBadQuantity] = useState(false);
+  const [pendingBadQty, setPendingBadQty] =
+    useState<UpdateWorkOrderAreasBody | null>(null);
   const [showConfirm, setShowConfirm] = useState(false);
 
   const [areaBadQuantities, setAreaBadQuantities] = useState<
     Record<string, string>
   >({});
-  const [pendingBadQuantityInputs, setPendingBadQuantityInputs] = useState<
-    BadQuantityModalResult['inputsByArea'] | null
-  >(null);
 
   const [goodQuantity, setGoodQuantity] = useState<number | string>('');
   const [excessQuantity, setExcessQuantity] = useState<number | string>('');
@@ -316,17 +351,17 @@ export default function CorteComponent({ workOrder }: Props) {
 
       const cachedSummary =
         !existingSummary.length &&
-        !detailSummary.length &&
-        workOrderKey &&
-        flowId
+          !detailSummary.length &&
+          workOrderKey &&
+          flowId
           ? loadBadQuantitySummary(workOrderKey, flowId) ?? []
           : [];
 
       const summary = existingSummary.length
         ? existingSummary
         : detailSummary.length
-        ? detailSummary
-        : cachedSummary;
+          ? detailSummary
+          : cachedSummary;
 
       return summary.length ? { ...flow, badQuantitySummary: summary } : flow;
     });
@@ -359,6 +394,15 @@ export default function CorteComponent({ workOrder }: Props) {
   useEffect(() => {
     setFlowListState([...(workOrder?.workOrder?.flow ?? [])]);
   }, [workOrder]);
+
+  useEffect(() => {
+    const otId = workOrder?.workOrder?.ot_id ?? '';
+    const flowId = currentFlow?.id ?? null;
+    if (otId) {
+      const cached = loadPendingBadQty(otId, flowId);
+      if (cached) setPendingBadQty(cached);
+    }
+  }, [workOrder?.workOrder?.ot_id, currentFlow?.id]);
 
   // =================== Handlers ===================
   const openModal = () => setShowModal(true);
@@ -448,6 +492,7 @@ export default function CorteComponent({ workOrder }: Props) {
 
     // Producción considerada para la validación
     const producedSoFar = goodQty + sumPartialQty;
+    console.log(producedSoFar, 'producedsofar')
     const partialsActual = currentFlow?.partialReleases ?? [];
     if (isNaN(numValue) || !Number.isInteger(numValue) || numValue <= 0) {
       alert('Por favor, ingresa una cantidad de muestra válida.');
@@ -455,9 +500,9 @@ export default function CorteComponent({ workOrder }: Props) {
     } else if (
       partialsActual.length > 0 &&
       Number(goodQuantity) +
-        Number(lastAreaBadQuantity) +
-        Number(excessQuantity) >
-        cantidadporliberar
+      Number(lastAreaBadQuantity) +
+      Number(excessQuantity) >
+      cantidadporliberar
     ) {
       alert(
         `La cantidad total a liberar es mayor a la entregada no procesada por la parcialidad anterior ${cantidadporliberar}.`
@@ -490,21 +535,19 @@ export default function CorteComponent({ workOrder }: Props) {
   };
 
   const handleCorteSubmit = async () => {
-    if (pendingBadQuantityInputs) {
-      const saved = await handleSaveChanges(pendingBadQuantityInputs, {
-        silent: true,
-      });
-
-      if (!saved) {
-        alert(
-          'No se pudieron guardar las cantidades por área. Intenta nuevamente.'
-        );
-        return;
-      }
-
-      setPendingBadQuantityInputs(null);
-    }
-
+    /*const otId = workOrder?.workOrder?.ot_id ?? '';
+    const flowId = currentFlow?.id ?? null;
+    const bodyToSend = pendingBadQty ?? loadPendingBadQty(otId, flowId);
+    if (
+      bodyToSend &&
+      Array.isArray(bodyToSend.badQuantitySummary) &&
+      bodyToSend.badQuantitySummary.length > 0
+    ) {
+      console.log('[SEND] updateWorkOrderAreas body:', bodyToSend);
+      await updateWorkOrderAreas(otId, bodyToSend);
+      clearPendingBadQty(otId, flowId);
+      setPendingBadQty(null);
+    }*/
     const payload = {
       workOrderId: workOrder.workOrder.id,
       workOrderFlowId: currentFlow.id,
@@ -521,7 +564,45 @@ export default function CorteComponent({ workOrder }: Props) {
     };
 
     try {
-      await releaseProductFromCorte(payload);
+      const otId = workOrder?.workOrder?.ot_id ?? '';
+      const res = (await releaseProductFromCorte(payload)) as ReleaseResponse;
+
+      // 2) Si es PARCIAL → mandar badQuantitySummary con partialReleaseId
+      const stash = pendingBadQty ?? loadPendingBadQty(otId, currentFlow?.id ?? null);
+
+      const isPartial =
+        !!res &&
+        typeof res === 'object' &&
+        'partialReleaseId' in res &&
+        typeof res.partialReleaseId === 'number' &&
+        res.partialReleaseId > 0;
+
+      const hasStash =
+        !!stash &&
+        Array.isArray(stash.badQuantitySummary) &&
+        stash.badQuantitySummary.length > 0;
+
+      if (isPartial && hasStash) {
+        // ⬅️ PARCIAL: manda con partialReleaseId
+        await updateWorkOrderAreas(otId, {
+          sourceAreaId: stash.sourceAreaId,
+          sourceWorkOrderFlowId: stash.sourceWorkOrderFlowId,
+          badQuantitySummary: stash.badQuantitySummary,
+          partialReleaseId: res.partialReleaseId,
+        });
+      } else if (!isPartial && hasStash) {
+        // ⬅️ FINAL (completa): manda explícitamente con partialReleaseId: null
+        await updateWorkOrderAreas(otId, {
+          sourceAreaId: stash.sourceAreaId,
+          sourceWorkOrderFlowId: stash.sourceWorkOrderFlowId,
+          badQuantitySummary: stash.badQuantitySummary,
+          partialReleaseId: null, // <- importante
+        });
+      }
+
+      // 3) Final o ya enviado: limpia stash local
+      clearPendingBadQty(otId, currentFlow?.id ?? null);
+      setPendingBadQty(null);
       router.push('/liberarProducto');
     } catch (error) {
       console.log('Error al enviar datos:', error);
@@ -537,19 +618,45 @@ export default function CorteComponent({ workOrder }: Props) {
   const handleOpenBadQuantityModal = () => {
     const initialValues: Record<string, string> = {};
 
-    previousFlows.forEach((flow) => {
-      (flow?.badQuantityDetails ?? []).forEach((detail: any) => {
-        if (detail?.source_area_id === currentFlow?.area_id) {
-          const areaName = normalizeAreaKey(detail?.targetArea?.name ?? '');
-          initialValues[`${areaName}_bad`] =
-            detail?.bad_quantity != null ? String(detail.bad_quantity) : '0';
-          initialValues[`${areaName}_material`] =
-            detail?.material_quantity != null
-              ? String(detail.material_quantity)
-              : '0';
+    const hasPartials =
+      Array.isArray(currentFlow?.partialReleases) &&
+      currentFlow.partialReleases.length > 0;
+
+    if (hasPartials) {
+      // ✅ Hay parciales: NO prellenar con acumulados → todo en "0"
+      previousFlows.forEach((flow) => {
+        const areaName = flow.area?.name ?? '';
+        const areaKey = normalizeAreaKey(areaName);
+        // evita corte (área actual) si no la quieres en el modal
+        // if (areaKey === 'corte') return;
+
+        // Resuelve si el área soporta material
+        const blockKey = resolveBlockKey(areaName);
+        const supportsMaterial = blockSupportsMaterial(blockKey);
+
+        if (!(areaKey + '_bad' in initialValues)) {
+          initialValues[`${areaKey}_bad`] = '0';
+        }
+        if (supportsMaterial && !(areaKey + '_material' in initialValues)) {
+          initialValues[`${areaKey}_material`] = '0';
         }
       });
-    });
+    } else {
+      // ❇️ Sin parciales: comportamiento anterior (prellenar con lo guardado)
+      previousFlows.forEach((flow) => {
+        (flow?.badQuantityDetails ?? []).forEach((detail: any) => {
+          if (detail?.source_area_id === currentFlow?.area_id) {
+            const areaName = normalizeAreaKey(detail?.targetArea?.name ?? '');
+            initialValues[`${areaName}_bad`] =
+              detail?.bad_quantity != null ? String(detail.bad_quantity) : '0';
+            initialValues[`${areaName}_material`] =
+              detail?.material_quantity != null
+                ? String(detail.material_quantity)
+                : '0';
+          }
+        });
+      });
+    }
 
     setAreaBadQuantities(initialValues);
     setShowBadQuantity(true);
@@ -579,10 +686,8 @@ export default function CorteComponent({ workOrder }: Props) {
   );
 
   const handleSaveChanges = async (
-    modalInputs?: BadQuantityModalResult['inputsByArea'],
-    options?: { silent?: boolean }
+    modalInputs?: BadQuantityModalResult['inputsByArea']
   ) => {
-    const { silent = false } = options ?? {};
     const toInt = (v: any) => {
       const n = parseInt(String(v ?? '0').trim(), 10);
       return Number.isFinite(n) ? n : 0;
@@ -759,18 +864,10 @@ export default function CorteComponent({ workOrder }: Props) {
         }
       }
 
-      if (!silent) {
-        alert('Cambios guardados correctamente');
-      }
-
-      return true;
+      alert('Cambios guardados correctamente');
     } catch (err) {
       console.error('Error al guardar los cambios', err);
-      if (!silent) {
-        alert('Error al guardar los cambios');
-      }
-
-      return false;
+      alert('Error al guardar los cambios');
     }
   };
 
@@ -841,6 +938,7 @@ export default function CorteComponent({ workOrder }: Props) {
                 value={sumaBadQuantity}
                 onClick={handleOpenBadQuantityModal}
                 readOnly
+                disabled={shouldDisableLiberar()}
               />
               <Label>Sin procesar:</Label>
               <Input
@@ -896,30 +994,93 @@ export default function CorteComponent({ workOrder }: Props) {
           areaBadQuantities={areaBadQuantities}
           setAreaBadQuantities={setAreaBadQuantities}
           onConfirm={({ inputsByArea }) => {
-            const currentAreaInputs = inputsByArea.find(
-              (item) => item.areaId === workOrder.area.id
+            const toInt = (v: any) =>
+              Number.isFinite(parseInt(String(v ?? '0'), 10))
+                ? parseInt(String(v ?? '0'), 10)
+                : 0;
+            const inputsMap = new Map(
+              inputsByArea.map((it) => [it.areaId, it.values])
+            );
+            const uiPreviewPayload = {
+              areas: previousFlows.flatMap((flow) => {
+                const areaName = flow.area?.name ?? '';
+                const areaKey = normalizeAreaKey(areaName);
+                const blockMap: Partial<Record<string, BlockKey>> = {
+                  impresion: 'impression',
+                  serigrafia: 'serigrafia',
+                  empalme: 'empalme',
+                  laminacion: 'laminacion',
+                };
+                if (areaKey === 'corte') return [];
+                const mappedBlock = blockMap[areaKey];
+                const blockKey: BlockKey | null =
+                  mappedBlock ?? resolveBlockKey(areaName);
+                if (!blockKey) return [];
+                const blockData = flow.areaResponse?.[blockKey];
+                const blockId = blockData?.id ?? null;
+                if (!blockId) return [];
+                const supportsMaterial = blockSupportsMaterial(blockKey);
+                const badKey = `${areaKey}_bad`;
+                const materialKey = `${areaKey}_material`;
+                const data: Record<string, number> = {
+                  bad_quantity: toInt(areaBadQuantities[badKey]),
+                };
+                if (supportsMaterial)
+                  data.material_quantity = toInt(
+                    areaBadQuantities[materialKey]
+                  );
+                const inputsForArea = inputsMap.get(flow.area_id) ?? [];
+                return {
+                  areaId: flow.area_id,
+                  block: blockKey,
+                  blockId,
+                  formId: blockData?.form_auditory_id ?? null,
+                  cqmId: blockData?.form_answer_id ?? null,
+                  data,
+                  inputsByArea: inputsForArea,
+                };
+              }),
+              sourceAreaId: currentFlow?.area_id ?? workOrder?.area?.id ?? null,
+              sourceWorkOrderFlowId: currentFlow?.id ?? null,
+              badQuantitySummary: inputsByArea,
+            };
+            console.log(
+              '[PREVIEW] updateWorkOrderAreas payload:',
+              uiPreviewPayload
             );
 
+            // B) SERVER BODY (solo lo que el backend realmente usa)
+            const body: UpdateWorkOrderAreasBody = {
+              sourceAreaId: currentFlow?.area_id ?? workOrder?.area?.id ?? null,
+              sourceWorkOrderFlowId: currentFlow?.id ?? null,
+              badQuantitySummary: inputsByArea,
+            };
+            setPendingBadQty(body);
+            savePendingBadQty(
+              workOrder?.workOrder?.ot_id ?? '',
+              currentFlow?.id ?? null,
+              body
+            );
+
+            // C) Actualiza UI (totales del área actual) igual que hacías
+            const currentAreaInputs = inputsByArea.find(
+              (i) => i.areaId === workOrder.area.id
+            );
             if (currentAreaInputs) {
-              const normalizeLabel = (value: string) =>
-                value
+              const norm = (s: string) =>
+                s
                   .normalize('NFD')
                   .replace(/[\u0300-\u036f]/g, '')
                   .trim()
                   .toLowerCase();
-
-              const findValue = (label: string) =>
+              const find = (label: string) =>
                 currentAreaInputs.values.find(
-                  (entry) =>
-                    normalizeLabel(entry.label) === normalizeLabel(label)
+                  (e) => norm(e.label) === norm(label)
                 )?.value ?? 0;
-
-              setLastBadQuantity(String(findValue('Malas')));
-              setMaterialBadQuantity(String(findValue('Malo de fábrica')));
+              setLastBadQuantity(String(find('Malas')));
+              setMaterialBadQuantity(String(find('Malo de fábrica')));
             }
-
             setShowBadQuantity(false);
-            setPendingBadQuantityInputs(inputsByArea);
           }}
           onClose={() => setShowBadQuantity(false)}
         />
@@ -1146,15 +1307,15 @@ const CqmButton = styled.button<CqmButtonProps>`
 
   &:hover {
     background-color: ${({ $status, $cantidadporliberar, disabled }) => {
-      if ($status === 'Listo') return '#16a34a';
-      if (
-        ['Enviado a CQM', 'En Calidad'].includes($status) ||
-        Number($cantidadporliberar) === 0 ||
-        disabled
-      )
-        return '#9ca3af';
-      return '#1d4ed8';
-    }};
+    if ($status === 'Listo') return '#16a34a';
+    if (
+      ['Enviado a CQM', 'En Calidad'].includes($status) ||
+      Number($cantidadporliberar) === 0 ||
+      disabled
+    )
+      return '#9ca3af';
+    return '#1d4ed8';
+  }};
   }
 `;
 

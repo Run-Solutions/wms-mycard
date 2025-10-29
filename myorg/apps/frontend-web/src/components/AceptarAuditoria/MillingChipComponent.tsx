@@ -114,8 +114,7 @@ export default function MillingChipComponentAcceptAuditory({
 
   const computeInitialBadQuantities = useCallback(() => {
     const initialValues: Record<string, string> = {};
-    const makeAreaKey = (name?: string) =>
-      (name ?? '').toLowerCase().replace(/\s/g, '');
+    const makeAreaKey = (name?: string) => normalizeAreaKey(name ?? '');
 
     previousFlows.forEach((flow) => {
       (flow?.badQuantityDetails ?? []).forEach((detail: any) => {

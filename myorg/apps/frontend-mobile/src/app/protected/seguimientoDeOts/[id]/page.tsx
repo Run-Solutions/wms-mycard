@@ -926,39 +926,58 @@ const WorkOrderDetailScreen: React.FC = () => {
   }, [id]);
 
   const badAgg = useMemo(() => {
-    const byTarget = new Map<number, number>(); // opcional: acumulados por target
-    const byTargetMat = new Map<number, number>(); // opcional: material por target
-    const bySourceTarget = new Map<
+    const allBySourceTarget = new Map<
       number,
       Map<number, { bad: number; mat: number }>
     >();
+    const remainderBySourceTarget = new Map<
+      number,
+      Map<number, { bad: number; mat: number }>
+    >();
+
+    const accumulate = (
+      store: Map<number, Map<number, { bad: number; mat: number }>>,
+      sourceId: number,
+      targetId: number,
+      bad: number,
+      mat: number
+    ) => {
+      if (!sourceId || !targetId) return;
+      if (!store.has(sourceId)) {
+        store.set(sourceId, new Map());
+      }
+      const targetMap = store.get(sourceId)!;
+      const prev = targetMap.get(targetId) ?? { bad: 0, mat: 0 };
+      targetMap.set(targetId, {
+        bad: prev.bad + bad,
+        mat: prev.mat + mat,
+      });
+    };
 
     const flows = workOrder?.flow ?? [];
     flows.forEach((f: any) => {
       (f?.badQuantityDetails ?? []).forEach((d: any) => {
         const s = Number(d?.source_area_id) || 0;
         const t = Number(d?.target_area_id) || 0;
+        if (!s || !t) return;
+
         const bad = toNum(d?.bad_quantity);
         const mat = toNum(d?.material_quantity);
+        const partialReleaseId = Number(d?.partial_release_id) || null;
 
-        if (t) {
-          byTarget.set(t, (byTarget.get(t) || 0) + bad);
-          byTargetMat.set(t, (byTargetMat.get(t) || 0) + mat);
-        }
-        if (s) {
-          if (!bySourceTarget.has(s)) bySourceTarget.set(s, new Map());
-          const m = bySourceTarget.get(s)!;
-          const prev = m.get(t) ?? { bad: 0, mat: 0 };
-          m.set(t, { bad: prev.bad + bad, mat: prev.mat + mat });
+        accumulate(allBySourceTarget, s, t, bad, mat);
+
+        if (partialReleaseId == null) {
+          accumulate(remainderBySourceTarget, s, t, bad, mat);
         }
       });
     });
 
-    return { byTarget, byTargetMat, bySourceTarget };
+    return { allBySourceTarget, remainderBySourceTarget };
   }, [workOrder]);
 
   const sumBadBySource = (sourceId: number, includeSelf: boolean) => {
-    const m = badAgg.bySourceTarget.get(Number(sourceId));
+    const m = badAgg.allBySourceTarget.get(Number(sourceId));
     if (!m) return 0;
     let total = 0;
     m.forEach((v, tId) => {
@@ -988,14 +1007,18 @@ const WorkOrderDetailScreen: React.FC = () => {
       (a) => a.status === 'Completado' && a.name.toLowerCase() !== 'preprensa'
     );
 
-    const perTarget = badAgg.bySourceTarget.get(ownerArea.id) ?? new Map();
+    const perTarget =
+      badAgg.remainderBySourceTarget.get(ownerArea.id) ??
+      new Map<number, { bad: number; mat: number }>();
 
     areasForModal.forEach((area) => {
       if (area.id === ownerArea.id) return; // 🔒 excluye self-target
       const key = area.name.toLowerCase().replace(/\s/g, '');
       const agg = perTarget.get(area.id) ?? { bad: 0, mat: 0 };
-      initialValues[`${key}_bad`] = String(agg.bad);
-      if (area.id >= 6) initialValues[`${key}_material`] = String(agg.mat);
+      initialValues[`${key}_bad`] = String(toNum(agg.bad));
+      if (area.id >= 6) {
+        initialValues[`${key}_material`] = String(toNum(agg.mat));
+      }
     });
 
     setAreaBadQuantities(initialValues);
@@ -2150,12 +2173,27 @@ const WorkOrderDetailScreen: React.FC = () => {
                   );
                   const totalBad = badToOthers + selfBad;
 
+                  let partialSumForSigma = 0;
+                  let partialTotalBadAccum = 0;
                   const cells = area.partials.map((p, pIndex) => {
                     const value =
                       field === 'buenas'
                         ? toNum(p.quantity)
                         : /* field === 'malas' */
                           toNum(p.bad_quantity);
+
+                    const partialBadDetailsSum = (p.badQuantityDetails ?? []).reduce(
+                      (acc, detail) => acc + toNum(detail?.bad_quantity),
+                      0
+                    );
+                    const partialTotalBad = toNum(p.bad_quantity) + partialBadDetailsSum;
+
+                    if (field === 'buenas') {
+                      partialSumForSigma += value;
+                    }
+                    if (field === 'malas') {
+                      partialTotalBadAccum += partialTotalBad;
+                    }
 
                     const isLastPartial =
                       rem <= 0 && pIndex === area.partials.length - 1;
@@ -2166,14 +2204,8 @@ const WorkOrderDetailScreen: React.FC = () => {
                       area.status === 'Completado' &&
                       isLastPartial;
 
-                    if (field === 'malas' && shouldShowModalTrigger) {
-                      console.log({ badToOthers, selfBad, totalBad });
-                    }
-
-                    // === Celda de parcial ===
                     if (field === 'malas') {
                       return shouldShowModalTrigger ? (
-                        // Mantén tus estilos; solo envuelvo para alinear columnas
                         <View
                           key={`area-${area.id}-parcial-${
                             p.id ?? pIndex
@@ -2193,7 +2225,7 @@ const WorkOrderDetailScreen: React.FC = () => {
                             ]}
                           >
                             <Text style={{ textAlign: 'center' }}>
-                              {totalBad}
+                              {partialTotalBad}
                             </Text>
                           </TouchableOpacity>
                         </View>
@@ -2204,12 +2236,11 @@ const WorkOrderDetailScreen: React.FC = () => {
                           }-${field}`}
                           style={styles.cellUser}
                         >
-                          {value}
+                          {partialTotalBad}
                         </Text>
                       );
                     }
 
-                    // buenas → texto simple con tu estilo
                     return (
                       <Text
                         key={`area-${area.id}-parcial-${
@@ -2229,11 +2260,16 @@ const WorkOrderDetailScreen: React.FC = () => {
 
                     if (field === 'buenas') {
                       remValue = getRemainderByField(area, 'buenas');
-                      remSum = getRemainderBySum(area, 'buenas');
+                      remSum = partialSumForSigma;
+                    } else if (field === 'malas') {
+                      remSum = totalBad;
+                      remValue = Math.max(totalBad - partialTotalBadAccum, 0);
+                    } else if (field === 'excedente') {
+                      remValue = getRemainderByField(area, 'excedente');
+                      remSum = getRemainderBySum(area, 'excedente');
                     } else {
-                      // malas
-                      remValue = getRemainderByField(area, 'malas');
-                      remSum = getRemainderBySum(area, 'malas');
+                      remValue = getRemainderByField(area, 'noprocess');
+                      remSum = getRemainderBySum(area, 'noprocess');
                     }
 
                     // Rem
@@ -2248,41 +2284,26 @@ const WorkOrderDetailScreen: React.FC = () => {
 
                     // Σ
                     if (field === 'malas' && area.status === 'Completado') {
-                      const shouldShowModalTriggerInSum =
-                        area.id >= 6 && remSum > 0;
-
                       cells.push(
-                        shouldShowModalTriggerInSum ? (
-                          <View
-                            key={`prod-${area.id}-${field}-sum`}
-                            style={styles.cellUser}
+                        <View
+                          key={`prod-${area.id}-${field}-sum`}
+                          style={styles.cellUser}
+                        >
+                          <TouchableOpacity
+                            onPress={() => handleOpenBadQuantityModal(area)}
+                            style={[
+                              styles.input,
+                              {
+                                height: 40,
+                                backgroundColor: '#eaeaf5',
+                                borderRadius: 9,
+                                justifyContent: 'center',
+                              },
+                            ]}
                           >
-                            <TouchableOpacity
-                              onPress={() => handleOpenBadQuantityModal(area)}
-                              style={[
-                                styles.input,
-                                {
-                                  height: 40,
-                                  backgroundColor: '#eaeaf5',
-                                  borderRadius: 9,
-                                  justifyContent: 'center',
-                                },
-                              ]}
-                            >
-                              {/* ⭐ aquí también totalBad; NO aggregatedBad + defectuoso */}
-                              <Text style={{ textAlign: 'center' }}>
-                                {totalBad}
-                              </Text>
-                            </TouchableOpacity>
-                          </View>
-                        ) : (
-                          <Text
-                            key={`prod-${area.id}-${field}-sum`}
-                            style={[styles.cellUser, { fontWeight: '700' }]}
-                          >
-                            {remSum}
-                          </Text>
-                        )
+                            <Text style={{ textAlign: 'center' }}>{remSum}</Text>
+                          </TouchableOpacity>
+                        </View>
                       );
                     } else {
                       // buenas Σ normal (sólo número)
@@ -2291,7 +2312,7 @@ const WorkOrderDetailScreen: React.FC = () => {
                           key={`prod-${area.id}-${field}-sum`}
                           style={[styles.cellUser, { fontWeight: '700' }]}
                         >
-                          {remSum}
+                          {field === 'buenas' ? partialSumForSigma : remSum}
                         </Text>
                       );
                     }

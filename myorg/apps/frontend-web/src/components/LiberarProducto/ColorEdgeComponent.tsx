@@ -103,6 +103,9 @@ export default function ColorEdgeComponent({ workOrder }: Props) {
   const [areaBadQuantities, setAreaBadQuantities] = useState<
     Record<string, string>
   >({});
+  const [pendingBadQuantityInputs, setPendingBadQuantityInputs] = useState<
+    BadQuantityModalResult['inputsByArea'] | null
+  >(null);
 
   const [goodQuantity, setGoodQuantity] = useState<number | string>('');
   const [excessQuantity, setExcessQuantity] = useState<number | string>('');
@@ -539,6 +542,21 @@ export default function ColorEdgeComponent({ workOrder }: Props) {
   };
 
   const handleColorEdgeSubmit = async () => {
+    if (pendingBadQuantityInputs) {
+      const saved = await handleSaveChanges(pendingBadQuantityInputs, {
+        silent: true,
+      });
+
+      if (!saved) {
+        alert(
+          'No se pudieron guardar las cantidades por área. Intenta nuevamente.'
+        );
+        return;
+      }
+
+      setPendingBadQuantityInputs(null);
+    }
+
     const payload = {
       workOrderId: workOrder?.workOrder?.id,
       workOrderFlowId: currentFlow?.id,
@@ -557,6 +575,7 @@ export default function ColorEdgeComponent({ workOrder }: Props) {
     try {
       await releaseProductFromColorEdge(payload);
       setShowConfirm(false);
+      setPendingBadQuantityInputs(null);
       router.push('/liberarProducto');
     } catch (error) {
       console.error('Error al enviar datos:', error);
@@ -570,23 +589,26 @@ export default function ColorEdgeComponent({ workOrder }: Props) {
   );
 
   const handleOpenBadQuantityModal = () => {
-    const initialValues: Record<string, string> = {};
+    const resetValues: Record<string, string> = {};
 
     previousFlows.forEach((flow) => {
-      (flow?.badQuantityDetails ?? []).forEach((detail: any) => {
-        if (detail?.source_area_id === currentFlow?.area_id) {
-          const areaName = normalizeAreaKey(detail?.targetArea?.name ?? '');
-          initialValues[`${areaName}_bad`] =
-            detail?.bad_quantity != null ? String(detail.bad_quantity) : '0';
-          initialValues[`${areaName}_material`] =
-            detail?.material_quantity != null
-              ? String(detail.material_quantity)
-              : '0';
-        }
-      });
+      const areaName = normalizeAreaKey(flow?.area?.name ?? '');
+      if (!areaName) return;
+
+      resetValues[`${areaName}_bad`] = '0';
+
+      const supportsMaterial = blockSupportsMaterial(
+        resolveBlockKey(flow?.area?.name ?? '')
+      );
+
+      if (supportsMaterial) {
+        resetValues[`${areaName}_material`] = '0';
+      }
     });
 
-    setAreaBadQuantities(initialValues);
+    setAreaBadQuantities(resetValues);
+    setLastBadQuantity('0');
+    setMaterialBadQuantity('0');
     setShowBadQuantity(true);
   };
 
@@ -598,8 +620,8 @@ export default function ColorEdgeComponent({ workOrder }: Props) {
         ),
         id: item.area?.id ?? item.id,
         name: item.area?.name ?? item.name ?? '',
-        malas: item.malas ?? 0,
-        defectuoso: item.defectuoso ?? 0,
+        malas: 0,
+        defectuoso: 0,
         status: item.status ?? '',
         response: item.areaResponse ?? {},
         answers: item.answers ?? [],
@@ -614,8 +636,10 @@ export default function ColorEdgeComponent({ workOrder }: Props) {
   );
 
   const handleSaveChanges = async (
-    modalInputs?: BadQuantityModalResult['inputsByArea']
+    modalInputs?: BadQuantityModalResult['inputsByArea'],
+    options?: { silent?: boolean }
   ) => {
+    const { silent = false } = options ?? {};
     const toInt = (v: any) => {
       const n = parseInt(String(v ?? '0').trim(), 10);
       return Number.isFinite(n) ? n : 0;
@@ -795,10 +819,18 @@ export default function ColorEdgeComponent({ workOrder }: Props) {
         }
       }
 
-      alert('Cambios guardados correctamente');
+      if (!silent) {
+        alert('Cambios guardados correctamente');
+      }
+
+      return true;
     } catch (err) {
       console.error('Error al guardar los cambios', err);
-      alert('Error al guardar los cambios');
+      if (!silent) {
+        alert('Error al guardar los cambios');
+      }
+
+      return false;
     }
   };
 
@@ -953,7 +985,7 @@ export default function ColorEdgeComponent({ workOrder }: Props) {
             }
 
             setShowBadQuantity(false);
-            void handleSaveChanges(inputsByArea);
+            setPendingBadQuantityInputs(inputsByArea);
           }}
           onClose={() => setShowBadQuantity(false)}
         />

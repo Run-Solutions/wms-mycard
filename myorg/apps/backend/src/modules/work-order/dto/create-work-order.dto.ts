@@ -118,6 +118,11 @@ export class UpdateWorkOrderAreasDto {
   @IsOptional()
   @Type(() => Number)
   @IsInt()
+  partialReleaseId?: number;
+
+  @IsOptional()
+  @Type(() => Number)
+  @IsInt()
   sourceAreaId?: number;
 
   @IsOptional()

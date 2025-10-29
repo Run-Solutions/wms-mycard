@@ -216,7 +216,7 @@ export class WorkOrderController {
     return await this.workOrderService.updateAreaResponseData(id, user.id, body);
   }
 
-  @Patch(':id/areas')
+@Patch(':id/areas')
   async updateWorkOrderAreas(
     @Req() req: AuthenticatedRequest,
     @Body() body: UpdateWorkOrderAreasDto,
@@ -232,6 +232,7 @@ export class WorkOrderController {
       body.sourceAreaId ?? null,
       body.sourceWorkOrderFlowId ?? null,
       body.badQuantitySummary,
+      body.partialReleaseId ?? null,
     );
   }
 }

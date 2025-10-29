@@ -597,28 +597,6 @@ export default function CloseWorkOrderAuxPage({ params }: Props) {
     setEvidenceFile(file);
   };
 
-  // Suma de malas/material por área DESTINO a partir de TODOS los badQuantityDetails del flujo
-  const badQtyAgg = useMemo(() => {
-    const badByTarget = new Map<number, number>();
-    const matByTarget = new Map<number, number>();
-
-    const flows = workOrder?.flow ?? [];
-    flows.forEach((f: any) => {
-      (f?.badQuantityDetails ?? []).forEach((d: any) => {
-        const tId = Number(d?.target_area_id) || 0;
-        if (!tId) return;
-
-        const bad = toNum(d?.bad_quantity);
-        const mat = toNum(d?.material_quantity);
-
-        badByTarget.set(tId, (badByTarget.get(tId) || 0) + bad);
-        matByTarget.set(tId, (matByTarget.get(tId) || 0) + mat);
-      });
-    });
-
-    return { badByTarget, matByTarget };
-  }, [workOrder]);
-
   const modalOptions = useMemo(() => {
     if (!opModal.areaId) return [];
     const base = getUserOptionsForArea(opModal.areaId);
@@ -822,39 +800,58 @@ export default function CloseWorkOrderAuxPage({ params }: Props) {
   };
 
   const badAgg = useMemo(() => {
-    const byTarget = new Map<number, number>(); // opcional: acumulados por target
-    const byTargetMat = new Map<number, number>(); // opcional: material por target
-    const bySourceTarget = new Map<
+    const allBySourceTarget = new Map<
+      number,
+      Map<number, { bad: number; mat: number }>
+    >();
+    const remainderBySourceTarget = new Map<
       number,
       Map<number, { bad: number; mat: number }>
     >();
 
+    const accumulate = (
+      store: Map<number, Map<number, { bad: number; mat: number }>>,
+      sourceId: number,
+      targetId: number,
+      bad: number,
+      mat: number
+    ) => {
+      if (!sourceId || !targetId) return;
+      if (!store.has(sourceId)) {
+        store.set(sourceId, new Map());
+      }
+      const targetMap = store.get(sourceId)!;
+      const prev = targetMap.get(targetId) ?? { bad: 0, mat: 0 };
+      targetMap.set(targetId, {
+        bad: prev.bad + bad,
+        mat: prev.mat + mat,
+      });
+    };
+
     const flows = workOrder?.flow ?? [];
     flows.forEach((f: any) => {
       (f?.badQuantityDetails ?? []).forEach((d: any) => {
-        const s = Number(d?.source_area_id) || 0;
-        const t = Number(d?.target_area_id) || 0;
+        const sourceId = Number(d?.source_area_id) || 0;
+        const targetId = Number(d?.target_area_id) || 0;
+        if (!sourceId || !targetId) return;
+
         const bad = toNum(d?.bad_quantity);
         const mat = toNum(d?.material_quantity);
+        const partialReleaseId = Number(d?.partial_release_id) || null;
 
-        if (t) {
-          byTarget.set(t, (byTarget.get(t) || 0) + bad);
-          byTargetMat.set(t, (byTargetMat.get(t) || 0) + mat);
-        }
-        if (s) {
-          if (!bySourceTarget.has(s)) bySourceTarget.set(s, new Map());
-          const m = bySourceTarget.get(s)!;
-          const prev = m.get(t) ?? { bad: 0, mat: 0 };
-          m.set(t, { bad: prev.bad + bad, mat: prev.mat + mat });
+        accumulate(allBySourceTarget, sourceId, targetId, bad, mat);
+
+        if (partialReleaseId == null) {
+          accumulate(remainderBySourceTarget, sourceId, targetId, bad, mat);
         }
       });
     });
 
-    return { byTarget, byTargetMat, bySourceTarget };
+    return { allBySourceTarget, remainderBySourceTarget };
   }, [workOrder]);
 
   const sumBadBySource = (sourceId: number, includeSelf: boolean) => {
-    const m = badAgg.bySourceTarget.get(Number(sourceId));
+    const m = badAgg.allBySourceTarget.get(Number(sourceId));
     if (!m) return 0;
     let total = 0;
     m.forEach((v, tId) => {
@@ -899,7 +896,7 @@ export default function CloseWorkOrderAuxPage({ params }: Props) {
 
     // mapa agregado (source -> (target -> {bad, mat}))
     const perTarget =
-      badAgg.bySourceTarget.get(ownerArea.id) ??
+      badAgg.remainderBySourceTarget.get(ownerArea.id) ??
       new Map<number, { bad: number; mat: number }>();
 
     orderedAreas.forEach((area) => {
@@ -2109,9 +2106,6 @@ export default function CloseWorkOrderAuxPage({ params }: Props) {
                             const aggregatedFieldValue = Number(
                               area[field] ?? 0
                             );
-                            let aggregatedBad = toNum(
-                              sumBadBySource(area.id, false)
-                            );
                             const isEditableAggregateField =
                               ['excedente', 'noprocess'].includes(field) &&
                               (area.status === 'Completado' ||
@@ -2125,6 +2119,8 @@ export default function CloseWorkOrderAuxPage({ params }: Props) {
                               area?.response?.[blockKey]?.bad_quantity ?? 0
                             );
                             const totalBad = badToOthers + selfBad;
+                            let partialSumForSigma = 0;
+                            let partialTotalBadAccum = 0;
                             const cells: React.ReactNode[] = area.partials.map(
                               (p, pIndex) => {
                                 const value =
@@ -2135,6 +2131,19 @@ export default function CloseWorkOrderAuxPage({ params }: Props) {
                                     : field === 'excedente'
                                     ? toNum(p.excess_quantity)
                                     : toNum(p.noprocess_quantity);
+
+                                const partialBadDetailsSum = (p.badQuantityDetails ?? []).reduce(
+                                  (acc, detail) => acc + toNum(detail?.bad_quantity),
+                                  0
+                                );
+                                const partialTotalBad = toNum(p.bad_quantity) + partialBadDetailsSum;
+
+                                if (field === 'buenas') {
+                                  partialSumForSigma += value;
+                                }
+                                if (field === 'malas') {
+                                  partialTotalBadAccum += partialTotalBad;
+                                }
 
                                 const isLastPartial =
                                   rem <= 0 &&
@@ -2166,12 +2175,12 @@ export default function CloseWorkOrderAuxPage({ params }: Props) {
                                           onClick={() =>
                                             handleOpenBadQuantityModal(area)
                                           }
-                                          title={`Cantidad mala total: ${totalBad}`}
+                                          title={`Cantidad mala total del parcial: ${partialTotalBad}`}
                                         >
-                                          {totalBad}
+                                          {partialTotalBad}
                                         </button>
                                       ) : (
-                                        value
+                                        partialTotalBad
                                       )
                                     ) : shouldRenderAggregateInput ? (
                                       <input
@@ -2204,7 +2213,7 @@ export default function CloseWorkOrderAuxPage({ params }: Props) {
                                     area,
                                     'buenas'
                                   );
-                                  remSum = getRemainderBySum(area, 'buenas');
+                                  remSum = partialSumForSigma;
                                   break;
                                 case 'excedente':
                                   remValue = getRemainderByField(
@@ -2221,38 +2230,25 @@ export default function CloseWorkOrderAuxPage({ params }: Props) {
                                   remSum = getRemainderBySum(area, 'noprocess');
                                   break;
                                 case 'malas':
-                                  remValue = getRemainderByField(area, 'malas');
-                                  remSum = getRemainderBySum(area, 'malas');
+                                  remSum = totalBad;
+                                  remValue = Math.max(
+                                    totalBad - partialTotalBadAccum,
+                                    0
+                                  );
                                   break;
                                 default:
                                   remValue = 0;
                               }
 
-                              const shouldShowModalTrigger =
-                                field === 'malas' &&
-                                area.id >= 6 &&
-                                (area.status === 'Completado' ||
-                                  area.status === 'En auditoria');
-
-                              const remainderAggregateContent =
+                              let remainderAggregateContent: React.ReactNode;
+                              if (
                                 field === 'malas' &&
                                 (area.status === 'Completado' ||
-                                  area.status === 'En auditoria') ? (
-                                  shouldShowModalTrigger && remSum > 0 ? (
-                                    <button
-                                      type="button"
-                                      className="inline-flex min-w-[64px] justify-center rounded border border-gray-200 bg-gray-50 px-2 py-1 text-sm text-gray-700 hover:bg-gray-100 focus:outline-none focus:ring-1 focus:ring-blue-400"
-                                      onClick={() =>
-                                        handleOpenBadQuantityModal(area)
-                                      }
-                                      title={`Cantidad mala total: ${aggregatedBad}`}
-                                    >
-                                      {aggregatedFieldValue}
-                                    </button>
-                                  ) : (
-                                    remSum
-                                  )
-                                ) : isEditableAggregateField ? (
+                                  area.status === 'En auditoria')
+                              ) {
+                                remainderAggregateContent = totalBad;
+                              } else if (isEditableAggregateField) {
+                                remainderAggregateContent = (
                                   <input
                                     type="number"
                                     value={aggregatedFieldValue}
@@ -2266,9 +2262,12 @@ export default function CloseWorkOrderAuxPage({ params }: Props) {
                                     }
                                     className="w-20 rounded border border-gray-200 px-2 py-1 text-center"
                                   />
-                                ) : (
-                                  remSum
                                 );
+                              } else if (field === 'buenas') {
+                                remainderAggregateContent = partialSumForSigma;
+                              } else {
+                                remainderAggregateContent = remSum;
+                              }
 
                               cells.push(
                                 <React.Fragment

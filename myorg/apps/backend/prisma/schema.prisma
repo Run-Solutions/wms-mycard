@@ -31,7 +31,6 @@ model User {
   biometricKeys         UserBiometricKey[]  
   partialReleases       PartialRelease[]    @relation("UserPartialReleases")
   badQuantityDetails    BadQuantityDetail[]
-  partialReleaseBadQuantityDetails PartialReleaseBadQuantityDetail[]
 
   // Campos inversos añadidos
   deviceTokens          DeviceToken[]
@@ -116,8 +115,6 @@ model AreasOperator {
 
   badQuantityDetailsSource BadQuantityDetail[] @relation("BadQuantitySourceArea")
   badQuantityDetailsTarget BadQuantityDetail[] @relation("BadQuantityTargetArea")
-  partialReleaseBadQuantityDetailsSource PartialReleaseBadQuantityDetail[] @relation("PartialReleaseBadQuantitySourceArea")
-  partialReleaseBadQuantityDetailsTarget PartialReleaseBadQuantityDetail[] @relation("PartialReleaseBadQuantityTargetArea")
 
   @@map("areas_operator")
 }
@@ -212,7 +209,6 @@ model WorkOrderFlow {
   partialReleases        PartialRelease[]
   formAuditory           FormAuditory[]
   badQuantityDetails     BadQuantityDetail[] @relation("BadQuantitySourceFlow")
-  partialReleaseBadQuantityDetails PartialReleaseBadQuantityDetail[] @relation("PartialReleaseBadQuantitySourceFlow")
 
   created_at             DateTime            @default(now()) @map("created_at")
   updated_at             DateTime            @updatedAt @map("updated_at")
@@ -241,7 +237,7 @@ model PartialRelease {
   user                   User?               @relation("UserPartialReleases", fields: [user_id], references: [id])
   inconformities         Inconformities[]    // Relacion inversa
   WorkOrderFlow          WorkOrderFlow       @relation(fields: [work_order_flow_id], references: [id], onDelete: Cascade)
-  badQuantityDetails     PartialReleaseBadQuantityDetail[]
+  badQuantityDetails     BadQuantityDetail[] @relation("PartialReleaseBadQuantityDetails")
 
   created_at             DateTime            @default(now()) @map("created_at")
 
@@ -259,6 +255,7 @@ model BadQuantityDetail {
   material_quantity         Int?
   values                    Json?
   created_by                Int
+  partial_release_id        Int?
   created_at                DateTime        @default(now()) @map("created_at")
   updated_at                DateTime        @updatedAt @map("updated_at")
 
@@ -267,33 +264,11 @@ model BadQuantityDetail {
   sourceArea          AreasOperator @relation("BadQuantitySourceArea", fields: [source_area_id], references: [id])
   targetArea          AreasOperator @relation("BadQuantityTargetArea", fields: [target_area_id], references: [id])
   user                User          @relation(fields: [created_by], references: [id])
+  partialRelease      PartialRelease? @relation("PartialReleaseBadQuantityDetails", fields: [partial_release_id], references: [id], onDelete: Cascade)
 
-  @@unique([source_work_order_flow_id, target_area_id])
   @@map("bad_quantity_detail")
-}
-
-model PartialReleaseBadQuantityDetail {
-  id                        Int             @id @default(autoincrement())
-  partial_release_id        Int
-  source_work_order_flow_id Int
-  source_area_id            Int
-  target_area_id            Int
-  block                     String
-  bad_quantity              Int?
-  material_quantity         Int?
-  values                    Json?
-  created_by                Int
-  created_at                DateTime        @default(now()) @map("created_at")
-  updated_at                DateTime        @updatedAt @map("updated_at")
-
-  partialRelease      PartialRelease @relation(fields: [partial_release_id], references: [id], onDelete: Cascade)
-  sourceWorkOrderFlow WorkOrderFlow  @relation("PartialReleaseBadQuantitySourceFlow", fields: [source_work_order_flow_id], references: [id], onDelete: Cascade)
-  sourceArea          AreasOperator  @relation("PartialReleaseBadQuantitySourceArea", fields: [source_area_id], references: [id])
-  targetArea          AreasOperator  @relation("PartialReleaseBadQuantityTargetArea", fields: [target_area_id], references: [id])
-  user                User           @relation(fields: [created_by], references: [id])
-
-  @@unique([partial_release_id, target_area_id])
-  @@map("partial_release_bad_quantity_detail")
+  @@index([source_work_order_flow_id, target_area_id])
+  @@index([partial_release_id, target_area_id])
 }
 
 model AreasResponse {

@@ -16,7 +16,7 @@ export class FreeWorkOrderService {
   constructor(
     private prisma: PrismaService,
     private notificationsService: NotificationsService,
-  ) {}
+  ) { }
 
   /*
     Envía una notificación a los auditores avisando de una orden disponible.
@@ -359,12 +359,12 @@ export class FreeWorkOrderService {
         const respuestasFrente = question_id.flatMap((questionId, idx) =>
           frente[idx]
             ? [
-                {
-                  question_id: questionId,
-                  response_operator: frente[idx],
-                  form_answer_id: formAnswerId,
-                },
-              ]
+              {
+                question_id: questionId,
+                response_operator: frente[idx],
+                form_answer_id: formAnswerId,
+              },
+            ]
             : [],
         );
 
@@ -372,12 +372,12 @@ export class FreeWorkOrderService {
         const respuestasVuelta = question_id.flatMap((questionId, idx) =>
           vuelta[idx]
             ? [
-                {
-                  question_id: questionId,
-                  response_operator: vuelta[idx],
-                  form_answer_id: formAnswerId,
-                },
-              ]
+              {
+                question_id: questionId,
+                response_operator: vuelta[idx],
+                form_answer_id: formAnswerId,
+              },
+            ]
             : [],
         );
         // Crear todas las respuestas
@@ -1123,121 +1123,221 @@ export class FreeWorkOrderService {
   }
 
   // Para guardar respuesta de liberacion de Corte
-  async createCorteResponse(dto: CreateCorteResponseDto) {
-    return this.prisma.$transaction(async (tx) => {
-      // 1. Obtener cantidad de la orden
-      const workOrder = await tx.workOrder.findUnique({
-        where: { id: dto.workOrderId },
-        select: { quantity: true },
-      });
-      if (!workOrder) throw new Error('Work Order no encontrada');
-      // 2. Calcular totales previos
-      const partials = await tx.partialRelease.findMany({
-        where: { work_order_flow_id: dto.workOrderFlowId },
-      });
-      const totalLiberadoPrevio = partials.reduce(
-        (sum, p) => sum + (p.quantity ?? 0),
-        0,
-      );
-      const totalBadPrevio = partials.reduce(
-        (sum, p) => sum + (p.bad_quantity ?? 0),
-        0,
-      );
-      const totalExcessPrevio = partials.reduce(
-        (sum, p) => sum + (p.excess_quantity ?? 0),
-        0,
-      );
-      const totalNoProcessPrevio = partials.reduce(
-        (sum, p) => sum + (p.noprocess_quantity ?? 0),
-        0,
-      );
-      const totalMaterialPrevio = partials.reduce(
-        (sum, p) => sum + (p.material_quantity ?? 0),
-        0,
-      );
-      // 3. Calcular nuevos totales
-      const totalLiberadoActual = totalLiberadoPrevio + dto.goodQuantity;
-      const totalBadActual = totalBadPrevio + dto.badQuantity;
-      const totalNoProcessActual = totalNoProcessPrevio + dto.noProcessQuantity;
-      const totalExcessActual = totalExcessPrevio + dto.excessQuantity;
-      const totalMaterialActual = totalMaterialPrevio + dto.materialBadQuantity;
-      // 4. Si NO se alcanza la cantidad solicitada => solo crear liberación parcial
-      if (totalLiberadoActual < workOrder.quantity) {
-        await tx.partialRelease.create({
-          data: {
-            work_order_flow_id: dto.workOrderFlowId,
-            quantity: dto.goodQuantity,
-            bad_quantity: dto.badQuantity,
-            excess_quantity: dto.excessQuantity,
-            noprocess_quantity: dto.noProcessQuantity,
-            material_quantity: dto.materialBadQuantity,
-            observation: dto.comments,
-            user_id: dto.assignedUser,
-          },
-        });
+async createCorteResponse(dto: CreateCorteResponseDto) {
+  return this.prisma.$transaction(async (tx) => {
+    // 1) Obtener cantidad de la orden
+    const workOrder = await tx.workOrder.findUnique({
+      where: { id: dto.workOrderId },
+      select: { quantity: true },
+    });
+    if (!workOrder) throw new Error('Work Order no encontrada');
 
-        await tx.workOrderFlow.update({
-          where: { id: dto.workOrderFlowId },
-          data: { status: 'Enviado a auditoria parcial' },
-        });
-        await this.notifyAuditors(tx, dto.workOrderFlowId);
+    // 2) Totales previos a partir de parciales existentes del flujo
+    const partials = await tx.partialRelease.findMany({
+      where: { work_order_flow_id: dto.workOrderFlowId },
+    });
 
-        return { message: 'Liberación parcial registrada con éxito' };
-      }
-      // 5. Si ya se alcanzó o superó la cantidad => crear respuestas finales
-      // Buscar o crear AreasResponse
-      let response = await tx.areasResponse.findFirst({
-        where: {
+    const totalLiberadoPrevio = partials.reduce(
+      (sum, p) => sum + (p.quantity ?? 0),
+      0,
+    );
+    const totalBadPrevio = partials.reduce(
+      (sum, p) => sum + (p.bad_quantity ?? 0),
+      0,
+    );
+    const totalExcessPrevio = partials.reduce(
+      (sum, p) => sum + (p.excess_quantity ?? 0),
+      0,
+    );
+    const totalNoProcessPrevio = partials.reduce(
+      (sum, p) => sum + (p.noprocess_quantity ?? 0),
+      0,
+    );
+    const totalMaterialPrevio = partials.reduce(
+      (sum, p) => sum + (p.material_quantity ?? 0),
+      0,
+    );
+
+    // 3) Nuevos totales con el dto actual
+    const totalLiberadoActual = totalLiberadoPrevio + dto.goodQuantity;
+    const totalBadActual = totalBadPrevio + dto.badQuantity;
+    const totalNoProcessActual = totalNoProcessPrevio + dto.noProcessQuantity;
+    const totalExcessActual = totalExcessPrevio + dto.excessQuantity;
+    const totalMaterialActual = totalMaterialPrevio + dto.materialBadQuantity;
+
+    // 4) Si NO se alcanza la cantidad solicitada => sólo crear liberación parcial
+    if (totalLiberadoActual < workOrder.quantity) {
+      const partial = await tx.partialRelease.create({
+        data: {
+          work_order_flow_id: dto.workOrderFlowId,
+          quantity: dto.goodQuantity,
+          bad_quantity: dto.badQuantity,
+          excess_quantity: dto.excessQuantity,
+          noprocess_quantity: dto.noProcessQuantity,
+          material_quantity: dto.materialBadQuantity,
+          observation: dto.comments,
+          user_id: dto.assignedUser,
+        },
+      });
+
+      await tx.workOrderFlow.update({
+        where: { id: dto.workOrderFlowId },
+        data: { status: 'Enviado a auditoria parcial' },
+      });
+
+      await this.notifyAuditors(tx, dto.workOrderFlowId);
+
+      return {
+        message: 'Liberación parcial registrada con éxito',
+        partialReleaseId: partial.id,
+      };
+    }
+
+    // 5) Si ya se alcanzó o superó la cantidad => crear respuestas finales
+
+    // 5.1) Buscar o crear AreasResponse
+    let response = await tx.areasResponse.findFirst({
+      where: {
+        work_order_id: dto.workOrderId,
+        work_order_flow_id: dto.workOrderFlowId,
+        area_id: dto.areaId,
+      },
+    });
+
+    if (!response) {
+      response = await tx.areasResponse.create({
+        data: {
           work_order_id: dto.workOrderId,
           work_order_flow_id: dto.workOrderFlowId,
           area_id: dto.areaId,
+          assigned_user: dto.assignedUser,
         },
       });
-      if (!response) {
-        response = await tx.areasResponse.create({
+    }
+
+    // 5.2) Asociar AreaResponse al flujo
+    await tx.workOrderFlow.update({
+      where: { id: dto.workOrderFlowId },
+      data: { area_response_id: response.id },
+    });
+
+    // 5.3) Crear FormAuditory
+    const formAuditory = await tx.formAuditory.create({
+      data: {
+        reviewed_by_id: null,
+        work_order_flow_id: dto.workOrderFlowId,
+      },
+    });
+
+    // 5.4) Crear CorteResponse (finales consolidados)
+    await tx.corteResponse.create({
+      data: {
+        good_quantity: totalLiberadoActual,
+        bad_quantity: totalBadActual,
+        excess_quantity: totalExcessActual,
+        noprocess_quantity: totalNoProcessActual,
+        material_quantity: totalMaterialActual,
+        comments: dto.comments,
+        form_answer_id: dto.formAnswerId,
+        areas_response_id: response.id,
+        form_auditory_id: formAuditory.id,
+      },
+    });
+
+    // 5.5) Actualizar estado final
+    await tx.workOrderFlow.update({
+      where: { id: dto.workOrderFlowId },
+      data: { status: 'Enviado a Auditoria' },
+    });
+
+    // 5.6) Agregar por target: obtener parciales por target para consolidar un FINAL (partial_release_id = null)
+    const allPerTarget = await tx.badQuantityDetail.findMany({
+      where: {
+        source_work_order_flow_id: dto.workOrderFlowId,
+        // sólo parciales
+        partial_release_id: { not: null },
+      },
+      select: {
+        target_area_id: true,
+        block: true,
+        bad_quantity: true,
+        material_quantity: true,
+        values: true,
+      },
+    });
+
+    const aggregateByTarget = new Map<
+      number,
+      {
+        block: string | null;
+        bad: number;
+        mat: number;
+        values: Array<{ label: string; value: number }>;
+      }
+    >();
+
+    for (const row of allPerTarget) {
+      const entry = aggregateByTarget.get(row.target_area_id) ?? {
+        block: row.block ?? null,
+        bad: 0,
+        mat: 0,
+        values: [],
+      };
+      entry.bad += Number(row.bad_quantity ?? 0);
+      entry.mat += Number(row.material_quantity ?? 0);
+      if (Array.isArray(row.values)) entry.values.push(...(row.values as any[]));
+      aggregateByTarget.set(row.target_area_id, entry);
+    }
+
+    // 5.7) Consolidar FINAL por target
+    // IMPORTANTE: no usar upsert con clave compuesta que incluye partial_release_id=null.
+    for (const [targetAreaId, agg] of aggregateByTarget) {
+      const mergedValues = null; // o tu mergeDetailValues(...)
+
+      // Buscar FINAL existente
+      const existingFinal = await tx.badQuantityDetail.findFirst({
+        where: {
+          source_work_order_flow_id: dto.workOrderFlowId,
+          target_area_id: targetAreaId,
+          partial_release_id: null, // FINAL
+        },
+        select: { id: true },
+      });
+
+      if (existingFinal) {
+        await tx.badQuantityDetail.update({
+          where: { id: existingFinal.id },
+          data: {
+            block: agg.block ?? 'partialRelease',
+            bad_quantity: agg.bad,
+            material_quantity: agg.mat,
+            values: mergedValues ?? undefined,
+            updated_at: new Date(),
+          },
+        });
+      } else {
+        await tx.badQuantityDetail.create({
           data: {
             work_order_id: dto.workOrderId,
-            work_order_flow_id: dto.workOrderFlowId,
-            area_id: dto.areaId,
-            assigned_user: dto.assignedUser,
+            source_work_order_flow_id: dto.workOrderFlowId,
+            source_area_id: dto.areaId,
+            target_area_id: targetAreaId,
+            block: agg.block ?? 'partialRelease',
+            bad_quantity: agg.bad,
+            material_quantity: agg.mat,
+            values: mergedValues ?? undefined,
+            created_by: dto.assignedUser ?? 0,
+            partial_release_id: null, // FINAL
           },
         });
       }
-      // Asociar AreaResponse al flujo
-      await tx.workOrderFlow.update({
-        where: { id: dto.workOrderFlowId },
-        data: { area_response_id: response.id },
-      });
-      // Crear FormAuditory
-      const formAuditory = await tx.formAuditory.create({
-        data: {
-          reviewed_by_id: null,
-          work_order_flow_id: dto.workOrderFlowId,
-        },
-      });
-      // Crear CorteResponse
-      await tx.corteResponse.create({
-        data: {
-          good_quantity: totalLiberadoActual,
-          bad_quantity: totalBadActual,
-          excess_quantity: totalExcessActual,
-          noprocess_quantity: totalNoProcessActual,
-          material_quantity: totalMaterialActual,
-          comments: dto.comments,
-          form_answer_id: dto.formAnswerId,
-          areas_response_id: response.id,
-          form_auditory_id: formAuditory.id,
-        },
-      });
-      // Actualizar estado final
-      await tx.workOrderFlow.update({
-        where: { id: dto.workOrderFlowId },
-        data: { status: 'Enviado a Auditoria' },
-      });
-      await this.notifyAuditors(tx, dto.workOrderFlowId);
-      return { message: 'Respuesta guardada con éxito' };
-    });
-  }
+    }
+
+    await this.notifyAuditors(tx, dto.workOrderFlowId);
+
+    return { message: 'Respuesta guardada con éxito' };
+  });
+}
 
   // Guardar las respuestas del formulario
   async saveFormAnswersColorEdge(dto: CreateFormAnswerImpressionDto) {

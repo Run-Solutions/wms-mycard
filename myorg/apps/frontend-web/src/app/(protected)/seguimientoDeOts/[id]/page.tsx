@@ -1,7 +1,7 @@
 // myorg/apps/frontend-web/src/app/(protected)/seguimientoDeOts/[id]/page.tsx
 'use client';
 
-import React, { use, useState, Fragment, useEffect, useMemo } from 'react';
+import React, { use, useState, Fragment, useEffect, useMemo, useCallback, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import styled from 'styled-components';
 
@@ -9,6 +9,7 @@ import { Card, CardContent } from '@/components/ui/card';
 import ProgressBarAreas from '@/components/SeguimientoDeOts/ProgressBarAreas';
 import InconformitiesHistory from '@/components/SeguimientoDeOts/InconformitiesHistory';
 import BadQuantityModal, {
+  AreaForBadQty,
   BadQuantityModalResult,
 } from '@/components/SeguimientoDeOts/BadQuantityModal';
 import PartialHistory from '@/components/SeguimientoDeOts/PartialHistory';
@@ -70,6 +71,17 @@ type ResponseBlock = {
   material_quantity?: number;
 };
 
+type BadSummaryValue = {
+  label: string;
+  value: number;
+};
+
+type BadSummaryEntry = {
+  areaId: number;
+  areaName: string;
+  values: BadSummaryValue[];
+};
+
 
 const pickBlock = (
   resp: any, // si tienes tipo Area['response'], úsalo aquí
@@ -108,6 +120,13 @@ const resolveBlockKey = (name?: string | null): BlockKey | null => {
 const blockSupportsMaterial = (block?: BlockKey | null) =>
   !!block &&
   ['corte', 'colorEdge', 'millingChip', 'personalizacion'].includes(block);
+
+const normalizeSummaryLabel = (label?: string) =>
+  String(label ?? '')
+    .normalize('NFD')
+    .replace(/\u0300-\u036f/g, '')
+    .trim()
+    .toLowerCase();
 
 interface Props {
   params: Promise<{ id: string }>;
@@ -173,6 +192,8 @@ export type AreaData = {
   muestras: number;
   flowId?: number;
   assigned_user_id?: number | null;
+
+  badQuantitySummary?: BadSummaryEntry[];
 
   parciales: number; // total de parciales creados
   parcialesValidados: number;
@@ -307,51 +328,46 @@ const getRemainderByField = (
   const block = getAreaBlock(area) as any;
   if (!block) return 0;
 
+  // ✅ caso especial para "malas": usar SOLO detalles no liberados
+  if (field === 'malas') {
+    const unreleasedFromDetails = (area.partials ?? []).reduce((acc, p) => {
+      const details = p.badQuantityDetails ?? [];
+      const sumUnreleased = details.reduce((dacc, detail: any) => {
+        const isUnreleased = detail?.partial_release_id == null; // null o undefined
+        return isUnreleased ? dacc + toNum(detail?.bad_quantity) : dacc;
+      }, 0);
+      return acc + sumUnreleased;
+    }, 0);
+
+    return toNum(unreleasedFromDetails);
+  }
+
+  // ↙️ para el resto, se mantiene tu lógica actual
   let total = 0;
   let parcialesSum = 0;
 
   switch (field) {
     case 'buenas':
-      total = toNum(
-        block.release_quantity ?? block.good_quantity ?? block.plates
-      );
-      parcialesSum = (area.partials ?? []).reduce(
-        (acc, p) => acc + toNum(p?.quantity),
-        0
-      );
-      break;
-    case 'malas':
-      total = toNum(block.bad_quantity);
-      parcialesSum = (area.partials ?? []).reduce(
-        (acc, p) => acc + toNum(p?.bad_quantity),
-        0
-      );
+      total = toNum(block.release_quantity ?? block.good_quantity ?? block.plates);
+      parcialesSum = (area.partials ?? []).reduce((acc, p) => acc + toNum(p?.quantity), 0);
       break;
     case 'excedente':
       total = toNum(block.excess_quantity);
-      parcialesSum = (area.partials ?? []).reduce(
-        (acc, p) => acc + toNum(p?.excess_quantity),
-        0
-      );
+      parcialesSum = (area.partials ?? []).reduce((acc, p) => acc + toNum(p?.excess_quantity), 0);
       break;
     case 'noprocess':
       total = toNum(block.noprocess_quantity);
-      parcialesSum = (area.partials ?? []).reduce(
-        (acc, p) => acc + toNum(p?.noprocess_quantity),
-        0
-      );
+      parcialesSum = (area.partials ?? []).reduce((acc, p) => acc + toNum(p?.noprocess_quantity), 0);
       break;
     case 'defectuoso':
       total = toNum(block.material_quantity);
-      parcialesSum = (area.partials ?? []).reduce(
-        (acc, p) => acc + toNum(p?.material_quantity),
-        0
-      );
+      parcialesSum = (area.partials ?? []).reduce((acc, p) => acc + toNum(p?.material_quantity), 0);
       break;
   }
 
   return Math.max(total - parcialesSum, 0);
 };
+
 
 const getRemainderBySum = (
   area: AreaData,
@@ -608,7 +624,88 @@ export default function SeguimientoDeOtsAuxPage({ params }: Props) {
   const [badModalPartial, setBadModalPartial] = useState<
     AreaData['partials'][number] | null
   >(null);
-  const [modalAreas, setModalAreas] = useState<AreaData[]>([]);
+  const [modalAreas, setModalAreas] = useState<AreaForBadQty[]>([]);
+  const modalBaselineRef = useRef<
+    Map<number, { bad: number; material: number | null; supportsMaterial: boolean }>
+  >(new Map());
+
+
+  // Totales REM (solo detalles con partial_release_id === null)
+  const remBadBySourceTarget = useMemo(() => {
+    const map = new Map<number, Map<number, { bad: number; mat: number }>>();
+
+    const flows = workOrder?.flow ?? [];
+    flows.forEach((f: any) => {
+      (f?.badQuantityDetails ?? []).forEach((d: any) => {
+        // 👈 Solo REM
+        if (d?.partial_release_id == null) {
+          const sourceId = Number(d?.source_area_id) || 0;
+          const targetId = Number(d?.target_area_id) || 0;
+          if (!sourceId || !targetId) return;
+
+          const bad = toNum(d?.bad_quantity);
+          const mat = toNum(d?.material_quantity);
+
+          if (!map.has(sourceId)) map.set(sourceId, new Map());
+          const tgt = map.get(sourceId)!;
+          const prev = tgt.get(targetId) ?? { bad: 0, mat: 0 };
+          tgt.set(targetId, { bad: prev.bad + bad, mat: prev.mat + mat });
+        }
+      });
+    });
+
+    return map;
+  }, [workOrder]);
+
+
+  // Indexa totales de MALAS por P1..Pn y REM a nivel de cada flow (área)
+  const pxTotalsByAreaId = useMemo(() => {
+    const map = new Map<number, { orderLabels: string[]; totals: Record<string, number> }>();
+
+    const flows = workOrder?.flow ?? [];
+    flows.forEach((f: any) => {
+      const areaId = Number(f?.area_id);
+      if (!areaId) return;
+
+      // 1) Ordena los parciales por fecha y crea mapping pr.id -> P#
+      const prs = Array.isArray(f?.partialReleases) ? [...f.partialReleases] : [];
+      prs.sort((a: any, b: any) => new Date(a?.created_at).getTime() - new Date(b?.created_at).getTime());
+      const prLabelById = new Map<number, string>(prs.map((pr: any, i: number) => [Number(pr?.id), `P${i + 1}`]));
+
+      // 2) Suma malas por etiqueta Px o REM desde badQuantityDetails del FLOW
+      const totals: Record<string, number> = {};
+      const details = Array.isArray(f?.badQuantityDetails) ? f.badQuantityDetails : [];
+      for (const d of details) {
+        const prId = d?.partial_release_id == null ? null : Number(d.partial_release_id);
+        const label = prId == null ? 'REM' : (prLabelById.get(prId) ?? `PR#${prId}`);
+        const bad = Number(d?.bad_quantity) || 0;
+        totals[label] = (totals[label] || 0) + bad;
+      }
+
+      // 3) Orden natural de salida: P1..Pn y, si aplica, REM al final
+      const orderLabels = [
+        ...prs.map((pr: any) => prLabelById.get(Number(pr?.id))!).filter(Boolean),
+        ...(totals['REM'] ? ['REM'] : []),
+      ];
+
+      map.set(areaId, { orderLabels, totals });
+    });
+
+    return map;
+  }, [workOrder]);
+
+  // Helpers para consumir arriba:
+  const getPxTotal = (areaId: number, partialIndex: number) => {
+    const entry = pxTotalsByAreaId.get(Number(areaId));
+    if (!entry) return 0;
+    const label = entry.orderLabels[partialIndex];
+    return entry.totals[label] || 0;
+  };
+
+  const getRemTotal = (areaId: number) => {
+    const entry = pxTotalsByAreaId.get(Number(areaId));
+    return entry?.totals?.['REM'] || 0;
+  };
 
   // ---- Operators maps ----
   const operatorOptionsByAreaId = useMemo(() => {
@@ -674,24 +771,41 @@ export default function SeguimientoDeOtsAuxPage({ params }: Props) {
 
   // Suma de malas/material por área DESTINO a partir de TODOS los badQuantityDetails del flujo
   const badQtyAgg = useMemo(() => {
-    const badByTarget = new Map<number, number>();
-    const matByTarget = new Map<number, number>();
+    const bySourceTarget = new Map<
+      number,
+      Map<number, { bad: number; mat: number; partial: boolean }>
+    >();
 
     const flows = workOrder?.flow ?? [];
     flows.forEach((f: any) => {
       (f?.badQuantityDetails ?? []).forEach((d: any) => {
-        const tId = Number(d?.target_area_id) || 0;
-        if (!tId) return;
+        const sourceId = Number(d?.source_area_id) || 0;
+        const targetId = Number(d?.target_area_id) || 0;
+        if (!sourceId || !targetId) return;
 
         const bad = toNum(d?.bad_quantity);
         const mat = toNum(d?.material_quantity);
+        const isPartial = Number(d?.partial_release_id) > 0;
 
-        badByTarget.set(tId, (badByTarget.get(tId) || 0) + bad);
-        matByTarget.set(tId, (matByTarget.get(tId) || 0) + mat);
+        if (!bySourceTarget.has(sourceId)) {
+          bySourceTarget.set(sourceId, new Map());
+        }
+        const targetMap = bySourceTarget.get(sourceId)!;
+        const prev = targetMap.get(targetId) ?? {
+          bad: 0,
+          mat: 0,
+          partial: false,
+        };
+
+        targetMap.set(targetId, {
+          bad: prev.bad + bad,
+          mat: prev.mat + mat,
+          partial: prev.partial || isPartial,
+        });
       });
     });
 
-    return { badByTarget, matByTarget };
+    return { bySourceTarget };
   }, [workOrder]);
 
   const modalOptions = useMemo(() => {
@@ -722,168 +836,169 @@ export default function SeguimientoDeOtsAuxPage({ params }: Props) {
   }, []);
 
   // ---- Load data ----
-  useEffect(() => {
+  const loadData = useCallback(async () => {
     if (!id) return;
 
-    const loadData = async () => {
-      try {
-        setLoading(true);
+    try {
+      setLoading(true);
 
-        const data = await fetchWorkOrderById(id);
-        const users = await fetchAllUsers();
-        setOperatorUsers(users || []);
-        setWorkOrder(data);
+      const data = await fetchWorkOrderById(id);
+      const users = await fetchAllUsers();
+      setOperatorUsers(users || []);
+      setWorkOrder(data);
 
-        // Vistos Buenos history
-        const historyData =
-          data.flow
-            .filter((item: any) => item.answers?.length > 0)
-            .map((item: any) => {
-              const areaName = item.area?.name?.toLowerCase() || '';
-              const mode = ['impresion'].includes(areaName)
-                ? 'doble'
-                : 'simple';
-              return {
-                areaName: item.area?.name || 'Sin nombre',
-                username: item.user?.username || '',
-                questions: item.area?.formQuestions || [],
-                formAnswers: item.answers.map((a: any) => ({
-                  accepted: a.accepted,
-                  altura_chip: a.altura_chip,
-                  apariencia_quemado: a.apariencia_quemado,
-                  carga_aplicacion: a.carga_aplicacion,
-                  codigo_barras: a.codigo_barras,
-                  color: a.color,
-                  color_edge: a.color_edge,
-                  color_foil: a.color_foil,
-                  color_personalizacion: a.color_personalizacion,
-                  finish_validation: a.finish_validation,
-                  holographic_type: a.holographic_type,
-                  imagen_holograma: a.imagen_holograma,
-                  localizacion_contactos: a.localizacion_contactos,
-                  magnetic_band: a.magnetic_band,
-                  revisar_posicion: a.revisar_posicion,
-                  revisar_tecnologia: a.revisar_tecnologia,
-                  sample_quantity: a.sample_quantity,
-                  testtype_cqm: a.testtype_cqm,
-                  prueba_over: a.prueba_over,
-                  prueba_cinta_magnetica: a.prueba_cinta_magnetica,
-                  prueba_centro: a.prueba_centro,
-                  tipo_personalizacion: a.tipo_personalizacion,
-                  track_type: a.track_type,
-                  validar_inlays: a.validar_inlays,
-                  validar_kvc: a.validar_kvc,
-                  validar_kvc_perso: a.validar_kvc_perso,
-                  valor_anclaje: a.valor_anclaje,
-                  verificar_etiqueta: a.verificar_etiqueta,
-                  verificar_script: a.verificar_script,
-                  created_at: a.created_at,
-                  reviewer: a.reviewer || [],
-                  FormAnswerResponse: a.FormAnswerResponse || [],
-                })),
-                mode,
-              };
-            }) || [];
+      // Vistos Buenos history
+      const historyData =
+        data.flow
+          .filter((item: any) => item.answers?.length > 0)
+          .map((item: any) => {
+            const areaName = item.area?.name?.toLowerCase() || '';
+            const mode = ['impresion'].includes(areaName) ? 'doble' : 'simple';
+            return {
+              areaName: item.area?.name || 'Sin nombre',
+              username: item.user?.username || '',
+              questions: item.area?.formQuestions || [],
+              formAnswers: item.answers.map((a: any) => ({
+                accepted: a.accepted,
+                altura_chip: a.altura_chip,
+                apariencia_quemado: a.apariencia_quemado,
+                carga_aplicacion: a.carga_aplicacion,
+                codigo_barras: a.codigo_barras,
+                color: a.color,
+                color_edge: a.color_edge,
+                color_foil: a.color_foil,
+                color_personalizacion: a.color_personalizacion,
+                finish_validation: a.finish_validation,
+                holographic_type: a.holographic_type,
+                imagen_holograma: a.imagen_holograma,
+                localizacion_contactos: a.localizacion_contactos,
+                magnetic_band: a.magnetic_band,
+                revisar_posicion: a.revisar_posicion,
+                revisar_tecnologia: a.revisar_tecnologia,
+                sample_quantity: a.sample_quantity,
+                testtype_cqm: a.testtype_cqm,
+                prueba_over: a.prueba_over,
+                prueba_cinta_magnetica: a.prueba_cinta_magnetica,
+                prueba_centro: a.prueba_centro,
+                tipo_personalizacion: a.tipo_personalizacion,
+                track_type: a.track_type,
+                validar_inlays: a.validar_inlays,
+                validar_kvc: a.validar_kvc,
+                validar_kvc_perso: a.validar_kvc_perso,
+                valor_anclaje: a.valor_anclaje,
+                verificar_etiqueta: a.verificar_etiqueta,
+                verificar_script: a.verificar_script,
+                created_at: a.created_at,
+                reviewer: a.reviewer || [],
+                FormAnswerResponse: a.FormAnswerResponse || [],
+              })),
+              mode,
+            };
+          }) || [];
 
-        setVistosBuenosHistory(historyData);
+      setVistosBuenosHistory(historyData);
 
-        // Áreas
-        const areaData =
-          data?.flow?.map((item: any) => ({
-            id: item.area_id,
-            name: item.area?.name || 'Sin nombre',
-            status: item.status || 'Desconocido',
-            isCollator: data.isCollator || false,
-            response: item.areaResponse || {},
-            answers: item.answers || [],
-            flowId: item.id,
-            assigned_user_id: item.assigned_user,
-            ...getAreaData(
-              item.area_id,
-              item.areaResponse,
-              item.partialReleases,
-              item.user
-            ),
-          })) || [];
+      // Áreas
+      const areaData =
+        data?.flow?.map((item: any) => ({
+          id: item.area_id,
+          name: item.area?.name || 'Sin nombre',
+          status: item.status || 'Desconocido',
+          isCollator: data.isCollator || false,
+          response: item.areaResponse || {},
+          answers: item.answers || [],
+          flowId: item.id,
+          assigned_user_id: item.assigned_user,
+          badQuantitySummary: item.badQuantitySummary || [],
+          ...getAreaData(
+            item.area_id,
+            item.areaResponse,
+            item.partialReleases,
+            item.user
+          ),
+        })) || [];
 
-        setAreas(areaData);
+      setAreas(areaData);
 
-        // Inconformidades (directas + parciales + auditorías)
-        const allInconformities: InconformityData[] =
-          data?.flow?.flatMap((flowItem: any) => {
-            const areaName = flowItem.area?.name || 'Área desconocida';
+      // Inconformidades (directas + parciales + auditorías)
+      const allInconformities: InconformityData[] =
+        data?.flow?.flatMap((flowItem: any) => {
+          const areaName = flowItem.area?.name || 'Área desconocida';
 
-            const direct =
-              flowItem?.areaResponse?.inconformities?.map((inc: any) => ({
+          const direct =
+            flowItem?.areaResponse?.inconformities?.map((inc: any) => ({
+              id: inc.id,
+              comments: inc.comments,
+              createdAt: inc.created_at ?? inc.createdAt,
+              createdBy:
+                inc.user?.username || inc.created_by || 'Desconocido',
+              area: areaName,
+            })) || [];
+
+          const partials =
+            flowItem?.partialReleases?.flatMap((release: any) =>
+              (release?.inconformities || []).map((inc: any) => ({
                 id: inc.id,
                 comments: inc.comments,
                 createdAt: inc.created_at ?? inc.createdAt,
                 createdBy:
                   inc.user?.username || inc.created_by || 'Desconocido',
                 area: areaName,
-              })) || [];
+              }))
+            ) || [];
 
-            const partials =
-              flowItem?.partialReleases?.flatMap((release: any) =>
-                (release?.inconformities || []).map((inc: any) => ({
+          const partialsAuditory =
+            flowItem?.partialReleases?.flatMap((release: any) =>
+              (release?.formAuditory?.inconformidades || []).map(
+                (inc: any) => ({
                   id: inc.id,
                   comments: inc.comments,
                   createdAt: inc.created_at ?? inc.createdAt,
                   createdBy:
                     inc.user?.username || inc.created_by || 'Desconocido',
                   area: areaName,
-                }))
-              ) || [];
+                })
+              )
+            ) || [];
 
-            const partialsAuditory =
-              flowItem?.partialReleases?.flatMap((release: any) =>
-                (release?.formAuditory?.inconformities || []).map(
-                  (inc: any) => ({
+          const audits: InconformityData[] = [];
+          if (flowItem.areaResponse) {
+            Object.values(flowItem.areaResponse).forEach((block: any) => {
+              if (block?.formAuditory?.inconformities) {
+                block.formAuditory.inconformities.forEach((inc: any) => {
+                  audits.push({
                     id: inc.id,
                     comments: inc.comments,
-                    createdAt: inc.created_at ?? inc.createdAt,
-                    createdBy:
-                      inc.user?.username || inc.created_by || 'Desconocido',
+                    createdAt: inc.created_at,
+                    createdBy: inc.user?.username || 'Desconocido',
                     area: areaName,
-                  })
-                )
-              ) || [];
-
-            const audits: InconformityData[] = [];
-            if (flowItem.areaResponse) {
-              Object.values(flowItem.areaResponse).forEach((block: any) => {
-                if (block?.formAuditory?.inconformities) {
-                  block.formAuditory.inconformities.forEach((inc: any) => {
-                    audits.push({
-                      id: inc.id,
-                      comments: inc.comments,
-                      createdAt: inc.created_at,
-                      createdBy: inc.user?.username || 'Desconocido',
-                      area: areaName,
-                    });
                   });
-                }
-              });
-            }
+                });
+              }
+            });
+          }
 
-            return [...direct, ...partials, ...partialsAuditory, ...audits];
-          }) || [];
+          return [...direct, ...partials, ...partialsAuditory, ...audits];
+        }) || [];
 
-        setInconformities(allInconformities);
+      setInconformities(allInconformities);
 
-        // Progreso
-        const completedCount = areaData.filter(
-          (a: any) => a.status === 'Completado'
-        ).length;
-        const percentage = (completedCount / areaData.length) * 100;
-        setTimeout(() => setProgressWidth(percentage), 100);
-      } finally {
-        setLoading(false);
-      }
-    };
-
-    loadData();
+      // Progreso
+      const completedCount = areaData.filter(
+        (a: any) => a.status === 'Completado'
+      ).length;
+      const percentage = areaData.length
+        ? (completedCount / areaData.length) * 100
+        : 0;
+      setTimeout(() => setProgressWidth(percentage), 100);
+    } finally {
+      setLoading(false);
+    }
   }, [id]);
+
+  useEffect(() => {
+    loadData();
+  }, [loadData]);
 
   // ======================================================
   // Derived totals / helpers
@@ -896,35 +1011,41 @@ export default function SeguimientoDeOtsAuxPage({ params }: Props) {
   };
 
   const badAgg = useMemo(() => {
-    const byTarget = new Map<number, number>(); // opcional: acumulados por target
-    const byTargetMat = new Map<number, number>(); // opcional: material por target
     const bySourceTarget = new Map<
       number,
-      Map<number, { bad: number; mat: number }>
+      Map<number, { bad: number; mat: number; partial: boolean }>
     >();
 
     const flows = workOrder?.flow ?? [];
     flows.forEach((f: any) => {
       (f?.badQuantityDetails ?? []).forEach((d: any) => {
-        const s = Number(d?.source_area_id) || 0;
-        const t = Number(d?.target_area_id) || 0;
+        const sourceId = Number(d?.source_area_id) || 0;
+        const targetId = Number(d?.target_area_id) || 0;
+        if (!sourceId || !targetId) return;
+
         const bad = toNum(d?.bad_quantity);
         const mat = toNum(d?.material_quantity);
+        const isPartial = Number(d?.partial_release_id) > 0;
 
-        if (t) {
-          byTarget.set(t, (byTarget.get(t) || 0) + bad);
-          byTargetMat.set(t, (byTargetMat.get(t) || 0) + mat);
+        if (!bySourceTarget.has(sourceId)) {
+          bySourceTarget.set(sourceId, new Map());
         }
-        if (s) {
-          if (!bySourceTarget.has(s)) bySourceTarget.set(s, new Map());
-          const m = bySourceTarget.get(s)!;
-          const prev = m.get(t) ?? { bad: 0, mat: 0 };
-          m.set(t, { bad: prev.bad + bad, mat: prev.mat + mat });
-        }
+        const targetMap = bySourceTarget.get(sourceId)!;
+        const prev = targetMap.get(targetId) ?? {
+          bad: 0,
+          mat: 0,
+          partial: false,
+        };
+
+        targetMap.set(targetId, {
+          bad: prev.bad + bad,
+          mat: prev.mat + mat,
+          partial: prev.partial || isPartial,
+        });
       });
     });
 
-    return { byTarget, byTargetMat, bySourceTarget };
+    return { bySourceTarget };
   }, [workOrder]);
 
   const sumBadBySource = (sourceId: number, includeSelf: boolean) => {
@@ -951,82 +1072,112 @@ export default function SeguimientoDeOtsAuxPage({ params }: Props) {
     return { bad, mat };
   };
 
-const handleOpenBadQuantityModal = (
-  ownerArea: AreaData,
-  partial?: AreaData['partials'][number] | null
-) => {
+  const handleOpenBadQuantityModal = (
+    ownerArea: AreaData,
+    partial?: AreaData['partials'][number] | null
+  ) => {
     const initialValues: Record<string, string> = {};
-
     const TARGET_AREA_IDS = [2, 3, 4, 5, 6, 7];
-
     const orderedAreas: AreaData[] = [];
+    modalBaselineRef.current = new Map();
     const pushUnique = (candidate: AreaData | undefined | null) => {
       if (!candidate) return;
       if (orderedAreas.some((item) => item.id === candidate.id)) return;
       orderedAreas.push(candidate);
     };
-
     TARGET_AREA_IDS.forEach((targetId) => {
-      const match = areas.find((area) => Number(area.id) === targetId);
-      pushUnique(match);
+      pushUnique(areas.find((a) => Number(a.id) === targetId));
     });
-
-    // asegura que el owner esté presente (queda al final si ya estaba)
     pushUnique(ownerArea);
 
-    // mapa agregado (source -> (target -> {bad, mat}))
-    const perTarget =
-      badAgg.bySourceTarget.get(ownerArea.id) ??
-      new Map<number, { bad: number; mat: number }>();
-
-    const partialDetails = partial?.badQuantityDetails ?? [];
+    const modalAreaSummaries: AreaForBadQty[] = [];
 
     orderedAreas.forEach((area) => {
       const key = normalizeAreaKey(area.name);
       const isOwnerArea = Number(area.id) === Number(ownerArea.id);
+      const supportsMaterial = area.id >= 6;
 
       let badValue = 0;
       let materialValue = 0;
 
       if (partial) {
+        // ✅ Caso con parcial (lo que ya tenías)
         if (isOwnerArea) {
-          badValue = toNum(partial.bad_quantity);
-          materialValue = toNum(partial.material_quantity);
+          badValue = toNum(partial?.bad_quantity);
+          materialValue = toNum(partial?.material_quantity);
         } else {
-          const detail = partialDetails.find(
+          const detail = (partial?.badQuantityDetails ?? []).find(
             (d) => Number(d?.target_area_id) === Number(area.id)
           );
-          if (detail) {
-            badValue = toNum(detail?.bad_quantity);
-            materialValue = toNum(detail?.material_quantity);
-          } else {
-            const agg = perTarget.get(Number(area.id)) ?? { bad: 0, mat: 0 };
-            badValue = toNum(agg.bad);
-            materialValue = toNum(agg.mat);
-          }
+          badValue = toNum(detail?.bad_quantity);
+          materialValue = toNum(detail?.material_quantity);
         }
-      } else if (isOwnerArea) {
-        const { bad, mat } = getSelfBadAndMat(ownerArea);
-        badValue = toNum(bad);
-        materialValue = toNum(mat);
       } else {
-        const agg = perTarget.get(Number(area.id)) ?? { bad: 0, mat: 0 };
-        badValue = toNum(agg.bad);
-        materialValue = toNum(agg.mat);
+        // ✅ Caso REM (sin parcial): usar solo detalles con partial_release_id === null
+        if (isOwnerArea) {
+          // Puedes mantener el propio bad/material del bloque del área
+          const { bad, mat } = getSelfBadAndMat(ownerArea);
+          badValue = toNum(bad);
+          materialValue = toNum(mat);
+        } else {
+          const rem = remBadBySourceTarget
+            .get(Number(ownerArea.id))
+            ?.get(Number(area.id));
+          badValue = toNum(rem?.bad);
+          materialValue = toNum(rem?.mat);
+        }
       }
 
-      initialValues[`${key}_bad`] = String(badValue);
-      if (area.id >= 6) {
-        initialValues[`${key}_material`] = String(materialValue);
+      // Fallback con summary si llega vacío
+      const summaryEntry = Array.isArray(ownerArea.badQuantitySummary)
+        ? ownerArea.badQuantitySummary.find(
+          (entry) => Number(entry.areaId) === Number(area.id)
+        )
+        : null;
+
+      if (!badValue && summaryEntry) {
+        const badFromSummary = summaryEntry.values.find(
+          (entry) => normalizeSummaryLabel(entry.label) === 'malas'
+        );
+        if (badFromSummary) badValue = toNum(badFromSummary.value);
       }
+
+      if (supportsMaterial && !materialValue && summaryEntry) {
+        const materialFromSummary = summaryEntry.values.find(
+          (entry) =>
+            normalizeSummaryLabel(entry.label).includes('fabrica') ||
+            normalizeSummaryLabel(entry.label).includes('materia')
+        );
+        if (materialFromSummary) materialValue = toNum(materialFromSummary.value);
+      }
+
+      modalBaselineRef.current.set(area.id, {
+        bad: Number(badValue) || 0,
+        material: supportsMaterial ? Number(materialValue) || 0 : null,
+        supportsMaterial,
+      });
+
+      initialValues[`${key}_bad`] = String(Number(badValue) || 0);
+      if (supportsMaterial) {
+        initialValues[`${key}_material`] = String(Number(materialValue) || 0);
+      }
+
+      modalAreaSummaries.push({
+        id: area.id,
+        name: area.name,
+        malas: Number(badValue) || 0,
+        defectuoso: supportsMaterial ? Number(materialValue) || 0 : Number(area.defectuoso ?? 0),
+        supportsMaterial,
+      });
     });
 
-    setModalAreas(orderedAreas);
+    setModalAreas(modalAreaSummaries);
     setAreaBadQuantities(initialValues);
     setBadModalOwner(ownerArea);
     setBadModalPartial(partial ?? null);
     setShowBadQuantity(true);
   };
+
 
   const getAreaSumaTotal = (area: AreaData) => {
     // Si existen parciales -> sumar SOLO el primer parcial
@@ -1086,22 +1237,22 @@ const handleOpenBadQuantityModal = (
     if (area.id < 6) {
       return 0; // ignora áreas menores a 6
     }
-  
+
     const blockKey = getBlockKey(area.id);
     const badToOthers = toNum(sumBadBySource(area.id, false));
     const selfBad = toNum(pickBlock(area.response, blockKey)?.bad_quantity ?? 0);
-  
+
     // parciales malas (solo si no hay selfBad)
     const partialsBad =
       selfBad > 0
         ? 0
         : (area.partials ?? []).reduce(
-            (pAcc, p) => pAcc + toNum(p.bad_quantity),
-            0
-          );
-  
+          (pAcc, p) => pAcc + toNum(p.bad_quantity),
+          0
+        );
+
     const areaTotalBad = badToOthers + selfBad + partialsBad;
-  
+
     return acc + areaTotalBad;
   }, 0);
   const totalDefectuoso = areas.reduce(
@@ -1178,10 +1329,10 @@ const handleOpenBadQuantityModal = (
       prev.map((a) =>
         a.id === area.id
           ? {
-              ...a,
-              assigned_user_id: newUserId,
-              usuario: operatorById.get(newUserId) ?? a.usuario,
-            }
+            ...a,
+            assigned_user_id: newUserId,
+            usuario: operatorById.get(newUserId) ?? a.usuario,
+          }
           : a
       )
     );
@@ -1260,7 +1411,11 @@ const handleOpenBadQuantityModal = (
     }
 
     // 6. Malas: desde Corte en adelante se gestiona via modal acumulado
+    console.log("aeaa", area);
+
     if (field === 'malas') {
+      console.log("area", area);
+
       if (area.id >= 6) {
         const blockKey = areaBlockMap[area.id];
         console.log(blockKey, 'blovkkey');
@@ -1335,21 +1490,58 @@ const handleOpenBadQuantityModal = (
       return Number.isFinite(n) ? n : 0;
     };
 
-    const modalInputs = modalResult?.inputsByArea ?? [];
+    const baselineMap = modalBaselineRef.current ?? new Map<number, {
+      bad: number;
+      material: number | null;
+      supportsMaterial: boolean;
+    }>();
+
+    const modalInputsRaw = modalResult?.inputsByArea ?? [];
+    const modalInputs = modalInputsRaw.filter((entry) => {
+      const baseline = baselineMap.get(Number(entry.areaId));
+      if (!baseline) {
+        return true;
+      }
+
+      const values = entry.values ?? [];
+      const badFromSummary = values.find(
+        (value) => normalizeSummaryLabel(value.label) === 'malas'
+      );
+      const nextBad = toInt(badFromSummary?.value);
+      const baselineBad = toInt(baseline.bad);
+      const badChanged = nextBad !== baselineBad;
+
+      let materialChanged = false;
+      if (baseline.supportsMaterial) {
+        const materialEntry = values.find((value) => {
+          const normalized = normalizeSummaryLabel(value.label);
+          return (
+            normalized.includes('fabrica') || normalized.includes('materia')
+          );
+        });
+
+        const nextMaterial = toInt(materialEntry?.value);
+        const baselineMaterial = toInt(baseline.material ?? 0);
+        materialChanged = nextMaterial !== baselineMaterial;
+      }
+
+      return badChanged || materialChanged;
+    });
+    const changedAreaIds = new Set(modalInputs.map((entry) => Number(entry.areaId)));
     const updatedAreasFromModal = modalResult?.updatedAreas ?? null;
 
     const effectiveAreas = updatedAreasFromModal
       ? areas.map((area) => {
-          const replacement = updatedAreasFromModal.find(
-            (item) => item.id === area.id
-          );
-          if (!replacement) return area;
-          return {
-            ...area,
-            malas: Number(replacement.malas ?? area.malas ?? 0),
-            defectuoso: Number(replacement.defectuoso ?? area.defectuoso ?? 0),
-          };
-        })
+        const replacement = updatedAreasFromModal.find(
+          (item) => item.id === area.id
+        );
+        if (!replacement) return area;
+        return {
+          ...area,
+          malas: Number(replacement.malas ?? area.malas ?? 0),
+          defectuoso: Number(replacement.defectuoso ?? area.defectuoso ?? 0),
+        };
+      })
       : areas;
 
     if (updatedAreasFromModal) {
@@ -1372,7 +1564,7 @@ const handleOpenBadQuantityModal = (
     const areasFromTable = effectiveAreas
       .filter((area) => area.status === 'Completado')
       .map((area) => {
-        const normalizedName = area.name.toLowerCase().replace(/\s/g, '');
+        const normalizedName = normalizeAreaKey(area.name);
         const block = (blockMap[normalizedName] || 'otros') as
           | BlockKey
           | 'otros';
@@ -1434,6 +1626,11 @@ const handleOpenBadQuantityModal = (
       const inputsMap = new Map(modalInputs.map((i) => [i.areaId, i.values]));
 
       areasFromBadModal = flows.flatMap((flow: any) => {
+        const flowAreaId = Number(flow?.area_id);
+        if (!flowAreaId || !changedAreaIds.has(flowAreaId)) {
+          return [];
+        }
+
         const areaName = flow.area?.name ?? '';
         const areaKey = normalizeAreaKey(areaName);
 
@@ -1471,13 +1668,13 @@ const handleOpenBadQuantityModal = (
 
         return [
           {
-            areaId: Number(flow.area_id),
+            areaId: flowAreaId,
             block: blockKey,
             blockId,
             formId,
             cqmId,
             data,
-            inputsByArea: inputsMap.get(Number(flow.area_id)) ?? [],
+            inputsByArea: inputsMap.get(flowAreaId) ?? [],
           },
         ];
       });
@@ -1569,14 +1766,14 @@ const handleOpenBadQuantityModal = (
         return entry;
       })
       .filter(Boolean) as Array<{
-      areaId: number;
-      block: BlockKey;
-      blockId: number;
-      formId?: number;
-      cqmId?: number;
-      data: Record<string, number>;
-      sample_data?: Record<string, number>;
-    }>;
+        areaId: number;
+        block: BlockKey;
+        blockId: number;
+        formId?: number;
+        cqmId?: number;
+        data: Record<string, number>;
+        sample_data?: Record<string, number>;
+      }>;
 
     const summary = modalInputs
       .map((item) => {
@@ -1609,6 +1806,7 @@ const handleOpenBadQuantityModal = (
 
     if (areasForDataUpdate.length === 0 && summary.length === 0) {
       alert('No hay cambios para guardar');
+      modalBaselineRef.current = new Map();
       return;
     }
 
@@ -1620,23 +1818,31 @@ const handleOpenBadQuantityModal = (
       }
 
       if (summary.length > 0) {
+        const sourceAreaId = badModalOwner?.id ?? null;
+        const sourceWorkOrderFlowId =
+          workOrder?.flow?.find((f: any) => Number(f?.area_id) === sourceAreaId)?.id ?? null;
+
+        const partialReleaseId = badModalPartial?.id ?? null; // 👈 clave
+
         const payload: any = {
           badQuantitySummary: summary,
+          mode: 'replace',               // si lo usas, limítalo (ver punto C)
+          sourceAreaId,
+          sourceWorkOrderFlowId,
+          partialReleaseId,              // 👈 ENVÍALO SIEMPRE (null = REM)
         };
-        if (sourceAreaId) {
-          payload.sourceAreaId = sourceAreaId;
-        }
-        if (sourceWorkOrderFlowId) {
-          payload.sourceWorkOrderFlowId = sourceWorkOrderFlowId;
-        }
-
+        console.log("payload", payload);
+        
         await updateWorkOrderAreas(workOrder.ot_id, payload);
       }
 
+      await loadData();
       alert('Cambios guardados correctamente');
     } catch (err) {
       console.error(err);
       alert('Error al guardar los cambios');
+    } finally {
+      modalBaselineRef.current = new Map();
     }
   };
 
@@ -1801,12 +2007,12 @@ const handleOpenBadQuantityModal = (
                       file.type === 'OT'
                         ? 'Ver OT'
                         : file.type === 'SKU'
-                        ? 'Ver SKU'
-                        : file.type === 'OP'
-                        ? 'Ver OP'
-                        : file.type === 'CARD_IMAGE'
-                        ? 'Ver TARJETA'
-                        : 'Adjunto';
+                          ? 'Ver SKU'
+                          : file.type === 'OP'
+                            ? 'Ver OP'
+                            : file.type === 'CARD_IMAGE'
+                              ? 'Ver TARJETA'
+                              : 'Adjunto';
                     return (
                       <button
                         key={file.id}
@@ -2069,11 +2275,10 @@ const handleOpenBadQuantityModal = (
                             }
                           >
                             <span
-                              className={`px-2 py-1 rounded-lg text-sm font-medium ${
-                                name && name !== '—'
-                                  ? 'bg-yellow-100 text-yellow-800'
-                                  : ''
-                              }`}
+                              className={`px-2 py-1 rounded-lg text-sm font-medium ${name && name !== '—'
+                                ? 'bg-yellow-100 text-yellow-800'
+                                : ''
+                                }`}
                             >
                               {name || '—'}
                             </span>
@@ -2107,11 +2312,10 @@ const handleOpenBadQuantityModal = (
                           className="text-center"
                         >
                           <span
-                            className={`px-2 py-1 rounded-lg text-sm font-medium ${
-                              reviewerName && reviewerName !== '—'
-                                ? 'bg-yellow-100 text-yellow-800'
-                                : ''
-                            }`}
+                            className={`px-2 py-1 rounded-lg text-sm font-medium ${reviewerName && reviewerName !== '—'
+                              ? 'bg-yellow-100 text-yellow-800'
+                              : ''
+                              }`}
                           >
                             {reviewerName || '—'}
                           </span>
@@ -2139,11 +2343,10 @@ const handleOpenBadQuantityModal = (
                             }
                           >
                             <span
-                              className={`px-2 py-1 rounded-lg text-sm font-medium ${
-                                name && name !== '—'
-                                  ? 'bg-purple-100 text-purple-800'
-                                  : ''
-                              }`}
+                              className={`px-2 py-1 rounded-lg text-sm font-medium ${name && name !== '—'
+                                ? 'bg-purple-100 text-purple-800'
+                                : ''
+                                }`}
                             >
                               {name || '—'}
                             </span>
@@ -2176,11 +2379,10 @@ const handleOpenBadQuantityModal = (
                           className="text-center"
                         >
                           <span
-                            className={`px-2 py-1 rounded-lg text-sm font-medium ${
-                              auditorName !== '—'
-                                ? 'bg-purple-100 text-purple-800'
-                                : ''
-                            }`}
+                            className={`px-2 py-1 rounded-lg text-sm font-medium ${auditorName !== '—'
+                              ? 'bg-purple-100 text-purple-800'
+                              : ''
+                              }`}
                           >
                             {auditorName}
                           </span>
@@ -2245,22 +2447,27 @@ const handleOpenBadQuantityModal = (
                             );
                             const totalBad = badToOthers + selfBad;
 
+                            let partialSumForSigma = 0;
                             const cells: React.ReactNode[] = area.partials.map(
                               (p, pIndex) => {
                                 const value =
                                   field === 'buenas'
                                     ? toNum(p.quantity)
                                     : field === 'malas'
-                                    ? toNum(p.bad_quantity)
-                                    : field === 'excedente'
-                                    ? toNum(p.excess_quantity)
-                                    : toNum(p.noprocess_quantity);
+                                      ? toNum(p.bad_quantity)
+                                      : field === 'excedente'
+                                        ? toNum(p.excess_quantity)
+                                        : toNum(p.noprocess_quantity);
 
                                 const partialBadDetailsSum = (p.badQuantityDetails ?? []).reduce(
                                   (acc, detail) => acc + toNum(detail?.bad_quantity),
                                   0
                                 );
                                 const partialTotalBad = toNum(p.bad_quantity) + partialBadDetailsSum;
+
+                                if (field === 'buenas') {
+                                  partialSumForSigma += value;
+                                }
 
                                 const isLastPartial =
                                   rem <= 0 &&
@@ -2277,7 +2484,7 @@ const handleOpenBadQuantityModal = (
                                   rem <= 0;
 
                                 const displayValue =
-                                  field === 'malas' ? partialTotalBad : value;
+                                  field === 'malas' ? getPxTotal(area.id, pIndex) : value;
 
                                 const partialContent = allowBadQuantityModal ? (
                                   <button
@@ -2308,9 +2515,8 @@ const handleOpenBadQuantityModal = (
 
                                 return (
                                   <td
-                                    key={`area-${area.id}-parcial-${
-                                      p.id ?? pIndex
-                                    }-${field}`}
+                                    key={`area-${area.id}-parcial-${p.id ?? pIndex
+                                      }-${field}`}
                                     className="text-center"
                                   >
                                     {field === 'malas' ? partialContent : value}
@@ -2344,10 +2550,11 @@ const handleOpenBadQuantityModal = (
                                   );
                                   remSum = getRemainderBySum(area, 'noprocess');
                                   break;
-                                case 'malas':
-                                  remValue = getRemainderByField(area, 'malas');
-                                  remSum = getRemainderBySum(area, 'malas');
+                                case 'malas': {
+                                  remValue = getRemTotal(area.id);     // <- solo no liberados (REM) desde flow.badQuantityDetails
+                                  remSum = totalBad;                   // puedes mantener tu total acumulado como Σ
                                   break;
+                                }
                                 default:
                                   remValue = 0;
                               }
@@ -2357,10 +2564,11 @@ const handleOpenBadQuantityModal = (
                                 area.id >= 6 &&
                                 area.status === 'Completado';
 
-                              const remainderAggregateContent =
-                                field === 'malas'
-                                  ? aggregatedFieldValue
-                                  : isEditableAggregateField ? (
+                              let remainderAggregateContent: React.ReactNode;
+                              if (field === 'malas') {
+                                remainderAggregateContent = totalBad;
+                              } else if (isEditableAggregateField) {
+                                remainderAggregateContent = (
                                   <input
                                     type="number"
                                     value={aggregatedFieldValue}
@@ -2374,9 +2582,12 @@ const handleOpenBadQuantityModal = (
                                     }
                                     className="w-20 rounded border border-gray-200 px-2 py-1 text-center"
                                   />
-                                  ) : (
-                                    remSum
-                                  );
+                                );
+                              } else if (field === 'buenas') {
+                                remainderAggregateContent = partialSumForSigma;
+                              } else {
+                                remainderAggregateContent = remSum;
+                              }
 
                               const remainderPartialContent = allowBadQuantityModalRem ? (
                                 <button
@@ -2498,7 +2709,7 @@ const handleOpenBadQuantityModal = (
                           field === 'cqm'
                             ? getSingleCqm(area)
                             : renderCell?.(area, field as any) ??
-                              getAnswerValue(undefined, field as any, area);
+                            getAnswerValue(undefined, field as any, area);
 
                         return (
                           <td
@@ -2677,9 +2888,8 @@ const handleOpenBadQuantityModal = (
                           onClick={() =>
                             setOpModal((s) => ({ ...s, selectedUserId: u.id }))
                           }
-                          className={`w-full text-left px-3 py-2 border-b last:border-b-0 ${
-                            selected ? 'bg-blue-100' : 'hover:bg-gray-50'
-                          }`}
+                          className={`w-full text-left px-3 py-2 border-b last:border-b-0 ${selected ? 'bg-blue-100' : 'hover:bg-gray-50'
+                            }`}
                         >
                           {u.username}
                         </button>
@@ -2722,17 +2932,18 @@ const handleOpenBadQuantityModal = (
           onConfirm={(result: BadQuantityModalResult) => {
             setShowBadQuantity(false);
             handleSaveChanges(result);
-            setModalAreas([]);
+            setModalAreas(() => []);
             setBadModalOwner(null);
             setBadModalPartial(null);
+            modalBaselineRef.current = new Map();
           }}
           onClose={() => {
             setShowBadQuantity(false);
-            setModalAreas([]);
+            setModalAreas(() => []);
             setBadModalOwner(null);
             setBadModalPartial(null);
+            modalBaselineRef.current = new Map();
           }}
-          isEditable={badModalPartial == null}
         />
       )}
       {showConfirm && (
