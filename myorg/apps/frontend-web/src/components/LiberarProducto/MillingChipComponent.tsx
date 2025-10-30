@@ -9,7 +9,7 @@ import {
   releaseProductFromMillingChip,
   ReleaseResponse,
 } from '@/api/liberarProducto';
-import { updateWorkOrderAreas } from '@/api/seguimientoDeOts';
+import { updateWorkOrderAreasLiberar } from '@/api/seguimientoDeOts';
 
 import { useAuthContext } from '@/context/AuthContext';
 
@@ -579,21 +579,6 @@ export default function MillingChipComponent({ workOrder }: Props) {
     setShowConfirm(true);
   };
   const handleMillingChipSubmit = async () => {
-    if (pendingBadQuantityInputs) {
-      const saved = await handleSaveChanges(pendingBadQuantityInputs, {
-        silent: true,
-      });
-
-      if (!saved) {
-        alert(
-          'No se pudieron guardar las cantidades por área. Intenta nuevamente.'
-        );
-        return;
-      }
-
-      setPendingBadQuantityInputs(null);
-    }
-
     const payload = {
       workOrderId: workOrder.workOrder.id,
       workOrderFlowId: currentFlow.id,
@@ -613,8 +598,8 @@ export default function MillingChipComponent({ workOrder }: Props) {
       const otId = workOrder?.workOrder?.ot_id ?? '';
       const res = (await releaseProductFromMillingChip(payload)) as ReleaseResponse;
 
-      // 2) Si es PARCIAL → mandar badQuantitySummary con partialReleaseId
-      const stash = pendingBadQty ?? loadPendingBadQty(otId, currentFlow?.id ?? null);
+      // 2️⃣ Si es PARCIAL → mandar badQuantitySummary con partialReleaseId
+      const stash = pendingBadQty;
 
       const isPartial =
         !!res &&
@@ -627,26 +612,40 @@ export default function MillingChipComponent({ workOrder }: Props) {
         !!stash &&
         Array.isArray(stash.badQuantitySummary) &&
         stash.badQuantitySummary.length > 0;
-      console.log("has", stash);
 
+      console.log('hasStash', stash);
 
+      // 🔹 Normaliza valores para evitar doble suma (usa solo los nuevos del modal)
+      if (hasStash && Array.isArray(stash.badQuantitySummary)) {
+        stash.badQuantitySummary = stash.badQuantitySummary.map((summary) => ({
+          ...summary,
+          values: summary.values.map((v) => ({
+            ...v,
+            value: Number(v.value) || 0, // fuerza número limpio, sin acumulado
+          })),
+        }));
+      }
+
+      // 3️⃣ Actualiza backend
       if (isPartial && hasStash) {
-        // ⬅️ PARCIAL: manda con partialReleaseId
-        await updateWorkOrderAreas(otId, {
+        // PARCIAL → manda con partialReleaseId
+        await updateWorkOrderAreasLiberar(otId, {
           sourceAreaId: stash.sourceAreaId,
           sourceWorkOrderFlowId: stash.sourceWorkOrderFlowId,
           badQuantitySummary: stash.badQuantitySummary,
           partialReleaseId: res.partialReleaseId,
         });
       } else if (!isPartial && hasStash) {
-        // ⬅️ FINAL (completa): manda explícitamente con partialReleaseId: null
-        await updateWorkOrderAreas(otId, {
+        // FINAL → manda con partialReleaseId: null
+        await updateWorkOrderAreasLiberar(otId, {
           sourceAreaId: stash.sourceAreaId,
           sourceWorkOrderFlowId: stash.sourceWorkOrderFlowId,
           badQuantitySummary: stash.badQuantitySummary,
-          partialReleaseId: null, // <- importante
+          partialReleaseId: null,
         });
       }
+
+      // Limpieza final
       clearPendingBadQty(otId, currentFlow?.id ?? null);
       setPendingBadQty(null);
       setPendingBadQuantityInputs(null);
@@ -663,26 +662,37 @@ export default function MillingChipComponent({ workOrder }: Props) {
   );
 
   const handleOpenBadQuantityModal = () => {
-    const resetValues: Record<string, string> = {};
+    const initialValues: Record<string, string> = {};
 
-    previousFlows.forEach((flow) => {
-      const areaName = normalizeAreaKey(flow?.area?.name ?? '');
-      if (!areaName) return;
+    const hasPartials =
+      Array.isArray(currentFlow?.partialReleases) &&
+      currentFlow.partialReleases.length > 0;
 
-      resetValues[`${areaName}_bad`] = '0';
+    if (hasPartials) {
+      // 🟢 Si ya hay parciales → todo arranca en cero
+      previousFlows.forEach((flow) => {
+        const areaName = flow.area?.name ?? '';
+        const areaKey = normalizeAreaKey(areaName);
+        const blockKey = resolveBlockKey(areaName);
+        const supportsMaterial = blockSupportsMaterial(blockKey);
 
-      const supportsMaterial = blockSupportsMaterial(
-        resolveBlockKey(flow?.area?.name ?? '')
-      );
+        initialValues[`${areaKey}_bad`] = '0';
+        if (supportsMaterial) initialValues[`${areaKey}_material`] = '0';
+      });
+    } else {
+      // 🟢 Primer parcial → no hay detalles, por tanto todo también en cero
+      previousFlows.forEach((flow) => {
+        const areaName = flow.area?.name ?? '';
+        const areaKey = normalizeAreaKey(areaName);
+        const blockKey = resolveBlockKey(areaName);
+        const supportsMaterial = blockSupportsMaterial(blockKey);
 
-      if (supportsMaterial) {
-        resetValues[`${areaName}_material`] = '0';
-      }
-    });
+        initialValues[`${areaKey}_bad`] = '0';
+        if (supportsMaterial) initialValues[`${areaKey}_material`] = '0';
+      });
+    }
 
-    setAreaBadQuantities(resetValues);
-    setLastBadQuantity('0');
-    setMaterialBadQuantity('0');
+    setAreaBadQuantities(initialValues);
     setShowBadQuantity(true);
   };
 
@@ -786,7 +796,7 @@ export default function MillingChipComponent({ workOrder }: Props) {
     };
 
     try {
-      const response = await updateWorkOrderAreas(
+      const response = await updateWorkOrderAreasLiberar(
         workOrder?.workOrder?.ot_id,
         payload
       );
@@ -1032,42 +1042,81 @@ export default function MillingChipComponent({ workOrder }: Props) {
           areaBadQuantities={areaBadQuantities}
           setAreaBadQuantities={setAreaBadQuantities}
           onConfirm={({ inputsByArea }) => {
-            const currentAreaInputs = inputsByArea.find(
-              (item) => item.areaId === workOrder.area.id
-            );
+            const toInt = (v: any) =>
+              Number.isFinite(parseInt(String(v ?? '0'), 10))
+                ? parseInt(String(v ?? '0'), 10)
+                : 0;
 
-            if (currentAreaInputs) {
-              const normalizeLabel = (value: string) =>
-                value
-                  .normalize('NFD')
-                  .replace(/[\u0300-\u036f]/g, '')
-                  .trim()
-                  .toLowerCase();
+            const inputsMap = new Map(inputsByArea.map((it) => [it.areaId, it.values]));
 
-              const findValue = (label: string) =>
-                currentAreaInputs.values.find(
-                  (entry) =>
-                    normalizeLabel(entry.label) === normalizeLabel(label)
-                )?.value ?? 0;
+            const uiPreviewPayload = {
+              areas: previousFlows.flatMap((flow) => {
+                const areaName = flow.area?.name ?? '';
+                const areaKey = normalizeAreaKey(areaName);
+                const blockMap: Partial<Record<string, BlockKey>> = {
+                  impresion: 'impression',
+                  serigrafia: 'serigrafia',
+                  empalme: 'empalme',
+                  laminacion: 'laminacion',
+                  corte: 'corte',
+                  coloredge: 'colorEdge',
+                  hotstamping: 'hotStamping',
+                };
+                if (areaKey === 'millingchip') return [];
+                const mappedBlock = blockMap[areaKey];
+                const blockKey: BlockKey | null =
+                  mappedBlock ?? resolveBlockKey(areaName);
+                if (!blockKey) return [];
+                const blockData = flow.areaResponse?.[blockKey];
+                const blockId = blockData?.id ?? null;
+                if (!blockId) return [];
+                const supportsMaterial = blockSupportsMaterial(blockKey);
+                const badKey = `${areaKey}_bad`;
+                const materialKey = `${areaKey}_material`;
+                const data: Record<string, number> = {
+                  bad_quantity: toInt(areaBadQuantities[badKey]),
+                };
+                if (supportsMaterial)
+                  data.material_quantity = toInt(areaBadQuantities[materialKey]);
+                const inputsForArea = inputsMap.get(flow.area_id) ?? [];
+                return {
+                  areaId: flow.area_id,
+                  block: blockKey,
+                  blockId,
+                  formId: blockData?.form_auditory_id ?? null,
+                  cqmId: blockData?.form_answer_id ?? null,
+                  data,
+                  inputsByArea: inputsForArea,
+                };
+              }),
+              sourceAreaId: currentFlow?.area_id ?? workOrder?.area?.id ?? null,
+              sourceWorkOrderFlowId: currentFlow?.id ?? null,
+              badQuantitySummary: inputsByArea,
+            };
+            console.log('[PREVIEW] updateWorkOrderAreasLiberar payload:', uiPreviewPayload);
 
-              setLastBadQuantity(String(findValue('Malas')));
-              setMaterialBadQuantity(String(findValue('Malo de fábrica')));
-            }
             const body: UpdateWorkOrderAreasBody = {
               sourceAreaId: currentFlow?.area_id ?? workOrder?.area?.id ?? null,
               sourceWorkOrderFlowId: currentFlow?.id ?? null,
               badQuantitySummary: inputsByArea,
             };
             setPendingBadQty(body);
-            savePendingBadQty(
-              workOrder?.workOrder?.ot_id ?? '',
-              currentFlow?.id ?? null,
-              body
+            savePendingBadQty(workOrder?.workOrder?.ot_id ?? '', currentFlow?.id ?? null, body);
+
+            const currentAreaInputs = inputsByArea.find(
+              (item) => item.areaId === workOrder.area.id
             );
+            if (currentAreaInputs) {
+              const norm = (s: string) =>
+                s.normalize('NFD').replace(/[\u0300-\u036f]/g, '').trim().toLowerCase();
+              const find = (label: string) =>
+                currentAreaInputs.values.find((e) => norm(e.label) === norm(label))?.value ?? 0;
+              setLastBadQuantity(String(find('Malas')));
+              setMaterialBadQuantity(String(find('Malo de fábrica')));
+            }
             setShowBadQuantity(false);
-            setPendingBadQuantityInputs(inputsByArea);
           }}
-          onClose={() => setShowBadQuantity(false)}
+      onClose={() => setShowBadQuantity(false)}
         />
       )}
 

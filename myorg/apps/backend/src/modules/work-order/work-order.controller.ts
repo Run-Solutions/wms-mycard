@@ -235,4 +235,24 @@ export class WorkOrderController {
       body.partialReleaseId ?? null,
     );
   }
+
+  @Patch(':id/areas/liberar')
+  async updateWorkOrderAreasLiberar(
+    @Req() req: AuthenticatedRequest,
+    @Body() body: UpdateWorkOrderAreasDto,
+    @Param('id') id: string,
+  ) {
+    const user = req.user;
+    if (!user) {
+      throw new ForbiddenException('Usuario no autenticado.');
+    }
+    return await this.workOrderService.updateWorkOrderAreasLiberar(
+      id,
+      user.id,
+      body.sourceAreaId ?? null,
+      body.sourceWorkOrderFlowId ?? null,
+      body.badQuantitySummary,
+      body.partialReleaseId ?? null,
+    );
+  }
 }

@@ -9,7 +9,7 @@ import {
   releaseProductFromHotStamping,
   ReleaseResponse,
 } from '@/api/liberarProducto';
-import { updateWorkOrderAreas } from '@/api/seguimientoDeOts';
+import { updateWorkOrderAreasLiberar } from '@/api/seguimientoDeOts';
 
 import { useAuthContext } from '@/context/AuthContext';
 
@@ -675,7 +675,7 @@ export default function HotStampingComponent({ workOrder }: Props) {
       
             if (isPartial && hasStash) {
               // ⬅️ PARCIAL: manda con partialReleaseId
-              await updateWorkOrderAreas(otId, {
+              await updateWorkOrderAreasLiberar(otId, {
                 sourceAreaId: stash.sourceAreaId,
                 sourceWorkOrderFlowId: stash.sourceWorkOrderFlowId,
                 badQuantitySummary: stash.badQuantitySummary,
@@ -683,7 +683,7 @@ export default function HotStampingComponent({ workOrder }: Props) {
               });
             } else if (!isPartial && hasStash) {
               // ⬅️ FINAL (completa): manda explícitamente con partialReleaseId: null
-              await updateWorkOrderAreas(otId, {
+              await updateWorkOrderAreasLiberar(otId, {
                 sourceAreaId: stash.sourceAreaId,
                 sourceWorkOrderFlowId: stash.sourceWorkOrderFlowId,
                 badQuantitySummary: stash.badQuantitySummary,
@@ -829,7 +829,7 @@ export default function HotStampingComponent({ workOrder }: Props) {
     };
 
     try {
-      const response = await updateWorkOrderAreas(
+      const response = await updateWorkOrderAreasLiberar(
         workOrder?.workOrder?.ot_id,
         payload
       );
