@@ -280,10 +280,10 @@ export const releaseProductFromCorte = async (
 };
 export const releaseProductFromColorEdge = async (
   payload: ReleasePayloadForAuditory
-): Promise<void> => {
+): Promise<ReleaseResponse> => {
   try {
-    await API.post('/free-order-flow/color-edge', payload);
-    
+    const res = await API.post('/free-order-flow/color-edge', payload);
+    return res.data as ReleaseResponse;
   } catch (error: any) {
     console.error(
       'Error en releaseProductFromColorEdge',
@@ -294,9 +294,10 @@ export const releaseProductFromColorEdge = async (
 };
 export const releaseProductFromHotStamping = async (
   payload: ReleasePayloadForAuditory
-): Promise<void> => {
+): Promise<ReleaseResponse> => {
   try {
-    await API.post('/free-order-flow/hot-stamping', payload);
+    const res = await API.post('/free-order-flow/hot-stamping', payload);
+    return res.data as ReleaseResponse;
   } catch (error: any) {
     console.error(
       'Error en releaseProductFromLaminacion',
@@ -307,9 +308,10 @@ export const releaseProductFromHotStamping = async (
 };
 export const releaseProductFromMillingChip = async (
   payload: ReleasePayloadForAuditory
-): Promise<void> => {
+): Promise<ReleaseResponse> => {
   try {
-    await API.post('/free-order-flow/milling-chip', payload);
+    const res = await API.post('/free-order-flow/milling-chip', payload);
+    return res.data as ReleaseResponse;
   } catch (error: any) {
     console.error(
       'Error en releaseProductFromMillingChip',
@@ -320,9 +322,10 @@ export const releaseProductFromMillingChip = async (
 };
 export const releaseProductFromPersonalizacion = async (
   payload: ReleasePayloadForAuditory
-): Promise<void> => {
+): Promise<ReleaseResponse> => {
   try {
-    await API.post('/free-order-flow/personalizacion', payload);
+    const res = await API.post('/free-order-flow/personalizacion', payload);
+    return res.data as ReleaseResponse;
   } catch (error: any) {
     console.error(
       'Error en releaseProductFromPersonalizacion',

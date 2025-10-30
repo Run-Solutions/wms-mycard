@@ -581,7 +581,9 @@ export default function CorteComponent({ workOrder }: Props) {
         !!stash &&
         Array.isArray(stash.badQuantitySummary) &&
         stash.badQuantitySummary.length > 0;
+      console.log("has", stash);
 
+      
       if (isPartial && hasStash) {
         // ⬅️ PARCIAL: manda con partialReleaseId
         await updateWorkOrderAreas(otId, {

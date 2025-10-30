@@ -592,6 +592,56 @@ const guessMimeFromName = (filename: string): string => {
   }
 };
 
+function sumDetailFromPartial(
+  partial: AreaData['partials'][number] | null | undefined,
+  ownerSourceId: number,
+  targetAreaId: number
+) {
+  let bad = 0;
+  let mat = 0;
+  if (!partial) return { bad, mat };
+  const list = Array.isArray(partial.badQuantityDetails)
+    ? partial.badQuantityDetails
+    : [];
+  for (const d of list) {
+    if (
+      Number(d?.source_area_id) === Number(ownerSourceId) &&
+      Number(d?.target_area_id) === Number(targetAreaId)
+    ) {
+      bad += toNum(d?.bad_quantity);
+      mat += toNum(d?.material_quantity);
+    }
+  }
+  return { bad, mat };
+}
+
+// Suma malas/material del REMANENTE (partial_release_id == null) para (source, target)
+function sumDetailFromRem(
+  workOrder: any,
+  ownerSourceId: number,
+  targetAreaId: number
+) {
+  let bad = 0;
+  let mat = 0;
+  const flows = Array.isArray(workOrder?.flow) ? workOrder.flow : [];
+  for (const f of flows) {
+    const details = Array.isArray(f?.badQuantityDetails)
+      ? f.badQuantityDetails
+      : [];
+    for (const d of details) {
+      if (d?.partial_release_id != null) continue; // solo REM
+      if (
+        Number(d?.source_area_id) === Number(ownerSourceId) &&
+        Number(d?.target_area_id) === Number(targetAreaId)
+      ) {
+        bad += toNum(d?.bad_quantity);
+        mat += toNum(d?.material_quantity);
+      }
+    }
+  }
+  return { bad, mat };
+}
+
 // ========================================================
 // Component
 // ========================================================
@@ -1072,111 +1122,110 @@ export default function SeguimientoDeOtsAuxPage({ params }: Props) {
     return { bad, mat };
   };
 
-  const handleOpenBadQuantityModal = (
-    ownerArea: AreaData,
-    partial?: AreaData['partials'][number] | null
-  ) => {
-    const initialValues: Record<string, string> = {};
-    const TARGET_AREA_IDS = [2, 3, 4, 5, 6, 7];
-    const orderedAreas: AreaData[] = [];
-    modalBaselineRef.current = new Map();
-    const pushUnique = (candidate: AreaData | undefined | null) => {
-      if (!candidate) return;
-      if (orderedAreas.some((item) => item.id === candidate.id)) return;
-      orderedAreas.push(candidate);
-    };
-    TARGET_AREA_IDS.forEach((targetId) => {
-      pushUnique(areas.find((a) => Number(a.id) === targetId));
-    });
-    pushUnique(ownerArea);
+const handleOpenBadQuantityModal = (
+  ownerArea: AreaData,
+  partial?: AreaData['partials'][number] | null
+) => {
+  const initialValues: Record<string, string> = {};
+  const orderedAreas: AreaData[] = [];
 
-    const modalAreaSummaries: AreaForBadQty[] = [];
+  // Áreas destino permitidas (ajusta si necesitas)
+  const TARGET_AREA_IDS = [2, 3, 4, 5, 6, 7, 8, 9, 10];
 
-    orderedAreas.forEach((area) => {
-      const key = normalizeAreaKey(area.name);
-      const isOwnerArea = Number(area.id) === Number(ownerArea.id);
-      const supportsMaterial = area.id >= 6;
+  modalBaselineRef.current = new Map();
 
-      let badValue = 0;
-      let materialValue = 0;
-
-      if (partial) {
-        // ✅ Caso con parcial (lo que ya tenías)
-        if (isOwnerArea) {
-          badValue = toNum(partial?.bad_quantity);
-          materialValue = toNum(partial?.material_quantity);
-        } else {
-          const detail = (partial?.badQuantityDetails ?? []).find(
-            (d) => Number(d?.target_area_id) === Number(area.id)
-          );
-          badValue = toNum(detail?.bad_quantity);
-          materialValue = toNum(detail?.material_quantity);
-        }
-      } else {
-        // ✅ Caso REM (sin parcial): usar solo detalles con partial_release_id === null
-        if (isOwnerArea) {
-          // Puedes mantener el propio bad/material del bloque del área
-          const { bad, mat } = getSelfBadAndMat(ownerArea);
-          badValue = toNum(bad);
-          materialValue = toNum(mat);
-        } else {
-          const rem = remBadBySourceTarget
-            .get(Number(ownerArea.id))
-            ?.get(Number(area.id));
-          badValue = toNum(rem?.bad);
-          materialValue = toNum(rem?.mat);
-        }
-      }
-
-      // Fallback con summary si llega vacío
-      const summaryEntry = Array.isArray(ownerArea.badQuantitySummary)
-        ? ownerArea.badQuantitySummary.find(
-          (entry) => Number(entry.areaId) === Number(area.id)
-        )
-        : null;
-
-      if (!badValue && summaryEntry) {
-        const badFromSummary = summaryEntry.values.find(
-          (entry) => normalizeSummaryLabel(entry.label) === 'malas'
-        );
-        if (badFromSummary) badValue = toNum(badFromSummary.value);
-      }
-
-      if (supportsMaterial && !materialValue && summaryEntry) {
-        const materialFromSummary = summaryEntry.values.find(
-          (entry) =>
-            normalizeSummaryLabel(entry.label).includes('fabrica') ||
-            normalizeSummaryLabel(entry.label).includes('materia')
-        );
-        if (materialFromSummary) materialValue = toNum(materialFromSummary.value);
-      }
-
-      modalBaselineRef.current.set(area.id, {
-        bad: Number(badValue) || 0,
-        material: supportsMaterial ? Number(materialValue) || 0 : null,
-        supportsMaterial,
-      });
-
-      initialValues[`${key}_bad`] = String(Number(badValue) || 0);
-      if (supportsMaterial) {
-        initialValues[`${key}_material`] = String(Number(materialValue) || 0);
-      }
-
-      modalAreaSummaries.push({
-        id: area.id,
-        name: area.name,
-        malas: Number(badValue) || 0,
-        defectuoso: supportsMaterial ? Number(materialValue) || 0 : Number(area.defectuoso ?? 0),
-        supportsMaterial,
-      });
-    });
-
-    setModalAreas(modalAreaSummaries);
-    setAreaBadQuantities(initialValues);
-    setBadModalOwner(ownerArea);
-    setBadModalPartial(partial ?? null);
-    setShowBadQuantity(true);
+  const pushUnique = (candidate: AreaData | undefined | null) => {
+    if (!candidate) return;
+    if (orderedAreas.some((item) => item.id === candidate.id)) return;
+    orderedAreas.push(candidate);
   };
+
+  // Orden sugerido para el modal (y agrega el owner al final para que aparezca)
+  TARGET_AREA_IDS.forEach((targetId) => {
+    const a = areas.find((x) => Number(x.id) === Number(targetId));
+    if (a) pushUnique(a);
+  });
+  pushUnique(ownerArea);
+
+  const modalAreaSummaries: AreaForBadQty[] = [];
+
+  // Para cada área DESTINO, precarga únicamente el detalle (source=owner → target=area)
+  orderedAreas.forEach((area) => {
+    const key = normalizeAreaKey(area.name);
+    const supportsMaterial = Number(area.id) >= 6; // tu regla actual
+    const sourceId = Number(ownerArea.id);
+    const targetId = Number(area.id);
+
+    let badValue = 0;
+    let materialValue = 0;
+
+    if (partial) {
+      // ➤ PARCIAL: usa exclusivamente badQuantityDetails del parcial
+      const { bad, mat } = sumDetailFromPartial(partial, sourceId, targetId);
+      badValue = bad;
+      materialValue = mat;
+    } else {
+      // ➤ REM: usa exclusivamente badQuantityDetails con partial_release_id == null
+      const { bad, mat } = sumDetailFromRem(workOrder, sourceId, targetId);
+      badValue = bad;
+      materialValue = mat;
+    }
+
+    // ⚠️ JAMÁS tomes de los bloques (p. ej. impression.bad_quantity), eso es TOTAL del área, no del detalle.
+
+    // Fallback: si no había detalle y tienes un summary previo en memoria del flow (opcional)
+    const summaryEntry = Array.isArray(ownerArea.badQuantitySummary)
+      ? ownerArea.badQuantitySummary.find(
+          (entry) => Number(entry.areaId) === targetId
+        )
+      : null;
+
+    if (!badValue && summaryEntry) {
+      const badFromSummary = summaryEntry.values.find(
+        (entry) => normalizeSummaryLabel(entry.label) === 'malas'
+      );
+      if (badFromSummary) badValue = toNum(badFromSummary.value);
+    }
+
+    if (supportsMaterial && !materialValue && summaryEntry) {
+      const materialFromSummary = summaryEntry.values.find((entry) => {
+        const n = normalizeSummaryLabel(entry.label);
+        return n.includes('fabrica') || n.includes('materia');
+      });
+      if (materialFromSummary) materialValue = toNum(materialFromSummary.value);
+    }
+
+    // Guarda baseline SOLO con el detalle (para detectar cambios y enviar deltas / absolutos correctos)
+    modalBaselineRef.current.set(targetId, {
+      bad: Number(badValue) || 0,
+      material: supportsMaterial ? Number(materialValue) || 0 : null,
+      supportsMaterial,
+    });
+
+    // Inputs del modal
+    initialValues[`${key}_bad`] = String(Number(badValue) || 0);
+    if (supportsMaterial) {
+      initialValues[`${key}_material`] = String(Number(materialValue) || 0);
+    }
+
+    // Datos para la tabla del modal
+    modalAreaSummaries.push({
+      id: targetId,
+      name: area.name,
+      malas: Number(badValue) || 0,
+      defectuoso: supportsMaterial
+        ? Number(materialValue) || 0
+        : Number(area.defectuoso ?? 0),
+      supportsMaterial,
+    });
+  });
+
+  setModalAreas(modalAreaSummaries);
+  setAreaBadQuantities(initialValues);
+  setBadModalOwner(ownerArea);
+  setBadModalPartial(partial ?? null);
+  setShowBadQuantity(true);
+};
 
 
   const getAreaSumaTotal = (area: AreaData) => {
@@ -1414,7 +1463,6 @@ export default function SeguimientoDeOtsAuxPage({ params }: Props) {
     console.log("aeaa", area);
 
     if (field === 'malas') {
-      console.log("area", area);
 
       if (area.id >= 6) {
         const blockKey = areaBlockMap[area.id];
@@ -1479,372 +1527,271 @@ export default function SeguimientoDeOtsAuxPage({ params }: Props) {
     );
   };
 
-  const handleSaveChanges = async (modalResult?: BadQuantityModalResult) => {
-    if (!workOrder) {
-      alert('No se encontró información de la orden de trabajo.');
-      return;
+const handleSaveChanges = async (modalResult?: BadQuantityModalResult) => {
+  if (!workOrder) {
+    alert('No se encontró información de la orden de trabajo.');
+    return;
+  }
+
+  const toInt = (v: any) => {
+    const n = parseInt(String(v ?? '0').trim(), 10);
+    return Number.isFinite(n) ? n : 0;
+  };
+
+  // ====== 1) Baseline y detección de cambios del modal ======
+  const baselineMap =
+    modalBaselineRef.current ??
+    new Map<number, { bad: number; material: number | null; supportsMaterial: boolean }>();
+
+  const modalInputsRaw = modalResult?.inputsByArea ?? [];
+  const modalInputs = modalInputsRaw.filter((entry) => {
+    const baseline = baselineMap.get(Number(entry.areaId));
+    if (!baseline) return true;
+    const values = entry.values ?? [];
+
+    const badFromSummary = values.find(v => normalizeSummaryLabel(v.label) === 'malas');
+    const nextBad = toInt(badFromSummary?.value);
+    const badChanged = nextBad !== toInt(baseline.bad);
+
+    let materialChanged = false;
+    if (baseline.supportsMaterial) {
+      const matEntry = values.find(v => {
+        const n = normalizeSummaryLabel(v.label);
+        return n.includes('fabrica') || n.includes('materia');
+      });
+      const nextMat = toInt(matEntry?.value);
+      materialChanged = nextMat !== toInt(baseline.material ?? 0);
     }
+    return badChanged || materialChanged;
+  });
 
-    const toInt = (v: any) => {
-      const n = parseInt(String(v ?? '0').trim(), 10);
-      return Number.isFinite(n) ? n : 0;
-    };
-
-    const baselineMap = modalBaselineRef.current ?? new Map<number, {
-      bad: number;
-      material: number | null;
-      supportsMaterial: boolean;
-    }>();
-
-    const modalInputsRaw = modalResult?.inputsByArea ?? [];
-    const modalInputs = modalInputsRaw.filter((entry) => {
-      const baseline = baselineMap.get(Number(entry.areaId));
-      if (!baseline) {
-        return true;
-      }
-
-      const values = entry.values ?? [];
-      const badFromSummary = values.find(
-        (value) => normalizeSummaryLabel(value.label) === 'malas'
-      );
-      const nextBad = toInt(badFromSummary?.value);
-      const baselineBad = toInt(baseline.bad);
-      const badChanged = nextBad !== baselineBad;
-
-      let materialChanged = false;
-      if (baseline.supportsMaterial) {
-        const materialEntry = values.find((value) => {
-          const normalized = normalizeSummaryLabel(value.label);
-          return (
-            normalized.includes('fabrica') || normalized.includes('materia')
-          );
-        });
-
-        const nextMaterial = toInt(materialEntry?.value);
-        const baselineMaterial = toInt(baseline.material ?? 0);
-        materialChanged = nextMaterial !== baselineMaterial;
-      }
-
-      return badChanged || materialChanged;
-    });
-    const changedAreaIds = new Set(modalInputs.map((entry) => Number(entry.areaId)));
-    const updatedAreasFromModal = modalResult?.updatedAreas ?? null;
-
-    const effectiveAreas = updatedAreasFromModal
-      ? areas.map((area) => {
-        const replacement = updatedAreasFromModal.find(
-          (item) => item.id === area.id
-        );
-        if (!replacement) return area;
-        return {
-          ...area,
-          malas: Number(replacement.malas ?? area.malas ?? 0),
-          defectuoso: Number(replacement.defectuoso ?? area.defectuoso ?? 0),
-        };
+  // === (A) NO contamines el payload de tabla con los números del modal
+  // Puedes seguir actualizando UI si quieres, pero NO uses esos valores para construir el payload de tabla.
+  const updatedAreasFromModal = modalResult?.updatedAreas ?? null;
+  if (updatedAreasFromModal) {
+    // Solo para UI
+    setAreas(prev =>
+      prev.map(a => {
+        const r = updatedAreasFromModal.find(x => x.id === a.id);
+        return r ? { ...a, malas: Number(r.malas ?? a.malas ?? 0), defectuoso: Number(r.defectuoso ?? a.defectuoso ?? 0) } : a;
       })
-      : areas;
+    );
+  }
 
-    if (updatedAreasFromModal) {
-      setAreas(effectiveAreas);
-    }
+  // Para construir la tabla en esta ejecución usa SIEMPRE el estado crudo:
+  const areasForTableBuild = areas; // <— clave
 
-    const blockMap: Record<string, BlockKey> = {
-      preprensa: 'prepress',
-      impresion: 'impression',
-      serigrafia: 'serigrafia',
-      empalme: 'empalme',
-      laminacion: 'laminacion',
-      corte: 'corte',
-      coloredge: 'colorEdge',
-      millingchip: 'millingChip',
-      hotstamping: 'hotStamping',
-      personalizacion: 'personalizacion',
-    };
+  // ====== 2) Mapa de bloques ======
+  const blockMap: Record<string, BlockKey> = {
+    preprensa: 'prepress',
+    impresion: 'impression',
+    serigrafia: 'serigrafia',
+    empalme: 'empalme',
+    laminacion: 'laminacion',
+    corte: 'corte',
+    coloredge: 'colorEdge',
+    millingchip: 'millingChip',
+    hotstamping: 'hotStamping',
+    personalizacion: 'personalizacion',
+  };
 
-    const areasFromTable = effectiveAreas
-      .filter((area) => area.status === 'Completado')
-      .map((area) => {
-        const normalizedName = normalizeAreaKey(area.name);
-        const block = (blockMap[normalizedName] || 'otros') as
-          | BlockKey
-          | 'otros';
+  const ALLOW_BAD_FROM_TABLE: BlockKey[] = ['impression','serigrafia','laminacion','empalme'];
 
-        const blockId = (area.response as any)?.[block]?.id;
-        const formId = (area.response as any)?.[block]?.form_auditory_id;
-        const cqmId = (area.response as any)?.[block]?.form_answer_id;
+  // ====== 3) Summary del modal ======
+  const summary = modalInputs
+    .map((item) => {
+      const areaId = Number(item.areaId);
+      const areaName =
+        item.areaName ?? areasForTableBuild.find(a => Number(a.id) === areaId)?.name ?? '';
+      const values = (item.values ?? [])
+        .map(e => ({ label: e?.label ?? '', value: Number.isFinite(Number(e?.value)) ? Number(e?.value) : 0 }))
+        .filter(e => !!e.label);
+      return { areaId, areaName, values };
+    })
+    .filter(e => Number.isFinite(e.areaId) && !!e.areaName && e.values.length > 0);
 
-        let data: Record<string, number> = {
-          good_quantity: Number(area.buenas ?? 0),
-          bad_quantity: Number(area.malas ?? 0),
+  const areaIdsTouchedByModal = new Set(summary.map(s => Number(s.areaId)));
+
+  // ====== 4) Payload de TABLA (usando areasForTableBuild) ======
+  const areasFromTable = areasForTableBuild
+    .filter(area => area.status === 'Completado')
+    .map((area) => {
+      const normalizedName = normalizeAreaKey(area.name);
+      const block = (blockMap[normalizedName] || 'otros') as BlockKey | 'otros';
+
+      const blockId = (area.response as any)?.[block]?.id;
+      const formId = (area.response as any)?.[block]?.form_auditory_id;
+      const cqmId  = (area.response as any)?.[block]?.form_answer_id;
+
+      // === (B) Bloquea bad_quantity desde tabla si hay modal o si el modal tocó esa área
+      const canSendBadFromTable =
+        block !== 'otros' &&
+        ALLOW_BAD_FROM_TABLE.includes(block as BlockKey) &&
+        !modalResult && // <- si hay modalResult, NO mandes bad desde tabla
+        !areaIdsTouchedByModal.has(Number(area.id));
+
+      let data: Record<string, number> = {
+        good_quantity: Number(area.buenas ?? 0),
+        ...(canSendBadFromTable ? { bad_quantity: Number(area.malas ?? 0) } : {}),
+        excess_quantity: Number(area.excedente ?? 0),
+        noprocess_quantity: Number(area.noprocess ?? 0),
+      };
+
+      let sample_data: Record<string, number> = {};
+      if (typeof area.cqm === 'number')      sample_data.sample_quantity   = Number(area.cqm ?? 0);
+      if (typeof area.muestras === 'number') sample_data.sample_auditory   = Number(area.muestras ?? 0);
+
+      if (block === 'prepress') {
+        data = { plates: Number(area.buenas ?? 0) };
+      }
+      if (['impression', 'serigrafia', 'laminacion', 'empalme'].includes(block)) {
+        data = {
+          release_quantity: Number(area.buenas ?? 0),
+          ...(canSendBadFromTable ? { bad_quantity: Number(area.malas ?? 0) } : {}),
           excess_quantity: Number(area.excedente ?? 0),
           noprocess_quantity: Number(area.noprocess ?? 0),
-          material_quantity: Number(area.defectuoso ?? 0),
         };
-        let sample_data: Record<string, number> = {
-          sample_quantity: Number(area.cqm ?? 0),
-          sample_auditory: Number(area.muestras ?? 0),
-        };
+        sample_data = { sample_quantity: Number(area.cqm ?? 0) };
+      }
 
-        if (block === 'prepress') {
-          data = { plates: Number(area.buenas ?? 0) };
-        }
-        if (
-          ['impression', 'serigrafia', 'laminacion', 'empalme'].includes(block)
-        ) {
-          data = {
-            release_quantity: Number(area.buenas ?? 0),
-            bad_quantity: Number(area.malas ?? 0),
-            excess_quantity: Number(area.excedente ?? 0),
-            noprocess_quantity: Number(area.noprocess ?? 0),
-          };
-          sample_data = { sample_quantity: Number(area.cqm ?? 0) };
-        }
+      return { areaId: area.id, block, blockId, formId, cqmId, data, sample_data };
+    });
 
-        return {
-          areaId: area.id,
-          block,
-          blockId,
-          formId,
-          cqmId,
-          data,
-          sample_data,
-        };
+  const areasForDataUpdate = areasFromTable
+    .map(item => {
+      if (!item || !item.block || item.block === 'otros') return null;
+      const areaIdNum = Number(item.areaId);
+      const blockIdNum = Number(item.blockId);
+      if (!Number.isFinite(areaIdNum) || !Number.isFinite(blockIdNum) || blockIdNum <= 0) return null;
+
+      const sanitizedData: Record<string, number> = {};
+      Object.entries(item.data ?? {}).forEach(([k, v]) => {
+        const n = Number(v);
+        if (Number.isFinite(n)) sanitizedData[k] = Math.round(n);
       });
 
-    let areasFromBadModal: Array<{
-      areaId: number;
-      block: BlockKey;
-      blockId: number | null;
-      formId: number | null;
-      cqmId: number | null;
-      data: Record<string, number>;
-      inputsByArea: Array<{ label: string; value: number }>;
-    }> = [];
+      const sampleSanitized: Record<string, number> = {};
+      const sampleRaw = (item as any).sample_data ?? {};
+      if (sampleRaw.sample_quantity !== undefined) {
+        const n = Number(sampleRaw.sample_quantity);
+        if (Number.isFinite(n)) sampleSanitized.sample_quantity = Math.round(n);
+      }
+      if (sampleRaw.sample_auditory !== undefined) {
+        const n = Number(sampleRaw.sample_auditory);
+        if (Number.isFinite(n)) sampleSanitized.sample_auditory = Math.round(n);
+      }
 
-    if (modalInputs.length) {
-      const flows = workOrder?.flow ?? [];
-      const inputsMap = new Map(modalInputs.map((i) => [i.areaId, i.values]));
+      if (Object.keys(sanitizedData).length === 0 && Object.keys(sampleSanitized).length === 0) return null;
 
-      areasFromBadModal = flows.flatMap((flow: any) => {
-        const flowAreaId = Number(flow?.area_id);
-        if (!flowAreaId || !changedAreaIds.has(flowAreaId)) {
-          return [];
+      const entry: {
+        areaId: number; block: BlockKey; blockId: number;
+        formId?: number; cqmId?: number;
+        data: Record<string, number>; sample_data?: Record<string, number>;
+      } = { areaId: areaIdNum, block: item.block as BlockKey, blockId: blockIdNum, data: sanitizedData };
+
+      const formIdNum = Number((item as any).formId);
+      if (Number.isFinite(formIdNum) && formIdNum > 0) entry.formId = formIdNum;
+      const cqmIdNum  = Number((item as any).cqmId);
+      if (Number.isFinite(cqmIdNum) && cqmIdNum > 0) entry.cqmId = cqmIdNum;
+      if (Object.keys(sampleSanitized).length > 0) entry.sample_data = sampleSanitized;
+
+      return entry;
+    })
+    .filter(Boolean) as Array<{
+      areaId: number; block: BlockKey; blockId: number;
+      formId?: number; cqmId?: number;
+      data: Record<string, number>; sample_data?: Record<string, number>;
+    }>;
+
+  try {
+    // ====== 5) Si hay MODAL: guarda SOLO el modal + bump y sal ======
+    if (summary.length > 0 && modalResult) {
+      const sourceAreaId = badModalOwner?.id ?? null;
+      const sourceWorkOrderFlowId =
+        workOrder?.flow?.find((f: any) => Number(f?.area_id) === sourceAreaId)?.id ?? null;
+      const partialReleaseId = badModalPartial?.id ?? null;
+
+      const payload: any = {
+        badQuantitySummary: summary,
+        sourceAreaId,
+        sourceWorkOrderFlowId,
+        partialReleaseId,
+      };
+      await updateWorkOrderAreas(workOrder.ot_id, payload);
+
+      // === BUMP opcional: subir counters del bloque para reflejo inmediato en UI ===
+      const deltas: Array<{ areaId: number; deltaBad: number; deltaMat: number }> = [];
+      for (const item of modalInputs) {
+        const areaId = Number(item.areaId);
+        const base = baselineMap.get(areaId);
+        if (!base) continue;
+
+        const badEntry = (item.values ?? []).find(v => normalizeSummaryLabel(v.label) === 'malas');
+        const nextBad = toInt(badEntry?.value);
+        const deltaBad = nextBad - toInt(base.bad);
+
+        let deltaMat = 0;
+        if (base.supportsMaterial) {
+          const matEntry = (item.values ?? []).find(v => {
+            const n = normalizeSummaryLabel(v.label);
+            return n.includes('fabrica') || n.includes('materia');
+          });
+          deltaMat = toInt(matEntry?.value) - toInt(base.material ?? 0);
         }
 
-        const areaName = flow.area?.name ?? '';
-        const areaKey = normalizeAreaKey(areaName);
-
-        const targetMap: Partial<Record<string, BlockKey>> = {
-          impresion: 'impression',
-          serigrafia: 'serigrafia',
-          empalme: 'empalme',
-          laminacion: 'laminacion',
-          corte: 'corte',
-        };
-
-        if (areaKey === 'coloredge') return [];
-
-        const mapped = targetMap[areaKey];
-        const blockKey: BlockKey | null = mapped ?? resolveBlockKey(areaName);
-        if (!blockKey) return [];
-
-        const blockData = flow.areaResponse?.[blockKey];
-        const blockId = blockData?.id ?? null;
-        if (!blockId) return [];
-
-        const formId = blockData?.form_auditory_id ?? null;
-        const cqmId = blockData?.form_answer_id ?? null;
-
-        const supportsMaterial = blockSupportsMaterial(blockKey);
-        const badKey = `${areaKey}_bad`;
-        const materialKey = `${areaKey}_material`;
-
-        const data: Record<string, number> = {
-          bad_quantity: toInt(areaBadQuantities[badKey]),
-        };
-        if (supportsMaterial) {
-          data.material_quantity = toInt(areaBadQuantities[materialKey]);
+        if (deltaBad !== 0 || deltaMat !== 0) {
+          deltas.push({ areaId, deltaBad, deltaMat });
         }
+      }
 
-        return [
-          {
-            areaId: flowAreaId,
-            block: blockKey,
-            blockId,
-            formId,
-            cqmId,
-            data,
-            inputsByArea: inputsMap.get(flowAreaId) ?? [],
-          },
-        ];
-      });
+      const bumps = deltas.map(({ areaId, deltaBad, deltaMat }) => {
+        const block = areaBlockMap[areaId] as BlockKey | undefined;
+        if (!block) return null;
+        const flow = workOrder?.flow?.find((f: any) => Number(f.area_id) === areaId);
+        const blockId = flow?.areaResponse?.[block]?.id;
+        if (!blockId) return null;
+
+        const data: Record<string, number> = {};
+        if (deltaBad !== 0) {
+          const now = toInt(flow?.areaResponse?.[block]?.bad_quantity ?? 0);
+          data.bad_quantity = now + deltaBad;
+        }
+        if (deltaMat !== 0) {
+          const now = toInt(flow?.areaResponse?.[block]?.material_quantity ?? 0);
+          data.material_quantity = now + deltaMat;
+        }
+        if (Object.keys(data).length === 0) return null;
+
+        return { areaId, block, blockId, data };
+      }).filter(Boolean);
+
+      if (bumps.length > 0) {
+        await updateAreaResponseData(workOrder.ot_id, { areas: bumps as any });
+      }
+
+      await loadData();
+      alert('Cambios guardados correctamente');
+      modalBaselineRef.current = new Map();
+      return; // <— (C) SHORT-CIRCUIT: no guardar tabla en esta ejecución
     }
 
-    const sourceAreaId = badModalOwner?.id ?? null;
-    const sourceWorkOrderFlowId =
-      workOrder?.flow?.find((f: any) => Number(f?.area_id) === sourceAreaId)
-        ?.id ?? null;
-
-    const combinedAreas = [...areasFromTable, ...areasFromBadModal];
-
-    const areasForDataUpdate = combinedAreas
-      .map((item) => {
-        if (!item) return null;
-        if (!item.block || item.block === 'otros') return null;
-
-        const areaIdNum = Number(item.areaId);
-        const blockIdNum = Number(item.blockId);
-
-        if (
-          !Number.isFinite(areaIdNum) ||
-          !Number.isFinite(blockIdNum) ||
-          blockIdNum <= 0
-        ) {
-          return null;
-        }
-
-        const sanitizedData: Record<string, number> = {};
-        Object.entries(item.data ?? {}).forEach(([key, value]) => {
-          const numeric = Number(value);
-          if (Number.isFinite(numeric)) {
-            sanitizedData[key] = Math.round(numeric);
-          }
-        });
-
-        const sampleRaw = (item as any).sample_data ?? {};
-        const sampleSanitized: Record<string, number> = {};
-
-        if (sampleRaw.sample_quantity !== undefined) {
-          const numeric = Number(sampleRaw.sample_quantity);
-          if (Number.isFinite(numeric)) {
-            sampleSanitized.sample_quantity = Math.round(numeric);
-          }
-        }
-        if (sampleRaw.sample_auditory !== undefined) {
-          const numeric = Number(sampleRaw.sample_auditory);
-          if (Number.isFinite(numeric)) {
-            sampleSanitized.sample_auditory = Math.round(numeric);
-          }
-        }
-
-        if (
-          Object.keys(sanitizedData).length === 0 &&
-          Object.keys(sampleSanitized).length === 0
-        ) {
-          return null;
-        }
-
-        const entry: {
-          areaId: number;
-          block: BlockKey;
-          blockId: number;
-          formId?: number;
-          cqmId?: number;
-          data: Record<string, number>;
-          sample_data?: Record<string, number>;
-        } = {
-          areaId: areaIdNum,
-          block: item.block as BlockKey,
-          blockId: blockIdNum,
-          data: sanitizedData,
-        };
-
-        const formIdNum = Number((item as any).formId);
-        if (Number.isFinite(formIdNum) && formIdNum > 0) {
-          entry.formId = formIdNum;
-        }
-
-        const cqmIdNum = Number((item as any).cqmId);
-        if (Number.isFinite(cqmIdNum) && cqmIdNum > 0) {
-          entry.cqmId = cqmIdNum;
-        }
-
-        if (Object.keys(sampleSanitized).length > 0) {
-          entry.sample_data = sampleSanitized;
-        }
-
-        return entry;
-      })
-      .filter(Boolean) as Array<{
-        areaId: number;
-        block: BlockKey;
-        blockId: number;
-        formId?: number;
-        cqmId?: number;
-        data: Record<string, number>;
-        sample_data?: Record<string, number>;
-      }>;
-
-    const summary = modalInputs
-      .map((item) => {
-        const areaId = Number(item.areaId);
-        const areaName =
-          item.areaName ??
-          effectiveAreas.find((area) => Number(area.id) === areaId)?.name ??
-          '';
-        const values = (item.values ?? [])
-          .map((entry) => ({
-            label: entry?.label ?? '',
-            value: Number.isFinite(Number(entry?.value))
-              ? Number(entry?.value)
-              : 0,
-          }))
-          .filter((entry) => !!entry.label);
-
-        return {
-          areaId,
-          areaName,
-          values,
-        };
-      })
-      .filter(
-        (entry) =>
-          Number.isFinite(entry.areaId) &&
-          !!entry.areaName &&
-          entry.values.length > 0
-      );
-
-    if (areasForDataUpdate.length === 0 && summary.length === 0) {
+    // ====== 6) Sin modal → guarda TABLA ======
+    if (areasForDataUpdate.length === 0) {
       alert('No hay cambios para guardar');
       modalBaselineRef.current = new Map();
       return;
     }
 
-    try {
-      if (areasForDataUpdate.length > 0) {
-        await updateAreaResponseData(workOrder.ot_id, {
-          areas: areasForDataUpdate,
-        });
-      }
-
-      if (summary.length > 0) {
-        const sourceAreaId = badModalOwner?.id ?? null;
-        const sourceWorkOrderFlowId =
-          workOrder?.flow?.find((f: any) => Number(f?.area_id) === sourceAreaId)?.id ?? null;
-
-        const partialReleaseId = badModalPartial?.id ?? null; // 👈 clave
-
-        const payload: any = {
-          badQuantitySummary: summary,
-          mode: 'replace',               // si lo usas, limítalo (ver punto C)
-          sourceAreaId,
-          sourceWorkOrderFlowId,
-          partialReleaseId,              // 👈 ENVÍALO SIEMPRE (null = REM)
-        };
-        console.log("payload", payload);
-        
-        await updateWorkOrderAreas(workOrder.ot_id, payload);
-      }
-
-      await loadData();
-      alert('Cambios guardados correctamente');
-    } catch (err) {
-      console.error(err);
-      alert('Error al guardar los cambios');
-    } finally {
-      modalBaselineRef.current = new Map();
-    }
-  };
+    await updateAreaResponseData(workOrder.ot_id, { areas: areasForDataUpdate });
+    await loadData();
+    alert('Cambios guardados correctamente');
+  } catch (err) {
+    console.error(err);
+    alert('Error al guardar los cambios');
+  } finally {
+    modalBaselineRef.current = new Map();
+  }
+};
 
   const downloadFile = async (filename: string) => {
     try {

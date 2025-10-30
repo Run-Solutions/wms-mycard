@@ -1454,7 +1454,7 @@ async createCorteResponse(dto: CreateCorteResponseDto) {
       const totalMaterialActual = totalMaterialPrevio + dto.materialBadQuantity;
       // 4. Si NO se alcanza la cantidad solicitada => solo crear liberación parcial
       if (totalLiberadoActual < workOrder.quantity) {
-        await tx.partialRelease.create({
+        const partial = await tx.partialRelease.create({
           data: {
             work_order_flow_id: dto.workOrderFlowId,
             quantity: dto.goodQuantity,
@@ -1473,7 +1473,7 @@ async createCorteResponse(dto: CreateCorteResponseDto) {
         });
         await this.notifyAuditors(tx, dto.workOrderFlowId);
 
-        return { message: 'Liberación parcial registrada con éxito' };
+        return { message: 'Liberación parcial registrada con éxito', partialReleaseId: partial.id};
       }
       // 5. Si ya se alcanzó o superó la cantidad => crear respuestas finales
       // Buscar o crear AreasResponse
@@ -1572,7 +1572,7 @@ async createCorteResponse(dto: CreateCorteResponseDto) {
       const totalMaterialActual = totalMaterialPrevio + dto.materialBadQuantity;
       // 4. Si NO se alcanza la cantidad solicitada => solo crear liberación parcial
       if (totalLiberadoActual < workOrder.quantity) {
-        await tx.partialRelease.create({
+        const partial = await tx.partialRelease.create({
           data: {
             work_order_flow_id: dto.workOrderFlowId,
             quantity: dto.goodQuantity,
@@ -1591,7 +1591,7 @@ async createCorteResponse(dto: CreateCorteResponseDto) {
         });
         await this.notifyAuditors(tx, dto.workOrderFlowId);
 
-        return { message: 'Liberación parcial registrada con éxito' };
+        return { message: 'Liberación parcial registrada con éxito',partialReleaseId: partial.id, };
       }
       // 5. Si ya se alcanzó o superó la cantidad => crear respuestas finales
       // Buscar o crear AreasResponse
@@ -1690,7 +1690,7 @@ async createCorteResponse(dto: CreateCorteResponseDto) {
       const totalMaterialActual = totalMaterialPrevio + dto.materialBadQuantity;
       // 4. Si NO se alcanza la cantidad solicitada => solo crear liberación parcial
       if (totalLiberadoActual < workOrder.quantity) {
-        await tx.partialRelease.create({
+        const partial= await tx.partialRelease.create({
           data: {
             work_order_flow_id: dto.workOrderFlowId,
             quantity: dto.goodQuantity,
@@ -1709,7 +1709,7 @@ async createCorteResponse(dto: CreateCorteResponseDto) {
         });
         await this.notifyAuditors(tx, dto.workOrderFlowId);
 
-        return { message: 'Liberación parcial registrada con éxito' };
+        return { message: 'Liberación parcial registrada con éxito', partialReleaseId: partial.id, };
       }
       // 5. Si ya se alcanzó o superó la cantidad => crear respuestas finales
       // Buscar o crear AreasResponse
@@ -1807,7 +1807,7 @@ async createCorteResponse(dto: CreateCorteResponseDto) {
       const totalMaterialActual = totalMaterialPrevio + dto.materialBadQuantity;
       // 4. Si NO se alcanza la cantidad solicitada => solo crear liberación parcial
       if (totalLiberadoActual < workOrder.quantity) {
-        await tx.partialRelease.create({
+        const partial = await tx.partialRelease.create({
           data: {
             work_order_flow_id: dto.workOrderFlowId,
             quantity: dto.goodQuantity,
@@ -1826,7 +1826,7 @@ async createCorteResponse(dto: CreateCorteResponseDto) {
         });
         await this.notifyAuditors(tx, dto.workOrderFlowId);
 
-        return { message: 'Liberación parcial registrada con éxito' };
+        return { message: 'Liberación parcial registrada con éxito', partialReleaseId: partial.id };
       }
       // 5. Si ya se alcanzó o superó la cantidad => crear respuestas finales
       // Buscar o crear AreasResponse

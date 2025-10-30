@@ -7,6 +7,7 @@ import styled from 'styled-components';
 import {
   submitToCQMHotStamping,
   releaseProductFromHotStamping,
+  ReleaseResponse,
 } from '@/api/liberarProducto';
 import { updateWorkOrderAreas } from '@/api/seguimientoDeOts';
 
@@ -89,6 +90,41 @@ const NEXT_INVALID_FOR_PARTIAL = [
 
 const NEXT_CORTE_STATUSES = ['Enviado a auditoria parcial'] as const;
 
+type UpdateWorkOrderAreasBody = {
+  sourceAreaId: number | null;
+  sourceWorkOrderFlowId: number | null;
+  badQuantitySummary: BadQuantityModalResult['inputsByArea'];
+  partialReleaseId?: number | null;
+};
+
+const pendingBQKey = (otId: string, flowId: number | null) =>
+  `pending_bq:${otId}:${flowId ?? 'none'}`;
+
+const savePendingBadQty = (
+  otId: string,
+  flowId: number | null,
+  body: UpdateWorkOrderAreasBody
+) => {
+  localStorage.setItem(pendingBQKey(otId, flowId), JSON.stringify(body));
+};
+
+const loadPendingBadQty = (
+  otId: string,
+  flowId: number | null
+): UpdateWorkOrderAreasBody | null => {
+  const raw = localStorage.getItem(pendingBQKey(otId, flowId));
+  if (!raw) return null;
+  try {
+    return JSON.parse(raw);
+  } catch {
+    return null;
+  }
+};
+
+const clearPendingBadQty = (otId: string, flowId: number | null) => {
+  localStorage.removeItem(pendingBQKey(otId, flowId));
+};
+
 export default function HotStampingComponent({ workOrder }: Props) {
   const router = useRouter();
   const { user } = useAuthContext();
@@ -129,6 +165,8 @@ export default function HotStampingComponent({ workOrder }: Props) {
   const [imagenHologramaChecks, setImagenHologramaChecks] = useState<string[]>(
     []
   );
+    const [pendingBadQty, setPendingBadQty] =
+      useState<UpdateWorkOrderAreasBody | null>(null);
   const commentsRef = useRef<HTMLTextAreaElement | null>(null);
 
   const [flowListState, setFlowListState] = useState<any[]>(() => [
@@ -615,7 +653,46 @@ export default function HotStampingComponent({ workOrder }: Props) {
     };
 
     try {
-      await releaseProductFromHotStamping(payload);
+            const otId = workOrder?.workOrder?.ot_id ?? '';
+            const res = (await releaseProductFromHotStamping(payload)) as ReleaseResponse;
+      
+            // 2) Si es PARCIAL → mandar badQuantitySummary con partialReleaseId
+            const stash = pendingBadQty ?? loadPendingBadQty(otId, currentFlow?.id ?? null);
+      
+            const isPartial =
+              !!res &&
+              typeof res === 'object' &&
+              'partialReleaseId' in res &&
+              typeof res.partialReleaseId === 'number' &&
+              res.partialReleaseId > 0;
+      
+            const hasStash =
+              !!stash &&
+              Array.isArray(stash.badQuantitySummary) &&
+              stash.badQuantitySummary.length > 0;
+            console.log("has", stash);
+      
+      
+            if (isPartial && hasStash) {
+              // ⬅️ PARCIAL: manda con partialReleaseId
+              await updateWorkOrderAreas(otId, {
+                sourceAreaId: stash.sourceAreaId,
+                sourceWorkOrderFlowId: stash.sourceWorkOrderFlowId,
+                badQuantitySummary: stash.badQuantitySummary,
+                partialReleaseId: res.partialReleaseId,
+              });
+            } else if (!isPartial && hasStash) {
+              // ⬅️ FINAL (completa): manda explícitamente con partialReleaseId: null
+              await updateWorkOrderAreas(otId, {
+                sourceAreaId: stash.sourceAreaId,
+                sourceWorkOrderFlowId: stash.sourceWorkOrderFlowId,
+                badQuantitySummary: stash.badQuantitySummary,
+                partialReleaseId: null, // <- importante
+              });
+            }
+          
+      clearPendingBadQty(otId, currentFlow?.id ?? null);
+      setPendingBadQty(null);
       setPendingBadQuantityInputs(null);
       router.push('/liberarProducto');
     } catch (error) {

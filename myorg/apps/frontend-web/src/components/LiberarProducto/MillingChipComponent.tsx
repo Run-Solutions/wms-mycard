@@ -7,6 +7,7 @@ import styled from 'styled-components';
 import {
   submitToCQMMillingChip,
   releaseProductFromMillingChip,
+  ReleaseResponse,
 } from '@/api/liberarProducto';
 import { updateWorkOrderAreas } from '@/api/seguimientoDeOts';
 
@@ -88,6 +89,42 @@ const NEXT_INVALID_FOR_PARTIAL = [
 
 const NEXT_CORTE_STATUSES = ['Enviado a auditoria parcial'] as const;
 
+type UpdateWorkOrderAreasBody = {
+  sourceAreaId: number | null;
+  sourceWorkOrderFlowId: number | null;
+  badQuantitySummary: BadQuantityModalResult['inputsByArea'];
+  partialReleaseId?: number | null;
+};
+
+const pendingBQKey = (otId: string, flowId: number | null) =>
+  `pending_bq:${otId}:${flowId ?? 'none'}`;
+
+const savePendingBadQty = (
+  otId: string,
+  flowId: number | null,
+  body: UpdateWorkOrderAreasBody
+) => {
+  localStorage.setItem(pendingBQKey(otId, flowId), JSON.stringify(body));
+};
+
+const loadPendingBadQty = (
+  otId: string,
+  flowId: number | null
+): UpdateWorkOrderAreasBody | null => {
+  const raw = localStorage.getItem(pendingBQKey(otId, flowId));
+  if (!raw) return null;
+  try {
+    return JSON.parse(raw);
+  } catch {
+    return null;
+  }
+};
+
+const clearPendingBadQty = (otId: string, flowId: number | null) => {
+  localStorage.removeItem(pendingBQKey(otId, flowId));
+};
+
+
 export default function MillingChipComponent({ workOrder }: Props) {
   const router = useRouter();
   const { user } = useAuthContext();
@@ -113,7 +150,8 @@ export default function MillingChipComponent({ workOrder }: Props) {
   );
   const [materialBadQuantity, setMaterialBadQuantity] = useState<string>('0');
   const [lastAreaBadQuantity, setLastBadQuantity] = useState<string>('0');
-
+  const [pendingBadQty, setPendingBadQty] =
+    useState<UpdateWorkOrderAreasBody | null>(null);
   const [responses, setResponses] = useState<
     { questionId: number; answer: boolean }[]
   >([]);
@@ -328,17 +366,17 @@ export default function MillingChipComponent({ workOrder }: Props) {
 
       const cachedSummary =
         !existingSummary.length &&
-        !detailSummary.length &&
-        workOrderKey &&
-        flowId
+          !detailSummary.length &&
+          workOrderKey &&
+          flowId
           ? loadBadQuantitySummary(workOrderKey, flowId) ?? []
           : [];
 
       const summary = existingSummary.length
         ? existingSummary
         : detailSummary.length
-        ? detailSummary
-        : cachedSummary;
+          ? detailSummary
+          : cachedSummary;
 
       return summary.length ? { ...flow, badQuantitySummary: summary } : flow;
     });
@@ -498,11 +536,11 @@ export default function MillingChipComponent({ workOrder }: Props) {
       return;
     } else if (
       cqm_quantity +
-        (Number(goodQuantity) +
-          Number(lastAreaBadQuantity) +
-          Number(materialBadQuantity) +
-          Number(excessQuantity) +
-          totalParcialesActuales) >
+      (Number(goodQuantity) +
+        Number(lastAreaBadQuantity) +
+        Number(materialBadQuantity) +
+        Number(excessQuantity) +
+        totalParcialesActuales) >
       prevAreaSum
     ) {
       alert(
@@ -512,9 +550,9 @@ export default function MillingChipComponent({ workOrder }: Props) {
     } else if (
       partialsActual.length > 0 &&
       Number(goodQuantity) +
-        Number(lastAreaBadQuantity) +
-        Number(excessQuantity) >
-        cantidadporliberar
+      Number(lastAreaBadQuantity) +
+      Number(excessQuantity) >
+      cantidadporliberar
     ) {
       alert(
         `La cantidad total a liberar es mayor a la entregada no procesada por la parcialidad anterior ${cantidadporliberar}.`
@@ -523,7 +561,7 @@ export default function MillingChipComponent({ workOrder }: Props) {
     } else if (
       producedSoFar < orderQty &&
       noProc === 0 &&
-      currentFlow?.areaResponse == null    ) {
+      currentFlow?.areaResponse == null) {
       alert(
         `La cantidad de excedente ${Number(noProcessQuantity)} es invalida.`
       );
@@ -572,7 +610,45 @@ export default function MillingChipComponent({ workOrder }: Props) {
     };
 
     try {
-      await releaseProductFromMillingChip(payload);
+      const otId = workOrder?.workOrder?.ot_id ?? '';
+      const res = (await releaseProductFromMillingChip(payload)) as ReleaseResponse;
+
+      // 2) Si es PARCIAL → mandar badQuantitySummary con partialReleaseId
+      const stash = pendingBadQty ?? loadPendingBadQty(otId, currentFlow?.id ?? null);
+
+      const isPartial =
+        !!res &&
+        typeof res === 'object' &&
+        'partialReleaseId' in res &&
+        typeof res.partialReleaseId === 'number' &&
+        res.partialReleaseId > 0;
+
+      const hasStash =
+        !!stash &&
+        Array.isArray(stash.badQuantitySummary) &&
+        stash.badQuantitySummary.length > 0;
+      console.log("has", stash);
+
+
+      if (isPartial && hasStash) {
+        // ⬅️ PARCIAL: manda con partialReleaseId
+        await updateWorkOrderAreas(otId, {
+          sourceAreaId: stash.sourceAreaId,
+          sourceWorkOrderFlowId: stash.sourceWorkOrderFlowId,
+          badQuantitySummary: stash.badQuantitySummary,
+          partialReleaseId: res.partialReleaseId,
+        });
+      } else if (!isPartial && hasStash) {
+        // ⬅️ FINAL (completa): manda explícitamente con partialReleaseId: null
+        await updateWorkOrderAreas(otId, {
+          sourceAreaId: stash.sourceAreaId,
+          sourceWorkOrderFlowId: stash.sourceWorkOrderFlowId,
+          badQuantitySummary: stash.badQuantitySummary,
+          partialReleaseId: null, // <- importante
+        });
+      }
+      clearPendingBadQty(otId, currentFlow?.id ?? null);
+      setPendingBadQty(null);
       setPendingBadQuantityInputs(null);
       router.push('/liberarProducto');
     } catch (error) {
@@ -977,7 +1053,17 @@ export default function MillingChipComponent({ workOrder }: Props) {
               setLastBadQuantity(String(findValue('Malas')));
               setMaterialBadQuantity(String(findValue('Malo de fábrica')));
             }
-
+            const body: UpdateWorkOrderAreasBody = {
+              sourceAreaId: currentFlow?.area_id ?? workOrder?.area?.id ?? null,
+              sourceWorkOrderFlowId: currentFlow?.id ?? null,
+              badQuantitySummary: inputsByArea,
+            };
+            setPendingBadQty(body);
+            savePendingBadQty(
+              workOrder?.workOrder?.ot_id ?? '',
+              currentFlow?.id ?? null,
+              body
+            );
             setShowBadQuantity(false);
             setPendingBadQuantityInputs(inputsByArea);
           }}
@@ -1200,15 +1286,15 @@ const CqmButton = styled.button<CqmButtonProps>`
 
   &:hover {
     background-color: ${({ $status, $cantidadporliberar, disabled }) => {
-      if ($status === 'Listo') return '#16a34a';
-      if (
-        ['Enviado a CQM', 'En Calidad'].includes($status) ||
-        Number($cantidadporliberar) === 0 ||
-        disabled
-      )
-        return '#9ca3af';
-      return '#1d4ed8';
-    }};
+    if ($status === 'Listo') return '#16a34a';
+    if (
+      ['Enviado a CQM', 'En Calidad'].includes($status) ||
+      Number($cantidadporliberar) === 0 ||
+      disabled
+    )
+      return '#9ca3af';
+    return '#1d4ed8';
+  }};
   }
 `;
 
