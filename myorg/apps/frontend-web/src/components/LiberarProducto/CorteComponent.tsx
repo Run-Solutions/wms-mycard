@@ -83,7 +83,7 @@ const NEXT_INVALID_FOR_PARTIAL = [
 
 const NEXT_CORTE_STATUSES = ['Enviado a auditoria parcial'] as const;
 
-type UpdateWorkOrderAreasBody = {
+export type UpdateWorkOrderAreasBody = {
   sourceAreaId: number | null;
   sourceWorkOrderFlowId: number | null;
   badQuantitySummary: BadQuantityModalResult['inputsByArea'];
@@ -536,19 +536,6 @@ export default function CorteComponent({ workOrder }: Props) {
   };
 
   const handleCorteSubmit = async () => {
-    /*const otId = workOrder?.workOrder?.ot_id ?? '';
-    const flowId = currentFlow?.id ?? null;
-    const bodyToSend = pendingBadQty ?? loadPendingBadQty(otId, flowId);
-    if (
-      bodyToSend &&
-      Array.isArray(bodyToSend.badQuantitySummary) &&
-      bodyToSend.badQuantitySummary.length > 0
-    ) {
-      console.log('[SEND] updateWorkOrderAreasLiberar body:', bodyToSend);
-      await updateWorkOrderAreasLiberar(otId, bodyToSend);
-      clearPendingBadQty(otId, flowId);
-      setPendingBadQty(null);
-    }*/
     const payload = {
       workOrderId: workOrder.workOrder.id,
       workOrderFlowId: currentFlow.id,
@@ -687,7 +674,6 @@ export default function CorteComponent({ workOrder }: Props) {
       })),
     [previousFlows]
   );
-
 
   const sumaBadQuantity = useMemo(() => {
     if (!Array.isArray(normalizedAreas) || normalizedAreas.length === 0) {

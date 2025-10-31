@@ -1,10 +1,10 @@
 // myorg/apps/frontend-mobile/src/api/http.ts
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import axios from "axios";
-export const BASE_URL = "https://mycard.runsolutions-services.com/api/";
+export const BASE_URL = 'http://192.168.80.33:3003';
 
 const API = axios.create({
-  baseURL: "https://mycard.runsolutions-services.com/api/",
+  baseURL: "http://192.168.80.33:3003",
   timeout: 10000,
 });
 

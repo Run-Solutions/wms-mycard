@@ -1,7 +1,15 @@
 // myorg/apps/frontend-web/src/app/(protected)/seguimientoDeOts/[id]/page.tsx
 'use client';
 
-import React, { use, useState, Fragment, useEffect, useMemo, useCallback, useRef } from 'react';
+import React, {
+  use,
+  useState,
+  Fragment,
+  useEffect,
+  useMemo,
+  useCallback,
+  useRef,
+} from 'react';
 import { useRouter } from 'next/navigation';
 import styled from 'styled-components';
 
@@ -81,7 +89,6 @@ type BadSummaryEntry = {
   areaName: string;
   values: BadSummaryValue[];
 };
-
 
 const pickBlock = (
   resp: any, // si tienes tipo Area['response'], úsalo aquí
@@ -348,26 +355,39 @@ const getRemainderByField = (
 
   switch (field) {
     case 'buenas':
-      total = toNum(block.release_quantity ?? block.good_quantity ?? block.plates);
-      parcialesSum = (area.partials ?? []).reduce((acc, p) => acc + toNum(p?.quantity), 0);
+      total = toNum(
+        block.release_quantity ?? block.good_quantity ?? block.plates
+      );
+      parcialesSum = (area.partials ?? []).reduce(
+        (acc, p) => acc + toNum(p?.quantity),
+        0
+      );
       break;
     case 'excedente':
       total = toNum(block.excess_quantity);
-      parcialesSum = (area.partials ?? []).reduce((acc, p) => acc + toNum(p?.excess_quantity), 0);
+      parcialesSum = (area.partials ?? []).reduce(
+        (acc, p) => acc + toNum(p?.excess_quantity),
+        0
+      );
       break;
     case 'noprocess':
       total = toNum(block.noprocess_quantity);
-      parcialesSum = (area.partials ?? []).reduce((acc, p) => acc + toNum(p?.noprocess_quantity), 0);
+      parcialesSum = (area.partials ?? []).reduce(
+        (acc, p) => acc + toNum(p?.noprocess_quantity),
+        0
+      );
       break;
     case 'defectuoso':
       total = toNum(block.material_quantity);
-      parcialesSum = (area.partials ?? []).reduce((acc, p) => acc + toNum(p?.material_quantity), 0);
+      parcialesSum = (area.partials ?? []).reduce(
+        (acc, p) => acc + toNum(p?.material_quantity),
+        0
+      );
       break;
   }
 
   return Math.max(total - parcialesSum, 0);
 };
-
 
 const getRemainderBySum = (
   area: AreaData,
@@ -676,9 +696,11 @@ export default function SeguimientoDeOtsAuxPage({ params }: Props) {
   >(null);
   const [modalAreas, setModalAreas] = useState<AreaForBadQty[]>([]);
   const modalBaselineRef = useRef<
-    Map<number, { bad: number; material: number | null; supportsMaterial: boolean }>
+    Map<
+      number,
+      { bad: number; material: number | null; supportsMaterial: boolean }
+    >
   >(new Map());
-
 
   // Totales REM (solo detalles con partial_release_id === null)
   const remBadBySourceTarget = useMemo(() => {
@@ -707,10 +729,12 @@ export default function SeguimientoDeOtsAuxPage({ params }: Props) {
     return map;
   }, [workOrder]);
 
-
   // Indexa totales de MALAS por P1..Pn y REM a nivel de cada flow (área)
   const pxTotalsByAreaId = useMemo(() => {
-    const map = new Map<number, { orderLabels: string[]; totals: Record<string, number> }>();
+    const map = new Map<
+      number,
+      { orderLabels: string[]; totals: Record<string, number> }
+    >();
 
     const flows = workOrder?.flow ?? [];
     flows.forEach((f: any) => {
@@ -718,23 +742,36 @@ export default function SeguimientoDeOtsAuxPage({ params }: Props) {
       if (!areaId) return;
 
       // 1) Ordena los parciales por fecha y crea mapping pr.id -> P#
-      const prs = Array.isArray(f?.partialReleases) ? [...f.partialReleases] : [];
-      prs.sort((a: any, b: any) => new Date(a?.created_at).getTime() - new Date(b?.created_at).getTime());
-      const prLabelById = new Map<number, string>(prs.map((pr: any, i: number) => [Number(pr?.id), `P${i + 1}`]));
+      const prs = Array.isArray(f?.partialReleases)
+        ? [...f.partialReleases]
+        : [];
+      prs.sort(
+        (a: any, b: any) =>
+          new Date(a?.created_at).getTime() - new Date(b?.created_at).getTime()
+      );
+      const prLabelById = new Map<number, string>(
+        prs.map((pr: any, i: number) => [Number(pr?.id), `P${i + 1}`])
+      );
 
       // 2) Suma malas por etiqueta Px o REM desde badQuantityDetails del FLOW
       const totals: Record<string, number> = {};
-      const details = Array.isArray(f?.badQuantityDetails) ? f.badQuantityDetails : [];
+      const details = Array.isArray(f?.badQuantityDetails)
+        ? f.badQuantityDetails
+        : [];
       for (const d of details) {
-        const prId = d?.partial_release_id == null ? null : Number(d.partial_release_id);
-        const label = prId == null ? 'REM' : (prLabelById.get(prId) ?? `PR#${prId}`);
+        const prId =
+          d?.partial_release_id == null ? null : Number(d.partial_release_id);
+        const label =
+          prId == null ? 'REM' : prLabelById.get(prId) ?? `PR#${prId}`;
         const bad = Number(d?.bad_quantity) || 0;
         totals[label] = (totals[label] || 0) + bad;
       }
 
       // 3) Orden natural de salida: P1..Pn y, si aplica, REM al final
       const orderLabels = [
-        ...prs.map((pr: any) => prLabelById.get(Number(pr?.id))!).filter(Boolean),
+        ...prs
+          .map((pr: any) => prLabelById.get(Number(pr?.id))!)
+          .filter(Boolean),
         ...(totals['REM'] ? ['REM'] : []),
       ];
 
@@ -754,7 +791,20 @@ export default function SeguimientoDeOtsAuxPage({ params }: Props) {
 
   const getRemTotal = (areaId: number) => {
     const entry = pxTotalsByAreaId.get(Number(areaId));
-    return entry?.totals?.['REM'] || 0;
+    const remFromDetails = Number(entry?.totals?.['REM'] ?? 0);
+
+    const area = areas.find((a) => a.id === areaId);
+    const blockKey = areaBlockMap[areaId];
+    const selfBad = Number(area?.response?.[blockKey]?.bad_quantity ?? 0);
+
+    // 🔍 Corrige la prioridad: si selfBad es mayor, úsalo
+    // y solo usa remFromDetails si es realmente superior
+    if (selfBad > remFromDetails) {
+      return selfBad;
+    }
+
+    // si ambos son 0 o iguales, devuelve el mayor
+    return Math.max(remFromDetails, selfBad);
   };
 
   // ---- Operators maps ----
@@ -865,17 +915,6 @@ export default function SeguimientoDeOtsAuxPage({ params }: Props) {
     return q ? base.filter((u) => u.username.toLowerCase().includes(q)) : base;
   }, [opModal.areaId, opModal.search, operatorOptionsByAreaId]);
 
-  const confirmOperatorModal = async () => {
-    if (!opModal.area || opModal.selectedUserId == null) return;
-    if (!canEditUser(opModal.area, opModal.partial)) return;
-    await handleChangeUser(
-      opModal.area,
-      opModal.partial,
-      opModal.selectedUserId
-    );
-    closeOperatorModal();
-  };
-
   // ---- First-load reload workaround ----
   useEffect(() => {
     const alreadyReloaded = sessionStorage.getItem('alreadyReloaded');
@@ -980,8 +1019,7 @@ export default function SeguimientoDeOtsAuxPage({ params }: Props) {
               id: inc.id,
               comments: inc.comments,
               createdAt: inc.created_at ?? inc.createdAt,
-              createdBy:
-                inc.user?.username || inc.created_by || 'Desconocido',
+              createdBy: inc.user?.username || inc.created_by || 'Desconocido',
               area: areaName,
             })) || [];
 
@@ -1130,27 +1168,27 @@ export default function SeguimientoDeOtsAuxPage({ params }: Props) {
     const orderedAreas: AreaData[] = [];
 
     // ✅ Mostrar SIEMPRE las áreas 1..6 (si existen en la OT) + el área actual
-    const PREV_IDS = [ 2, 3, 4, 5, 6];
-    const prevTargets = PREV_IDS
-      .map(id => areas.find(a => Number(a.id) === id))
-      .filter(Boolean) as AreaData[];
+    const PREV_IDS = [2, 3, 4, 5, 6];
+    const prevTargets = PREV_IDS.map((id) =>
+      areas.find((a) => Number(a.id) === id)
+    ).filter(Boolean) as AreaData[];
 
     const pushUnique = (candidate?: AreaData | null) => {
       if (!candidate) return;
-      if (!orderedAreas.some(x => Number(x.id) === Number(candidate.id))) {
+      if (!orderedAreas.some((x) => Number(x.id) === Number(candidate.id))) {
         orderedAreas.push(candidate);
       }
     };
 
     // 1) Agrega 1..6 en orden
-    prevTargets.forEach(a => pushUnique(a));
+    prevTargets.forEach((a) => pushUnique(a));
     // 2) Agrega el área actual (si no estaba ya)
     pushUnique(ownerArea);
 
     const modalAreaSummaries: AreaForBadQty[] = [];
     modalBaselineRef.current = new Map();
 
-    orderedAreas.forEach(area => {
+    orderedAreas.forEach((area) => {
       const key = normalizeAreaKey(area.name);
       const supportsMaterial = Number(area.id) >= 6; // < 6 no muestra "malo de fábrica"
 
@@ -1173,7 +1211,9 @@ export default function SeguimientoDeOtsAuxPage({ params }: Props) {
 
       // Fallback desde badQuantitySummary si no hay detalle
       const summaryEntry = Array.isArray(ownerArea.badQuantitySummary)
-        ? ownerArea.badQuantitySummary.find(e => Number(e.areaId) === targetId)
+        ? ownerArea.badQuantitySummary.find(
+            (e) => Number(e.areaId) === targetId
+          )
         : null;
 
       if (!badValue && summaryEntry) {
@@ -1187,7 +1227,8 @@ export default function SeguimientoDeOtsAuxPage({ params }: Props) {
           const n = normalizeSummaryLabel(e.label);
           return n.includes('fabrica') || n.includes('materia');
         });
-        if (materialFromSummary) materialValue = toNum(materialFromSummary.value);
+        if (materialFromSummary)
+          materialValue = toNum(materialFromSummary.value);
       }
 
       // Baseline para deltas
@@ -1222,9 +1263,6 @@ export default function SeguimientoDeOtsAuxPage({ params }: Props) {
     setShowBadQuantity(true);
   };
 
-
-
-
   const getAreaSumaTotal = (area: AreaData) => {
     const badToOthers = sumBadBySource(Number(area.id ?? 0), false);
 
@@ -1253,6 +1291,27 @@ export default function SeguimientoDeOtsAuxPage({ params }: Props) {
       );
     }
 
+    // Caso 2: Áreas con id < 6
+    if (area.id < 6) {
+      const buenas = Number(area.buenas ?? 0);
+      const excedente = Number(area.excedente ?? 0);
+      const defectuoso = Number(area.defectuoso ?? 0);
+      const cqm = Number(area.cqm ?? 0);
+      const muestras = Number(area.muestras ?? 0);
+      const noprocess = Number(area.noprocess ?? 0);
+
+      return (
+        buenas +
+        excedente +
+        badToOthers +
+        defectuoso +
+        cqm +
+        muestras +
+        noprocess
+      );
+    }
+
+    // Caso 3: Sin parciales (id >= 6 pero sin partials)
     // Caso 2: Áreas con id < 6
     if (area.id < 6) {
       const buenas = Number(area.buenas ?? 0);
@@ -1306,16 +1365,18 @@ export default function SeguimientoDeOtsAuxPage({ params }: Props) {
 
     const blockKey = getBlockKey(area.id);
     const badToOthers = toNum(sumBadBySource(area.id, false));
-    const selfBad = toNum(pickBlock(area.response, blockKey)?.bad_quantity ?? 0);
+    const selfBad = toNum(
+      pickBlock(area.response, blockKey)?.bad_quantity ?? 0
+    );
 
     // parciales malas (solo si no hay selfBad)
     const partialsBad =
       selfBad > 0
         ? 0
         : (area.partials ?? []).reduce(
-          (pAcc, p) => pAcc + toNum(p.bad_quantity),
-          0
-        );
+            (pAcc, p) => pAcc + toNum(p.bad_quantity),
+            0
+          );
 
     const areaTotalBad = badToOthers + selfBad + partialsBad;
 
@@ -1395,10 +1456,10 @@ export default function SeguimientoDeOtsAuxPage({ params }: Props) {
       prev.map((a) =>
         a.id === area.id
           ? {
-            ...a,
-            assigned_user_id: newUserId,
-            usuario: operatorById.get(newUserId) ?? a.usuario,
-          }
+              ...a,
+              assigned_user_id: newUserId,
+              usuario: operatorById.get(newUserId) ?? a.usuario,
+            }
           : a
       )
     );
@@ -1477,10 +1538,9 @@ export default function SeguimientoDeOtsAuxPage({ params }: Props) {
     }
 
     // 6. Malas: desde Corte en adelante se gestiona via modal acumulado
-    console.log("aeaa", area);
+    console.log('aeaa', area);
 
     if (field === 'malas') {
-
       if (area.id >= 6) {
         const blockKey = areaBlockMap[area.id];
         console.log(blockKey, 'blovkkey');
@@ -1558,21 +1618,25 @@ export default function SeguimientoDeOtsAuxPage({ params }: Props) {
     // ====== 1) Baseline y detección de cambios del modal ======
     const baselineMap =
       modalBaselineRef.current ??
-      new Map<number, { bad: number; material: number | null; supportsMaterial: boolean }>();
+      new Map<
+        number,
+        { bad: number; material: number | null; supportsMaterial: boolean }
+      >();
 
     const modalInputsRaw = modalResult?.inputsByArea ?? [];
     const modalInputs = modalInputsRaw.filter((entry) => {
       const baseline = baselineMap.get(Number(entry.areaId));
       if (!baseline) return true;
       const values = entry.values ?? [];
-
-      const badFromSummary = values.find(v => normalizeSummaryLabel(v.label) === 'malas');
+      const badFromSummary = values.find(
+        (v) => normalizeSummaryLabel(v.label) === 'malas'
+      );
       const nextBad = toInt(badFromSummary?.value);
       const badChanged = nextBad !== toInt(baseline.bad);
 
       let materialChanged = false;
       if (baseline.supportsMaterial) {
-        const matEntry = values.find(v => {
+        const matEntry = values.find((v) => {
           const n = normalizeSummaryLabel(v.label);
           return n.includes('fabrica') || n.includes('materia');
         });
@@ -1587,10 +1651,16 @@ export default function SeguimientoDeOtsAuxPage({ params }: Props) {
     const updatedAreasFromModal = modalResult?.updatedAreas ?? null;
     if (updatedAreasFromModal) {
       // Solo para UI
-      setAreas(prev =>
-        prev.map(a => {
-          const r = updatedAreasFromModal.find(x => x.id === a.id);
-          return r ? { ...a, malas: Number(r.malas ?? a.malas ?? 0), defectuoso: Number(r.defectuoso ?? a.defectuoso ?? 0) } : a;
+      setAreas((prev) =>
+        prev.map((a) => {
+          const r = updatedAreasFromModal.find((x) => x.id === a.id);
+          return r
+            ? {
+                ...a,
+                malas: Number(r.malas ?? a.malas ?? 0),
+                defectuoso: Number(r.defectuoso ?? a.defectuoso ?? 0),
+              }
+            : a;
         })
       );
     }
@@ -1611,30 +1681,43 @@ export default function SeguimientoDeOtsAuxPage({ params }: Props) {
       hotstamping: 'hotStamping',
       personalizacion: 'personalizacion',
     };
-
-    const ALLOW_BAD_FROM_TABLE: BlockKey[] = ['impression', 'serigrafia', 'laminacion', 'empalme'];
+    const ALLOW_BAD_FROM_TABLE: BlockKey[] = [
+      'impression',
+      'serigrafia',
+      'laminacion',
+      'empalme',
+    ];
 
     // ====== 3) Summary del modal ======
     const summary = modalInputs
       .map((item) => {
         const areaId = Number(item.areaId);
         const areaName =
-          item.areaName ?? areasForTableBuild.find(a => Number(a.id) === areaId)?.name ?? '';
+          item.areaName ??
+          areasForTableBuild.find((a) => Number(a.id) === areaId)?.name ??
+          '';
         const values = (item.values ?? [])
-          .map(e => ({ label: e?.label ?? '', value: Number.isFinite(Number(e?.value)) ? Number(e?.value) : 0 }))
-          .filter(e => !!e.label);
+          .map((e) => ({
+            label: e?.label ?? '',
+            value: Number.isFinite(Number(e?.value)) ? Number(e?.value) : 0,
+          }))
+          .filter((e) => !!e.label);
         return { areaId, areaName, values };
       })
-      .filter(e => Number.isFinite(e.areaId) && !!e.areaName && e.values.length > 0);
+      .filter(
+        (e) => Number.isFinite(e.areaId) && !!e.areaName && e.values.length > 0
+      );
 
-    const areaIdsTouchedByModal = new Set(summary.map(s => Number(s.areaId)));
+    const areaIdsTouchedByModal = new Set(summary.map((s) => Number(s.areaId)));
 
     // ====== 4) Payload de TABLA (usando areasForTableBuild) ======
     const areasFromTable = areasForTableBuild
-      .filter(area => area.status === 'Completado')
+      .filter((area) => area.status === 'Completado')
       .map((area) => {
         const normalizedName = normalizeAreaKey(area.name);
-        const block = (blockMap[normalizedName] || 'otros') as BlockKey | 'otros';
+        const block = (blockMap[normalizedName] || 'otros') as
+          | BlockKey
+          | 'otros';
 
         const blockId = (area.response as any)?.[block]?.id;
         const formId = (area.response as any)?.[block]?.form_auditory_id;
@@ -1649,37 +1732,58 @@ export default function SeguimientoDeOtsAuxPage({ params }: Props) {
 
         let data: Record<string, number> = {
           good_quantity: Number(area.buenas ?? 0),
-          ...(canSendBadFromTable ? { bad_quantity: Number(area.malas ?? 0) } : {}),
+          ...(canSendBadFromTable
+            ? { bad_quantity: Number(area.malas ?? 0) }
+            : {}),
           excess_quantity: Number(area.excedente ?? 0),
           noprocess_quantity: Number(area.noprocess ?? 0),
         };
 
         let sample_data: Record<string, number> = {};
-        if (typeof area.cqm === 'number') sample_data.sample_quantity = Number(area.cqm ?? 0);
-        if (typeof area.muestras === 'number') sample_data.sample_auditory = Number(area.muestras ?? 0);
+        if (typeof area.cqm === 'number')
+          sample_data.sample_quantity = Number(area.cqm ?? 0);
+        if (typeof area.muestras === 'number')
+          sample_data.sample_auditory = Number(area.muestras ?? 0);
 
         if (block === 'prepress') {
           data = { plates: Number(area.buenas ?? 0) };
         }
-        if (['impression', 'serigrafia', 'laminacion', 'empalme'].includes(block)) {
+        if (
+          ['impression', 'serigrafia', 'laminacion', 'empalme'].includes(block)
+        ) {
           data = {
             release_quantity: Number(area.buenas ?? 0),
-            ...(canSendBadFromTable ? { bad_quantity: Number(area.malas ?? 0) } : {}),
+            ...(canSendBadFromTable
+              ? { bad_quantity: Number(area.malas ?? 0) }
+              : {}),
             excess_quantity: Number(area.excedente ?? 0),
             noprocess_quantity: Number(area.noprocess ?? 0),
           };
           sample_data = { sample_quantity: Number(area.cqm ?? 0) };
         }
 
-        return { areaId: area.id, block, blockId, formId, cqmId, data, sample_data };
+        return {
+          areaId: area.id,
+          block,
+          blockId,
+          formId,
+          cqmId,
+          data,
+          sample_data,
+        };
       });
 
     const areasForDataUpdate = areasFromTable
-      .map(item => {
+      .map((item) => {
         if (!item || !item.block || item.block === 'otros') return null;
         const areaIdNum = Number(item.areaId);
         const blockIdNum = Number(item.blockId);
-        if (!Number.isFinite(areaIdNum) || !Number.isFinite(blockIdNum) || blockIdNum <= 0) return null;
+        if (
+          !Number.isFinite(areaIdNum) ||
+          !Number.isFinite(blockIdNum) ||
+          blockIdNum <= 0
+        )
+          return null;
 
         const sanitizedData: Record<string, number> = {};
         Object.entries(item.data ?? {}).forEach(([k, v]) => {
@@ -1691,41 +1795,63 @@ export default function SeguimientoDeOtsAuxPage({ params }: Props) {
         const sampleRaw = (item as any).sample_data ?? {};
         if (sampleRaw.sample_quantity !== undefined) {
           const n = Number(sampleRaw.sample_quantity);
-          if (Number.isFinite(n)) sampleSanitized.sample_quantity = Math.round(n);
+          if (Number.isFinite(n))
+            sampleSanitized.sample_quantity = Math.round(n);
         }
         if (sampleRaw.sample_auditory !== undefined) {
           const n = Number(sampleRaw.sample_auditory);
-          if (Number.isFinite(n)) sampleSanitized.sample_auditory = Math.round(n);
+          if (Number.isFinite(n))
+            sampleSanitized.sample_auditory = Math.round(n);
         }
 
-        if (Object.keys(sanitizedData).length === 0 && Object.keys(sampleSanitized).length === 0) return null;
+        if (
+          Object.keys(sanitizedData).length === 0 &&
+          Object.keys(sampleSanitized).length === 0
+        )
+          return null;
 
         const entry: {
-          areaId: number; block: BlockKey; blockId: number;
-          formId?: number; cqmId?: number;
-          data: Record<string, number>; sample_data?: Record<string, number>;
-        } = { areaId: areaIdNum, block: item.block as BlockKey, blockId: blockIdNum, data: sanitizedData };
+          areaId: number;
+          block: BlockKey;
+          blockId: number;
+          formId?: number;
+          cqmId?: number;
+          data: Record<string, number>;
+          sample_data?: Record<string, number>;
+        } = {
+          areaId: areaIdNum,
+          block: item.block as BlockKey,
+          blockId: blockIdNum,
+          data: sanitizedData,
+        };
 
         const formIdNum = Number((item as any).formId);
-        if (Number.isFinite(formIdNum) && formIdNum > 0) entry.formId = formIdNum;
+        if (Number.isFinite(formIdNum) && formIdNum > 0)
+          entry.formId = formIdNum;
         const cqmIdNum = Number((item as any).cqmId);
         if (Number.isFinite(cqmIdNum) && cqmIdNum > 0) entry.cqmId = cqmIdNum;
-        if (Object.keys(sampleSanitized).length > 0) entry.sample_data = sampleSanitized;
+        if (Object.keys(sampleSanitized).length > 0)
+          entry.sample_data = sampleSanitized;
 
         return entry;
       })
       .filter(Boolean) as Array<{
-        areaId: number; block: BlockKey; blockId: number;
-        formId?: number; cqmId?: number;
-        data: Record<string, number>; sample_data?: Record<string, number>;
-      }>;
+      areaId: number;
+      block: BlockKey;
+      blockId: number;
+      formId?: number;
+      cqmId?: number;
+      data: Record<string, number>;
+      sample_data?: Record<string, number>;
+    }>;
 
     try {
       // ====== 5) Si hay MODAL: guarda SOLO el modal + bump y sal ======
       if (summary.length > 0 && modalResult) {
         const sourceAreaId = badModalOwner?.id ?? null;
         const sourceWorkOrderFlowId =
-          workOrder?.flow?.find((f: any) => Number(f?.area_id) === sourceAreaId)?.id ?? null;
+          workOrder?.flow?.find((f: any) => Number(f?.area_id) === sourceAreaId)
+            ?.id ?? null;
         const partialReleaseId = badModalPartial?.id ?? null;
 
         const payload: any = {
@@ -1737,19 +1863,25 @@ export default function SeguimientoDeOtsAuxPage({ params }: Props) {
         await updateWorkOrderAreas(workOrder.ot_id, payload);
 
         // === BUMP opcional: subir counters del bloque para reflejo inmediato en UI ===
-        const deltas: Array<{ areaId: number; deltaBad: number; deltaMat: number }> = [];
+        const deltas: Array<{
+          areaId: number;
+          deltaBad: number;
+          deltaMat: number;
+        }> = [];
         for (const item of modalInputs) {
           const areaId = Number(item.areaId);
           const base = baselineMap.get(areaId);
           if (!base) continue;
 
-          const badEntry = (item.values ?? []).find(v => normalizeSummaryLabel(v.label) === 'malas');
+          const badEntry = (item.values ?? []).find(
+            (v) => normalizeSummaryLabel(v.label) === 'malas'
+          );
           const nextBad = toInt(badEntry?.value);
           const deltaBad = nextBad - toInt(base.bad);
 
           let deltaMat = 0;
           if (base.supportsMaterial) {
-            const matEntry = (item.values ?? []).find(v => {
+            const matEntry = (item.values ?? []).find((v) => {
               const n = normalizeSummaryLabel(v.label);
               return n.includes('fabrica') || n.includes('materia');
             });
@@ -1761,29 +1893,37 @@ export default function SeguimientoDeOtsAuxPage({ params }: Props) {
           }
         }
 
-        const bumps = deltas.map(({ areaId, deltaBad, deltaMat }) => {
-          const block = areaBlockMap[areaId] as BlockKey | undefined;
-          if (!block) return null;
-          const flow = workOrder?.flow?.find((f: any) => Number(f.area_id) === areaId);
-          const blockId = flow?.areaResponse?.[block]?.id;
-          if (!blockId) return null;
+        const bumps = deltas
+          .map(({ areaId, deltaBad, deltaMat }) => {
+            const block = areaBlockMap[areaId] as BlockKey | undefined;
+            if (!block) return null;
+            const flow = workOrder?.flow?.find(
+              (f: any) => Number(f.area_id) === areaId
+            );
+            const blockId = flow?.areaResponse?.[block]?.id;
+            if (!blockId) return null;
 
-          const data: Record<string, number> = {};
-          if (deltaBad !== 0) {
-            const now = toInt(flow?.areaResponse?.[block]?.bad_quantity ?? 0);
-            data.bad_quantity = now + deltaBad;
-          }
-          if (deltaMat !== 0) {
-            const now = toInt(flow?.areaResponse?.[block]?.material_quantity ?? 0);
-            data.material_quantity = now + deltaMat;
-          }
-          if (Object.keys(data).length === 0) return null;
+            const data: Record<string, number> = {};
+            if (deltaBad !== 0) {
+              const now = toInt(flow?.areaResponse?.[block]?.bad_quantity ?? 0);
+              data.bad_quantity = now + deltaBad;
+            }
+            if (deltaMat !== 0) {
+              const now = toInt(
+                flow?.areaResponse?.[block]?.material_quantity ?? 0
+              );
+              data.material_quantity = now + deltaMat;
+            }
+            if (Object.keys(data).length === 0) return null;
 
-          return { areaId, block, blockId, data };
-        }).filter(Boolean);
+            return { areaId, block, blockId, data };
+          })
+          .filter(Boolean);
 
         if (bumps.length > 0) {
-          await updateAreaResponseData(workOrder.ot_id, { areas: bumps as any });
+          await updateAreaResponseData(workOrder.ot_id, {
+            areas: bumps as any,
+          });
         }
 
         await loadData();
@@ -1791,7 +1931,6 @@ export default function SeguimientoDeOtsAuxPage({ params }: Props) {
         modalBaselineRef.current = new Map();
         return; // <— (C) SHORT-CIRCUIT: no guardar tabla en esta ejecución
       }
-
       // ====== 6) Sin modal → guarda TABLA ======
       if (areasForDataUpdate.length === 0) {
         alert('No hay cambios para guardar');
@@ -1799,7 +1938,9 @@ export default function SeguimientoDeOtsAuxPage({ params }: Props) {
         return;
       }
 
-      await updateAreaResponseData(workOrder.ot_id, { areas: areasForDataUpdate });
+      await updateAreaResponseData(workOrder.ot_id, {
+        areas: areasForDataUpdate,
+      });
       await loadData();
       alert('Cambios guardados correctamente');
     } catch (err) {
@@ -1841,6 +1982,16 @@ export default function SeguimientoDeOtsAuxPage({ params }: Props) {
     if (partial)
       return !partial.validated && editableStatuses.includes(area.status);
     return editableStatuses.includes(area.status);
+  };
+  const confirmOperatorModal = async () => {
+    if (!opModal.area || opModal.selectedUserId == null) return;
+    if (!canEditUser(opModal.area, opModal.partial)) return;
+    await handleChangeUser(
+      opModal.area,
+      opModal.partial,
+      opModal.selectedUserId
+    );
+    closeOperatorModal();
   };
 
   const fieldLabels: Record<string, string> = {
@@ -1971,12 +2122,12 @@ export default function SeguimientoDeOtsAuxPage({ params }: Props) {
                       file.type === 'OT'
                         ? 'Ver OT'
                         : file.type === 'SKU'
-                          ? 'Ver SKU'
-                          : file.type === 'OP'
-                            ? 'Ver OP'
-                            : file.type === 'CARD_IMAGE'
-                              ? 'Ver TARJETA'
-                              : 'Adjunto';
+                        ? 'Ver SKU'
+                        : file.type === 'OP'
+                        ? 'Ver OP'
+                        : file.type === 'CARD_IMAGE'
+                        ? 'Ver TARJETA'
+                        : 'Adjunto';
                     return (
                       <button
                         key={file.id}
@@ -2239,10 +2390,11 @@ export default function SeguimientoDeOtsAuxPage({ params }: Props) {
                             }
                           >
                             <span
-                              className={`px-2 py-1 rounded-lg text-sm font-medium ${name && name !== '—'
-                                ? 'bg-yellow-100 text-yellow-800'
-                                : ''
-                                }`}
+                              className={`px-2 py-1 rounded-lg text-sm font-medium ${
+                                name && name !== '—'
+                                  ? 'bg-yellow-100 text-yellow-800'
+                                  : ''
+                              }`}
                             >
                               {name || '—'}
                             </span>
@@ -2276,10 +2428,11 @@ export default function SeguimientoDeOtsAuxPage({ params }: Props) {
                           className="text-center"
                         >
                           <span
-                            className={`px-2 py-1 rounded-lg text-sm font-medium ${reviewerName && reviewerName !== '—'
-                              ? 'bg-yellow-100 text-yellow-800'
-                              : ''
-                              }`}
+                            className={`px-2 py-1 rounded-lg text-sm font-medium ${
+                              reviewerName && reviewerName !== '—'
+                                ? 'bg-yellow-100 text-yellow-800'
+                                : ''
+                            }`}
                           >
                             {reviewerName || '—'}
                           </span>
@@ -2307,10 +2460,11 @@ export default function SeguimientoDeOtsAuxPage({ params }: Props) {
                             }
                           >
                             <span
-                              className={`px-2 py-1 rounded-lg text-sm font-medium ${name && name !== '—'
-                                ? 'bg-purple-100 text-purple-800'
-                                : ''
-                                }`}
+                              className={`px-2 py-1 rounded-lg text-sm font-medium ${
+                                name && name !== '—'
+                                  ? 'bg-purple-100 text-purple-800'
+                                  : ''
+                              }`}
                             >
                               {name || '—'}
                             </span>
@@ -2343,10 +2497,11 @@ export default function SeguimientoDeOtsAuxPage({ params }: Props) {
                           className="text-center"
                         >
                           <span
-                            className={`px-2 py-1 rounded-lg text-sm font-medium ${auditorName !== '—'
-                              ? 'bg-purple-100 text-purple-800'
-                              : ''
-                              }`}
+                            className={`px-2 py-1 rounded-lg text-sm font-medium ${
+                              auditorName !== '—'
+                                ? 'bg-purple-100 text-purple-800'
+                                : ''
+                            }`}
                           >
                             {auditorName}
                           </span>
@@ -2418,16 +2573,20 @@ export default function SeguimientoDeOtsAuxPage({ params }: Props) {
                                   field === 'buenas'
                                     ? toNum(p.quantity)
                                     : field === 'malas'
-                                      ? toNum(p.bad_quantity)
-                                      : field === 'excedente'
-                                        ? toNum(p.excess_quantity)
-                                        : toNum(p.noprocess_quantity);
+                                    ? toNum(p.bad_quantity)
+                                    : field === 'excedente'
+                                    ? toNum(p.excess_quantity)
+                                    : toNum(p.noprocess_quantity);
 
-                                const partialBadDetailsSum = (p.badQuantityDetails ?? []).reduce(
-                                  (acc: any, detail: any) => acc + toNum(detail?.bad_quantity),
+                                const partialBadDetailsSum = (
+                                  p.badQuantityDetails ?? []
+                                ).reduce(
+                                  (acc: any, detail: any) =>
+                                    acc + toNum(detail?.bad_quantity),
                                   0
                                 );
-                                const partialTotalBad = toNum(p.bad_quantity) + partialBadDetailsSum;
+                                const partialTotalBad =
+                                  toNum(p.bad_quantity) + partialBadDetailsSum;
 
                                 if (field === 'buenas') {
                                   partialSumForSigma += value;
@@ -2448,13 +2607,17 @@ export default function SeguimientoDeOtsAuxPage({ params }: Props) {
                                   rem <= 0;
 
                                 const displayValue =
-                                  field === 'malas' ? getPxTotal(area.id, pIndex) : value;
+                                  field === 'malas'
+                                    ? getPxTotal(area.id, pIndex)
+                                    : value;
 
                                 const partialContent = allowBadQuantityModal ? (
                                   <button
                                     type="button"
                                     className="inline-flex min-w-[64px] justify-center rounded border border-gray-200 bg-gray-50 px-2 py-1 text-sm text-gray-700 hover:bg-gray-100 focus:outline-none focus:ring-1 focus:ring-blue-400"
-                                    onClick={() => handleOpenBadQuantityModal(area, p)}
+                                    onClick={() =>
+                                      handleOpenBadQuantityModal(area, p)
+                                    }
                                     title={`Cantidad mala total del parcial: ${partialTotalBad}`}
                                   >
                                     {displayValue}
@@ -2479,8 +2642,9 @@ export default function SeguimientoDeOtsAuxPage({ params }: Props) {
 
                                 return (
                                   <td
-                                    key={`area-${area.id}-parcial-${p.id ?? pIndex
-                                      }-${field}`}
+                                    key={`area-${area.id}-parcial-${
+                                      p.id ?? pIndex
+                                    }-${field}`}
                                     className="text-center"
                                   >
                                     {field === 'malas' ? partialContent : value}
@@ -2515,8 +2679,8 @@ export default function SeguimientoDeOtsAuxPage({ params }: Props) {
                                   remSum = getRemainderBySum(area, 'noprocess');
                                   break;
                                 case 'malas': {
-                                  remValue = getRemTotal(area.id);     // <- solo no liberados (REM) desde flow.badQuantityDetails
-                                  remSum = totalBad;                   // puedes mantener tu total acumulado como Σ
+                                  remValue = getRemTotal(area.id); // <- solo no liberados (REM) desde flow.badQuantityDetails
+                                  remSum = totalBad; // puedes mantener tu total acumulado como Σ
                                   break;
                                 }
                                 default:
@@ -2530,7 +2694,25 @@ export default function SeguimientoDeOtsAuxPage({ params }: Props) {
 
                               let remainderAggregateContent: React.ReactNode;
                               if (field === 'malas') {
-                                remainderAggregateContent = totalBad;
+                                if (area.id < 6) {
+                                  remainderAggregateContent = (
+                                    <input
+                                      type="number"
+                                      value={area.malas ?? selfBad ?? 0} // ← usa selfBad solo si malas aún no existe
+                                      min={0}
+                                      onChange={(e) =>
+                                        handleValueChange(
+                                          area.id,
+                                          'malas',
+                                          e.target.value
+                                        )
+                                      }
+                                      className="w-20 rounded border border-gray-300 bg-white px-2 py-1 text-center"
+                                    />
+                                  );
+                                } else {
+                                  remainderAggregateContent = totalBad;
+                                }
                               } else if (isEditableAggregateField) {
                                 remainderAggregateContent = (
                                   <input
@@ -2544,27 +2726,44 @@ export default function SeguimientoDeOtsAuxPage({ params }: Props) {
                                         e.target.value
                                       )
                                     }
-                                    className="w-20 rounded border border-gray-200 px-2 py-1 text-center"
+                                    className="w-20 rounded px-2 py-1 text-center"
                                   />
                                 );
                               } else if (field === 'buenas') {
-                                remainderAggregateContent = partialSumForSigma + remValue;
+                                remainderAggregateContent = (
+                                  <input
+                                    type="number"
+                                    value={partialSumForSigma + remValue}
+                                    min={0}
+                                    onChange={(e) =>
+                                      handleValueChange(
+                                        area.id,
+                                        field,
+                                        e.target.value
+                                      )
+                                    }
+                                    className="w-20 rounded px-2 py-1 text-center"
+                                  />
+                                );
                               } else {
                                 remainderAggregateContent = remSum;
                               }
 
-                              const remainderPartialContent = allowBadQuantityModalRem ? (
-                                <button
-                                  type="button"
-                                  className="inline-flex min-w-[64px] justify-center rounded border border-gray-200 bg-gray-50 px-2 py-1 text-sm text-gray-700 hover:bg-gray-100 focus:outline-none focus:ring-1 focus:ring-blue-400"
-                                  onClick={() => handleOpenBadQuantityModal(area)}
-                                  title={`Cantidad mala total del área: ${aggregatedFieldValue}`}
-                                >
-                                  {remValue}
-                                </button>
-                              ) : (
-                                remValue
-                              );
+                              const remainderPartialContent =
+                                allowBadQuantityModalRem ? (
+                                  <button
+                                    type="button"
+                                    className="inline-flex min-w-[64px] justify-center rounded border border-gray-200 bg-gray-50 px-2 py-1 text-sm text-gray-700 hover:bg-gray-100 focus:outline-none focus:ring-1 focus:ring-blue-400"
+                                    onClick={() =>
+                                      handleOpenBadQuantityModal(area)
+                                    }
+                                    title={`Cantidad mala total del área: ${aggregatedFieldValue}`}
+                                  >
+                                    {remValue}
+                                  </button>
+                                ) : (
+                                  remValue
+                                );
 
                               cells.push(
                                 <React.Fragment
@@ -2673,7 +2872,7 @@ export default function SeguimientoDeOtsAuxPage({ params }: Props) {
                           field === 'cqm'
                             ? getSingleCqm(area)
                             : renderCell?.(area, field as any) ??
-                            getAnswerValue(undefined, field as any, area);
+                              getAnswerValue(undefined, field as any, area);
 
                         return (
                           <td
@@ -2852,8 +3051,9 @@ export default function SeguimientoDeOtsAuxPage({ params }: Props) {
                           onClick={() =>
                             setOpModal((s) => ({ ...s, selectedUserId: u.id }))
                           }
-                          className={`w-full text-left px-3 py-2 border-b last:border-b-0 ${selected ? 'bg-blue-100' : 'hover:bg-gray-50'
-                            }`}
+                          className={`w-full text-left px-3 py-2 border-b last:border-b-0 ${
+                            selected ? 'bg-blue-100' : 'hover:bg-gray-50'
+                          }`}
                         >
                           {u.username}
                         </button>

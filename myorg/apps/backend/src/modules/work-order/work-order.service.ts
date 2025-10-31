@@ -55,37 +55,6 @@ type DetailSnapshot = {
   values: Prisma.JsonValue | null;
 };
 
-type DetailPersistenceContext = {
-  partialReleaseId: number | null;
-  sourceWorkOrderFlowId: number;
-  sourceAreaId: number;
-  existing: DetailSnapshot | null;
-};
-
-const AREA_NAME_TO_BLOCK: Record<string, BlockKey> = {
-  preprensa: 'prepress',
-  prepress: 'prepress',
-  impresion: 'impression',
-  impression: 'impression',
-  serigrafia: 'serigrafia',
-  empalme: 'empalme',
-  laminacion: 'laminacion',
-  lamination: 'laminacion',
-  corte: 'corte',
-  coloredge: 'colorEdge',
-  color_edge: 'colorEdge',
-  'color edge': 'colorEdge',
-  'color-edge': 'colorEdge',
-  hotstamping: 'hotStamping',
-  'hot stamping': 'hotStamping',
-  hot_stamping: 'hotStamping',
-  millingchip: 'millingChip',
-  'milling chip': 'millingChip',
-  milling_chip: 'millingChip',
-  personalizacion: 'personalizacion',
-  personalization: 'personalizacion',
-};
-
 const ACCUMULATE_BLOCKS = new Set<ResultBlockKey>([
   'prepress',
   'impression',
@@ -180,14 +149,9 @@ const BLOCK_DATA_FIELDS: Record<BlockKey, ReadonlyArray<string>> = {
   ],
 };
 
-const PARTIAL_RELEASE_FIELDS: ReadonlyArray<UpdatableField> = [
-  'bad_quantity',
-  'material_quantity',
-];
-
 @Injectable()
 export class WorkOrderService {
-  constructor(private prisma: PrismaService) { }
+  constructor(private prisma: PrismaService) {}
 
   async createWorkOrder(
     dto: CreateWorkOrderDto,
@@ -564,7 +528,7 @@ export class WorkOrderService {
                 badQuantityDetails: {
                   include: {
                     targetArea: true,
-                  }
+                  },
                 },
                 formAuditory: {
                   include: {
@@ -1043,7 +1007,9 @@ export class WorkOrderService {
 
         if ((hasBadUpdate || hasMaterialUpdate) && blockKey) {
           const aggregateIntoCut = AGGREGATE_INTO_CUT_AREA_IDS.has(areaId);
-          const targetAreaIdForRemainder = aggregateIntoCut ? CUT_AREA_ID : areaId;
+          const targetAreaIdForRemainder = aggregateIntoCut
+            ? CUT_AREA_ID
+            : areaId;
           const blockForRemainder: ResultBlockKey | null = aggregateIntoCut
             ? 'corte'
             : blockKey;
@@ -1070,7 +1036,7 @@ export class WorkOrderService {
           const partialCount =
             typeof partialStats._count === 'number'
               ? partialStats._count
-              : (partialStats._count as any)?._all ?? 0;
+              : ((partialStats._count as any)?._all ?? 0);
 
           const existingDetail = await tx.badQuantityDetail.findFirst({
             where: {
@@ -1083,17 +1049,19 @@ export class WorkOrderService {
 
           if (partialCount === 0) {
             if (existingDetail) {
-              await tx.badQuantityDetail.delete({ where: { id: existingDetail.id } });
+              await tx.badQuantityDetail.delete({
+                where: { id: existingDetail.id },
+              });
             }
             continue;
           }
 
           const totalBad = hasBadUpdate
             ? Number(sanitizedData.bad_quantity ?? 0)
-            : coerceToNumber(blockRecord?.bad_quantity ?? null) ?? 0;
+            : (coerceToNumber(blockRecord?.bad_quantity ?? null) ?? 0);
           const totalMaterial = hasMaterialUpdate
             ? Number(sanitizedData.material_quantity ?? 0)
-            : coerceToNumber(blockRecord?.material_quantity ?? null) ?? 0;
+            : (coerceToNumber(blockRecord?.material_quantity ?? null) ?? 0);
 
           const partialBadSum =
             coerceToNumber(partialStats._sum?.bad_quantity ?? null) ?? 0;
@@ -1101,11 +1069,16 @@ export class WorkOrderService {
             coerceToNumber(partialStats._sum?.material_quantity ?? null) ?? 0;
 
           const remainderBad = Math.max(totalBad - partialBadSum, 0);
-          const remainderMaterial = Math.max(totalMaterial - partialMaterialSum, 0);
+          const remainderMaterial = Math.max(
+            totalMaterial - partialMaterialSum,
+            0,
+          );
 
           if (remainderBad === 0 && remainderMaterial === 0) {
             if (existingDetail) {
-              await tx.badQuantityDetail.delete({ where: { id: existingDetail.id } });
+              await tx.badQuantityDetail.delete({
+                where: { id: existingDetail.id },
+              });
             }
             continue;
           }
@@ -1153,11 +1126,11 @@ export class WorkOrderService {
             formId:
               typeof blockRecord.form_auditory_id === 'number'
                 ? blockRecord.form_auditory_id
-                : area.formId ?? null,
+                : (area.formId ?? null),
             cqmId:
               typeof blockRecord.form_answer_id === 'number'
                 ? blockRecord.form_answer_id
-                : area.cqmId ?? null,
+                : (area.cqmId ?? null),
           });
         }
       }
@@ -1178,9 +1151,9 @@ export class WorkOrderService {
     badQuantitySummary: BadQuantitySummaryDto[] = [],
     partialReleaseId: number | null = null,
   ) {
-    const normalizedSummary = (Array.isArray(badQuantitySummary)
-      ? badQuantitySummary
-      : [])
+    const normalizedSummary = (
+      Array.isArray(badQuantitySummary) ? badQuantitySummary : []
+    )
       .map((entry) => {
         const areaId = Number(entry?.areaId);
         if (!Number.isFinite(areaId) || areaId <= 0) return null;
@@ -1188,9 +1161,9 @@ export class WorkOrderService {
         const areaName =
           typeof entry?.areaName === 'string' ? entry.areaName.trim() : '';
 
-        const sanitizedValues = (Array.isArray(entry?.values)
-          ? entry.values
-          : [])
+        const sanitizedValues = (
+          Array.isArray(entry?.values) ? entry.values : []
+        )
           .map((value) => {
             const label =
               typeof value?.label === 'string' ? value.label.trim() : '';
@@ -1207,7 +1180,10 @@ export class WorkOrderService {
               value: rounded,
             };
           })
-          .filter((value): value is { label: string; value: number } => value !== null);
+          .filter(
+            (value): value is { label: string; value: number } =>
+              value !== null,
+          );
 
         if (sanitizedValues.length === 0) {
           return null;
@@ -1220,7 +1196,9 @@ export class WorkOrderService {
         };
       })
       .filter(
-        (entry): entry is {
+        (
+          entry,
+        ): entry is {
           areaId: number;
           areaName: string;
           values: Array<{ label: string; value: number }>;
@@ -1252,13 +1230,11 @@ export class WorkOrderService {
       );
     }
 
-    let resolvedFlow = null as
-      | {
-        id: number;
-        area_id: number;
-        work_order_id: number;
-      }
-      | null;
+    let resolvedFlow = null as {
+      id: number;
+      area_id: number;
+      work_order_id: number;
+    } | null;
 
     if (sourceWorkOrderFlowId !== null) {
       resolvedFlow = await this.prisma.workOrderFlow.findUnique({
@@ -1414,21 +1390,25 @@ export class WorkOrderService {
         const existingDetail = existingByTarget.get(entry.areaId) ?? null;
         const existingSnapshot: DetailSnapshot | null = existingDetail
           ? {
-            id: existingDetail.id,
-            bad_quantity: existingDetail.bad_quantity,
-            material_quantity: existingDetail.material_quantity,
-            values: existingDetail.values as Prisma.JsonValue | null,
-          }
+              id: existingDetail.id,
+              bad_quantity: existingDetail.bad_quantity,
+              material_quantity: existingDetail.material_quantity,
+              values: existingDetail.values as Prisma.JsonValue | null,
+            }
           : null;
 
         // Totales previos del detalle existente
         const previousTotals = extractDetailTotals(existingSnapshot) ?? {};
 
         // Totales ENTRANTES desde el modal (se interpretan como ABSOLUTOS, no deltas)
-        const incomingTotals = aggregateSummaryValues(entry as BadQuantitySummaryDto);
+        const incomingTotals = aggregateSummaryValues(
+          entry as BadQuantitySummaryDto,
+        );
 
         // Construye los "nextTotals" como ABSOLUTOS (no sumes a lo previo)
-        const nextTotals: Partial<Record<UpdatableField, number>> = { ...previousTotals };
+        const nextTotals: Partial<Record<UpdatableField, number>> = {
+          ...previousTotals,
+        };
         let totalsChanged = false;
 
         for (const field of Object.keys(incomingTotals) as UpdatableField[]) {
@@ -1454,7 +1434,7 @@ export class WorkOrderService {
         const valuesChanged =
           previousValues.length !== mergedValues.length ||
           JSON.stringify(sortDetailValues(previousValues)) !==
-          JSON.stringify(sortDetailValues(mergedValues));
+            JSON.stringify(sortDetailValues(mergedValues));
 
         // ¿Queda algo positivo?
         const hasValues = mergedValues.length > 0;
@@ -1466,7 +1446,10 @@ export class WorkOrderService {
         const blockChanged = existingDetail?.block !== blockKey;
 
         // Normaliza totales finales para persistir
-        const nextBadQuantity = Math.max(0, Math.round(nextTotals.bad_quantity ?? 0));
+        const nextBadQuantity = Math.max(
+          0,
+          Math.round(nextTotals.bad_quantity ?? 0),
+        );
         const nextMaterialQuantity = Math.max(
           0,
           Math.round(nextTotals.material_quantity ?? 0),
@@ -1490,7 +1473,9 @@ export class WorkOrderService {
         const shouldDelete = !!existingDetail && !positiveTotals && !hasValues;
 
         if (shouldDelete) {
-          await tx.badQuantityDetail.delete({ where: { id: existingDetail!.id } });
+          await tx.badQuantityDetail.delete({
+            where: { id: existingDetail!.id },
+          });
           existingByTarget.delete(entry.areaId);
           detailResults.push({
             targetAreaId: entry.areaId,
@@ -1568,7 +1553,6 @@ export class WorkOrderService {
       details: transactionResult,
     };
   }
-
 
   async updateWorkOrderAreasLiberar(
     workOrderOtId: string,
@@ -1674,11 +1658,15 @@ export class WorkOrderService {
 
     await this.prisma.$transaction(async (tx) => {
       for (const summary of badQuantitySummary) {
+        console.log(
+          `🔁 Procesando área ${summary.areaName} (ID: ${summary.areaId}) con valores:`,
+          JSON.stringify(summary.values),
+        );
         const aggregated = aggregateSummaryValues(summary);
         if (Object.keys(aggregated).length === 0) continue;
 
         const areaRecord = areaResponseByAreaId.get(summary.areaId); // TARGET
-        const blockKey = resolveBlockKey(summary.areaName);          // TARGET BLOCK
+        const blockKey = resolveBlockKey(summary.areaName); // TARGET BLOCK
 
         let handledByAreaResponse = false;
         let detailBlock: ResultBlockKey | null = blockKey ?? null;
@@ -1698,7 +1686,12 @@ export class WorkOrderService {
                 partial_release_id: partialReleaseId,
                 block: detailBlock ?? undefined,
               },
-              select: { id: true, bad_quantity: true, material_quantity: true, values: true },
+              select: {
+                id: true,
+                bad_quantity: true,
+                material_quantity: true,
+                values: true,
+              },
             })) as any;
           } else {
             // FINAL: findFirst por (source_flow, target_area, partial_release=null)
@@ -1709,10 +1702,24 @@ export class WorkOrderService {
                 partial_release_id: null,
                 block: detailBlock ?? undefined,
               },
-              select: { id: true, bad_quantity: true, material_quantity: true, values: true },
+              select: {
+                id: true,
+                bad_quantity: true,
+                material_quantity: true,
+                values: true,
+              },
             })) as any;
           }
         }
+        console.log(
+          `🧾 existingDetail para ${summary.areaName}:`,
+          existingDetail
+            ? {
+                id: existingDetail.id,
+                bad_quantity: existingDetail.bad_quantity,
+              }
+            : 'no existe (null)',
+        );
 
         const detailTotals = extractDetailTotals(existingDetail ?? null);
         const { deltas: summaryDeltas, totals: normalizedTotals } =
@@ -1777,24 +1784,68 @@ export class WorkOrderService {
               }
 
               // 3) Lee y aplica increments
-              const existing = await delegate.findUnique({ where: { id: blockId } });
+              const existing = await delegate.findUnique({
+                where: { id: blockId },
+              });
               if (existing) {
+                console.log(
+                  '\n⚙️ --- Aplicando incrementos para',
+                  summary.areaName,
+                  '---',
+                );
+                console.log('   existing.bad_quantity:', existing.bad_quantity);
+                console.log(
+                  '   summaryDeltas.bad_quantity:',
+                  summaryDeltas.bad_quantity,
+                );
+                console.log(
+                  '   existing.material_quantity:',
+                  existing.material_quantity,
+                );
+                console.log(
+                  '   summaryDeltas.material_quantity:',
+                  summaryDeltas.material_quantity,
+                );
                 const incomingNext = {
-                  bad_quantity: (coerceToNumber(existing?.bad_quantity) ?? 0) + (summaryDeltas.bad_quantity ?? 0),
-                  material_quantity: (coerceToNumber(existing?.material_quantity) ?? 0) + (summaryDeltas.material_quantity ?? 0),
+                  bad_quantity:
+                    (coerceToNumber(existing?.bad_quantity) ?? 0) +
+                    (summaryDeltas.bad_quantity ?? 0),
+                  material_quantity:
+                    (coerceToNumber(existing?.material_quantity) ?? 0) +
+                    (summaryDeltas.material_quantity ?? 0),
                 };
+
+                console.log(
+                  '   ➡️ incomingNext.bad_quantity (nuevo total calculado):',
+                  incomingNext.bad_quantity,
+                );
+                console.log(
+                  '   ➡️ incomingNext.material_quantity (nuevo total calculado):',
+                  incomingNext.material_quantity,
+                );
+                console.log('⚙️ --- Fin incrementos ---\n');
                 const { deltas, logs, nextValues } = buildNumericChanges(
                   existing,
-                  incomingNext,             // deltas del summary para ESTE TARGET
+                  incomingNext, // deltas del summary para ESTE TARGET
                   config.updatableFields,
                 );
+                console.log(
+                  '🧮 Resultado de buildNumericChanges para',
+                  summary.areaName,
+                );
+                console.log('   incomingNext:', incomingNext);
+                console.log('   nextValues (devuelto):', nextValues);
+                console.log('   deltas (devuelto):', deltas);
+                console.log('   logs:', logs);
 
                 const updatePayload: Record<string, any> = {};
 
                 if (summaryDeltas.bad_quantity !== undefined) {
                   const prevBad = coerceToNumber(existing?.bad_quantity);
                   if (prevBad === null) {
-                    updatePayload.bad_quantity = Number(nextValues.bad_quantity ?? 0);
+                    updatePayload.bad_quantity = Number(
+                      nextValues.bad_quantity ?? 0,
+                    );
                   } else if (deltas.bad_quantity) {
                     updatePayload.bad_quantity = nextValues.bad_quantity;
                   }
@@ -1803,14 +1854,24 @@ export class WorkOrderService {
                 if (summaryDeltas.material_quantity !== undefined) {
                   const prevMat = coerceToNumber(existing?.material_quantity);
                   if (prevMat === null) {
-                    updatePayload.material_quantity = Number(nextValues.material_quantity ?? 0);
+                    updatePayload.material_quantity = Number(
+                      nextValues.material_quantity ?? 0,
+                    );
                   } else if (deltas.material_quantity) {
-                    updatePayload.material_quantity = nextValues.material_quantity;
+                    updatePayload.material_quantity =
+                      nextValues.material_quantity;
                   }
                 }
 
                 if (Object.keys(updatePayload).length > 0) {
-                  await delegate.update({ where: { id: blockId }, data: updatePayload });
+                  console.log(
+                    `💾 Actualizando bloque ${blockKey} (areaId=${targetAreaId}) con:`,
+                    updatePayload,
+                  );
+                  await delegate.update({
+                    where: { id: blockId },
+                    data: updatePayload,
+                  });
 
                   updatedAreas.push({
                     areaId: targetAreaId,
@@ -1856,29 +1917,38 @@ export class WorkOrderService {
                 deltas: partialDeltas,
                 logs: partialLogs,
                 nextValues: partialNextValues,
-              } = buildNumericChanges(
-                existingPartial,
-                summaryDeltas,
-                ['bad_quantity', 'material_quantity'],
-              );
+              } = buildNumericChanges(existingPartial, summaryDeltas, [
+                'bad_quantity',
+                'material_quantity',
+              ]);
 
               const updatePayload: Record<string, any> = {};
 
               if (summaryDeltas.bad_quantity !== undefined) {
                 const prevBad = coerceToNumber(existingPartial?.bad_quantity);
                 if (prevBad === null) {
-                  updatePayload.bad_quantity = Number(partialNextValues.bad_quantity ?? 0);
+                  updatePayload.bad_quantity = Number(
+                    partialNextValues.bad_quantity ?? 0,
+                  );
                 } else if (partialDeltas.bad_quantity) {
-                  updatePayload.bad_quantity = { increment: partialDeltas.bad_quantity };
+                  updatePayload.bad_quantity = {
+                    increment: partialDeltas.bad_quantity,
+                  };
                 }
               }
 
               if (summaryDeltas.material_quantity !== undefined) {
-                const prevMat = coerceToNumber(existingPartial?.material_quantity);
+                const prevMat = coerceToNumber(
+                  existingPartial?.material_quantity,
+                );
                 if (prevMat === null) {
-                  updatePayload.material_quantity = Number(partialNextValues.material_quantity ?? 0);
+                  updatePayload.material_quantity = Number(
+                    partialNextValues.material_quantity ?? 0,
+                  );
                 } else if (partialDeltas.material_quantity) {
-                  updatePayload.material_quantity = { increment: partialDeltas.material_quantity };
+                  updatePayload.material_quantity = {
+                    increment: partialDeltas.material_quantity,
+                  };
                 }
               }
 
@@ -1925,18 +1995,20 @@ export class WorkOrderService {
           resolvedSourceFlowId !== null &&
           resolvedSourceAreaId !== null
         ) {
-          const incomingValues =
-            Array.isArray(summary.values)
-              ? summary.values
+          const incomingValues = Array.isArray(summary.values)
+            ? summary.values
                 .map((entry) => ({
                   label: entry?.label ?? '',
                   value: Number(entry?.value ?? 0),
                 }))
                 .filter((x) => x.label && Number.isFinite(x.value))
-              : [];
+            : [];
 
           const previousValues = Array.isArray(existingDetail?.values)
-            ? (existingDetail!.values as Array<{ label: string; value: number }>)
+            ? (existingDetail!.values as Array<{
+                label: string;
+                value: number;
+              }>)
             : [];
 
           const mergedValues =
@@ -1954,7 +2026,9 @@ export class WorkOrderService {
               updateData.bad_quantity = Number(normalizedTotals.bad_quantity);
             }
             if (normalizedTotals.material_quantity !== undefined) {
-              updateData.material_quantity = Number(normalizedTotals.material_quantity);
+              updateData.material_quantity = Number(
+                normalizedTotals.material_quantity,
+              );
             }
             if (mergedValues) {
               updateData.values = mergedValues;
@@ -2001,18 +2075,11 @@ export class WorkOrderService {
       badQuantitySummary,
     };
   }
-
-
-
-
 }
 
 // --------------------------
 // Helpers (sin cambios funcionales)
 // --------------------------
-
-
-
 
 const AREA_BLOCK_BY_ID_MAP: Record<number, ResultBlockKey> = {
   1: 'prepress',
@@ -2039,7 +2106,7 @@ function __normLabel__(s: string) {
 // Resolver blockKey primero por areaId y luego por nombre
 function __resolveBlockKeyByIdOrName__(
   areaId: number,
-  areaName?: string | null
+  areaName?: string | null,
 ): ResultBlockKey | null {
   const byId = AREA_BLOCK_BY_ID_MAP[Number(areaId)];
   if (byId) return byId;
@@ -2063,10 +2130,15 @@ function __aggregateSummaryValuesSafe__(summary: BadQuantitySummaryDto) {
   return out;
 }
 
-function resolveBlockKey(name: string | null | undefined): ResultBlockKey | null {
+function resolveBlockKey(
+  name: string | null | undefined,
+): ResultBlockKey | null {
   const k = (name ?? '')
-    .normalize('NFD').replace(/\u0300-\u036f/g, '')
-    .trim().toLowerCase().replace(/\s+/g, '');
+    .normalize('NFD')
+    .replace(/\u0300-\u036f/g, '')
+    .trim()
+    .toLowerCase()
+    .replace(/\s+/g, '');
   const map: Record<string, ResultBlockKey> = {
     preprensa: 'prepress',
     impresion: 'impression',
@@ -2114,16 +2186,17 @@ function buildNumericChanges(
     if (incrementValue === undefined) continue;
     if (!Number.isFinite(incrementValue)) continue;
 
-    const increment = Math.round(Number(incrementValue));
-    if (increment === 0) continue;
-
+    const newValue = Math.round(Number(incrementValue));
     const previousRaw = existing?.[field];
     const previousNumeric = coerceToNumber(previousRaw) ?? 0;
-    const nextTotal = previousNumeric + increment;
 
-    deltas[field] = increment;
-    nextValues[field] = nextTotal;
-    logs.push({ field, oldValue: previousRaw, newValue: nextTotal });
+    if (newValue === previousNumeric) continue;
+
+    const delta = newValue - previousNumeric;
+
+    deltas[field] = delta;
+    nextValues[field] = newValue;
+    logs.push({ field, oldValue: previousRaw, newValue });
   }
 
   return { deltas, logs, nextValues };
@@ -2189,9 +2262,7 @@ function extractDetailValuesList(
   return out;
 }
 
-function sortDetailValues(
-  values: Array<{ label: string; value: number }>,
-) {
+function sortDetailValues(values: Array<{ label: string; value: number }>) {
   return [...values].sort((a, b) =>
     normalizeLabel(a.label).localeCompare(normalizeLabel(b.label)),
   );
@@ -2204,21 +2275,45 @@ function computeDetailAdjustments(
   const deltas: Partial<Record<UpdatableField, number>> = {};
   const totals: Partial<Record<UpdatableField, number>> = {};
 
+  console.log('🧩 --- computeDetailAdjustments ---');
+  console.log(
+    '➡️ incomingTotals (valores que envía el frontend):',
+    incomingTotals,
+  );
+  console.log(
+    '📦 existingTotals (valores ya guardados en BD):',
+    existingTotals,
+  );
+
   for (const field of Object.keys(incomingTotals) as UpdatableField[]) {
     const nextValue = incomingTotals[field];
     if (nextValue === undefined) continue;
 
-    const nextTotal = Math.round(Number(nextValue ?? 0));
-    const previousTotal = existingTotals?.[field] ?? 0;
+    const nextTotal = Math.round(Number(nextValue ?? 0)); // valor nuevo desde el frontend
+    const previousTotal = existingTotals?.[field] ?? 0; // valor actual en BD
     const normalizedPrevious = Math.round(Number(previousTotal ?? 0));
+
     const difference = nextTotal - normalizedPrevious;
+
+    console.log(`\n🔍 Campo: ${field}`);
+    console.log(`   👉 nextTotal (nuevo del frontend): ${nextTotal}`);
+    console.log(`   🏗 previousTotal (guardado en BD): ${normalizedPrevious}`);
+    console.log(`   ⚖️ difference (delta calculado): ${difference}`);
 
     totals[field] = nextTotal;
 
     if (difference !== 0) {
       deltas[field] = difference;
+      console.log(`   ✅ Se agrega delta: ${field} = ${difference}`);
+    } else {
+      console.log(`   💤 No hay cambio en ${field}, se omite.`);
     }
   }
+
+  console.log('\n📊 Resultado final de computeDetailAdjustments:');
+  console.log('   🔹 deltas:', deltas);
+  console.log('   🔸 totals:', totals);
+  console.log('🧩 --- fin computeDetailAdjustments ---\n');
 
   return { deltas, totals };
 }

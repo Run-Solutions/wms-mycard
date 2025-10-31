@@ -2246,14 +2246,6 @@ export default function CloseWorkOrderAuxPage({ params }: Props) {
                                         type="number"
                                         value={aggregatedFieldValue}
                                         min={0}
-                                        onChange={(e) =>
-                                          handleValueChange(
-                                            area.id,
-                                            field,
-                                            e.target.value
-                                          )
-                                        }
-                                        className="w-20 rounded border border-gray-200 px-2 py-1 text-center"
                                       />
                                     ) : (
                                       value
@@ -2331,15 +2323,7 @@ export default function CloseWorkOrderAuxPage({ params }: Props) {
                                       // Para excedente y noprocess, si el agregado es editable, mostramos input
                                       if (isEditableAggregateField) {
                                         return (
-                                          <input
-                                            type="number"
-                                            value={aggregatedFieldValue}
-                                            min={0}
-                                            onChange={(e) =>
-                                              handleValueChange(area.id, field, e.target.value)
-                                            }
-                                            className="w-20 rounded border border-gray-200 px-2 py-1 text-center"
-                                          />
+                                          aggregatedFieldValue
                                         );
                                       }
 

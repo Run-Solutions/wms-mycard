@@ -1,15 +1,15 @@
 'use client';
 
 import { useRouter } from 'next/navigation';
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useState, useMemo, useEffect, useRef } from 'react';
 import styled from 'styled-components';
 
 import {
   submitToCQMColorEdge,
   releaseProductFromColorEdge,
-  ReleaseResponse,
+  type ReleaseResponse,
 } from '@/api/liberarProducto';
-import { updateWorkOrderAreas } from '@/api/seguimientoDeOts';
+import { updateWorkOrderAreasLiberar } from '@/api/seguimientoDeOts';
 
 import { useAuthContext } from '@/context/AuthContext';
 
@@ -38,6 +38,7 @@ import {
   resolveBlockKey,
   saveBadQuantitySummary,
 } from './util/areaMappings';
+import type { UpdateWorkOrderAreasBody } from './CorteComponent';
 
 interface Props {
   workOrder: any;
@@ -90,13 +91,6 @@ const NEXT_INVALID_FOR_PARTIAL = [
 
 const NEXT_CORTE_STATUSES = ['Enviado a auditoria parcial'] as const;
 
-type UpdateWorkOrderAreasBody = {
-  sourceAreaId: number | null;
-  sourceWorkOrderFlowId: number | null;
-  badQuantitySummary: BadQuantityModalResult['inputsByArea'];
-  partialReleaseId?: number | null;
-};
-
 const pendingBQKey = (otId: string, flowId: number | null) =>
   `pending_bq:${otId}:${flowId ?? 'none'}`;
 
@@ -125,7 +119,6 @@ const clearPendingBadQty = (otId: string, flowId: number | null) => {
   localStorage.removeItem(pendingBQKey(otId, flowId));
 };
 
-
 export default function ColorEdgeComponent({ workOrder }: Props) {
   const router = useRouter();
   const { user } = useAuthContext();
@@ -135,6 +128,8 @@ export default function ColorEdgeComponent({ workOrder }: Props) {
 
   const [showModal, setShowModal] = useState(false);
   const [showBadQuantity, setShowBadQuantity] = useState(false);
+  const [pendingBadQty, setPendingBadQty] =
+    useState<UpdateWorkOrderAreasBody | null>(null);
   const [showConfirm, setShowConfirm] = useState(false);
 
   const [areaBadQuantities, setAreaBadQuantities] = useState<
@@ -164,8 +159,6 @@ export default function ColorEdgeComponent({ workOrder }: Props) {
     ...(workOrder?.workOrder?.flow ?? []),
   ]);
   const flowList: any[] = useMemo(() => flowListState, [flowListState]);
-  const [pendingBadQty, setPendingBadQty] =
-    useState<UpdateWorkOrderAreasBody | null>(null);
   const currentFlow = useMemo(
     () =>
       workOrder?.workOrder?.flow?.find(
@@ -366,17 +359,17 @@ export default function ColorEdgeComponent({ workOrder }: Props) {
 
       const cachedSummary =
         !existingSummary.length &&
-          !detailSummary.length &&
-          workOrderKey &&
-          flowId
+        !detailSummary.length &&
+        workOrderKey &&
+        flowId
           ? loadBadQuantitySummary(workOrderKey, flowId) ?? []
           : [];
 
       const summary = existingSummary.length
         ? existingSummary
         : detailSummary.length
-          ? detailSummary
-          : cachedSummary;
+        ? detailSummary
+        : cachedSummary;
 
       return summary.length ? { ...flow, badQuantitySummary: summary } : flow;
     });
@@ -409,6 +402,15 @@ export default function ColorEdgeComponent({ workOrder }: Props) {
   useEffect(() => {
     setFlowListState([...(workOrder?.workOrder?.flow ?? [])]);
   }, [workOrder]);
+
+  useEffect(() => {
+    const otId = workOrder?.workOrder?.ot_id ?? '';
+    const flowId = currentFlow?.id ?? null;
+    if (otId) {
+      const cached = loadPendingBadQty(otId, flowId);
+      if (cached) setPendingBadQty(cached);
+    }
+  }, [workOrder?.workOrder?.ot_id, currentFlow?.id]);
 
   // =================== Handlers ===================
   const openModal = () => setShowModal(true);
@@ -535,11 +537,11 @@ export default function ColorEdgeComponent({ workOrder }: Props) {
       return;
     } else if (
       cqm_quantity +
-      (Number(goodQuantity) +
-        Number(lastAreaBadQuantity) +
-        Number(materialBadQuantity) +
-        Number(excessQuantity) +
-        totalParcialesActuales) >
+        (Number(goodQuantity) +
+          Number(lastAreaBadQuantity) +
+          Number(materialBadQuantity) +
+          Number(excessQuantity) +
+          totalParcialesActuales) >
       prevAreaSum
     ) {
       alert(
@@ -549,9 +551,9 @@ export default function ColorEdgeComponent({ workOrder }: Props) {
     } else if (
       partialsActual.length > 0 &&
       Number(goodQuantity) +
-      Number(lastAreaBadQuantity) +
-      Number(excessQuantity) >
-      cantidadporliberar
+        Number(lastAreaBadQuantity) +
+        Number(excessQuantity) >
+        cantidadporliberar
     ) {
       alert(
         `La cantidad total a liberar es mayor a la entregada no procesada por la parcialidad anterior ${cantidadporliberar}.`
@@ -580,21 +582,6 @@ export default function ColorEdgeComponent({ workOrder }: Props) {
   };
 
   const handleColorEdgeSubmit = async () => {
-    if (pendingBadQuantityInputs) {
-      const saved = await handleSaveChanges(pendingBadQuantityInputs, {
-        silent: true,
-      });
-
-      if (!saved) {
-        alert(
-          'No se pudieron guardar las cantidades por área. Intenta nuevamente.'
-        );
-        return;
-      }
-
-      setPendingBadQuantityInputs(null);
-    }
-
     const payload = {
       workOrderId: workOrder?.workOrder?.id,
       workOrderFlowId: currentFlow?.id,
@@ -612,10 +599,13 @@ export default function ColorEdgeComponent({ workOrder }: Props) {
 
     try {
       const otId = workOrder?.workOrder?.ot_id ?? '';
-      const res = (await releaseProductFromColorEdge(payload)) as ReleaseResponse;
+      const res = (await releaseProductFromColorEdge(
+        payload
+      )) as ReleaseResponse;
 
       // 2) Si es PARCIAL → mandar badQuantitySummary con partialReleaseId
-      const stash = pendingBadQty ?? loadPendingBadQty(otId, currentFlow?.id ?? null);
+      const stash =
+        pendingBadQty ?? loadPendingBadQty(otId, currentFlow?.id ?? null);
 
       const isPartial =
         !!res &&
@@ -628,12 +618,11 @@ export default function ColorEdgeComponent({ workOrder }: Props) {
         !!stash &&
         Array.isArray(stash.badQuantitySummary) &&
         stash.badQuantitySummary.length > 0;
-      console.log("has", stash);
-
+        console.log('hasStash', stash);
 
       if (isPartial && hasStash) {
         // ⬅️ PARCIAL: manda con partialReleaseId
-        await updateWorkOrderAreas(otId, {
+        await updateWorkOrderAreasLiberar(otId, {
           sourceAreaId: stash.sourceAreaId,
           sourceWorkOrderFlowId: stash.sourceWorkOrderFlowId,
           badQuantitySummary: stash.badQuantitySummary,
@@ -641,7 +630,7 @@ export default function ColorEdgeComponent({ workOrder }: Props) {
         });
       } else if (!isPartial && hasStash) {
         // ⬅️ FINAL (completa): manda explícitamente con partialReleaseId: null
-        await updateWorkOrderAreas(otId, {
+        await updateWorkOrderAreasLiberar(otId, {
           sourceAreaId: stash.sourceAreaId,
           sourceWorkOrderFlowId: stash.sourceWorkOrderFlowId,
           badQuantitySummary: stash.badQuantitySummary,
@@ -649,8 +638,7 @@ export default function ColorEdgeComponent({ workOrder }: Props) {
         });
       }
 
-      setShowConfirm(false);
-      setPendingBadQuantityInputs(null);
+      // Limpieza final
       clearPendingBadQty(otId, currentFlow?.id ?? null);
       setPendingBadQty(null);
       router.push('/liberarProducto');
@@ -666,26 +654,45 @@ export default function ColorEdgeComponent({ workOrder }: Props) {
   );
 
   const handleOpenBadQuantityModal = () => {
-    const resetValues: Record<string, string> = {};
+    const initialValues: Record<string, string> = {};
 
-    previousFlows.forEach((flow) => {
-      const areaName = normalizeAreaKey(flow?.area?.name ?? '');
-      if (!areaName) return;
+    const hasPartials =
+      Array.isArray(currentFlow?.partialReleases) &&
+      currentFlow.partialReleases.length > 0;
 
-      resetValues[`${areaName}_bad`] = '0';
+    if (hasPartials) {
+      // 🟢 Si ya hay parciales → todo arranca en cero
+      previousFlows.forEach((flow) => {
+        const areaName = flow.area?.name ?? '';
+        const areaKey = normalizeAreaKey(areaName);
+        const blockKey = resolveBlockKey(areaName);
+        const supportsMaterial = blockSupportsMaterial(blockKey);
 
-      const supportsMaterial = blockSupportsMaterial(
-        resolveBlockKey(flow?.area?.name ?? '')
-      );
+        if (!(areaKey + '_bad' in initialValues)) {
+          initialValues[`${areaKey}_bad`] = '0';
+        }
+        if (supportsMaterial && !(areaKey + '_material' in initialValues)) {
+          initialValues[`${areaKey}_material`] = '0';
+        }
+      });
+    } else {
+      // 🟢 Primer parcial → no hay detalles, por tanto todo también en cero
+      previousFlows.forEach((flow) => {
+        (flow?.badQuantityDetails ?? []).forEach((detail: any) => {
+          if (detail?.source_area_id === currentFlow?.area_id) {
+            const areaName = normalizeAreaKey(detail?.targetArea?.name ?? '');
+            initialValues[`${areaName}_bad`] =
+              detail?.bad_quantity != null ? String(detail.bad_quantity) : '0';
+            initialValues[`${areaName}_material`] =
+              detail?.material_quantity != null
+                ? String(detail.material_quantity)
+                : '0';
+          }
+        });
+      });
+    }
 
-      if (supportsMaterial) {
-        resetValues[`${areaName}_material`] = '0';
-      }
-    });
-
-    setAreaBadQuantities(resetValues);
-    setLastBadQuantity('0');
-    setMaterialBadQuantity('0');
+    setAreaBadQuantities(initialValues);
     setShowBadQuantity(true);
   };
 
@@ -711,205 +718,6 @@ export default function ColorEdgeComponent({ workOrder }: Props) {
       })),
     [previousFlows]
   );
-
-  const handleSaveChanges = async (
-    modalInputs?: BadQuantityModalResult['inputsByArea'],
-    options?: { silent?: boolean }
-  ) => {
-    const { silent = false } = options ?? {};
-    const toInt = (v: any) => {
-      const n = parseInt(String(v ?? '0').trim(), 10);
-      return Number.isFinite(n) ? n : 0;
-    };
-
-    const inputsMap = new Map(
-      (modalInputs ?? []).map((item) => [item.areaId, item.values])
-    );
-
-    const payload = {
-      areas: previousFlows.flatMap((flow) => {
-        const areaName = flow.area?.name ?? '';
-        const areaKey = normalizeAreaKey(areaName);
-        console.log(areaKey, 'areaKey');
-
-        // ✅ Tipar blockMap para que sus valores sean BlockKey
-        const blockMap: Partial<Record<string, BlockKey>> = {
-          impresion: 'impression',
-          serigrafia: 'serigrafia',
-          empalme: 'empalme',
-          laminacion: 'laminacion',
-          corte: 'corte',
-        };
-
-        if (areaKey === 'coloredge') return [] as any;
-
-        // ✅ mappedBlock ahora es BlockKey | undefined
-        const mappedBlock = blockMap[areaKey];
-        // ✅ blockKey queda BlockKey | null
-        const blockKey: BlockKey | null =
-          mappedBlock ?? resolveBlockKey(areaName);
-        if (!blockKey) return [] as any;
-
-        const blockData = flow.areaResponse?.[blockKey];
-        const blockId = blockData?.id ?? null;
-        if (!blockId) return [] as any;
-
-        const supportsMaterial = blockSupportsMaterial(blockKey);
-        const formId = blockData?.form_auditory_id ?? null;
-        const cqmId = blockData?.form_answer_id ?? null;
-
-        const badKey = `${areaKey}_bad`;
-        const materialKey = `${areaKey}_material`;
-
-        const data: Record<string, number> = {
-          bad_quantity: toInt(areaBadQuantities[badKey]),
-        };
-
-        if (supportsMaterial) {
-          data.material_quantity = toInt(areaBadQuantities[materialKey]);
-        }
-
-        const inputsForArea = inputsMap.get(flow.area_id) ?? [];
-
-        return {
-          areaId: flow.area_id,
-          block: blockKey, // ✅ typed
-          blockId,
-          formId,
-          cqmId,
-          data,
-          inputsByArea: inputsForArea,
-        };
-      }),
-      sourceAreaId: currentFlow?.area_id ?? workOrder?.area?.id ?? null,
-      sourceWorkOrderFlowId: currentFlow?.id ?? null,
-      badQuantitySummary: modalInputs ?? [],
-    };
-
-    try {
-      const response = await updateWorkOrderAreas(
-        workOrder?.workOrder?.ot_id,
-        payload
-      );
-
-      const serverAreas = Array.isArray(response?.updatedAreas)
-        ? response.updatedAreas
-        : [];
-      const effectiveAreas = serverAreas.length ? serverAreas : payload.areas;
-
-      const serverAreaMap = new Map(
-        effectiveAreas.map((areaItem: any) => [areaItem.areaId, areaItem])
-      );
-      const fallbackMap = new Map(
-        payload.areas.map((areaItem: any) => [areaItem.areaId, areaItem])
-      );
-
-      setFlowListState((prev) =>
-        prev.map((flow) => {
-          const areaUpdate =
-            serverAreaMap.get(flow.area_id) ?? fallbackMap.get(flow.area_id);
-          const updatedFlow = { ...flow };
-          if (!areaUpdate) {
-            if (flow.id === currentFlow?.id) {
-              updatedFlow.badQuantitySummary = modalInputs ?? [];
-            }
-            return updatedFlow;
-          }
-
-          const newAreaResponse = { ...(updatedFlow.areaResponse ?? {}) };
-          const existingBlock = newAreaResponse[areaUpdate.block] ?? {};
-          newAreaResponse[areaUpdate.block] = {
-            ...existingBlock,
-            ...(areaUpdate.data ?? {}),
-            id: areaUpdate.blockId ?? existingBlock.id ?? null,
-            form_auditory_id:
-              areaUpdate.formId ?? existingBlock.form_auditory_id ?? null,
-            form_answer_id:
-              areaUpdate.cqmId ?? existingBlock.form_answer_id ?? null,
-          };
-
-          updatedFlow.areaResponse = newAreaResponse;
-
-          if (flow.id === currentFlow?.id) {
-            updatedFlow.badQuantitySummary = modalInputs ?? [];
-          }
-
-          return updatedFlow;
-        })
-      );
-
-      if (currentFlow?.id) {
-        saveBadQuantitySummary(
-          workOrder?.workOrder?.ot_id,
-          currentFlow.id,
-          modalInputs ?? []
-        );
-      }
-
-      const baseValues: Record<string, string> = {};
-      previousFlows.forEach((flow) => {
-        const areaName = flow.area?.name ?? '';
-        const areaKey = normalizeAreaKey(areaName);
-        if (!areaKey) return;
-
-        // ✅ resolver el BlockKey con el mismo tipado
-        const blockMapLocal: Partial<Record<string, BlockKey>> = {
-          impresion: 'impression',
-          serigrafia: 'serigrafia',
-          empalme: 'empalme',
-          laminacion: 'laminacion',
-          corte: 'corte',
-        };
-        const mapped = blockMapLocal[areaKey];
-        const resolvedBlock: BlockKey | null =
-          mapped ?? resolveBlockKey(areaName);
-
-        const supportsMat = blockSupportsMaterial(resolvedBlock);
-
-        if (!(areaKey + '_bad' in baseValues)) {
-          baseValues[`${areaKey}_bad`] = '0';
-        }
-        if (supportsMat && !(areaKey + '_material' in baseValues)) {
-          baseValues[`${areaKey}_material`] = '0';
-        }
-      });
-
-      setAreaBadQuantities(() => {
-        const next: Record<string, string> = { ...baseValues };
-        populateInitialValuesFromSummary(modalInputs ?? [], next);
-        return next;
-      });
-
-      const currentAreaId = workOrder?.area?.id;
-      if (currentAreaId) {
-        const currentAreaUpdate =
-          serverAreaMap.get(currentAreaId) ?? fallbackMap.get(currentAreaId);
-
-        if (currentAreaUpdate?.data?.bad_quantity !== undefined) {
-          setLastBadQuantity(String(currentAreaUpdate.data.bad_quantity ?? 0));
-        }
-
-        if (currentAreaUpdate?.data?.material_quantity !== undefined) {
-          setMaterialBadQuantity(
-            String(currentAreaUpdate.data.material_quantity ?? 0)
-          );
-        }
-      }
-
-      if (!silent) {
-        alert('Cambios guardados correctamente');
-      }
-
-      return true;
-    } catch (err) {
-      console.error('Error al guardar los cambios', err);
-      if (!silent) {
-        alert('Error al guardar los cambios');
-      }
-
-      return false;
-    }
-  };
 
   // Suma malas de TODAS las áreas previas (y material defectuoso si aplica)
   const sumaBadQuantity = useMemo(() => {
@@ -979,6 +787,7 @@ export default function ColorEdgeComponent({ workOrder }: Props) {
                 value={sumaBadQuantity}
                 onClick={handleOpenBadQuantityModal}
                 readOnly
+                disabled={shouldDisableLiberar()}
               />
 
               <Label>Sin procesar:</Label>
@@ -1039,27 +848,66 @@ export default function ColorEdgeComponent({ workOrder }: Props) {
           areaBadQuantities={areaBadQuantities}
           setAreaBadQuantities={setAreaBadQuantities}
           onConfirm={({ inputsByArea }) => {
-            const currentAreaInputs = inputsByArea.find(
-              (item) => item.areaId === workOrder.area.id
+            const toInt = (v: any) =>
+              Number.isFinite(parseInt(String(v ?? '0'), 10))
+                ? parseInt(String(v ?? '0'), 10)
+                : 0;
+
+            const inputsMap = new Map(
+              inputsByArea.map((it) => [it.areaId, it.values])
             );
 
-            if (currentAreaInputs) {
-              const normalizeLabel = (value: string) =>
-                value
-                  .normalize('NFD')
-                  .replace(/[\u0300-\u036f]/g, '')
-                  .trim()
-                  .toLowerCase();
+            const uiPreviewPayload = {
+              areas: previousFlows.flatMap((flow) => {
+                const areaName = flow.area?.name ?? '';
+                const areaKey = normalizeAreaKey(areaName);
+                const blockMap: Partial<Record<string, BlockKey>> = {
+                  impresion: 'impression',
+                  serigrafia: 'serigrafia',
+                  empalme: 'empalme',
+                  laminacion: 'laminacion',
+                  corte: 'corte',
+                  millingChip: 'millingChip',
+                  hotStamping: 'hotStamping',
+                };
+                if (areaKey === 'colorEdge') return [];
+                const mappedBlock = blockMap[areaKey];
+                const blockKey: BlockKey | null =
+                  mappedBlock ?? resolveBlockKey(areaName);
+                if (!blockKey) return [];
+                const blockData = flow.areaResponse?.[blockKey];
+                const blockId = blockData?.id ?? null;
+                if (!blockId) return [];
+                const supportsMaterial = blockSupportsMaterial(blockKey);
+                const badKey = `${areaKey}_bad`;
+                const materialKey = `${areaKey}_material`;
+                const data: Record<string, number> = {
+                  bad_quantity: toInt(areaBadQuantities[badKey]),
+                };
+                if (supportsMaterial)
+                  data.material_quantity = toInt(
+                    areaBadQuantities[materialKey]
+                  );
+                const inputsForArea = inputsMap.get(flow.area_id) ?? [];
+                return {
+                  areaId: flow.area_id,
+                  block: blockKey,
+                  blockId,
+                  formId: blockData?.form_auditory_id ?? null,
+                  cqmId: blockData?.form_answer_id ?? null,
+                  data,
+                  inputsByArea: inputsForArea,
+                };
+              }),
+              sourceAreaId: currentFlow?.area_id ?? workOrder?.area?.id ?? null,
+              sourceWorkOrderFlowId: currentFlow?.id ?? null,
+              badQuantitySummary: inputsByArea,
+            };
+            console.log(
+              '[PREVIEW] updateWorkOrderAreasLiberar payload:',
+              uiPreviewPayload
+            );
 
-              const findValue = (label: string) =>
-                currentAreaInputs.values.find(
-                  (entry) =>
-                    normalizeLabel(entry.label) === normalizeLabel(label)
-                )?.value ?? 0;
-
-              setLastBadQuantity(String(findValue('Malas')));
-              setMaterialBadQuantity(String(findValue('Malo de fábrica')));
-            }
             const body: UpdateWorkOrderAreasBody = {
               sourceAreaId: currentFlow?.area_id ?? workOrder?.area?.id ?? null,
               sourceWorkOrderFlowId: currentFlow?.id ?? null,
@@ -1071,8 +919,25 @@ export default function ColorEdgeComponent({ workOrder }: Props) {
               currentFlow?.id ?? null,
               body
             );
+
+            const currentAreaInputs = inputsByArea.find(
+              (item) => item.areaId === workOrder.area.id
+            );
+            if (currentAreaInputs) {
+              const norm = (s: string) =>
+                s
+                  .normalize('NFD')
+                  .replace(/[\u0300-\u036f]/g, '')
+                  .trim()
+                  .toLowerCase();
+              const find = (label: string) =>
+                currentAreaInputs.values.find(
+                  (e) => norm(e.label) === norm(label)
+                )?.value ?? 0;
+              setLastBadQuantity(String(find('Malas')));
+              setMaterialBadQuantity(String(find('Malo de fábrica')));
+            }
             setShowBadQuantity(false);
-            setPendingBadQuantityInputs(inputsByArea);
           }}
           onClose={() => setShowBadQuantity(false)}
         />
@@ -1282,15 +1147,15 @@ const CqmButton = styled.button<CqmButtonProps>`
 
   &:hover {
     background-color: ${({ $status, $cantidadporliberar, disabled }) => {
-    if ($status === 'Listo') return '#16a34a';
-    if (
-      ['Enviado a CQM', 'En Calidad'].includes($status) ||
-      Number($cantidadporliberar) === 0 ||
-      disabled
-    )
-      return '#9ca3af';
-    return '#1d4ed8';
-  }};
+      if ($status === 'Listo') return '#16a34a';
+      if (
+        ['Enviado a CQM', 'En Calidad'].includes($status) ||
+        Number($cantidadporliberar) === 0 ||
+        disabled
+      )
+        return '#9ca3af';
+      return '#1d4ed8';
+    }};
   }
 `;
 
