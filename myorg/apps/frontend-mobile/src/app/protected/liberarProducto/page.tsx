@@ -113,7 +113,7 @@ const LiberarProductoScreen: React.FC = () => {
         <>
           <StatusLegend />
           <WorkOrderList
-            orders={filterOrdersByStatus(['En proceso', 'Enviado a CQM', 'Listo', 'En Calidad', 'Parcial'])}
+            orders={filterOrdersByStatus(['En proceso', 'Enviado a CQM', 'Listo', 'En Calidad', 'Parcial', 'Enviado a auditoria parcial'])}
           />
         </>
       )}

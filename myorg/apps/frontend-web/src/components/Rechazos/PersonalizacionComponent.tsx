@@ -191,15 +191,19 @@ export default function PersonalizacionComponent({
     const onlyOnePartial = partials.length === 1;
 
     // 🧠 Identificar el parcial activo (no validado, el más reciente)
-    const currentPartial = partials
-      .filter((p: any) => !p.validated)
+    const currentPartial = currentFlow.partialReleases
+      .filter((r: PartialRelease) => r.validated)
       .sort(
         (a: any, b: any) =>
           new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
       )[0];
 
     // --- Caso 1: todos los parciales validados
-    if (allValidated && Array.isArray(currentFlow?.badQuantityDetails)) {
+    if (
+      allValidated &&
+      Array.isArray(currentFlow?.badQuantityDetails) &&
+      currentFlow.areaResponse?.colorEdge
+    ) {
       const sinParcial = currentFlow.badQuantityDetails.filter(
         (d: any) => d.partial_release_id === null
       );
@@ -307,18 +311,26 @@ export default function PersonalizacionComponent({
     const partials = currentFlow?.partialReleases || [];
     const allValidated =
       partials.length > 0 && partials.every((p: any) => p.validated);
+    console.log(allValidated, 'allValidatedfff');
     const onlyOnePartial = partials.length === 1;
 
     // 🧠 identificar parcial activo (no validado, más reciente)
-    const currentPartial = partials
-      .filter((p: any) => !p.validated)
+    const currentPartial = currentFlow.partialReleases
+      .filter((r: PartialRelease) => r.validated)
       .sort(
         (a: any, b: any) =>
           new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
       )[0];
 
+    console.log(currentPartial, 'currentparcial');
+
     // --- Caso 1: todos validados → sumar los sin parcial
-    if (allValidated && Array.isArray(currentFlow?.badQuantityDetails)) {
+    if (
+      allValidated &&
+      Array.isArray(currentFlow?.badQuantityDetails) &&
+      currentFlow.areaResponse?.colorEdge
+    ) {
+      console.log('Caso 1: todos validados → sumar los sin parcial');
       const sinParciales = currentFlow.badQuantityDetails.filter(
         (d: any) => d.partial_release_id === null
       );

@@ -162,29 +162,74 @@ const MillingChipComponentAcceptAuditory: React.FC<{ workOrder: any }> = ({
   }, [workOrder, sumaBadQuantity]);
 
   const computeInitialBadQuantities = useCallback(() => {
-    const initialValues: Record<string, string> = {};
     const makeAreaKey = (name?: string) =>
       (name ?? '').toLowerCase().replace(/\s/g, '');
-
-    previousFlows.forEach((flow) => {
-      (flow?.badQuantityDetails ?? []).forEach((detail: any) => {
-        // OJO: usa siempre el mismo campo para el área actual (consistencia)
-        // Si tu objeto tiene area_id, úsalo; si no, usa workOrder?.area?.id
-        const currentAreaId = workOrder?.area_id ?? workOrder?.area?.id;
-        if (detail?.source_area_id === currentAreaId) {
-          const areaName = makeAreaKey(detail?.targetArea?.name);
-          initialValues[`${areaName}_bad`] = detail?.bad_quantity
-            ? String(detail.bad_quantity)
-            : '0';
-          initialValues[`${areaName}_material`] = detail?.material_quantity
-            ? String(detail.material_quantity)
-            : '0';
-        }
-      });
+    const initialValues: Record<string, string> = {};
+  
+    const currentPartial = workOrder?.partialReleases?.find((p: any) => !p.validated);
+  
+    const selectedPartial =
+      currentPartial ||
+      [...(workOrder?.partialReleases ?? [])].sort(
+        (a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
+      )[0];
+  
+    console.log("🧩 Parcial activo:", currentPartial?.id ?? "N/A");
+    console.log("🧩 Parcial seleccionado:", selectedPartial?.id ?? "N/A");
+  
+    const currentBadDetails = workOrder?.badQuantityDetails ?? [];
+    console.log("📦 Total de badQuantityDetails:", currentBadDetails.length);
+  
+    currentBadDetails.forEach((d: any) => {
+      console.log(
+        `🧾 Detail ID ${d.id} | Área: ${d.targetArea?.name} | Parcial: ${d.partial_release_id ?? 'null'} | Malas: ${d.bad_quantity}`
+      );
     });
-
+  
+    // 🧠 Determinar modo: parcial o liberación total
+    const isFullRelease =
+      !workOrder?.partialReleases?.length ||
+      workOrder?.partialReleases?.every((p: any) => p.validated);
+  
+    let detailsForSelected: any[] = [];
+  
+    if (isFullRelease) {
+      console.log("🚀 Modo: Liberación total → usando partial_release_id === null");
+      detailsForSelected = currentBadDetails.filter((d: any) => d.partial_release_id == null);
+    } else {
+      console.log("📦 Modo: Parcial → usando parcial", selectedPartial?.id);
+      detailsForSelected = currentBadDetails.filter(
+        (d: any) => d.partial_release_id === selectedPartial?.id
+      );
+    }
+  
+    console.log("🎯 Detalles del parcial o liberación:", detailsForSelected.length);
+    detailsForSelected.forEach((d: any) => {
+      console.log(
+        `➡️ Usado: ${d.targetArea?.name} (malas ${d.bad_quantity}, material ${d.material_quantity})`
+      );
+    });
+  
+    const allAreas = Array.from(
+      new Set(currentBadDetails.map((d: any) => makeAreaKey(d?.targetArea?.name ?? '')))
+    );
+  
+    console.log("🌎 Áreas detectadas:", allAreas);
+  
+    allAreas.forEach((areaKey) => {
+      initialValues[`${areaKey}_bad`] = '0';
+      initialValues[`${areaKey}_material`] = '0';
+    });
+  
+    detailsForSelected.forEach((detail: any) => {
+      const areaName = makeAreaKey(detail?.targetArea?.name);
+      initialValues[`${areaName}_bad`] = String(detail?.bad_quantity ?? 0);
+      initialValues[`${areaName}_material`] = String(detail?.material_quantity ?? 0);
+    });
+  
+    console.log("🧮 Valores finales calculados:", initialValues);
     return initialValues;
-  }, [previousFlows, workOrder?.area_id, workOrder?.area?.id]);
+  }, [workOrder]);
 
   // 2) Precarga al montar / cambiar workOrder
   useEffect(() => {

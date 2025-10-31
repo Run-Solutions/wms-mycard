@@ -8,6 +8,7 @@ export const getWorkOrdersWithInconformidadAuditory = async () => {
   const response = await API.get(
     `/work-order-flow/inconformidad?statuses=${query}`
   );
+  console.log('response', response)
   return response.data;
 };
 export const acceptCorteInconformityAuditory = async (areaResponseFlowId: number): Promise<void> => {

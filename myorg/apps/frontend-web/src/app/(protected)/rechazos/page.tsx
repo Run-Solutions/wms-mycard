@@ -35,6 +35,7 @@ const RechazosPage: React.FC = () => {
     async function fetchAllWorkOrders() {
       try {
         const res = await getWorkOrdersWithInconformidadAuditory();
+        console.log(res, 'res')
         const flowsAuditory = Array.isArray(res?.pendingOrdersAuditory) ? res.pendingOrdersAuditory : [];
         const flowsAuditoryPartial = Array.isArray(res?.pendingOrdersAuditoryPartial) ? res.pendingOrdersAuditoryPartial : [];
 

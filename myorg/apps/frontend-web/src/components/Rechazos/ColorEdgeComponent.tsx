@@ -179,25 +179,30 @@ export default function ColorEdgeComponent({ workOrder, currentFlow }: Props) {
   const computeInitialBadQuantities = useCallback(() => {
     const initialValues: Record<string, string> = {};
     const makeAreaKey = (name?: string) => normalizeAreaKey(name ?? '');
-  
+
     const partials = currentFlow?.partialReleases || [];
-    const allValidated = partials.length > 0 && partials.every((p: any) => p.validated);
+    const allValidated =
+      partials.length > 0 && partials.every((p: any) => p.validated);
     const onlyOnePartial = partials.length === 1;
-  
+
     // 🧠 Identificar el parcial activo (no validado, el más reciente)
-    const currentPartial = partials
-      .filter((p: any) => !p.validated)
+    const currentPartial = currentFlow.partialReleases
+      .filter((r: PartialRelease) => r.validated)
       .sort(
         (a: any, b: any) =>
           new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
       )[0];
-  
+
     // --- Caso 1: todos los parciales validados
-    if (allValidated && Array.isArray(currentFlow?.badQuantityDetails)) {
+    if (
+      allValidated &&
+      Array.isArray(currentFlow?.badQuantityDetails) &&
+      currentFlow.areaResponse?.colorEdge
+    ) {
       const sinParcial = currentFlow.badQuantityDetails.filter(
         (d: any) => d.partial_release_id === null
       );
-  
+
       sinParcial.forEach((detail: any) => {
         const areaName = makeAreaKey(detail?.targetArea?.name);
         initialValues[`${areaName}_bad`] = String(detail?.bad_quantity ?? 0);
@@ -207,13 +212,17 @@ export default function ColorEdgeComponent({ workOrder, currentFlow }: Props) {
       });
       return initialValues;
     }
-  
+
     // --- Caso 2: solo un parcial (o estás en el segundo parcial no validado)
-    if ((onlyOnePartial || currentPartial) && Array.isArray(currentFlow?.badQuantityDetails)) {
+    if (
+      (onlyOnePartial || currentPartial) &&
+      Array.isArray(currentFlow?.badQuantityDetails)
+    ) {
       const detallesDelParcial = currentFlow.badQuantityDetails.filter(
-        (d: any) => d.partial_release_id === (currentPartial?.id ?? partials[0]?.id)
+        (d: any) =>
+          d.partial_release_id === (currentPartial?.id ?? partials[0]?.id)
       );
-  
+
       detallesDelParcial.forEach((detail: any) => {
         const areaName = makeAreaKey(detail?.targetArea?.name);
         initialValues[`${areaName}_bad`] = String(detail?.bad_quantity ?? 0);
@@ -223,7 +232,7 @@ export default function ColorEdgeComponent({ workOrder, currentFlow }: Props) {
       });
       return initialValues;
     }
-  
+
     // --- Caso 3: sin parciales o incompletos (flujo original)
     previousFlows.forEach((flow: any) => {
       (flow?.badQuantityDetails ?? []).forEach((detail: any) => {
@@ -237,7 +246,7 @@ export default function ColorEdgeComponent({ workOrder, currentFlow }: Props) {
         }
       });
     });
-  
+
     return initialValues;
   }, [
     previousFlows,
@@ -297,44 +306,56 @@ export default function ColorEdgeComponent({ workOrder, currentFlow }: Props) {
     const partials = currentFlow?.partialReleases || [];
     const allValidated =
       partials.length > 0 && partials.every((p: any) => p.validated);
+    console.log(allValidated, 'allValidatedfff');
     const onlyOnePartial = partials.length === 1;
-  
+
     // 🧠 identificar parcial activo (no validado, más reciente)
-    const currentPartial = partials
-      .filter((p: any) => !p.validated)
+    const currentPartial = currentFlow.partialReleases
+      .filter((r: PartialRelease) => r.validated)
       .sort(
         (a: any, b: any) =>
           new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
       )[0];
-  
+
+    console.log(currentPartial, 'currentparcial');
+
     // --- Caso 1: todos validados → sumar los sin parcial
-    if (allValidated && Array.isArray(currentFlow?.badQuantityDetails)) {
+    if (
+      allValidated &&
+      Array.isArray(currentFlow?.badQuantityDetails) &&
+      currentFlow.areaResponse?.colorEdge
+    ) {
+      console.log('Caso 1: todos validados → sumar los sin parcial');
       const sinParciales = currentFlow.badQuantityDetails.filter(
         (d: any) => d.partial_release_id === null
       );
-  
+
       return sinParciales.reduce(
         (acc: number, d: any) => acc + (Number(d.bad_quantity) || 0),
         0
       );
     }
-  
+
     // --- Caso 2: solo un parcial o parcial actual activo → sumar los del parcial activo
-    if ((onlyOnePartial || currentPartial) && Array.isArray(currentFlow?.badQuantityDetails)) {
+    if (
+      (onlyOnePartial || currentPartial) &&
+      Array.isArray(currentFlow?.badQuantityDetails)
+    ) {
       const detallesDelParcial = currentFlow.badQuantityDetails.filter(
-        (d: any) => d.partial_release_id === (currentPartial?.id ?? partials[0]?.id)
+        (d: any) =>
+          d.partial_release_id === (currentPartial?.id ?? partials[0]?.id)
       );
-  
+
       return detallesDelParcial.reduce(
         (acc: number, d: any) => acc + (Number(d.bad_quantity) || 0),
         0
       );
     }
-  
+
     // --- Caso 3: sin parciales o con algunos sin validar → usar cálculo clásico por áreas
     if (!Array.isArray(normalizedAreas) || normalizedAreas.length === 0)
       return 0;
-  
+
     return normalizedAreas.reduce((acc, area) => {
       const key = normalizeAreaKey(area.name);
       const bad = Number(areaBadQuantities[`${key}_bad`] ?? 0);

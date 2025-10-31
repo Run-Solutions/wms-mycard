@@ -61,7 +61,9 @@ export class AcceptWorkOrderService {
     statuses: string[],
     userId: number,
   ) {
-    console.log('Buscando órdenes pendientes...');
+    console.log('Buscando órdenes pendientes...', statuses);
+    console.log('Usuario', userId);
+
 
     if (!areasOperatorIds && role_id === 2) {
       throw new Error('No se proporcionaron áreas válidas');
@@ -131,7 +133,7 @@ export class AcceptWorkOrderService {
         partialReleases: {
           some: {
             formAuditory: {
-              is: { reviewed_by_id: userId }, // relación 1–1 -> usar `is`
+              reviewed_by_id: userId,
             },
           },
         },
@@ -154,8 +156,13 @@ export class AcceptWorkOrderService {
         },
       },
     });
+    console.log(pendingOrdersAuditoryPartial, 'pendingOrdersAuditoryPartial')
 
-    if (pendingOrders.length === 0 && pendingOrdersAuditory.length === 0) {
+    if (
+      pendingOrders.length === 0 &&
+      pendingOrdersAuditory.length === 0 &&
+      pendingOrdersAuditoryPartial.length === 0
+    ) {
       return { message: 'No hay órdenes pendientes para esta área.' };
     }
 
