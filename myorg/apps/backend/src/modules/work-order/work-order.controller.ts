@@ -55,7 +55,7 @@ const multerOptions = {
 @Controller('work-orders')
 @UseGuards(JwtAuthGuard)
 export class WorkOrderController {
-  constructor(private readonly workOrderService: WorkOrderService) {}
+  constructor(private readonly workOrderService: WorkOrderService) { }
 
   @Post()
   @UseInterceptors(
@@ -85,7 +85,7 @@ export class WorkOrderController {
     console.log('Request Body:', createWorkOrderDto);
     console.log('Usuario autenticado:', req.user?.id);
 
-    const userId = req.user?.id; 
+    const userId = req.user?.id;
     if (!userId) {
       throw new Error('No se pudo obtener el usuario autenticado.');
     }
@@ -134,8 +134,8 @@ export class WorkOrderController {
     console.log('📌 Áreas asignadas:', user.areas_operator_id);
     const statuses = statusesRaw
       ? statusesRaw
-          .split(',')
-          .map((status) => decodeURIComponent(status.trim()))
+        .split(',')
+        .map((status) => decodeURIComponent(status.trim()))
       : ['En proceso'];
     return await this.workOrderService.getInProgressWorkOrders(
       user.id,
@@ -232,6 +232,47 @@ export class WorkOrderController {
       body.sourceAreaId ?? null,
       body.sourceWorkOrderFlowId ?? null,
       body.badQuantitySummary,
+      body.partialReleaseId ?? null,
+    );
+  }
+
+  @Patch(':id/areas/liberar')
+  async updateWorkOrderAreasLiberar(
+    @Req() req: AuthenticatedRequest,
+    @Body() body: UpdateWorkOrderAreasDto,
+    @Param('id') id: string,
+  ) {
+    const user = req.user;
+    if (!user) {
+      throw new ForbiddenException('Usuario no autenticado.');
+    }
+    return await this.workOrderService.updateWorkOrderAreasLiberar(
+      id,
+      user.id,
+      body.sourceAreaId ?? null,
+      body.sourceWorkOrderFlowId ?? null,
+      body.badQuantitySummary,
+      body.partialReleaseId ?? null,
+    );
+  }
+
+  @Patch(':id/areas/liberar/corte')
+  async updateWorkOrderAreasLiberarCorte(
+    @Req() req: AuthenticatedRequest,
+    @Body() body: UpdateWorkOrderAreasDto,
+    @Param('id') id: string,
+  ) {
+    const user = req.user;
+    if (!user) {
+      throw new ForbiddenException('Usuario no autenticado.');
+    }
+    return await this.workOrderService.updateWorkOrderAreasLiberarCorte(
+      id,
+      user.id,
+      body.sourceAreaId ?? null,
+      body.sourceWorkOrderFlowId ?? null,
+      body.badQuantitySummary,
+      body.partialReleaseId ?? null,
     );
   }
 }

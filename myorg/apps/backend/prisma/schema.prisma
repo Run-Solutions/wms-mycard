@@ -237,6 +237,7 @@ model PartialRelease {
   user                   User?               @relation("UserPartialReleases", fields: [user_id], references: [id])
   inconformities         Inconformities[]    // Relacion inversa
   WorkOrderFlow          WorkOrderFlow       @relation(fields: [work_order_flow_id], references: [id], onDelete: Cascade)
+  badQuantityDetails     BadQuantityDetail[] @relation("PartialReleaseBadQuantityDetails")
 
   created_at             DateTime            @default(now()) @map("created_at")
 
@@ -254,6 +255,7 @@ model BadQuantityDetail {
   material_quantity         Int?
   values                    Json?
   created_by                Int
+  partial_release_id        Int?
   created_at                DateTime        @default(now()) @map("created_at")
   updated_at                DateTime        @updatedAt @map("updated_at")
 
@@ -262,9 +264,11 @@ model BadQuantityDetail {
   sourceArea          AreasOperator @relation("BadQuantitySourceArea", fields: [source_area_id], references: [id])
   targetArea          AreasOperator @relation("BadQuantityTargetArea", fields: [target_area_id], references: [id])
   user                User          @relation(fields: [created_by], references: [id])
+  partialRelease      PartialRelease? @relation("PartialReleaseBadQuantityDetails", fields: [partial_release_id], references: [id], onDelete: Cascade)
 
-  @@unique([source_work_order_flow_id, target_area_id])
   @@map("bad_quantity_detail")
+  @@index([source_work_order_flow_id, target_area_id])
+  @@index([partial_release_id, target_area_id])
 }
 
 model AreasResponse {

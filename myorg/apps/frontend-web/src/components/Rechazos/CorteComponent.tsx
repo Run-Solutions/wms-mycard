@@ -164,50 +164,114 @@ export default function CorteComponent({ workOrder, currentFlow }: Props) {
     }
   }, [currentFlow]);
 
-// 1) No recrees flowList en cada render
-const flowList = useMemo(() => workOrder?.flow ?? [], [workOrder?.flow]);
+  // 1) No recrees flowList en cada render
+  const flowList = useMemo(() => workOrder?.flow ?? [], [workOrder?.flow]);
 
-// 2) Memoiza previousFlows basado en refs estables
-const currentIndex = useMemo(
-  () => flowList.findIndex((item: any) => item.id === currentFlow?.id),
-  [flowList, currentFlow?.id]
-);
+  // 2) Memoiza previousFlows basado en refs estables
+  const currentIndex = useMemo(
+    () => flowList.findIndex((item: any) => item.id === currentFlow?.id),
+    [flowList, currentFlow?.id]
+  );
 
-const previousFlows = useMemo(
-  () => flowList.slice(0, currentIndex + 1).filter((flow: any) => flow.area_id !== 1),
-  [flowList, currentIndex]
-);
+  const previousFlows = useMemo(
+    () =>
+      flowList
+        .slice(0, currentIndex + 1)
+        .filter((flow: any) => flow.area_id !== 1),
+    [flowList, currentIndex]
+  );
 
-// 3) Arregla las deps y evita setState si no cambió
-const computeInitialBadQuantities = useCallback(() => {
-  const initialValues: Record<string, string> = {};
-  const makeAreaKey = (name?: string) => (name ?? '').toLowerCase().replace(/\s/g, '');
+  // 3) Arregla las deps y evita setState si no cambió
+  const computeInitialBadQuantities = useCallback(() => {
+    const initialValues: Record<string, string> = {};
+    const makeAreaKey = (name?: string) => normalizeAreaKey(name ?? '');
 
-  previousFlows.forEach((flow: any) => {
-    (flow?.badQuantityDetails ?? []).forEach((detail: any) => {
-      const currentAreaId = currentFlow?.area_id ?? currentFlow?.area?.id;
-      if (detail?.source_area_id === currentAreaId) {
+    const partials = currentFlow?.partialReleases || [];
+    const allValidated =
+      partials.length > 0 && partials.every((p: any) => p.validated);
+    const onlyOnePartial = partials.length === 1;
+
+    // 🧠 Identificar el parcial activo (no validado, el más reciente)
+    const currentPartial = currentFlow.partialReleases
+      .filter((r: PartialRelease) => r.validated)
+      .sort(
+        (a: any, b: any) =>
+          new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
+      )[0];
+
+    // --- Caso 1: todos los parciales validados
+    if (
+      allValidated &&
+      Array.isArray(currentFlow?.badQuantityDetails) &&
+      currentFlow.areaResponse?.colorEdge
+    ) {
+      const sinParcial = currentFlow.badQuantityDetails.filter(
+        (d: any) => d.partial_release_id === null
+      );
+
+      sinParcial.forEach((detail: any) => {
         const areaName = makeAreaKey(detail?.targetArea?.name);
-        initialValues[`${areaName}_bad`] = detail?.bad_quantity ? String(detail.bad_quantity) : '0';
-        initialValues[`${areaName}_material`] = detail?.material_quantity ? String(detail.material_quantity) : '0';
-      }
-    });
-  });
+        initialValues[`${areaName}_bad`] = String(detail?.bad_quantity ?? 0);
+        initialValues[`${areaName}_material`] = String(
+          detail?.material_quantity ?? 0
+        );
+      });
+      return initialValues;
+    }
 
-  return initialValues;
-}, [previousFlows, currentFlow?.area_id, currentFlow?.area?.id]);
+    // --- Caso 2: solo un parcial (o estás en el segundo parcial no validado)
+    if (
+      (onlyOnePartial || currentPartial) &&
+      Array.isArray(currentFlow?.badQuantityDetails)
+    ) {
+      const detallesDelParcial = currentFlow.badQuantityDetails.filter(
+        (d: any) =>
+          d.partial_release_id === (currentPartial?.id ?? partials[0]?.id)
+      );
 
-// 4) Solo setear si realmente cambió (comparación simple por string)
-useEffect(() => {
-  const initial = computeInitialBadQuantities();
-  if (Object.keys(initial).length > 0) {
-    setAreaBadQuantities((prev) => {
-      const same =
-        JSON.stringify(prev) === JSON.stringify(initial); // barato y suficiente aquí
-      return same ? prev : initial;
+      detallesDelParcial.forEach((detail: any) => {
+        const areaName = makeAreaKey(detail?.targetArea?.name);
+        initialValues[`${areaName}_bad`] = String(detail?.bad_quantity ?? 0);
+        initialValues[`${areaName}_material`] = String(
+          detail?.material_quantity ?? 0
+        );
+      });
+      return initialValues;
+    }
+
+    // --- Caso 3: sin parciales o incompletos (flujo original)
+    previousFlows.forEach((flow: any) => {
+      (flow?.badQuantityDetails ?? []).forEach((detail: any) => {
+        const currentAreaId = currentFlow?.area_id ?? currentFlow?.area?.id;
+        if (detail?.source_area_id === currentAreaId) {
+          const areaName = makeAreaKey(detail?.targetArea?.name);
+          initialValues[`${areaName}_bad`] = String(detail?.bad_quantity ?? 0);
+          initialValues[`${areaName}_material`] = String(
+            detail?.material_quantity ?? 0
+          );
+        }
+      });
     });
-  }
-}, [computeInitialBadQuantities]);
+
+    return initialValues;
+  }, [
+    previousFlows,
+    currentFlow?.area_id,
+    currentFlow?.area?.id,
+    currentFlow?.badQuantityDetails,
+    currentFlow?.partialReleases,
+  ]);
+
+  // 4) Solo setear si realmente cambió (comparación simple por string)
+  useEffect(() => {
+    const initial = computeInitialBadQuantities();
+    if (Object.keys(initial).length > 0) {
+      setAreaBadQuantities((prev) => {
+        const same = JSON.stringify(prev) === JSON.stringify(initial); // barato y suficiente aquí
+        return same ? prev : initial;
+      });
+    }
+  }, [computeInitialBadQuantities]);
 
   const handleOpenBadQuantityModal = () => {
     const initial = computeInitialBadQuantities();
@@ -244,6 +308,56 @@ useEffect(() => {
   );
 
   const sumaBadQuantity = useMemo(() => {
+    const partials = currentFlow?.partialReleases || [];
+    const allValidated =
+      partials.length > 0 && partials.every((p: any) => p.validated);
+    console.log(allValidated, 'allValidatedfff');
+    const onlyOnePartial = partials.length === 1;
+
+    // 🧠 identificar parcial activo (no validado, más reciente)
+    const currentPartial = currentFlow.partialReleases
+      .filter((r: PartialRelease) => r.validated)
+      .sort(
+        (a: any, b: any) =>
+          new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
+      )[0];
+
+    console.log(currentPartial, 'currentparcial');
+
+    // --- Caso 1: todos validados → sumar los sin parcial
+    if (
+      allValidated &&
+      Array.isArray(currentFlow?.badQuantityDetails) &&
+      currentFlow.areaResponse?.colorEdge
+    ) {
+      console.log('Caso 1: todos validados → sumar los sin parcial');
+      const sinParciales = currentFlow.badQuantityDetails.filter(
+        (d: any) => d.partial_release_id === null
+      );
+
+      return sinParciales.reduce(
+        (acc: number, d: any) => acc + (Number(d.bad_quantity) || 0),
+        0
+      );
+    }
+
+    // --- Caso 2: solo un parcial o parcial actual activo → sumar los del parcial activo
+    if (
+      (onlyOnePartial || currentPartial) &&
+      Array.isArray(currentFlow?.badQuantityDetails)
+    ) {
+      const detallesDelParcial = currentFlow.badQuantityDetails.filter(
+        (d: any) =>
+          d.partial_release_id === (currentPartial?.id ?? partials[0]?.id)
+      );
+
+      return detallesDelParcial.reduce(
+        (acc: number, d: any) => acc + (Number(d.bad_quantity) || 0),
+        0
+      );
+    }
+
+    // --- Caso 3: sin parciales o con algunos sin validar → usar cálculo clásico por áreas
     if (!Array.isArray(normalizedAreas) || normalizedAreas.length === 0)
       return 0;
 
@@ -255,7 +369,12 @@ useEffect(() => {
         : 0;
       return acc + bad + mat;
     }, 0);
-  }, [normalizedAreas, areaBadQuantities]);
+  }, [
+    normalizedAreas,
+    areaBadQuantities,
+    currentFlow?.partialReleases,
+    currentFlow?.badQuantityDetails,
+  ]);
 
   return (
     <>

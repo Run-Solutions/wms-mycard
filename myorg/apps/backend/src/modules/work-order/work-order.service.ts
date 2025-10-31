@@ -27,6 +27,13 @@ type BlockKey =
 
 type UpdatableField = 'bad_quantity' | 'material_quantity';
 
+type BadQuantityDetailSnapshot = {
+  id: number;
+  bad_quantity: number | Prisma.Decimal | null;
+  material_quantity: number | Prisma.Decimal | null;
+  values: Prisma.JsonValue | null;
+};
+
 type DelegateKey =
   | 'prepressResponse'
   | 'impressionResponse'
@@ -41,35 +48,11 @@ type DelegateKey =
 
 type ResultBlockKey = BlockKey | 'partialRelease';
 
-type BadQuantityDetailSnapshot = {
+type DetailSnapshot = {
   id: number;
   bad_quantity: number | Prisma.Decimal | null;
   material_quantity: number | Prisma.Decimal | null;
   values: Prisma.JsonValue | null;
-};
-
-const AREA_NAME_TO_BLOCK: Record<string, BlockKey> = {
-  preprensa: 'prepress',
-  prepress: 'prepress',
-  impresion: 'impression',
-  impression: 'impression',
-  serigrafia: 'serigrafia',
-  empalme: 'empalme',
-  laminacion: 'laminacion',
-  lamination: 'laminacion',
-  corte: 'corte',
-  coloredge: 'colorEdge',
-  color_edge: 'colorEdge',
-  'color edge': 'colorEdge',
-  'color-edge': 'colorEdge',
-  hotstamping: 'hotStamping',
-  'hot stamping': 'hotStamping',
-  hot_stamping: 'hotStamping',
-  millingchip: 'millingChip',
-  'milling chip': 'millingChip',
-  milling_chip: 'millingChip',
-  personalizacion: 'personalizacion',
-  personalization: 'personalizacion',
 };
 
 const ACCUMULATE_BLOCKS = new Set<ResultBlockKey>([
@@ -79,6 +62,9 @@ const ACCUMULATE_BLOCKS = new Set<ResultBlockKey>([
   'empalme',
   'laminacion',
 ]);
+
+const CUT_AREA_ID = 6;
+const AGGREGATE_INTO_CUT_AREA_IDS = new Set<number>([1, 2, 3, 4, 5]);
 
 const BLOCK_CONFIG: Record<
   BlockKey,
@@ -163,14 +149,9 @@ const BLOCK_DATA_FIELDS: Record<BlockKey, ReadonlyArray<string>> = {
   ],
 };
 
-const PARTIAL_RELEASE_FIELDS: ReadonlyArray<UpdatableField> = [
-  'bad_quantity',
-  'material_quantity',
-];
-
 @Injectable()
 export class WorkOrderService {
-  constructor(private prisma: PrismaService) {}
+  constructor(private prisma: PrismaService) { }
 
   async createWorkOrder(
     dto: CreateWorkOrderDto,
@@ -544,6 +525,11 @@ export class WorkOrderService {
             partialReleases: {
               include: {
                 user: true,
+                badQuantityDetails: {
+                  include: {
+                    targetArea: true,
+                  },
+                },
                 formAuditory: {
                   include: {
                     user: true,
@@ -902,7 +888,8 @@ export class WorkOrderService {
           ) {
             const numeric = Number((area.data as Record<string, any>)[field]);
             if (Number.isFinite(numeric)) {
-              sanitizedData[field] = Math.round(numeric);
+              const rounded = Math.round(numeric);
+              sanitizedData[field] = Math.max(0, rounded);
             }
           }
         }
@@ -1009,6 +996,120 @@ export class WorkOrderService {
           }
         }
 
+        const hasBadUpdate = Object.prototype.hasOwnProperty.call(
+          sanitizedData,
+          'bad_quantity',
+        );
+        const hasMaterialUpdate = Object.prototype.hasOwnProperty.call(
+          sanitizedData,
+          'material_quantity',
+        );
+
+        if ((hasBadUpdate || hasMaterialUpdate) && blockKey) {
+          const aggregateIntoCut = AGGREGATE_INTO_CUT_AREA_IDS.has(areaId);
+          const targetAreaIdForRemainder = aggregateIntoCut
+            ? CUT_AREA_ID
+            : areaId;
+          const blockForRemainder: ResultBlockKey | null = aggregateIntoCut
+            ? 'corte'
+            : blockKey;
+
+          if (!blockForRemainder) {
+            continue;
+          }
+
+          // Limpia cualquier detalle previo que haya quedado con el target opuesto
+          await tx.badQuantityDetail.deleteMany({
+            where: {
+              partial_release_id: null,
+              source_work_order_flow_id: areaResponse.work_order_flow_id,
+              target_area_id: aggregateIntoCut ? areaId : CUT_AREA_ID,
+            },
+          });
+
+          const partialStats = await tx.partialRelease.aggregate({
+            where: { work_order_flow_id: areaResponse.work_order_flow_id },
+            _sum: { bad_quantity: true, material_quantity: true },
+            _count: true,
+          });
+
+          const partialCount =
+            typeof partialStats._count === 'number'
+              ? partialStats._count
+              : ((partialStats._count as any)?._all ?? 0);
+
+          const existingDetail = await tx.badQuantityDetail.findFirst({
+            where: {
+              partial_release_id: null,
+              source_work_order_flow_id: areaResponse.work_order_flow_id,
+              target_area_id: targetAreaIdForRemainder,
+              block: blockForRemainder,
+            },
+          });
+
+          if (partialCount === 0) {
+            if (existingDetail) {
+              await tx.badQuantityDetail.delete({
+                where: { id: existingDetail.id },
+              });
+            }
+            continue;
+          }
+
+          const totalBad = hasBadUpdate
+            ? Number(sanitizedData.bad_quantity ?? 0)
+            : (coerceToNumber(blockRecord?.bad_quantity ?? null) ?? 0);
+          const totalMaterial = hasMaterialUpdate
+            ? Number(sanitizedData.material_quantity ?? 0)
+            : (coerceToNumber(blockRecord?.material_quantity ?? null) ?? 0);
+
+          const partialBadSum =
+            coerceToNumber(partialStats._sum?.bad_quantity ?? null) ?? 0;
+          const partialMaterialSum =
+            coerceToNumber(partialStats._sum?.material_quantity ?? null) ?? 0;
+
+          const remainderBad = Math.max(totalBad - partialBadSum, 0);
+          const remainderMaterial = Math.max(
+            totalMaterial - partialMaterialSum,
+            0,
+          );
+
+          if (remainderBad === 0 && remainderMaterial === 0) {
+            if (existingDetail) {
+              await tx.badQuantityDetail.delete({
+                where: { id: existingDetail.id },
+              });
+            }
+            continue;
+          }
+
+          if (existingDetail) {
+            await tx.badQuantityDetail.update({
+              where: { id: existingDetail.id },
+              data: {
+                block: blockForRemainder,
+                bad_quantity: remainderBad,
+                material_quantity: remainderMaterial,
+                updated_at: new Date(),
+              },
+            });
+          } else {
+            await tx.badQuantityDetail.create({
+              data: {
+                work_order_id: workOrder.id,
+                source_work_order_flow_id: areaResponse.work_order_flow_id,
+                source_area_id: areaId,
+                target_area_id: targetAreaIdForRemainder,
+                block: blockForRemainder,
+                bad_quantity: remainderBad,
+                material_quantity: remainderMaterial,
+                partial_release_id: null,
+                created_by: _userId,
+              },
+            });
+          }
+        }
+
         if (
           Object.keys(sanitizedData).length > 0 ||
           Object.keys(sampleDataResult).length > 0
@@ -1025,11 +1126,11 @@ export class WorkOrderService {
             formId:
               typeof blockRecord.form_auditory_id === 'number'
                 ? blockRecord.form_auditory_id
-                : area.formId ?? null,
+                : (area.formId ?? null),
             cqmId:
               typeof blockRecord.form_answer_id === 'number'
                 ? blockRecord.form_answer_id
-                : area.cqmId ?? null,
+                : (area.cqmId ?? null),
           });
         }
       }
@@ -1048,6 +1149,418 @@ export class WorkOrderService {
     sourceAreaId: number | null = null,
     sourceWorkOrderFlowId: number | null = null,
     badQuantitySummary: BadQuantitySummaryDto[] = [],
+    partialReleaseId: number | null = null,
+  ) {
+    const normalizedSummary = (
+      Array.isArray(badQuantitySummary) ? badQuantitySummary : []
+    )
+      .map((entry) => {
+        const areaId = Number(entry?.areaId);
+        if (!Number.isFinite(areaId) || areaId <= 0) return null;
+
+        const areaName =
+          typeof entry?.areaName === 'string' ? entry.areaName.trim() : '';
+
+        const sanitizedValues = (
+          Array.isArray(entry?.values) ? entry.values : []
+        )
+          .map((value) => {
+            const label =
+              typeof value?.label === 'string' ? value.label.trim() : '';
+            if (!label) return null;
+
+            const numeric = Number(value?.value ?? 0);
+            if (!Number.isFinite(numeric)) return null;
+
+            const rounded = Math.round(numeric);
+            if (rounded === 0) return null;
+
+            return {
+              label,
+              value: rounded,
+            };
+          })
+          .filter(
+            (value): value is { label: string; value: number } =>
+              value !== null,
+          );
+
+        if (sanitizedValues.length === 0) {
+          return null;
+        }
+
+        return {
+          areaId,
+          areaName,
+          values: sanitizedValues,
+        };
+      })
+      .filter(
+        (
+          entry,
+        ): entry is {
+          areaId: number;
+          areaName: string;
+          values: Array<{ label: string; value: number }>;
+        } => entry !== null,
+      );
+
+    if (normalizedSummary.length === 0) {
+      return {
+        success: true,
+        message: 'No se enviaron datos de resumen para actualizar.',
+        details: [],
+      };
+    }
+
+    const workOrder = await this.prisma.workOrder.findUnique({
+      where: { ot_id: workOrderOtId },
+      select: { id: true },
+    });
+
+    if (!workOrder) {
+      throw new NotFoundException(
+        `No se encontró la orden de trabajo con ot_id: ${workOrderOtId}.`,
+      );
+    }
+
+    if (sourceAreaId === null && sourceWorkOrderFlowId === null) {
+      throw new BadRequestException(
+        'Debe indicar el área o flujo de origen para registrar las cantidades malas.',
+      );
+    }
+
+    let resolvedFlow = null as {
+      id: number;
+      area_id: number;
+      work_order_id: number;
+    } | null;
+
+    if (sourceWorkOrderFlowId !== null) {
+      resolvedFlow = await this.prisma.workOrderFlow.findUnique({
+        where: { id: sourceWorkOrderFlowId },
+        select: {
+          id: true,
+          area_id: true,
+          work_order_id: true,
+        },
+      });
+
+      if (!resolvedFlow || resolvedFlow.work_order_id !== workOrder.id) {
+        throw new BadRequestException(
+          'El flujo indicado no pertenece a la orden de trabajo especificada.',
+        );
+      }
+
+      if (
+        sourceAreaId !== null &&
+        Number(resolvedFlow.area_id) !== Number(sourceAreaId)
+      ) {
+        throw new BadRequestException(
+          'El flujo indicado no corresponde al área de origen proporcionada.',
+        );
+      }
+    }
+
+    if (resolvedFlow === null) {
+      if (sourceAreaId === null) {
+        throw new BadRequestException(
+          'No fue posible resolver el flujo de origen para la orden seleccionada.',
+        );
+      }
+
+      resolvedFlow = await this.prisma.workOrderFlow.findFirst({
+        where: {
+          work_order_id: workOrder.id,
+          area_id: Number(sourceAreaId),
+        },
+        orderBy: { id: 'desc' },
+        select: {
+          id: true,
+          area_id: true,
+          work_order_id: true,
+        },
+      });
+
+      if (!resolvedFlow) {
+        throw new BadRequestException(
+          'No se encontró un flujo asociado al área indicada para esta orden.',
+        );
+      }
+    }
+
+    if (!resolvedFlow) {
+      throw new BadRequestException(
+        'No fue posible resolver el flujo de origen para el resumen enviado.',
+      );
+    }
+
+    const resolvedSourceAreaId = Number(
+      sourceAreaId !== null ? sourceAreaId : resolvedFlow.area_id,
+    );
+
+    if (!Number.isFinite(resolvedSourceAreaId) || resolvedSourceAreaId <= 0) {
+      throw new BadRequestException(
+        'No fue posible determinar el área de origen para registrar el resumen.',
+      );
+    }
+
+    if (partialReleaseId !== null) {
+      const partialRecord = await this.prisma.partialRelease.findUnique({
+        where: { id: partialReleaseId },
+        select: { id: true, work_order_flow_id: true },
+      });
+
+      if (!partialRecord) {
+        throw new BadRequestException(
+          'El parcial indicado no existe o fue eliminado.',
+        );
+      }
+
+      if (partialRecord.work_order_flow_id !== resolvedFlow.id) {
+        throw new BadRequestException(
+          'El parcial indicado no pertenece al flujo de origen proporcionado.',
+        );
+      }
+    }
+
+    const uniqueTargetAreaIds = Array.from(
+      new Set(normalizedSummary.map((entry) => entry.areaId)),
+    );
+
+    if (uniqueTargetAreaIds.length === 0) {
+      return {
+        success: true,
+        message: 'No se encontraron áreas objetivo válidas para actualizar.',
+        details: [],
+      };
+    }
+
+    const resolvedFlowId = resolvedFlow.id;
+    const effectivePartialReleaseId = partialReleaseId ?? null;
+
+    const transactionResult = await this.prisma.$transaction(async (tx) => {
+      const areas = await tx.areasOperator.findMany({
+        where: { id: { in: uniqueTargetAreaIds } },
+        select: { id: true, name: true },
+      });
+
+      const areaNameMap = new Map(areas.map((area) => [area.id, area.name]));
+
+      if (areaNameMap.size !== uniqueTargetAreaIds.length) {
+        throw new BadRequestException(
+          'Se detectaron áreas objetivo inválidas dentro del resumen enviado.',
+        );
+      }
+
+      const partialFilter =
+        effectivePartialReleaseId === null
+          ? { equals: null }
+          : { equals: effectivePartialReleaseId };
+
+      const existingDetails = await tx.badQuantityDetail.findMany({
+        where: {
+          work_order_id: workOrder.id,
+          source_work_order_flow_id: resolvedFlowId,
+          source_area_id: resolvedSourceAreaId,
+          partial_release_id: partialFilter,
+          target_area_id: { in: uniqueTargetAreaIds },
+        },
+      });
+
+      const existingByTarget = new Map(
+        existingDetails.map((detail) => [detail.target_area_id, detail]),
+      );
+
+      const detailResults: Array<{
+        targetAreaId: number;
+        block: ResultBlockKey;
+        action: 'created' | 'updated' | 'deleted';
+        totals: Partial<Record<UpdatableField, number>>;
+      }> = [];
+
+      for (const entry of normalizedSummary) {
+        const effectiveAreaName =
+          areaNameMap.get(entry.areaId) || entry.areaName || '';
+
+        const blockKey =
+          __resolveBlockKeyByIdOrName__(entry.areaId, effectiveAreaName) ??
+          'partialRelease';
+
+        const existingDetail = existingByTarget.get(entry.areaId) ?? null;
+        const existingSnapshot: DetailSnapshot | null = existingDetail
+          ? {
+            id: existingDetail.id,
+            bad_quantity: existingDetail.bad_quantity,
+            material_quantity: existingDetail.material_quantity,
+            values: existingDetail.values as Prisma.JsonValue | null,
+          }
+          : null;
+
+        // Totales previos del detalle existente
+        const previousTotals = extractDetailTotals(existingSnapshot) ?? {};
+
+        // Totales ENTRANTES desde el modal (se interpretan como ABSOLUTOS, no deltas)
+        const incomingTotals = aggregateSummaryValues(
+          entry as BadQuantitySummaryDto,
+        );
+
+        // Construye los "nextTotals" como ABSOLUTOS (no sumes a lo previo)
+        const nextTotals: Partial<Record<UpdatableField, number>> = {
+          ...previousTotals,
+        };
+        let totalsChanged = false;
+
+        for (const field of Object.keys(incomingTotals) as UpdatableField[]) {
+          const incoming = Number(incomingTotals[field] ?? 0);
+          if (!Number.isFinite(incoming)) continue;
+
+          // Normaliza (>= 0 y entero)
+          const normalizedIncoming = Math.max(0, Math.round(incoming));
+          const current = Math.round(Number(previousTotals[field] ?? 0));
+
+          if (normalizedIncoming !== current) {
+            totalsChanged = true;
+            nextTotals[field] = normalizedIncoming;
+          }
+        }
+
+        // Reemplaza la lista de values con lo que trae el modal (no acumular etiquetas)
+        const previousValues = extractDetailValuesList(existingSnapshot);
+        const mergedValues = mergeDetailValues(previousValues, entry.values, {
+          accumulate: false, // <<--- antes estaba en true; ahora REEMPLAZA
+        });
+
+        const valuesChanged =
+          previousValues.length !== mergedValues.length ||
+          JSON.stringify(sortDetailValues(previousValues)) !==
+          JSON.stringify(sortDetailValues(mergedValues));
+
+        // ¿Queda algo positivo?
+        const hasValues = mergedValues.length > 0;
+        const positiveTotals = Object.values(nextTotals).some(
+          (value) => (value ?? 0) > 0,
+        );
+
+        // Determina el bloque destino (ya resuelto arriba en blockKey)
+        const blockChanged = existingDetail?.block !== blockKey;
+
+        // Normaliza totales finales para persistir
+        const nextBadQuantity = Math.max(
+          0,
+          Math.round(nextTotals.bad_quantity ?? 0),
+        );
+        const nextMaterialQuantity = Math.max(
+          0,
+          Math.round(nextTotals.material_quantity ?? 0),
+        );
+
+        const totalsForResult: Partial<Record<UpdatableField, number>> = {};
+        if (
+          nextTotals.bad_quantity !== undefined ||
+          (existingDetail && existingDetail.bad_quantity !== null)
+        ) {
+          totalsForResult.bad_quantity = nextBadQuantity;
+        }
+        if (
+          nextTotals.material_quantity !== undefined ||
+          (existingDetail && existingDetail.material_quantity !== null)
+        ) {
+          totalsForResult.material_quantity = nextMaterialQuantity;
+        }
+
+        // Borrado si quedó en cero y sin values
+        const shouldDelete = !!existingDetail && !positiveTotals && !hasValues;
+
+        if (shouldDelete) {
+          await tx.badQuantityDetail.delete({
+            where: { id: existingDetail!.id },
+          });
+          existingByTarget.delete(entry.areaId);
+          detailResults.push({
+            targetAreaId: entry.areaId,
+            block: (existingDetail!.block as ResultBlockKey) ?? blockKey,
+            action: 'deleted',
+            totals: { bad_quantity: 0, material_quantity: 0 },
+          });
+          continue;
+        }
+
+        if (existingDetail) {
+          if (totalsChanged || valuesChanged || blockChanged) {
+            const updateData: Prisma.BadQuantityDetailUpdateInput = {
+              block: blockKey,
+              bad_quantity: nextBadQuantity,
+              material_quantity: nextMaterialQuantity,
+              updated_at: new Date(),
+            };
+
+            if (valuesChanged) {
+              updateData.values = hasValues ? mergedValues : Prisma.JsonNull;
+            }
+
+            const updated = await tx.badQuantityDetail.update({
+              where: { id: existingDetail.id },
+              data: updateData,
+            });
+
+            existingByTarget.set(entry.areaId, updated);
+            detailResults.push({
+              targetAreaId: entry.areaId,
+              block: blockKey,
+              action: 'updated',
+              totals: totalsForResult,
+            });
+          }
+          continue;
+        }
+
+        if (!positiveTotals && !hasValues) {
+          continue;
+        }
+
+        // Crear nuevo detalle (modo reemplazo con totales absolutos)
+        const created = await tx.badQuantityDetail.create({
+          data: {
+            work_order_id: workOrder.id,
+            source_work_order_flow_id: resolvedFlowId,
+            source_area_id: resolvedSourceAreaId,
+            target_area_id: entry.areaId,
+            block: blockKey,
+            bad_quantity: nextBadQuantity,
+            material_quantity: nextMaterialQuantity,
+            values: hasValues ? mergedValues : undefined,
+            created_by: userId,
+            partial_release_id: effectivePartialReleaseId,
+          },
+        });
+
+        existingByTarget.set(entry.areaId, created);
+        detailResults.push({
+          targetAreaId: entry.areaId,
+          block: blockKey,
+          action: 'created',
+          totals: totalsForResult,
+        });
+      }
+
+      return detailResults;
+    });
+
+    return {
+      success: true,
+      message: 'Resumen de malas actualizado correctamente.',
+      details: transactionResult,
+    };
+  }
+
+  async updateWorkOrderAreasLiberar(
+    workOrderOtId: string,
+    userId: number,
+    sourceAreaId: number | null = null,
+    sourceWorkOrderFlowId: number | null = null,
+    badQuantitySummary: BadQuantitySummaryDto[] = [],
+    partialReleaseId: number | null = null,
   ) {
     const workOrder = await this.prisma.workOrder.findUnique({
       where: { ot_id: workOrderOtId },
@@ -1073,14 +1586,9 @@ export class WorkOrderService {
 
     let resolvedSourceAreaId = sourceAreaId ?? null;
     let resolvedSourceFlowId = sourceWorkOrderFlowId ?? null;
-    let sourceFlow: {
-      id: number;
-      area_id: number;
-      work_order_id: number;
-    } | null = null;
 
     if (resolvedSourceFlowId) {
-      sourceFlow = await this.prisma.workOrderFlow.findUnique({
+      const sourceFlow = await this.prisma.workOrderFlow.findUnique({
         where: { id: resolvedSourceFlowId },
         select: { id: true, area_id: true, work_order_id: true },
       });
@@ -1121,16 +1629,10 @@ export class WorkOrderService {
 
     const partialReleases = await this.prisma.partialRelease.findMany({
       where: {
-        WorkOrderFlow: {
-          work_order_id: workOrderId,
-        },
+        WorkOrderFlow: { work_order_id: workOrderId },
       },
       include: {
-        WorkOrderFlow: {
-          select: {
-            area_id: true,
-          },
-        },
+        WorkOrderFlow: { select: { area_id: true } },
       },
       orderBy: [{ created_at: 'asc' }, { id: 'asc' }],
     });
@@ -1156,149 +1658,251 @@ export class WorkOrderService {
 
     await this.prisma.$transaction(async (tx) => {
       for (const summary of badQuantitySummary) {
+        console.log(
+          `🔁 Procesando área ${summary.areaName} (ID: ${summary.areaId}) con valores:`,
+          JSON.stringify(summary.values),
+        );
         const aggregated = aggregateSummaryValues(summary);
         if (Object.keys(aggregated).length === 0) continue;
 
-        const areaRecord = areaResponseByAreaId.get(summary.areaId);
-        const blockKey = resolveBlockKey(summary.areaName);
+        const areaRecord = areaResponseByAreaId.get(summary.areaId); // TARGET
+        const blockKey = resolveBlockKey(summary.areaName); // TARGET BLOCK
 
         let handledByAreaResponse = false;
         let detailBlock: ResultBlockKey | null = blockKey ?? null;
 
-        let detailWhereInput: Prisma.BadQuantityDetailWhereUniqueInput | null =
-          null;
-        let existingDetail: BadQuantityDetailSnapshot | null = null;
+        // ===== Buscar detalle existente (parcial o final) para actualizar/mergear =====
+        let existingDetail:
+          | (BadQuantityDetailSnapshot & { id: number })
+          | null = null;
 
-        if (
-          canPersistDetails &&
-          resolvedSourceFlowId !== null &&
-          resolvedSourceAreaId !== null
-        ) {
-          detailWhereInput = {
-            source_work_order_flow_id_target_area_id: {
-              source_work_order_flow_id: resolvedSourceFlowId,
-              target_area_id: summary.areaId,
-            },
-          };
-
-          existingDetail = (await tx.badQuantityDetail.findUnique({
-            where: detailWhereInput,
-            select: {
-              id: true,
-              bad_quantity: true,
-              material_quantity: true,
-              values: true,
-            },
-          })) as BadQuantityDetailSnapshot | null;
+        if (canPersistDetails) {
+          if (partialReleaseId !== null) {
+            // PARCIAL: findFirst por (source_flow, target_area, partial_release, block)
+            existingDetail = (await tx.badQuantityDetail.findFirst({
+              where: {
+                source_work_order_flow_id: resolvedSourceFlowId!,
+                target_area_id: summary.areaId,
+                partial_release_id: partialReleaseId,
+                block: detailBlock ?? undefined,
+              },
+              select: {
+                id: true,
+                bad_quantity: true,
+                material_quantity: true,
+                values: true,
+              },
+            })) as any;
+          } else {
+            // FINAL: findFirst por (source_flow, target_area, partial_release=null)
+            existingDetail = (await tx.badQuantityDetail.findFirst({
+              where: {
+                source_work_order_flow_id: resolvedSourceFlowId!,
+                target_area_id: summary.areaId,
+                partial_release_id: null,
+                block: detailBlock ?? undefined,
+              },
+              select: {
+                id: true,
+                bad_quantity: true,
+                material_quantity: true,
+                values: true,
+              },
+            })) as any;
+          }
         }
+        console.log(
+          `🧾 existingDetail para ${summary.areaName}:`,
+          existingDetail
+            ? {
+              id: existingDetail.id,
+              bad_quantity: existingDetail.bad_quantity,
+            }
+            : 'no existe (null)',
+        );
 
-        const detailTotals = extractDetailTotals(existingDetail);
+        const detailTotals = extractDetailTotals(existingDetail ?? null);
         const { deltas: summaryDeltas, totals: normalizedTotals } =
           computeDetailAdjustments(aggregated, detailTotals);
 
+        const hasAnyDelta = Object.keys(summaryDeltas).length > 0;
+        const previousTotals =
+          detailTotals ?? ({} as Partial<Record<UpdatableField, number>>);
+        const hasDetailChange = Object.entries(normalizedTotals).some(
+          ([field, nextValue]) => {
+            const key = field as UpdatableField;
+            const prevValue = previousTotals[key] ?? 0;
+            const normalizedPrev = Math.round(Number(prevValue ?? 0));
+            const normalizedNext = Math.round(Number(nextValue ?? 0));
+            return normalizedPrev !== normalizedNext;
+          },
+        );
+
+        if (!hasAnyDelta && !hasDetailChange) {
+          continue;
+        }
+
         // --------------------------
-        // BLOQUES DE ÁREA (impression, serigrafia, etc.)
+        // ACUMULAR EN BLOQUE TARGET (impression, serigrafia, laminacion, empalme)
+        // - crea el bloque si no existe
+        // - incrementa bad_quantity/material_quantity
         // --------------------------
         if (areaRecord && blockKey) {
-          const shouldAccumulate = ACCUMULATE_BLOCKS.has(blockKey);
-        
+          const targetAreaId = summary.areaId;
+
+          const allowsAccumulation =
+            typeof targetAreaId === 'number' &&
+            Number.isFinite(targetAreaId) &&
+            targetAreaId > 0 &&
+            targetAreaId < CUT_AREA_ID;
+
+          const shouldAccumulate =
+            allowsAccumulation && ACCUMULATE_BLOCKS.has(blockKey);
+
           if (!shouldAccumulate) {
-            // CUALQUIER OTRO BLOQUE (p.ej. 'corte', 'colorEdge', etc.)
-            // -> no acumular; solo detalle y sin fallback a partialRelease
-            handledByAreaResponse = true;      // evita fallback
-            detailBlock = blockKey;            // el detalle queda marcado con su bloque real (p.ej. 'corte')
-            // No delegate.update, no updatedAreas.push
+            // No acumulamos en bloque target; pero el detalle sigue persistiendo con su block real
+            handledByAreaResponse = true;
+            detailBlock = blockKey;
           } else {
-            const blockData = areaRecord[blockKey];
-            if (blockData?.id) {
-              const config = BLOCK_CONFIG[blockKey];
-              const delegate = (tx as Record<string, any>)[config.delegate];
-              if (delegate?.findUnique && delegate?.update) {
-                const blockId = Number(blockData.id);
-                const existing = await delegate.findUnique({
-                  where: { id: blockId },
+            // 1) Delegate/config del bloque target
+            const config = BLOCK_CONFIG[blockKey];
+            const delegate = (tx as any)[config.delegate];
+            if (delegate?.findUnique) {
+              // 2) Asegura bloque (crea si falta)
+              let blockId = Number(areaRecord[blockKey]?.id ?? 0);
+              if (!Number.isFinite(blockId) || blockId <= 0) {
+                const created = await delegate.create({
+                  data: {
+                    // Ajusta los campos mínimos requeridos en tu schema:
+                    areas_response_id: areaRecord.id,
+                    work_order_id: workOrderId,
+                    bad_quantity: 0,
+                    material_quantity: 0,
+                  },
                 });
+                blockId = Number(created.id);
+              }
 
-                if (existing) {
-                  const { deltas, logs, nextValues } = buildNumericChanges(
-                    existing,
-                    summaryDeltas,
-                    config.updatableFields,
-                  );
+              // 3) Lee y aplica increments
+              const existing = await delegate.findUnique({
+                where: { id: blockId },
+              });
+              if (existing) {
+                console.log(
+                  '\n⚙️ --- Aplicando incrementos para',
+                  summary.areaName,
+                  '---',
+                );
+                console.log('   existing.bad_quantity:', existing.bad_quantity);
+                console.log(
+                  '   summaryDeltas.bad_quantity:',
+                  summaryDeltas.bad_quantity,
+                );
+                console.log(
+                  '   existing.material_quantity:',
+                  existing.material_quantity,
+                );
+                console.log(
+                  '   summaryDeltas.material_quantity:',
+                  summaryDeltas.material_quantity,
+                );
+                const incomingNext = {
+                  bad_quantity:
+                    (coerceToNumber(existing?.bad_quantity) ?? 0) +
+                    (summaryDeltas.bad_quantity ?? 0),
+                  material_quantity:
+                    (coerceToNumber(existing?.material_quantity) ?? 0) +
+                    (summaryDeltas.material_quantity ?? 0),
+                };
 
-                  // NUEVO: usar set cuando el previo es NULL, increment cuando es numérico
-                  const updatePayload: Record<string, any> = {};
+                console.log(
+                  '   ➡️ incomingNext.bad_quantity (nuevo total calculado):',
+                  incomingNext.bad_quantity,
+                );
+                console.log(
+                  '   ➡️ incomingNext.material_quantity (nuevo total calculado):',
+                  incomingNext.material_quantity,
+                );
+                console.log('⚙️ --- Fin incrementos ---\n');
+                const { deltas, logs, nextValues } = buildNumericChanges(
+                  existing,
+                  incomingNext, // deltas del summary para ESTE TARGET
+                  config.updatableFields,
+                );
+                console.log(
+                  '🧮 Resultado de buildNumericChanges para',
+                  summary.areaName,
+                );
+                console.log('   incomingNext:', incomingNext);
+                console.log('   nextValues (devuelto):', nextValues);
+                console.log('   deltas (devuelto):', deltas);
+                console.log('   logs:', logs);
 
-                  // bad_quantity
-                  if (summaryDeltas.bad_quantity !== undefined) {
-                    const prevBad = coerceToNumber(existing?.bad_quantity);
-                    if (prevBad === null) {
-                      updatePayload.bad_quantity = Number(
-                        nextValues.bad_quantity ?? 0,
-                      );
-                    } else if (
-                      deltas.bad_quantity !== undefined &&
-                      deltas.bad_quantity !== 0
-                    ) {
-                      updatePayload.bad_quantity = {
-                        increment: deltas.bad_quantity,
-                      };
-                    }
+                const updatePayload: Record<string, any> = {};
+
+                if (summaryDeltas.bad_quantity !== undefined) {
+                  const prevBad = coerceToNumber(existing?.bad_quantity);
+                  if (prevBad === null) {
+                    updatePayload.bad_quantity = Number(
+                      nextValues.bad_quantity ?? 0,
+                    );
+                  } else if (deltas.bad_quantity) {
+                    updatePayload.bad_quantity = nextValues.bad_quantity;
                   }
-
-                  // material_quantity
-                  if (summaryDeltas.material_quantity !== undefined) {
-                    const prevMat = coerceToNumber(existing?.material_quantity);
-                    if (prevMat === null) {
-                      updatePayload.material_quantity = Number(
-                        nextValues.material_quantity ?? 0,
-                      );
-                    } else if (
-                      deltas.material_quantity !== undefined &&
-                      deltas.material_quantity !== 0
-                    ) {
-                      updatePayload.material_quantity = {
-                        increment: deltas.material_quantity,
-                      };
-                    }
-                  }
-
-                  if (Object.keys(updatePayload).length > 0) {
-                    await delegate.update({
-                      where: { id: blockId },
-                      data: updatePayload,
-                    });
-
-                    updatedAreas.push({
-                      areaId: summary.areaId,
-                      block: blockKey,
-                      blockId,
-                      data: nextValues,
-                    });
-
-                    for (const entry of logs) {
-                      logsBuffer.push({
-                        work_order_id: workOrderId,
-                        area_id: summary.areaId,
-                        area_name: summary.areaName ?? blockKey,
-                        block: blockKey,
-                        field: entry.field,
-                        old_value: stringifyValue(entry.oldValue),
-                        new_value: stringifyValue(entry.newValue),
-                        user_id: userId,
-                      });
-                    }
-                  }
-
-                  handledByAreaResponse = true;
                 }
+
+                if (summaryDeltas.material_quantity !== undefined) {
+                  const prevMat = coerceToNumber(existing?.material_quantity);
+                  if (prevMat === null) {
+                    updatePayload.material_quantity = Number(
+                      nextValues.material_quantity ?? 0,
+                    );
+                  } else if (deltas.material_quantity) {
+                    updatePayload.material_quantity =
+                      nextValues.material_quantity;
+                  }
+                }
+
+                if (Object.keys(updatePayload).length > 0) {
+                  console.log(
+                    `💾 Actualizando bloque ${blockKey} (areaId=${targetAreaId}) con:`,
+                    updatePayload,
+                  );
+                  await delegate.update({
+                    where: { id: blockId },
+                    data: updatePayload,
+                  });
+
+                  updatedAreas.push({
+                    areaId: targetAreaId,
+                    block: blockKey,
+                    blockId,
+                    data: nextValues,
+                  });
+
+                  for (const entry of logs) {
+                    logsBuffer.push({
+                      work_order_id: workOrderId,
+                      area_id: targetAreaId,
+                      area_name: summary.areaName ?? blockKey,
+                      block: blockKey,
+                      field: entry.field,
+                      old_value: stringifyValue(entry.oldValue),
+                      new_value: stringifyValue(entry.newValue),
+                      user_id: userId,
+                    });
+                  }
+                }
+
+                handledByAreaResponse = true;
+                detailBlock = blockKey; // el detalle queda marcado con el bloque del target
               }
             }
           }
         }
 
         // --------------------------
-        // FALLBACK: partialRelease
+        // FALLBACK: partialRelease (si no se acumuló en bloque target)
         // --------------------------
         if (!handledByAreaResponse) {
           const partialList = partialReleaseByAreaId.get(summary.areaId);
@@ -1313,33 +1917,26 @@ export class WorkOrderService {
                 deltas: partialDeltas,
                 logs: partialLogs,
                 nextValues: partialNextValues,
-              } = buildNumericChanges(
-                existingPartial,
-                summaryDeltas,
-                PARTIAL_RELEASE_FIELDS,
-              );
+              } = buildNumericChanges(existingPartial, summaryDeltas, [
+                'bad_quantity',
+                'material_quantity',
+              ]);
 
-              // NUEVO: set si previo es NULL; increment si es numérico
               const updatePayload: Record<string, any> = {};
 
-              // bad_quantity
               if (summaryDeltas.bad_quantity !== undefined) {
                 const prevBad = coerceToNumber(existingPartial?.bad_quantity);
                 if (prevBad === null) {
                   updatePayload.bad_quantity = Number(
                     partialNextValues.bad_quantity ?? 0,
                   );
-                } else if (
-                  partialDeltas.bad_quantity !== undefined &&
-                  partialDeltas.bad_quantity !== 0
-                ) {
+                } else if (partialDeltas.bad_quantity) {
                   updatePayload.bad_quantity = {
                     increment: partialDeltas.bad_quantity,
                   };
                 }
               }
 
-              // material_quantity
               if (summaryDeltas.material_quantity !== undefined) {
                 const prevMat = coerceToNumber(
                   existingPartial?.material_quantity,
@@ -1348,10 +1945,7 @@ export class WorkOrderService {
                   updatePayload.material_quantity = Number(
                     partialNextValues.material_quantity ?? 0,
                   );
-                } else if (
-                  partialDeltas.material_quantity !== undefined &&
-                  partialDeltas.material_quantity !== 0
-                ) {
+                } else if (partialDeltas.material_quantity) {
                   updatePayload.material_quantity = {
                     increment: partialDeltas.material_quantity,
                   };
@@ -1393,28 +1987,30 @@ export class WorkOrderService {
         }
 
         // --------------------------
-        // Persistencia BadQuantityDetail (igual)
+        // Persistencia de BadQuantityDetail (parcial/final)
         // --------------------------
         if (
           canPersistDetails &&
           detailBlock &&
           resolvedSourceFlowId !== null &&
-          resolvedSourceAreaId !== null &&
-          detailWhereInput
+          resolvedSourceAreaId !== null
         ) {
-          const valuesPayload = Array.isArray(summary.values)
+          const incomingValues = Array.isArray(summary.values)
             ? summary.values
-                .map((entry) => ({
-                  label: entry?.label ?? '',
-                  value: Number(entry?.value ?? 0),
-                }))
-                .filter((entry) => entry.label && Number.isFinite(entry.value))
+              .map((entry) => ({
+                label: entry?.label ?? '',
+                value: Number(entry?.value ?? 0),
+              }))
+              .filter((x) => x.label && Number.isFinite(x.value))
             : [];
 
-          const incomingValues = valuesPayload;
           const previousValues = Array.isArray(existingDetail?.values)
-            ? (existingDetail.values as Array<{ label: string; value: number }>)
+            ? (existingDetail!.values as Array<{
+              label: string;
+              value: number;
+            }>)
             : [];
+
           const mergedValues =
             incomingValues.length > 0
               ? mergeDetailValues(previousValues, incomingValues)
@@ -1422,36 +2018,34 @@ export class WorkOrderService {
 
           if (existingDetail) {
             const updateData: Prisma.BadQuantityDetailUpdateInput = {
-              block: detailBlock,
+              block: detailBlock!,
               updated_at: new Date(),
             };
 
             if (normalizedTotals.bad_quantity !== undefined) {
               updateData.bad_quantity = Number(normalizedTotals.bad_quantity);
             }
-
             if (normalizedTotals.material_quantity !== undefined) {
               updateData.material_quantity = Number(
                 normalizedTotals.material_quantity,
               );
             }
-
             if (mergedValues) {
               updateData.values = mergedValues;
             }
 
             await tx.badQuantityDetail.update({
-              where: detailWhereInput,
+              where: { id: existingDetail.id },
               data: updateData,
             });
           } else {
             await tx.badQuantityDetail.create({
               data: {
                 work_order_id: workOrderId,
-                source_work_order_flow_id: resolvedSourceFlowId,
-                source_area_id: resolvedSourceAreaId,
+                source_work_order_flow_id: resolvedSourceFlowId!,
+                source_area_id: resolvedSourceAreaId!,
                 target_area_id: summary.areaId,
-                block: detailBlock,
+                block: detailBlock!,
                 bad_quantity:
                   normalizedTotals.bad_quantity !== undefined
                     ? Number(normalizedTotals.bad_quantity)
@@ -1462,6 +2056,439 @@ export class WorkOrderService {
                     : undefined,
                 values: incomingValues,
                 created_by: userId,
+                partial_release_id: partialReleaseId ?? null,
+              },
+            });
+          }
+        }
+      }
+
+      if (logsBuffer.length > 0) {
+        await tx.logAreaDataUpdate.createMany({ data: logsBuffer });
+      }
+    });
+
+    return {
+      success: true,
+      message: 'Cambios aplicados correctamente',
+      updatedAreas,
+      badQuantitySummary,
+    };
+  }
+
+  async updateWorkOrderAreasLiberarCorte(
+    workOrderOtId: string,
+    userId: number,
+    sourceAreaId: number | null = null,
+    sourceWorkOrderFlowId: number | null = null,
+    badQuantitySummary: BadQuantitySummaryDto[] = [],
+    partialReleaseId: number | null = null,
+  ) {
+    const workOrder = await this.prisma.workOrder.findUnique({
+      where: { ot_id: workOrderOtId },
+      select: { id: true },
+    });
+
+    if (!workOrder) {
+      throw new BadRequestException(
+        `No se encontró la orden de trabajo con ot_id: ${workOrderOtId}`,
+      );
+    }
+
+    if (!badQuantitySummary || badQuantitySummary.length === 0) {
+      return {
+        success: true,
+        message: 'No se enviaron datos para actualizar',
+        updatedAreas: [],
+        badQuantitySummary,
+      };
+    }
+
+    const workOrderId = workOrder.id;
+
+    let resolvedSourceAreaId = sourceAreaId ?? null;
+    let resolvedSourceFlowId = sourceWorkOrderFlowId ?? null;
+
+    if (resolvedSourceFlowId) {
+      const sourceFlow = await this.prisma.workOrderFlow.findUnique({
+        where: { id: resolvedSourceFlowId },
+        select: { id: true, area_id: true, work_order_id: true },
+      });
+
+      if (!sourceFlow || sourceFlow.work_order_id !== workOrderId) {
+        throw new BadRequestException(
+          'El flujo de trabajo origen no pertenece a la orden proporcionada.',
+        );
+      }
+
+      if (!resolvedSourceAreaId) {
+        resolvedSourceAreaId = sourceFlow.area_id;
+      }
+    }
+
+    const canPersistDetails =
+      resolvedSourceFlowId !== null && resolvedSourceAreaId !== null;
+
+    const areasResponses = await this.prisma.areasResponse.findMany({
+      where: { work_order_id: workOrderId },
+      include: {
+        prepress: true,
+        impression: true,
+        serigrafia: true,
+        empalme: true,
+        laminacion: true,
+        corte: true,
+        colorEdge: true,
+        hotStamping: true,
+        millingChip: true,
+        personalizacion: true,
+      },
+    });
+
+    const areaResponseByAreaId = new Map(
+      areasResponses.map((item) => [item.area_id, item]),
+    );
+
+    const partialReleases = await this.prisma.partialRelease.findMany({
+      where: {
+        WorkOrderFlow: { work_order_id: workOrderId },
+      },
+      include: {
+        WorkOrderFlow: { select: { area_id: true } },
+      },
+      orderBy: [{ created_at: 'asc' }, { id: 'asc' }],
+    });
+
+    const partialReleaseByAreaId = new Map<number, typeof partialReleases>();
+    for (const partial of partialReleases) {
+      const areaId = partial.WorkOrderFlow?.area_id;
+      if (!areaId) continue;
+      if (!partialReleaseByAreaId.has(areaId)) {
+        partialReleaseByAreaId.set(areaId, []);
+      }
+      partialReleaseByAreaId.get(areaId)!.push(partial);
+    }
+
+    const updatedAreas: Array<{
+      areaId: number;
+      block: ResultBlockKey;
+      blockId: number;
+      data: Record<string, number>;
+    }> = [];
+
+    const logsBuffer: Prisma.LogAreaDataUpdateCreateManyInput[] = [];
+
+    await this.prisma.$transaction(async (tx) => {
+      for (const summary of badQuantitySummary) {
+        const aggregated = aggregateSummaryValues(summary);
+        if (Object.keys(aggregated).length === 0) continue;
+
+        const areaRecord = areaResponseByAreaId.get(summary.areaId); // TARGET
+        const blockKey = resolveBlockKey(summary.areaName);          // TARGET BLOCK
+
+        let handledByAreaResponse = false;
+        let detailBlock: ResultBlockKey | null = blockKey ?? null;
+
+        // ===== Buscar detalle existente (parcial o final) para actualizar/mergear =====
+        let existingDetail:
+          | (BadQuantityDetailSnapshot & { id: number })
+          | null = null;
+
+        if (canPersistDetails) {
+          if (partialReleaseId !== null) {
+            // PARCIAL: findFirst por (source_flow, target_area, partial_release, block)
+            existingDetail = (await tx.badQuantityDetail.findFirst({
+              where: {
+                source_work_order_flow_id: resolvedSourceFlowId!,
+                target_area_id: summary.areaId,
+                partial_release_id: partialReleaseId,
+                block: detailBlock ?? undefined,
+              },
+              select: { id: true, bad_quantity: true, material_quantity: true, values: true },
+            })) as any;
+          } else {
+            // FINAL: findFirst por (source_flow, target_area, partial_release=null)
+            existingDetail = (await tx.badQuantityDetail.findFirst({
+              where: {
+                source_work_order_flow_id: resolvedSourceFlowId!,
+                target_area_id: summary.areaId,
+                partial_release_id: null,
+                block: detailBlock ?? undefined,
+              },
+              select: { id: true, bad_quantity: true, material_quantity: true, values: true },
+            })) as any;
+          }
+        }
+
+        const detailTotals = extractDetailTotals(existingDetail ?? null);
+        const { deltas: summaryDeltas, totals: normalizedTotals } =
+          computeDetailAdjustments(aggregated, detailTotals);
+
+        const hasAnyDelta = Object.keys(summaryDeltas).length > 0;
+        const previousTotals =
+          detailTotals ?? ({} as Partial<Record<UpdatableField, number>>);
+        const hasDetailChange = Object.entries(normalizedTotals).some(
+          ([field, nextValue]) => {
+            const key = field as UpdatableField;
+            const prevValue = previousTotals[key] ?? 0;
+            const normalizedPrev = Math.round(Number(prevValue ?? 0));
+            const normalizedNext = Math.round(Number(nextValue ?? 0));
+            return normalizedPrev !== normalizedNext;
+          },
+        );
+
+        if (!hasAnyDelta && !hasDetailChange) {
+          continue;
+        }
+
+        // --------------------------
+        // ACUMULAR EN BLOQUE TARGET (impression, serigrafia, laminacion, empalme)
+        // - crea el bloque si no existe
+        // - incrementa bad_quantity/material_quantity
+        // --------------------------
+        if (areaRecord && blockKey) {
+          const targetAreaId = summary.areaId;
+
+          const allowsAccumulation =
+            typeof targetAreaId === 'number' &&
+            Number.isFinite(targetAreaId) &&
+            targetAreaId > 0 &&
+            targetAreaId < CUT_AREA_ID;
+
+          const shouldAccumulate =
+            allowsAccumulation && ACCUMULATE_BLOCKS.has(blockKey);
+
+          if (!shouldAccumulate) {
+            // No acumulamos en bloque target; pero el detalle sigue persistiendo con su block real
+            handledByAreaResponse = true;
+            detailBlock = blockKey;
+          } else {
+            // 1) Delegate/config del bloque target
+            const config = BLOCK_CONFIG[blockKey];
+            const delegate = (tx as any)[config.delegate];
+            if (delegate?.findUnique) {
+              // 2) Asegura bloque (crea si falta)
+              let blockId = Number(areaRecord[blockKey]?.id ?? 0);
+              if (!Number.isFinite(blockId) || blockId <= 0) {
+                const created = await delegate.create({
+                  data: {
+                    // Ajusta los campos mínimos requeridos en tu schema:
+                    areas_response_id: areaRecord.id,
+                    work_order_id: workOrderId,
+                    bad_quantity: 0,
+                    material_quantity: 0,
+                  },
+                });
+                blockId = Number(created.id);
+              }
+
+              // 3) Lee y aplica increments
+              const existing = await delegate.findUnique({ where: { id: blockId } });
+              if (existing) {
+                const incomingNext = {
+                  bad_quantity: (coerceToNumber(existing?.bad_quantity) ?? 0) + (summaryDeltas.bad_quantity ?? 0),
+                  material_quantity: (coerceToNumber(existing?.material_quantity) ?? 0) + (summaryDeltas.material_quantity ?? 0),
+                };
+                const { deltas, logs, nextValues } = buildNumericChangesCorte(
+                  existing,
+                  incomingNext,             // deltas del summary para ESTE TARGET
+                  config.updatableFields,
+                );
+
+                const updatePayload: Record<string, any> = {};
+
+                if (summaryDeltas.bad_quantity !== undefined) {
+                  const prevBad = coerceToNumber(existing?.bad_quantity);
+                  if (prevBad === null) {
+                    updatePayload.bad_quantity = Number(nextValues.bad_quantity ?? 0);
+                  } else if (deltas.bad_quantity) {
+                    updatePayload.bad_quantity = nextValues.bad_quantity;
+                  }
+                }
+
+                if (summaryDeltas.material_quantity !== undefined) {
+                  const prevMat = coerceToNumber(existing?.material_quantity);
+                  if (prevMat === null) {
+                    updatePayload.material_quantity = Number(nextValues.material_quantity ?? 0);
+                  } else if (deltas.material_quantity) {
+                    updatePayload.material_quantity = nextValues.material_quantity;
+                  }
+                }
+
+                if (Object.keys(updatePayload).length > 0) {
+                  await delegate.update({ where: { id: blockId }, data: updatePayload });
+
+                  updatedAreas.push({
+                    areaId: targetAreaId,
+                    block: blockKey,
+                    blockId,
+                    data: nextValues,
+                  });
+
+                  for (const entry of logs) {
+                    logsBuffer.push({
+                      work_order_id: workOrderId,
+                      area_id: targetAreaId,
+                      area_name: summary.areaName ?? blockKey,
+                      block: blockKey,
+                      field: entry.field,
+                      old_value: stringifyValue(entry.oldValue),
+                      new_value: stringifyValue(entry.newValue),
+                      user_id: userId,
+                    });
+                  }
+                }
+
+                handledByAreaResponse = true;
+                detailBlock = blockKey; // el detalle queda marcado con el bloque del target
+              }
+            }
+          }
+        }
+
+        // --------------------------
+        // FALLBACK: partialRelease (si no se acumuló en bloque target)
+        // --------------------------
+        if (!handledByAreaResponse) {
+          const partialList = partialReleaseByAreaId.get(summary.areaId);
+          if (partialList && partialList.length > 0) {
+            const targetPartial = partialList[partialList.length - 1];
+            const existingPartial = await tx.partialRelease.findUnique({
+              where: { id: targetPartial.id },
+            });
+
+            if (existingPartial) {
+              const {
+                deltas: partialDeltas,
+                logs: partialLogs,
+                nextValues: partialNextValues,
+              } = buildNumericChangesCorte(
+                existingPartial,
+                summaryDeltas,
+                ['bad_quantity', 'material_quantity'],
+              );
+
+              const updatePayload: Record<string, any> = {};
+
+              if (summaryDeltas.bad_quantity !== undefined) {
+                const prevBad = coerceToNumber(existingPartial?.bad_quantity);
+                if (prevBad === null) {
+                  updatePayload.bad_quantity = Number(partialNextValues.bad_quantity ?? 0);
+                } else if (partialDeltas.bad_quantity) {
+                  updatePayload.bad_quantity = { increment: partialDeltas.bad_quantity };
+                }
+              }
+
+              if (summaryDeltas.material_quantity !== undefined) {
+                const prevMat = coerceToNumber(existingPartial?.material_quantity);
+                if (prevMat === null) {
+                  updatePayload.material_quantity = Number(partialNextValues.material_quantity ?? 0);
+                } else if (partialDeltas.material_quantity) {
+                  updatePayload.material_quantity = { increment: partialDeltas.material_quantity };
+                }
+              }
+
+              if (Object.keys(updatePayload).length > 0) {
+                await tx.partialRelease.update({
+                  where: { id: targetPartial.id },
+                  data: updatePayload,
+                });
+
+                updatedAreas.push({
+                  areaId: summary.areaId,
+                  block: 'partialRelease',
+                  blockId: targetPartial.id,
+                  data: partialNextValues,
+                });
+
+                for (const entry of partialLogs) {
+                  logsBuffer.push({
+                    work_order_id: workOrderId,
+                    area_id: summary.areaId,
+                    area_name: summary.areaName ?? 'partialRelease',
+                    block: 'partialRelease',
+                    field: entry.field,
+                    old_value: stringifyValue(entry.oldValue),
+                    new_value: stringifyValue(entry.newValue),
+                    user_id: userId,
+                  });
+                }
+              }
+
+              detailBlock = 'partialRelease';
+            }
+          } else if (!blockKey) {
+            detailBlock = null;
+          }
+        }
+
+        // --------------------------
+        // Persistencia de BadQuantityDetail (parcial/final)
+        // --------------------------
+        if (
+          canPersistDetails &&
+          detailBlock &&
+          resolvedSourceFlowId !== null &&
+          resolvedSourceAreaId !== null
+        ) {
+          const incomingValues =
+            Array.isArray(summary.values)
+              ? summary.values
+                .map((entry) => ({
+                  label: entry?.label ?? '',
+                  value: Number(entry?.value ?? 0),
+                }))
+                .filter((x) => x.label && Number.isFinite(x.value))
+              : [];
+
+          const previousValues = Array.isArray(existingDetail?.values)
+            ? (existingDetail!.values as Array<{ label: string; value: number }>)
+            : [];
+
+          const mergedValues =
+            incomingValues.length > 0
+              ? mergeDetailValues(previousValues, incomingValues)
+              : null;
+
+          if (existingDetail) {
+            const updateData: Prisma.BadQuantityDetailUpdateInput = {
+              block: detailBlock!,
+              updated_at: new Date(),
+            };
+
+            if (normalizedTotals.bad_quantity !== undefined) {
+              updateData.bad_quantity = Number(normalizedTotals.bad_quantity);
+            }
+            if (normalizedTotals.material_quantity !== undefined) {
+              updateData.material_quantity = Number(normalizedTotals.material_quantity);
+            }
+            if (mergedValues) {
+              updateData.values = mergedValues;
+            }
+
+            await tx.badQuantityDetail.update({
+              where: { id: existingDetail.id },
+              data: updateData,
+            });
+          } else {
+            await tx.badQuantityDetail.create({
+              data: {
+                work_order_id: workOrderId,
+                source_work_order_flow_id: resolvedSourceFlowId!,
+                source_area_id: resolvedSourceAreaId!,
+                target_area_id: summary.areaId,
+                block: detailBlock!,
+                bad_quantity:
+                  normalizedTotals.bad_quantity !== undefined
+                    ? Number(normalizedTotals.bad_quantity)
+                    : undefined,
+                material_quantity:
+                  normalizedTotals.material_quantity !== undefined
+                    ? Number(normalizedTotals.material_quantity)
+                    : undefined,
+                values: incomingValues,
+                created_by: userId,
+                partial_release_id: partialReleaseId ?? null,
               },
             });
           }
@@ -1486,6 +2513,81 @@ export class WorkOrderService {
 // Helpers (sin cambios funcionales)
 // --------------------------
 
+
+
+const AREA_BLOCK_BY_ID_MAP: Record<number, ResultBlockKey> = {
+  1: 'prepress',
+  2: 'impression',
+  3: 'serigrafia',
+  4: 'empalme',
+  5: 'laminacion',
+  6: 'corte',
+  7: 'colorEdge',
+  8: 'hotStamping',
+  9: 'millingChip',
+  10: 'personalizacion',
+};
+
+// Normalizador de etiquetas (case/acentos)
+function __normLabel__(s: string) {
+  return (s ?? '')
+    .normalize('NFD')
+    .replace(/\p{Diacritic}/gu, '')
+    .trim()
+    .toLowerCase();
+}
+
+// Resolver blockKey primero por areaId y luego por nombre
+function __resolveBlockKeyByIdOrName__(
+  areaId: number,
+  areaName?: string | null,
+): ResultBlockKey | null {
+  const byId = AREA_BLOCK_BY_ID_MAP[Number(areaId)];
+  if (byId) return byId;
+  // fallback a tu resolveBlockKey existente, por nombre normalizado
+  return resolveBlockKey(areaName ?? undefined) ?? null;
+}
+
+// Agregador robusto de valores del summary (Malas/Materia...)
+function __aggregateSummaryValuesSafe__(summary: BadQuantitySummaryDto) {
+  const out: Partial<Record<'bad_quantity' | 'material_quantity', number>> = {};
+  const list = Array.isArray(summary.values) ? summary.values : [];
+  for (const v of list) {
+    const label = __normLabel__(String(v?.label ?? ''));
+    const val = Number(v?.value ?? 0) || 0;
+    if (label === 'malas' || label === 'mala') {
+      out.bad_quantity = (out.bad_quantity ?? 0) + val;
+    } else if (label.includes('materia') || label.includes('fabrica')) {
+      out.material_quantity = (out.material_quantity ?? 0) + val;
+    }
+  }
+  return out;
+}
+
+function resolveBlockKey(
+  name: string | null | undefined,
+): ResultBlockKey | null {
+  const k = (name ?? '')
+    .normalize('NFD')
+    .replace(/\u0300-\u036f/g, '')
+    .trim()
+    .toLowerCase()
+    .replace(/\s+/g, '');
+  const map: Record<string, ResultBlockKey> = {
+    preprensa: 'prepress',
+    impresion: 'impression',
+    serigrafia: 'serigrafia',
+    empalme: 'empalme',
+    laminacion: 'laminacion',
+    corte: 'corte',
+    coloredge: 'colorEdge',
+    hotstamping: 'hotStamping',
+    millingchip: 'millingChip',
+    personalizacion: 'personalizacion',
+  };
+  return map[k] ?? null;
+}
+
 function aggregateSummaryValues(summary: BadQuantitySummaryDto) {
   const totals: Partial<Record<UpdatableField, number>> = {};
 
@@ -1504,6 +2606,36 @@ function aggregateSummaryValues(summary: BadQuantitySummaryDto) {
 }
 
 function buildNumericChanges(
+  existing: Record<string, any>,
+  aggregated: Partial<Record<UpdatableField, number>>,
+  fields: ReadonlyArray<UpdatableField>,
+) {
+  const deltas: Partial<Record<UpdatableField, number>> = {};
+  const nextValues: Partial<Record<UpdatableField, number>> = {};
+  const logs: Array<{ field: string; oldValue: unknown; newValue: number }> =
+    [];
+
+  for (const field of fields) {
+    const incrementValue = aggregated[field];
+    if (incrementValue === undefined) continue;
+    if (!Number.isFinite(incrementValue)) continue;
+
+    const newValue = Math.round(Number(incrementValue));
+    const previousRaw = existing?.[field];
+    const previousNumeric = coerceToNumber(previousRaw) ?? 0;
+
+    if (newValue === previousNumeric) continue;
+
+    const delta = newValue - previousNumeric;
+
+    deltas[field] = delta;
+    nextValues[field] = newValue;
+    logs.push({ field, oldValue: previousRaw, newValue });
+  }
+
+  return { deltas, logs, nextValues };
+}
+function buildNumericChangesCorte(
   existing: Record<string, any>,
   aggregated: Partial<Record<UpdatableField, number>>,
   fields: ReadonlyArray<UpdatableField>,
@@ -1554,7 +2686,7 @@ function coerceToNumber(value: unknown): number | null {
 }
 
 function extractDetailTotals(
-  detail: BadQuantityDetailSnapshot | null,
+  detail: DetailSnapshot | null,
 ): Partial<Record<UpdatableField, number>> | null {
   if (!detail) return null;
 
@@ -1573,6 +2705,32 @@ function extractDetailTotals(
   return totals;
 }
 
+function extractDetailValuesList(
+  detail: DetailSnapshot | null,
+): Array<{ label: string; value: number }> {
+  if (!detail) return [];
+  if (!Array.isArray(detail.values)) return [];
+
+  const out: Array<{ label: string; value: number }> = [];
+  for (const raw of detail.values as Array<any>) {
+    const label = typeof raw?.label === 'string' ? raw.label : '';
+    if (!label) continue;
+    const numeric = Number(raw?.value ?? 0);
+    if (!Number.isFinite(numeric)) continue;
+    const rounded = Math.round(numeric);
+    if (rounded === 0) continue;
+    out.push({ label, value: rounded });
+  }
+
+  return out;
+}
+
+function sortDetailValues(values: Array<{ label: string; value: number }>) {
+  return [...values].sort((a, b) =>
+    normalizeLabel(a.label).localeCompare(normalizeLabel(b.label)),
+  );
+}
+
 function computeDetailAdjustments(
   incomingTotals: Partial<Record<UpdatableField, number>>,
   existingTotals: Partial<Record<UpdatableField, number>> | null,
@@ -1580,21 +2738,45 @@ function computeDetailAdjustments(
   const deltas: Partial<Record<UpdatableField, number>> = {};
   const totals: Partial<Record<UpdatableField, number>> = {};
 
+  console.log('🧩 --- computeDetailAdjustments ---');
+  console.log(
+    '➡️ incomingTotals (valores que envía el frontend):',
+    incomingTotals,
+  );
+  console.log(
+    '📦 existingTotals (valores ya guardados en BD):',
+    existingTotals,
+  );
+
   for (const field of Object.keys(incomingTotals) as UpdatableField[]) {
     const nextValue = incomingTotals[field];
     if (nextValue === undefined) continue;
 
-    const nextTotal = Math.round(Number(nextValue ?? 0));
-    const previousTotal = existingTotals?.[field] ?? 0;
+    const nextTotal = Math.round(Number(nextValue ?? 0)); // valor nuevo desde el frontend
+    const previousTotal = existingTotals?.[field] ?? 0; // valor actual en BD
     const normalizedPrevious = Math.round(Number(previousTotal ?? 0));
+
     const difference = nextTotal - normalizedPrevious;
+
+    console.log(`\n🔍 Campo: ${field}`);
+    console.log(`   👉 nextTotal (nuevo del frontend): ${nextTotal}`);
+    console.log(`   🏗 previousTotal (guardado en BD): ${normalizedPrevious}`);
+    console.log(`   ⚖️ difference (delta calculado): ${difference}`);
 
     totals[field] = nextTotal;
 
     if (difference !== 0) {
       deltas[field] = difference;
+      console.log(`   ✅ Se agrega delta: ${field} = ${difference}`);
+    } else {
+      console.log(`   💤 No hay cambio en ${field}, se omite.`);
     }
   }
+
+  console.log('\n📊 Resultado final de computeDetailAdjustments:');
+  console.log('   🔹 deltas:', deltas);
+  console.log('   🔸 totals:', totals);
+  console.log('🧩 --- fin computeDetailAdjustments ---\n');
 
   return { deltas, totals };
 }
@@ -1602,16 +2784,20 @@ function computeDetailAdjustments(
 function mergeDetailValues(
   previousValues: Array<{ label: string; value: number }>,
   incomingValues: Array<{ label: string; value: number }>,
+  options?: { accumulate?: boolean },
 ) {
+  const accumulate = options?.accumulate ?? false;
   const registry = new Map<string, { label: string; value: number }>();
 
   for (const entry of previousValues ?? []) {
     if (!entry?.label) continue;
     const numeric = Number(entry.value ?? 0);
     if (!Number.isFinite(numeric)) continue;
+    const rounded = Math.round(numeric);
+    if (rounded === 0) continue;
     registry.set(normalizeLabel(entry.label), {
       label: entry.label,
-      value: numeric,
+      value: rounded,
     });
   }
 
@@ -1619,19 +2805,34 @@ function mergeDetailValues(
     if (!entry?.label) continue;
     const numeric = Number(entry.value ?? 0);
     if (!Number.isFinite(numeric)) continue;
-    registry.set(normalizeLabel(entry.label), {
-      label: entry.label,
-      value: numeric,
-    });
+    const rounded = Math.round(numeric);
+    if (rounded === 0) continue;
+
+    const key = normalizeLabel(entry.label);
+    if (accumulate) {
+      const previous = registry.get(key);
+      const nextValue = (previous?.value ?? 0) + rounded;
+
+      if (nextValue <= 0) {
+        if (previous) {
+          registry.delete(key);
+        }
+        continue;
+      }
+
+      registry.set(key, {
+        label: previous?.label ?? entry.label,
+        value: nextValue,
+      });
+    } else {
+      registry.set(key, {
+        label: entry.label,
+        value: rounded,
+      });
+    }
   }
 
   return Array.from(registry.values());
-}
-
-function resolveBlockKey(areaName: string | undefined): BlockKey | null {
-  if (!areaName) return null;
-  const normalized = normalizeLabel(areaName);
-  return AREA_NAME_TO_BLOCK[normalized] ?? null;
 }
 
 function resolveFieldFromLabel(
