@@ -9,7 +9,7 @@ import {
   releaseProductFromCorte,
   type ReleaseResponse,
 } from '@/api/liberarProducto';
-import { updateWorkOrderAreasLiberar } from '@/api/seguimientoDeOts';
+import { updateWorkOrderAreasLiberarCorte } from '@/api/seguimientoDeOts';
 
 import { useAuthContext } from '@/context/AuthContext';
 
@@ -574,7 +574,7 @@ export default function CorteComponent({ workOrder }: Props) {
       
       if (isPartial && hasStash) {
         // ⬅️ PARCIAL: manda con partialReleaseId
-        await updateWorkOrderAreasLiberar(otId, {
+        await updateWorkOrderAreasLiberarCorte(otId, {
           sourceAreaId: stash.sourceAreaId,
           sourceWorkOrderFlowId: stash.sourceWorkOrderFlowId,
           badQuantitySummary: stash.badQuantitySummary,
@@ -582,7 +582,7 @@ export default function CorteComponent({ workOrder }: Props) {
         });
       } else if (!isPartial && hasStash) {
         // ⬅️ FINAL (completa): manda explícitamente con partialReleaseId: null
-        await updateWorkOrderAreasLiberar(otId, {
+        await updateWorkOrderAreasLiberarCorte(otId, {
           sourceAreaId: stash.sourceAreaId,
           sourceWorkOrderFlowId: stash.sourceWorkOrderFlowId,
           badQuantitySummary: stash.badQuantitySummary,
@@ -849,7 +849,7 @@ export default function CorteComponent({ workOrder }: Props) {
               badQuantitySummary: inputsByArea,
             };
             console.log(
-              '[PREVIEW] updateWorkOrderAreasLiberar payload:',
+              '[PREVIEW] updateWorkOrderAreasLiberarCorte payload:',
               uiPreviewPayload
             );
 

@@ -18,7 +18,7 @@ import {
   releaseProductFromCorte,
   type ReleaseResponse,
 } from '../../api/liberarProducto';
-import { updateWorkOrderAreasLiberar } from '../../api/seguimientoDeOts';
+import { updateWorkOrderAreasLiberarCorte } from '../../api/seguimientoDeOts';
 import { useAuth } from '../../contexts/AuthContext';
 import { calcularCantidadPorLiberar } from './util/calcularCantidadPorLiberar';
 import BadQuantityModal, {
@@ -523,7 +523,7 @@ const CorteComponent = ({ workOrder }: { workOrder: any }) => {
 
       if (isPartial && hasStash) {
         // ⬅️ PARCIAL: manda con partialReleaseId
-        await updateWorkOrderAreasLiberar(otId, {
+        await updateWorkOrderAreasLiberarCorte(otId, {
           sourceAreaId: stash.sourceAreaId,
           sourceWorkOrderFlowId: stash.sourceWorkOrderFlowId,
           badQuantitySummary: stash.badQuantitySummary,
@@ -531,7 +531,7 @@ const CorteComponent = ({ workOrder }: { workOrder: any }) => {
         });
       } else if (!isPartial && hasStash) {
         // ⬅️ FINAL (completa): manda explícitamente con partialReleaseId: null
-        await updateWorkOrderAreasLiberar(otId, {
+        await updateWorkOrderAreasLiberarCorte(otId, {
           sourceAreaId: stash.sourceAreaId,
           sourceWorkOrderFlowId: stash.sourceWorkOrderFlowId,
           badQuantitySummary: stash.badQuantitySummary,

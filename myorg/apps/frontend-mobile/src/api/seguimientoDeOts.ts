@@ -159,3 +159,17 @@ export const updateAreaResponseData = async (
 
   return response.data;
 };
+export const updateWorkOrderAreasLiberarCorte = async (ot_id: string, payload: any) => {
+  const token = await localStorage.getItem('token');
+  if (!token) throw new Error('Token no encontrado');
+  console.log(payload, 'payload')
+
+  const response = await API.patch(`/work-orders/${ot_id}/areas/liberar/corte`, payload, {
+    headers: {
+      Authorization: `Bearer ${token}`,
+      'Content-Type': 'application/json',
+    },
+  });
+
+  return response.data;
+};
