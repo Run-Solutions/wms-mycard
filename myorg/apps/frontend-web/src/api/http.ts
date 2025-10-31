@@ -1,9 +1,9 @@
 // myorg/apps/frontend-web/src/api/http.ts
 import axios from "axios";
-export const BASE_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:3003";
+export const BASE_URL = process.env.NEXT_PUBLIC_API_URL || "https://mycard.runsolutions-services.com/api/"
 
 const API = axios.create({
-  baseURL: process.env.NEXT_PUBLIC_API_URL || "http://localhost:3003",
+  baseURL: process.env.NEXT_PUBLIC_API_URL || "https://mycard.runsolutions-services.com/api/",
   timeout: 10000,
 });
 
