@@ -2,17 +2,25 @@
 import React from 'react';
 import { AreaData } from '@/app/(protected)/seguimientoDeOts/[id]/page';
 
+export type AreaForBadQty = {
+  id: number;
+  name: string;
+  malas: number;
+  defectuoso: number;
+  supportsMaterial?: boolean;
+};
+
 export interface BadQuantityModalResult {
   inputsByArea: Array<{
     areaId: number;
     areaName: string;
     values: Array<{ label: string; value: number }>;
   }>;
-  updatedAreas: AreaData[];
+  updatedAreas: AreaForBadQty[];
 }
 
 interface Props {
-  areas: AreaData[];
+  areas: AreaForBadQty[];
   areaBadQuantities: { [key: string]: string };
   setAreaBadQuantities: React.Dispatch<React.SetStateAction<{ [key: string]: string }>>;
   onClose: () => void;

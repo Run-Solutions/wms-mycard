@@ -63,12 +63,17 @@ export function useModuleCounts(moduleNames: string[]) {
       },
       'rechazos': async () => {
         try {
-          const { pendingOrdersAuditory } = await getWorkOrdersWithInconformidadAuditory();
-          const workOrders = Array.isArray(pendingOrdersAuditory)
-            ? pendingOrdersAuditory.map((i: any) => i.workOrder)
-            : [];
-          return getPendingCount(workOrders);
-        } catch { return 0; }
+          const res = await getWorkOrdersWithInconformidadAuditory();
+          // Une ambas fuentes
+          const allFlows = Array.isArray(res?.pendingOrders)
+          ? res.pendingOrders
+          : [];
+          const count = getPendingCount(allFlows);
+          return typeof count === 'number' ? count : 0; // siempre número
+        } catch (err) {
+          console.warn('rechazos error:', err);
+          return 0;
+        }
       },
     };
     return map;

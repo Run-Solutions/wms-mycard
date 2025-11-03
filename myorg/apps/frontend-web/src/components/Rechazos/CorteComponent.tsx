@@ -203,7 +203,7 @@ export default function CorteComponent({ workOrder, currentFlow }: Props) {
     if (
       allValidated &&
       Array.isArray(currentFlow?.badQuantityDetails) &&
-      currentFlow.areaResponse?.colorEdge
+      currentFlow.areaResponse?.corte
     ) {
       const sinParcial = currentFlow.badQuantityDetails.filter(
         (d: any) => d.partial_release_id === null
@@ -311,7 +311,6 @@ export default function CorteComponent({ workOrder, currentFlow }: Props) {
     const partials = currentFlow?.partialReleases || [];
     const allValidated =
       partials.length > 0 && partials.every((p: any) => p.validated);
-    console.log(allValidated, 'allValidatedfff');
     const onlyOnePartial = partials.length === 1;
 
     // 🧠 identificar parcial activo (no validado, más reciente)
@@ -322,21 +321,21 @@ export default function CorteComponent({ workOrder, currentFlow }: Props) {
           new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
       )[0];
 
-    console.log(currentPartial, 'currentparcial');
-
-    // --- Caso 1: todos validados → sumar los sin parcial
+    // --- ✅ Caso 1: todos validados → sumar los sin parcial (malas + material)
     if (
       allValidated &&
       Array.isArray(currentFlow?.badQuantityDetails) &&
-      currentFlow.areaResponse?.colorEdge
+      currentFlow.areaResponse?.corte
     ) {
-      console.log('Caso 1: todos validados → sumar los sin parcial');
       const sinParciales = currentFlow.badQuantityDetails.filter(
         (d: any) => d.partial_release_id === null
       );
 
       return sinParciales.reduce(
-        (acc: number, d: any) => acc + (Number(d.bad_quantity) || 0),
+        (acc: number, d: any) =>
+          acc +
+          (Number(d.bad_quantity) || 0) +
+          (Number(d.material_quantity) || 0),
         0
       );
     }
@@ -352,7 +351,10 @@ export default function CorteComponent({ workOrder, currentFlow }: Props) {
       );
 
       return detallesDelParcial.reduce(
-        (acc: number, d: any) => acc + (Number(d.bad_quantity) || 0),
+        (acc: number, d: any) =>
+          acc +
+          (Number(d.bad_quantity) || 0) +
+          (Number(d.material_quantity) || 0),
         0
       );
     }

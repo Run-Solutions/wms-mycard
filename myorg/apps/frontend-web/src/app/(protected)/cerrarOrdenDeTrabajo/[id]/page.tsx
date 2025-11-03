@@ -7,6 +7,7 @@ import React, {
   useState,
   Fragment,
   useEffect,
+  useRef,
   useMemo,
   ChangeEvent,
   type ReactNode,
@@ -17,7 +18,10 @@ import styled from 'styled-components';
 import { Card, CardContent } from '@/components/ui/card';
 import ProgressBarAreas from '@/components/SeguimientoDeOts/ProgressBarAreas';
 import InconformitiesHistory from '@/components/SeguimientoDeOts/InconformitiesHistory';
-import BadQuantityModal, { BadQuantityModalResult } from '@/components/CerrarOrdenDeTrabajo/BadQuantityModal';
+import BadQuantityModal, {
+  AreaForBadQty,
+  BadQuantityModalResult,
+} from '@/components/CerrarOrdenDeTrabajo/BadQuantityModal';
 import PartialHistory from '@/components/SeguimientoDeOts/PartialHistory';
 import { AreaTotalsForPartialHistory } from '@/components/SeguimientoDeOts/PartialHistory';
 import { AreaData } from '../../seguimientoDeOts/[id]/page';
@@ -80,7 +84,6 @@ type ResponseBlock = {
   material_quantity?: number;
 };
 
-
 const pickBlock = (
   resp: any, // si tienes tipo Area['response'], úsalo aquí
   key: BlockKey | undefined
@@ -118,6 +121,13 @@ const resolveBlockKey = (name?: string | null): BlockKey | null => {
 const blockSupportsMaterial = (block?: BlockKey | null) =>
   !!block &&
   ['corte', 'colorEdge', 'millingChip', 'personalizacion'].includes(block);
+
+  const normalizeSummaryLabel = (label?: string) =>
+    String(label ?? '')
+      .normalize('NFD')
+      .replace(/\u0300-\u036f/g, '')
+      .trim()
+      .toLowerCase();
 
 interface Props {
   params: Promise<{ id: string }>;
@@ -494,6 +504,56 @@ const guessMimeFromName = (filename: string): string => {
   }
 };
 
+function sumDetailFromPartial(
+  partial: AreaData['partials'][number] | null | undefined,
+  ownerSourceId: number,
+  targetAreaId: number
+) {
+  let bad = 0;
+  let mat = 0;
+  if (!partial) return { bad, mat };
+  const list = Array.isArray(partial.badQuantityDetails)
+    ? partial.badQuantityDetails
+    : [];
+  for (const d of list) {
+    if (
+      Number(d?.source_area_id) === Number(ownerSourceId) &&
+      Number(d?.target_area_id) === Number(targetAreaId)
+    ) {
+      bad += toNum(d?.bad_quantity);
+      mat += toNum(d?.material_quantity);
+    }
+  }
+  return { bad, mat };
+}
+
+// Suma malas/material del REMANENTE (partial_release_id == null) para (source, target)
+function sumDetailFromRem(
+  workOrder: any,
+  ownerSourceId: number,
+  targetAreaId: number
+) {
+  let bad = 0;
+  let mat = 0;
+  const flows = Array.isArray(workOrder?.flow) ? workOrder.flow : [];
+  for (const f of flows) {
+    const details = Array.isArray(f?.badQuantityDetails)
+      ? f.badQuantityDetails
+      : [];
+    for (const d of details) {
+      if (d?.partial_release_id != null) continue; // solo REM
+      if (
+        Number(d?.source_area_id) === Number(ownerSourceId) &&
+        Number(d?.target_area_id) === Number(targetAreaId)
+      ) {
+        bad += toNum(d?.bad_quantity);
+        mat += toNum(d?.material_quantity);
+      }
+    }
+  }
+  return { bad, mat };
+}
+
 // ========================================================
 // Component
 // ========================================================
@@ -523,9 +583,17 @@ export default function CloseWorkOrderAuxPage({ params }: Props) {
   const [inconformitySectionOpen, setInconformitySectionOpen] = useState(false);
 
   const [badModalOwner, setBadModalOwner] = useState<AreaData | null>(null);
-  const [modalAreas, setModalAreas] = useState<AreaData[]>([]);
   const [evidenceFile, setEvidenceFile] = useState<File | null>(null);
-
+  const [modalAreas, setModalAreas] = useState<AreaForBadQty[]>([]);
+  const modalBaselineRef = useRef<
+    Map<
+      number,
+      { bad: number; material: number | null; supportsMaterial: boolean }
+    >
+  >(new Map())
+  const [badModalPartial, setBadModalPartial] = useState<
+    AreaData['partials'][number] | null
+  >(null);
   // ---- Operators maps ----
   const operatorOptionsByAreaId = useMemo(() => {
     const map = new Map<number, Array<{ id: number; username: string }>>();
@@ -548,9 +616,102 @@ export default function CloseWorkOrderAuxPage({ params }: Props) {
     return m;
   }, [operatorUsers]);
 
+  const pxTotalsByAreaId = useMemo(() => {
+    const map = new Map<
+      number,
+      { orderLabels: string[]; totals: Record<string, number> }
+    >();
+
+    const flows = workOrder?.flow ?? [];
+    flows.forEach((f: any) => {
+      const areaId = Number(f?.area_id);
+      if (!areaId) return;
+
+      // 1) Ordena los parciales por fecha y crea mapping pr.id -> P#
+      const prs = Array.isArray(f?.partialReleases)
+        ? [...f.partialReleases]
+        : [];
+      prs.sort(
+        (a: any, b: any) =>
+          new Date(a?.created_at).getTime() - new Date(b?.created_at).getTime()
+      );
+      const prLabelById = new Map<number, string>(
+        prs.map((pr: any, i: number) => [Number(pr?.id), `P${i + 1}`])
+      );
+
+      // 2) Suma malas por etiqueta Px o REM desde badQuantityDetails del FLOW
+      const totals: Record<string, number> = {};
+      const details = Array.isArray(f?.badQuantityDetails)
+        ? f.badQuantityDetails
+        : [];
+      for (const d of details) {
+        const prId =
+          d?.partial_release_id == null ? null : Number(d.partial_release_id);
+        const label =
+          prId == null ? 'REM' : prLabelById.get(prId) ?? `PR#${prId}`;
+        const bad = Number(d?.bad_quantity) || 0;
+        totals[label] = (totals[label] || 0) + bad;
+      }
+
+      // 3) Orden natural de salida: P1..Pn y, si aplica, REM al final
+      const orderLabels = [
+        ...prs
+          .map((pr: any) => prLabelById.get(Number(pr?.id))!)
+          .filter(Boolean),
+        ...(totals['REM'] ? ['REM'] : []),
+      ];
+
+      map.set(areaId, { orderLabels, totals });
+    });
+
+    return map;
+  }, [workOrder]);
+
+  // Helpers para consumir arriba:
+  const getPxTotal = (areaId: number, partialIndex: number) => {
+    const entry = pxTotalsByAreaId.get(Number(areaId));
+    if (!entry) return 0;
+    const label = entry.orderLabels[partialIndex];
+    return entry.totals[label] || 0;
+  };
+
   const getUserOptionsForArea = (areaId: number) =>
     operatorOptionsByAreaId.get(areaId) ?? [];
 
+  const getRemTotal = (areaId: number) => {
+    const entry = pxTotalsByAreaId.get(Number(areaId));
+    const area = areas.find((a) => a.id === areaId);
+    const blockKey = areaBlockMap[areaId];
+    const selfBad = Number(area?.response?.[blockKey]?.bad_quantity ?? 0);
+
+    // 🔹 Busca los detalles de esa área en workOrder.flow
+    const flow = workOrder?.flow?.find((f: any) => f.area_id === areaId);
+    const details = flow?.badQuantityDetails ?? [];
+
+    // 🔹 Solo REM (sin parciales)
+    const remBad = details
+      .filter((d: any) => d.partial_release_id == null)
+      .reduce((sum: number, d: any) => sum + (Number(d?.bad_quantity) || 0), 0);
+
+    // 🔹 Suma total (todas las malas)
+    const sumBad = details.reduce(
+      (sum: number, d: any) => sum + (Number(d?.bad_quantity) || 0),
+      0
+    );
+
+    // 🔹 Para áreas < 6: rem = total (porque no hay parciales)
+    if (areaId < 6) {
+      const totals = entry?.totals ?? {};
+      const totalSum = Object.values(totals).reduce(
+        (sum, v) => sum + (Number(v) || 0),
+        0
+      );
+      return { remBad: totalSum, sumBad: totalSum };
+    }
+
+    // 🔹 Para áreas >= 6
+    return { remBad: remBad || selfBad, sumBad: sumBad || selfBad };
+  };
   // ---- Operator modal ----
   type PartialType = AreaData['partials'][number] | null;
   const [opModal, setOpModal] = useState<{
@@ -800,11 +961,20 @@ export default function CloseWorkOrderAuxPage({ params }: Props) {
   };
 
   const badAgg = useMemo(() => {
-    const allBySourceTarget = new Map<number, Map<number, { bad: number; mat: number }>>();
-    const remainderBySourceTarget = new Map<number, Map<number, { bad: number; mat: number }>>();
+    const allBySourceTarget = new Map<
+      number,
+      Map<number, { bad: number; mat: number }>
+    >();
+    const remainderBySourceTarget = new Map<
+      number,
+      Map<number, { bad: number; mat: number }>
+    >();
 
     // NEW: source -> partial_release_id -> (target -> {bad, mat})
-    const perPartialBySourceTarget = new Map<number, Map<number, Map<number, { bad: number; mat: number }>>>();
+    const perPartialBySourceTarget = new Map<
+      number,
+      Map<number, Map<number, { bad: number; mat: number }>>
+    >();
 
     const accumulate = (
       store: Map<number, Map<number, { bad: number; mat: number }>>,
@@ -861,9 +1031,12 @@ export default function CloseWorkOrderAuxPage({ params }: Props) {
       });
     });
 
-    return { allBySourceTarget, remainderBySourceTarget, perPartialBySourceTarget };
+    return {
+      allBySourceTarget,
+      remainderBySourceTarget,
+      perPartialBySourceTarget,
+    };
   }, [workOrder]);
-
 
   const sumBadBySource = (sourceId: number, includeSelf: boolean) => {
     const m = badAgg.allBySourceTarget.get(Number(sourceId));
@@ -889,69 +1062,108 @@ export default function CloseWorkOrderAuxPage({ params }: Props) {
     return { bad, mat };
   };
 
-  const handleOpenBadQuantityModal = (ownerArea: AreaData, partialId?: number | null) => {
+  const handleOpenBadQuantityModal = (
+    ownerArea: AreaData,
+    partial?: AreaData['partials'][number] | null
+  ) => {
     const initialValues: Record<string, string> = {};
-
-    // Orden objetivo estable (Impresión→ColorEdge + self al final)
-    const TARGET_AREA_IDS = [2, 3, 4, 5, 6];
     const orderedAreas: AreaData[] = [];
-    const pushUnique = (candidate: AreaData | undefined | null) => {
+
+    // ✅ Mostrar SIEMPRE las áreas 1..6 (si existen en la OT) + el área actual
+    const PREV_IDS = [2, 3, 4, 5, 6];
+    const prevTargets = PREV_IDS.map((id) =>
+      areas.find((a) => Number(a.id) === id)
+    ).filter(Boolean) as AreaData[];
+
+    const pushUnique = (candidate?: AreaData | null) => {
       if (!candidate) return;
-      if (orderedAreas.some((item) => item.id === candidate.id)) return;
-      orderedAreas.push(candidate);
-    };
-    TARGET_AREA_IDS.forEach((targetId) => {
-      pushUnique(areas.find((a) => Number(a.id) === targetId));
-    });
-    pushUnique(ownerArea); // asegura self
-
-    const keyOf = (a: AreaData) => normalizeAreaKey(a.name);
-    const ownerBlockKey = getBlockKey(Number(ownerArea.id));
-
-    // 1) Mapa según contexto (parcial específico o remanente)
-    let perTargetForContext: Map<number, { bad: number; mat: number }> = new Map();
-
-    if (partialId != null) {
-      const byPartial = badAgg.perPartialBySourceTarget.get(ownerArea.id);
-      perTargetForContext = byPartial?.get(Number(partialId)) ?? new Map();
-    } else {
-      perTargetForContext = badAgg.remainderBySourceTarget.get(ownerArea.id) ?? new Map();
-    }
-
-    // 2) Prefill por área objetivo
-    orderedAreas.forEach((area) => {
-      const k = keyOf(area);
-
-      if (Number(area.id) === Number(ownerArea.id)) {
-        // SELF
-        if (partialId != null) {
-          // Tomar malas/material de ese parcial
-          const p = (ownerArea.partials ?? []).find((pp) => Number(pp?.id) === Number(partialId));
-          const selfBad = toNum(p?.bad_quantity);
-          const selfMat = toNum(p?.material_quantity);
-          initialValues[`${k}_bad`] = String(selfBad);
-          if (area.id >= 6) initialValues[`${k}_material`] = String(selfMat);
-        } else {
-          // Remanente: tomar del response del bloque
-          const selfBad = toNum(pickBlock(ownerArea.response, ownerBlockKey)?.bad_quantity ?? 0);
-          const selfMat = toNum(pickBlock(ownerArea.response, ownerBlockKey)?.material_quantity ?? 0);
-          initialValues[`${k}_bad`] = String(selfBad);
-          if (area.id >= 6) initialValues[`${k}_material`] = String(selfMat);
-        }
-      } else {
-        // TARGETS: usar agregados del contexto
-        const agg = perTargetForContext.get(Number(area.id)) ?? { bad: 0, mat: 0 };
-        initialValues[`${k}_bad`] = String(toNum(agg.bad));
-        if (area.id >= 6) initialValues[`${k}_material`] = String(toNum(agg.mat));
+      if (!orderedAreas.some((x) => Number(x.id) === Number(candidate.id))) {
+        orderedAreas.push(candidate);
       }
+    };
+
+    // 1) Agrega 1..6 en orden
+    prevTargets.forEach((a) => pushUnique(a));
+    // 2) Agrega el área actual (si no estaba ya)
+    pushUnique(ownerArea);
+
+    const modalAreaSummaries: AreaForBadQty[] = [];
+    modalBaselineRef.current = new Map();
+
+    orderedAreas.forEach((area) => {
+      const key = normalizeAreaKey(area.name);
+      const supportsMaterial = Number(area.id) >= 6; // < 6 no muestra "malo de fábrica"
+
+      const sourceId = Number(ownerArea.id);
+      const targetId = Number(area.id);
+
+      // Trae el detalle desde parcial o remanente (como en tu lógica actual)
+      let badValue = 0;
+      let materialValue = 0;
+
+      if (partial) {
+        const { bad, mat } = sumDetailFromPartial(partial, sourceId, targetId);
+        badValue = bad;
+        materialValue = mat;
+      } else {
+        const { bad, mat } = sumDetailFromRem(workOrder, sourceId, targetId);
+        badValue = bad;
+        materialValue = mat;
+      }
+
+      // Fallback desde badQuantitySummary si no hay detalle
+      const summaryEntry = Array.isArray(ownerArea.badQuantitySummary)
+        ? ownerArea.badQuantitySummary.find(
+            (e) => Number(e.areaId) === targetId
+          )
+        : null;
+
+      if (!badValue && summaryEntry) {
+        const badFromSummary = summaryEntry.values.find(
+          (e: any) => normalizeSummaryLabel(e.label) === 'malas'
+        );
+        if (badFromSummary) badValue = toNum(badFromSummary.value);
+      }
+      if (supportsMaterial && !materialValue && summaryEntry) {
+        const materialFromSummary = summaryEntry.values.find((e: any) => {
+          const n = normalizeSummaryLabel(e.label);
+          return n.includes('fabrica') || n.includes('materia');
+        });
+        if (materialFromSummary)
+          materialValue = toNum(materialFromSummary.value);
+      }
+
+      // Baseline para deltas
+      modalBaselineRef.current.set(targetId, {
+        bad: Number(badValue) || 0,
+        material: supportsMaterial ? Number(materialValue) || 0 : null,
+        supportsMaterial,
+      });
+
+      // Inputs iniciales
+      initialValues[`${key}_bad`] = String(Number(badValue) || 0);
+      if (supportsMaterial) {
+        initialValues[`${key}_material`] = String(Number(materialValue) || 0);
+      }
+
+      // Fila del modal
+      modalAreaSummaries.push({
+        id: targetId,
+        name: area.name,
+        malas: Number(badValue) || 0,
+        defectuoso: supportsMaterial
+          ? Number(materialValue) || 0
+          : Number(area.defectuoso ?? 0),
+        supportsMaterial,
+      });
     });
 
-    setModalAreas(orderedAreas);
+    setModalAreas(modalAreaSummaries);
     setAreaBadQuantities(initialValues);
     setBadModalOwner(ownerArea);
+    setBadModalPartial(partial ?? null);
     setShowBadQuantity(true);
   };
-
 
   const getAreaSumaTotal = (area: AreaData) => {
     const badToOthers = sumBadBySource(Number(area.id ?? 0), false);
@@ -1034,16 +1246,18 @@ export default function CloseWorkOrderAuxPage({ params }: Props) {
 
     const blockKey = getBlockKey(area.id);
     const badToOthers = toNum(sumBadBySource(area.id, false));
-    const selfBad = toNum(pickBlock(area.response, blockKey)?.bad_quantity ?? 0);
+    const selfBad = toNum(
+      pickBlock(area.response, blockKey)?.bad_quantity ?? 0
+    );
 
     // parciales malas (solo si no hay selfBad)
     const partialsBad =
       selfBad > 0
         ? 0
         : (area.partials ?? []).reduce(
-          (pAcc, p) => pAcc + toNum(p.bad_quantity),
-          0
-        );
+            (pAcc, p) => pAcc + toNum(p.bad_quantity),
+            0
+          );
 
     const areaTotalBad = badToOthers + selfBad + partialsBad;
 
@@ -1123,10 +1337,10 @@ export default function CloseWorkOrderAuxPage({ params }: Props) {
       prev.map((a) =>
         a.id === area.id
           ? {
-            ...a,
-            assigned_user_id: newUserId,
-            usuario: operatorById.get(newUserId) ?? a.usuario,
-          }
+              ...a,
+              assigned_user_id: newUserId,
+              usuario: operatorById.get(newUserId) ?? a.usuario,
+            }
           : a
       )
     );
@@ -1279,16 +1493,16 @@ export default function CloseWorkOrderAuxPage({ params }: Props) {
 
     const effectiveAreas = updatedAreasFromModal
       ? areas.map((area) => {
-        const replacement = updatedAreasFromModal.find(
-          (item) => item.id === area.id
-        );
-        if (!replacement) return area;
-        return {
-          ...area,
-          malas: Number(replacement.malas ?? area.malas ?? 0),
-          defectuoso: Number(replacement.defectuoso ?? area.defectuoso ?? 0),
-        };
-      })
+          const replacement = updatedAreasFromModal.find(
+            (item) => item.id === area.id
+          );
+          if (!replacement) return area;
+          return {
+            ...area,
+            malas: Number(replacement.malas ?? area.malas ?? 0),
+            defectuoso: Number(replacement.defectuoso ?? area.defectuoso ?? 0),
+          };
+        })
       : areas;
 
     if (updatedAreasFromModal) {
@@ -1508,14 +1722,14 @@ export default function CloseWorkOrderAuxPage({ params }: Props) {
         return entry;
       })
       .filter(Boolean) as Array<{
-        areaId: number;
-        block: BlockKey;
-        blockId: number;
-        formId?: number;
-        cqmId?: number;
-        data: Record<string, number>;
-        sample_data?: Record<string, number>;
-      }>;
+      areaId: number;
+      block: BlockKey;
+      blockId: number;
+      formId?: number;
+      cqmId?: number;
+      data: Record<string, number>;
+      sample_data?: Record<string, number>;
+    }>;
 
     const summary = modalInputs
       .map((item) => {
@@ -1740,12 +1954,12 @@ export default function CloseWorkOrderAuxPage({ params }: Props) {
                       file.type === 'OT'
                         ? 'Ver OT'
                         : file.type === 'SKU'
-                          ? 'Ver SKU'
-                          : file.type === 'OP'
-                            ? 'Ver OP'
-                            : file.type === 'CARD_IMAGE'
-                              ? 'Ver TARJETA'
-                              : 'Adjunto';
+                        ? 'Ver SKU'
+                        : file.type === 'OP'
+                        ? 'Ver OP'
+                        : file.type === 'CARD_IMAGE'
+                        ? 'Ver TARJETA'
+                        : 'Adjunto';
                     return (
                       <button
                         key={file.id}
@@ -2008,10 +2222,11 @@ export default function CloseWorkOrderAuxPage({ params }: Props) {
                             }
                           >
                             <span
-                              className={`px-2 py-1 rounded-lg text-sm font-medium ${name && name !== '—'
-                                ? 'bg-yellow-100 text-yellow-800'
-                                : ''
-                                }`}
+                              className={`px-2 py-1 rounded-lg text-sm font-medium ${
+                                name && name !== '—'
+                                  ? 'bg-yellow-100 text-yellow-800'
+                                  : ''
+                              }`}
                             >
                               {name || '—'}
                             </span>
@@ -2045,10 +2260,11 @@ export default function CloseWorkOrderAuxPage({ params }: Props) {
                           className="text-center"
                         >
                           <span
-                            className={`px-2 py-1 rounded-lg text-sm font-medium ${reviewerName && reviewerName !== '—'
-                              ? 'bg-yellow-100 text-yellow-800'
-                              : ''
-                              }`}
+                            className={`px-2 py-1 rounded-lg text-sm font-medium ${
+                              reviewerName && reviewerName !== '—'
+                                ? 'bg-yellow-100 text-yellow-800'
+                                : ''
+                            }`}
                           >
                             {reviewerName || '—'}
                           </span>
@@ -2076,10 +2292,11 @@ export default function CloseWorkOrderAuxPage({ params }: Props) {
                             }
                           >
                             <span
-                              className={`px-2 py-1 rounded-lg text-sm font-medium ${name && name !== '—'
-                                ? 'bg-purple-100 text-purple-800'
-                                : ''
-                                }`}
+                              className={`px-2 py-1 rounded-lg text-sm font-medium ${
+                                name && name !== '—'
+                                  ? 'bg-purple-100 text-purple-800'
+                                  : ''
+                              }`}
                             >
                               {name || '—'}
                             </span>
@@ -2112,10 +2329,11 @@ export default function CloseWorkOrderAuxPage({ params }: Props) {
                           className="text-center"
                         >
                           <span
-                            className={`px-2 py-1 rounded-lg text-sm font-medium ${auditorName !== '—'
-                              ? 'bg-purple-100 text-purple-800'
-                              : ''
-                              }`}
+                            className={`px-2 py-1 rounded-lg text-sm font-medium ${
+                              auditorName !== '—'
+                                ? 'bg-purple-100 text-purple-800'
+                                : ''
+                            }`}
                           >
                             {auditorName}
                           </span>
@@ -2187,69 +2405,73 @@ export default function CloseWorkOrderAuxPage({ params }: Props) {
                                   field === 'buenas'
                                     ? toNum(p.quantity)
                                     : field === 'malas'
-                                      ? toNum(p.bad_quantity)
-                                      : field === 'excedente'
-                                        ? toNum(p.excess_quantity)
-                                        : toNum(p.noprocess_quantity);
+                                    ? toNum(p.bad_quantity)
+                                    : field === 'excedente'
+                                    ? toNum(p.excess_quantity)
+                                    : toNum(p.noprocess_quantity);
 
-                                const partialBadDetailsSum = (p.badQuantityDetails ?? []).reduce(
-                                  (acc, detail) => acc + toNum(detail?.bad_quantity),
+                                const partialBadDetailsSum = (
+                                  p.badQuantityDetails ?? []
+                                ).reduce(
+                                  (acc, detail) =>
+                                    acc + toNum(detail?.bad_quantity),
                                   0
                                 );
-                                const partialTotalBad = toNum(p.bad_quantity) + partialBadDetailsSum;
+                                const partialTotalBad =
+                                  toNum(p.bad_quantity) + partialBadDetailsSum;
 
                                 if (field === 'buenas') {
                                   partialSumForSigma += value;
-                                }
-                                if (field === 'malas') {
-                                  partialTotalBadAccum += partialTotalBad;
                                 }
 
                                 const isLastPartial =
                                   rem <= 0 &&
                                   pIndex === area.partials.length - 1;
-                                const shouldShowModalTrigger =
+                                const allowBadQuantityModal =
                                   field === 'malas' &&
                                   area.id >= 6 &&
                                   (area.status === 'Completado' ||
-                                    area.status === 'En auditoria') &&
-                                  isLastPartial;
+                                    area.status.includes('auditoria'));
 
                                 const shouldRenderAggregateInput =
                                   isEditableAggregateField &&
                                   isLastPartial &&
                                   rem <= 0;
+                                const displayValue =
+                                  field === 'malas'
+                                    ? getPxTotal(area.id, pIndex)
+                                    : value;
 
-                                const canOpenModalForThisPartial =
-                                  ['Completado', 'En auditoria'].includes(area.status) && area.id >= 6;
+                                const partialContent = allowBadQuantityModal ? (
+                                  <button
+                                    type="button"
+                                    className="inline-flex min-w-[64px] justify-center rounded border border-gray-200 bg-gray-50 px-2 py-1 text-sm text-gray-700 hover:bg-gray-100 focus:outline-none focus:ring-1 focus:ring-blue-400"
+                                    onClick={() =>
+                                      handleOpenBadQuantityModal(area, p)
+                                    }
+                                    title={`Cantidad mala total del parcial: ${partialTotalBad}`}
+                                  >
+                                    {displayValue}
+                                  </button>
+                                ) : shouldRenderAggregateInput ? (
+                                  <input
+                                    type="number"
+                                    value={aggregatedFieldValue}
+                                    min={0}
+                                    className="w-20 rounded border border-gray-200 px-2 py-1 text-center"
+                                  />
+                                ) : (
+                                  displayValue
+                                );
+
                                 return (
                                   <td
-                                    key={`area-${area.id}-parcial-${p.id ?? pIndex
-                                      }-${field}`}
+                                    key={`area-${area.id}-parcial-${
+                                      p.id ?? pIndex
+                                    }-${field}`}
                                     className="text-center"
                                   >
-                                    {field === 'malas' ? (
-                                      canOpenModalForThisPartial ? (
-                                        <button
-                                          type="button"
-                                          className="inline-flex min-w-[64px] justify-center rounded border border-gray-200 bg-gray-50 px-2 py-1 text-sm text-gray-700 hover:bg-gray-100 focus:outline-none focus:ring-1 focus:ring-blue-400"
-                                          onClick={() => handleOpenBadQuantityModal(area, Number(p?.id ?? pIndex))}
-                                          title={`Cantidad mala total del parcial: ${partialTotalBad}`}
-                                        >
-                                          {partialTotalBad}
-                                        </button>
-                                      ) : (
-                                        partialTotalBad
-                                      )
-                                    ) : shouldRenderAggregateInput ? (
-                                      <input
-                                        type="number"
-                                        value={aggregatedFieldValue}
-                                        min={0}
-                                      />
-                                    ) : (
-                                      value
-                                    )}
+                                    {field === 'malas' ? partialContent : value}
                                   </td>
                                 );
                               }
@@ -2260,79 +2482,134 @@ export default function CloseWorkOrderAuxPage({ params }: Props) {
                               let remSum = 0;
                               switch (field) {
                                 case 'buenas':
-                                  remValue = getRemainderByField(area, 'buenas');
+                                  remValue = getRemainderByField(
+                                    area,
+                                    'buenas'
+                                  );
                                   remSum = partialSumForSigma;
                                   break;
                                 case 'excedente':
-                                  remValue = getRemainderByField(area, 'excedente');
+                                  remValue = getRemainderByField(
+                                    area,
+                                    'excedente'
+                                  );
                                   remSum = getRemainderBySum(area, 'excedente');
                                   break;
                                 case 'noprocess':
-                                  remValue = getRemainderByField(area, 'noprocess');
+                                  remValue = getRemainderByField(
+                                    area,
+                                    'noprocess'
+                                  );
                                   remSum = getRemainderBySum(area, 'noprocess');
                                   break;
                                 case 'malas': {
-                                  // totalBad = self (remanente) + a otras áreas (remanente)
-                                  remSum = totalBad;
-                                  // remValue = totalBad - suma de malas ya registradas en parciales
-                                  remValue = Math.max(totalBad - partialTotalBadAccum, 0);
+                                  const { remBad, sumBad } = getRemTotal(
+                                    area.id
+                                  );
+                                  remValue = remBad; // 👈 20 (solo REM)
+                                  remSum = sumBad; // 👈 35 (suma total)
                                   break;
                                 }
                                 default:
                                   remValue = 0;
                               }
 
-                              // ✅ Si es "malas", hacer que el Rem abra el modal de badQuantity en contexto REMANENTE
-                              const canOpenRemModal =
-                                field === 'malas' &&
-                                (area.status === 'Completado' || area.status === 'En auditoria') &&
-                                area.id >= 6;
+                              const allowBadQuantityModalRem =
+                              field === 'malas' &&
+                              area.id >= 6 &&
+                              (area.status === 'Completado' || area.status.includes('auditoria'));
+
+                              let remainderAggregateContent: React.ReactNode;
+                              if (field === 'malas') {
+                                if (area.id < 6) {
+                                  remainderAggregateContent = (
+                                    <input
+                                      type="number"
+                                      value={area.malas ?? selfBad ?? 0} // ← usa selfBad solo si malas aún no existe
+                                      min={0}
+                                      onChange={(e) =>
+                                        handleValueChange(
+                                          area.id,
+                                          'malas',
+                                          e.target.value
+                                        )
+                                      }
+                                      className="w-20 rounded border border-gray-300 bg-white px-2 py-1 text-center"
+                                    />
+                                  );
+                                } else {
+                                  remainderAggregateContent = remSum;
+                                }
+                              } else if (isEditableAggregateField) {
+                                remainderAggregateContent = (
+                                  <input
+                                    type="number"
+                                    value={aggregatedFieldValue}
+                                    min={0}
+                                    onChange={(e) =>
+                                      handleValueChange(
+                                        area.id,
+                                        field,
+                                        e.target.value
+                                      )
+                                    }
+                                    className="w-20 rounded px-2 py-1 text-center"
+                                  />
+                                );
+                              } else if (field === 'buenas') {
+                                remainderAggregateContent = (
+                                  <input
+                                    type="number"
+                                    value={partialSumForSigma + remValue}
+                                    min={0}
+                                    onChange={(e) =>
+                                      handleValueChange(
+                                        area.id,
+                                        field,
+                                        e.target.value
+                                      )
+                                    }
+                                    className="w-20 rounded px-2 py-1 text-center"
+                                  />
+                                );
+                              } else {
+                                remainderAggregateContent = remSum;
+                              }
+
+                              const remainderPartialContent =
+                                allowBadQuantityModalRem ? (
+                                  <button
+                                    type="button"
+                                    className="inline-flex min-w-[64px] justify-center rounded border border-gray-200 bg-gray-50 px-2 py-1 text-sm text-gray-700 hover:bg-gray-100 focus:outline-none focus:ring-1 focus:ring-blue-400"
+                                    onClick={() =>
+                                      handleOpenBadQuantityModal(area)
+                                    }
+                                    title={`Cantidad mala total del área: ${aggregatedFieldValue}`}
+                                  >
+                                    {remValue}
+                                  </button>
+                                ) : (
+                                  remValue
+                                );
 
                               cells.push(
-                                <React.Fragment key={`area-${area.id}-usuario-rem-wrapper-partial`}>
-                                  {/* Rem */}
+                                <React.Fragment
+                                  key={`area-${area.id}-usuario-rem-wrapper-partial`}
+                                >
                                   <td
                                     key={`area-${area.id}-parcial-rem-${field}`}
                                     className="text-center font-semibold"
                                     title="Remanente"
                                   >
-                                    {canOpenRemModal ? (
-                                      <button
-                                        type="button"
-                                        className="inline-flex min-w-[64px] justify-center rounded border border-gray-200 bg-gray-50 px-2 py-1 text-sm text-gray-700 hover:bg-gray-100 focus:outline-none focus:ring-1 focus:ring-blue-400"
-                                        onClick={() => handleOpenBadQuantityModal(area)} // REM: sin partialId
-                                        title="Editar distribución de malas (remanente)"
-                                      >
-                                        {remValue}
-                                      </button>
-                                    ) : (
-                                      remValue
-                                    )}
+                                    {remainderPartialContent}
                                   </td>
 
-                                  {/* Σ */}
                                   <td
                                     key={`area-${area.id}-parcial-rem-${field}-sum`}
                                     className="text-center font-semibold"
-                                    title="Suma total (parciales + remanente)"
+                                    title="Remanente"
                                   >
-                                    {(() => {
-                                      // Para 'malas' Σ es el totalBad (remSum ya calculado arriba)
-                                      if (field === 'malas') return remSum;
-
-                                      // Para excedente y noprocess, si el agregado es editable, mostramos input
-                                      if (isEditableAggregateField) {
-                                        return (
-                                          aggregatedFieldValue
-                                        );
-                                      }
-
-                                      // Para 'buenas' Σ es la suma de parciales (partialSumForSigma)
-                                      if (field === 'buenas') return partialSumForSigma;
-
-                                      // Por defecto usa remSum (ya calculado según el campo)
-                                      return remSum;
-                                    })()}
+                                    {remainderAggregateContent}
                                   </td>
                                 </React.Fragment>
                               );
@@ -2422,7 +2699,7 @@ export default function CloseWorkOrderAuxPage({ params }: Props) {
                           field === 'cqm'
                             ? getSingleCqm(area)
                             : renderCell?.(area, field as any) ??
-                            getAnswerValue(undefined, field as any, area);
+                              getAnswerValue(undefined, field as any, area);
 
                         return (
                           <td
@@ -2601,8 +2878,9 @@ export default function CloseWorkOrderAuxPage({ params }: Props) {
                           onClick={() =>
                             setOpModal((s) => ({ ...s, selectedUserId: u.id }))
                           }
-                          className={`w-full text-left px-3 py-2 border-b last:border-b-0 ${selected ? 'bg-blue-100' : 'hover:bg-gray-50'
-                            }`}
+                          className={`w-full text-left px-3 py-2 border-b last:border-b-0 ${
+                            selected ? 'bg-blue-100' : 'hover:bg-gray-50'
+                          }`}
                         >
                           {u.username}
                         </button>

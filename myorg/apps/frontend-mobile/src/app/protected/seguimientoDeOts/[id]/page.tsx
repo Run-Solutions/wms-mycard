@@ -729,20 +729,37 @@ const WorkOrderDetailScreen: React.FC = () => {
 
   const getRemTotal = (areaId: number) => {
     const entry = pxTotalsByAreaId.get(Number(areaId));
-    const remFromDetails = Number(entry?.totals?.['REM'] ?? 0);
-
     const area = areas.find((a) => a.id === areaId);
     const blockKey = areaBlockMap[areaId];
     const selfBad = Number(area?.response?.[blockKey]?.bad_quantity ?? 0);
-
-    // 🔍 Corrige la prioridad: si selfBad es mayor, úsalo
-    // y solo usa remFromDetails si es realmente superior
-    if (selfBad > remFromDetails) {
-      return selfBad;
+  
+    // 🔹 Busca los detalles de esa área en workOrder.flow
+    const flow = workOrder?.flow?.find((f: any) => f.area_id === areaId);
+    const details = flow?.badQuantityDetails ?? [];
+  
+    // 🔹 Solo REM (sin parciales)
+    const remBad = details
+      .filter((d: any) => d.partial_release_id == null)
+      .reduce((sum: number, d: any) => sum + (Number(d?.bad_quantity) || 0), 0);
+  
+    // 🔹 Suma total (todas las malas)
+    const sumBad = details.reduce(
+      (sum: number, d: any) => sum + (Number(d?.bad_quantity) || 0),
+      0
+    );
+  
+    // 🔹 Para áreas < 6: rem = total (porque no hay parciales)
+    if (areaId < 6) {
+      const totals = entry?.totals ?? {};
+      const totalSum = Object.values(totals).reduce(
+        (sum, v) => sum + (Number(v) || 0),
+        0
+      );
+      return { remBad: totalSum, sumBad: totalSum };
     }
-
-    // si ambos son 0 o iguales, devuelve el mayor
-    return Math.max(remFromDetails, selfBad);
+  
+    // 🔹 Para áreas >= 6
+    return { remBad: remBad || selfBad, sumBad: sumBad || selfBad };
   };
 
   // --- operadores (nuevo) ---
@@ -2734,11 +2751,12 @@ const WorkOrderDetailScreen: React.FC = () => {
                           remValue = getRemainderByField(area, 'noprocess');
                           remSum = getRemainderBySum(area, 'noprocess');
                           break;
-                        case 'malas': {
-                          remValue = getRemTotal(area.id); // <- solo no liberados (REM) desde flow.badQuantityDetails
-                          remSum = totalBad; // puedes mantener tu total acumulado como Σ
-                          break;
-                        }
+                          case 'malas': {
+                            const { remBad, sumBad } = getRemTotal(area.id);
+                            remValue = remBad; // 👈 20 (solo REM)
+                            remSum = sumBad;   // 👈 35 (suma total)
+                            break;
+                          }
                         default:
                           remValue = 0;
                       }

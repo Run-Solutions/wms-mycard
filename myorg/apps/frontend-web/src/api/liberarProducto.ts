@@ -204,8 +204,8 @@ interface ReleasePayloadForAuditory {
   areaId: number;
   assignedUser: number;
   goodQuantity: number;
-  badQuantity: number;
-  materialBadQuantity: number;
+  badQuantity?: number;
+  materialBadQuantity?: number;
   excessQuantity: number;
   noProcessQuantity: number;
   comments: string;

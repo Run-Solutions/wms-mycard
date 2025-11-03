@@ -140,7 +140,12 @@ const resolveBlockKey = (name?: string | null): BlockKey | null => {
 const blockSupportsMaterial = (block?: BlockKey | null) =>
   !!block &&
   ['corte', 'colorEdge', 'millingChip', 'personalizacion'].includes(block);
-
+const normalizeSummaryLabel = (label?: string) =>
+  String(label ?? '')
+    .normalize('NFD')
+    .replace(/\u0300-\u036f/g, '')
+    .trim()
+    .toLowerCase();
 interface Props {
   params: Promise<{ id: string }>;
 }
@@ -226,6 +231,56 @@ const getStatusStyleMobile = (status: string) => {
       return { backgroundColor: '#E5E7EB', textColor: '#374151' };
   }
 };
+
+function sumDetailFromPartial(
+  partial: AreaData['partials'][number] | null | undefined,
+  ownerSourceId: number,
+  targetAreaId: number
+) {
+  let bad = 0;
+  let mat = 0;
+  if (!partial) return { bad, mat };
+  const list = Array.isArray(partial.badQuantityDetails)
+    ? partial.badQuantityDetails
+    : [];
+  for (const d of list) {
+    if (
+      Number(d?.source_area_id) === Number(ownerSourceId) &&
+      Number(d?.target_area_id) === Number(targetAreaId)
+    ) {
+      bad += toNum(d?.bad_quantity);
+      mat += toNum(d?.material_quantity);
+    }
+  }
+  return { bad, mat };
+}
+
+// Suma malas/material del REMANENTE (partial_release_id == null) para (source, target)
+function sumDetailFromRem(
+  workOrder: any,
+  ownerSourceId: number,
+  targetAreaId: number
+) {
+  let bad = 0;
+  let mat = 0;
+  const flows = Array.isArray(workOrder?.flow) ? workOrder.flow : [];
+  for (const f of flows) {
+    const details = Array.isArray(f?.badQuantityDetails)
+      ? f.badQuantityDetails
+      : [];
+    for (const d of details) {
+      if (d?.partial_release_id != null) continue; // solo REM
+      if (
+        Number(d?.source_area_id) === Number(ownerSourceId) &&
+        Number(d?.target_area_id) === Number(targetAreaId)
+      ) {
+        bad += toNum(d?.bad_quantity);
+        mat += toNum(d?.material_quantity);
+      }
+    }
+  }
+  return { bad, mat };
+}
 
 // ---- Remainders (by field) ----
 const getAnswerValue = (
@@ -716,20 +771,37 @@ const CerrarOrdenDeTrabajoAuxScreen: React.FC = () => {
   };
   const getRemTotal = (areaId: number) => {
     const entry = pxTotalsByAreaId.get(Number(areaId));
-    const remFromDetails = Number(entry?.totals?.['REM'] ?? 0);
-
     const area = areas.find((a) => a.id === areaId);
     const blockKey = areaBlockMap[areaId];
     const selfBad = Number(area?.response?.[blockKey]?.bad_quantity ?? 0);
 
-    // 🔍 Corrige la prioridad: si selfBad es mayor, úsalo
-    // y solo usa remFromDetails si es realmente superior
-    if (selfBad > remFromDetails) {
-      return selfBad;
+    // 🔹 Busca los detalles de esa área en workOrder.flow
+    const flow = workOrder?.flow?.find((f: any) => f.area_id === areaId);
+    const details = flow?.badQuantityDetails ?? [];
+
+    // 🔹 Solo REM (sin parciales)
+    const remBad = details
+      .filter((d: any) => d.partial_release_id == null)
+      .reduce((sum: number, d: any) => sum + (Number(d?.bad_quantity) || 0), 0);
+
+    // 🔹 Suma total (todas las malas)
+    const sumBad = details.reduce(
+      (sum: number, d: any) => sum + (Number(d?.bad_quantity) || 0),
+      0
+    );
+
+    // 🔹 Para áreas < 6: rem = total (porque no hay parciales)
+    if (areaId < 6) {
+      const totals = entry?.totals ?? {};
+      const totalSum = Object.values(totals).reduce(
+        (sum, v) => sum + (Number(v) || 0),
+        0
+      );
+      return { remBad: totalSum, sumBad: totalSum };
     }
 
-    // si ambos son 0 o iguales, devuelve el mayor
-    return Math.max(remFromDetails, selfBad);
+    // 🔹 Para áreas >= 6
+    return { remBad: remBad || selfBad, sumBad: sumBad || selfBad };
   };
   // ---- Operators maps ----
   const operatorOptionsByAreaId = useMemo(() => {
@@ -1384,29 +1456,106 @@ const CerrarOrdenDeTrabajoAuxScreen: React.FC = () => {
     noprocess: 'Sin procesar',
   };
 
-  const handleOpenBadQuantityModal = (ownerArea: AreaData) => {
+  const handleOpenBadQuantityModal = (
+    ownerArea: AreaData,
+    partial?: AreaData['partials'][number] | null
+  ) => {
     const initialValues: Record<string, string> = {};
+    const orderedAreas: AreaData[] = [];
 
-    const areasForModal = areas.filter(
-      (a) => a.status === 'Completado' && a.name.toLowerCase() !== 'preprensa'
-    );
+    // ✅ Mostrar SIEMPRE las áreas 1..6 (si existen en la OT) + el área actual
+    const PREV_IDS = [2, 3, 4, 5, 6];
+    const prevTargets = PREV_IDS.map((id) =>
+      areas.find((a) => Number(a.id) === id)
+    ).filter(Boolean) as AreaData[];
 
-    const perTarget =
-      badAgg.remainderBySourceTarget.get(ownerArea.id) ??
-      new Map<number, { bad: number; mat: number }>();
-
-    areasForModal.forEach((area) => {
-      if (area.id === ownerArea.id) return; // 🔒 excluye self-target
-      const key = area.name.toLowerCase().replace(/\s/g, '');
-      const agg = perTarget.get(area.id) ?? { bad: 0, mat: 0 };
-      initialValues[`${key}_bad`] = String(toNum(agg.bad));
-      if (area.id >= 6) {
-        initialValues[`${key}_material`] = String(toNum(agg.mat));
+    const pushUnique = (candidate?: AreaData | null) => {
+      if (!candidate) return;
+      if (!orderedAreas.some((x) => Number(x.id) === Number(candidate.id))) {
+        orderedAreas.push(candidate);
       }
+    };
+
+    // 1) Agrega 1..6 en orden
+    prevTargets.forEach((a) => pushUnique(a));
+    // 2) Agrega el área actual (si no estaba ya)
+    pushUnique(ownerArea);
+
+    const modalAreaSummaries: AreaForBadQty[] = [];
+    modalBaselineRef.current = new Map();
+
+    orderedAreas.forEach((area) => {
+      const key = normalizeAreaKey(area.name);
+      const supportsMaterial = Number(area.id) >= 6; // < 6 no muestra "malo de fábrica"
+
+      const sourceId = Number(ownerArea.id);
+      const targetId = Number(area.id);
+
+      // Trae el detalle desde parcial o remanente (como en tu lógica actual)
+      let badValue = 0;
+      let materialValue = 0;
+
+      if (partial) {
+        const { bad, mat } = sumDetailFromPartial(partial, sourceId, targetId);
+        badValue = bad;
+        materialValue = mat;
+      } else {
+        const { bad, mat } = sumDetailFromRem(workOrder, sourceId, targetId);
+        badValue = bad;
+        materialValue = mat;
+      }
+
+      // Fallback desde badQuantitySummary si no hay detalle
+      const summaryEntry = Array.isArray(ownerArea.badQuantitySummary)
+        ? ownerArea.badQuantitySummary.find(
+            (e) => Number(e.areaId) === targetId
+          )
+        : null;
+
+      if (!badValue && summaryEntry) {
+        const badFromSummary = summaryEntry.values.find(
+          (e: any) => normalizeSummaryLabel(e.label) === 'malas'
+        );
+        if (badFromSummary) badValue = toNum(badFromSummary.value);
+      }
+      if (supportsMaterial && !materialValue && summaryEntry) {
+        const materialFromSummary = summaryEntry.values.find((e: any) => {
+          const n = normalizeSummaryLabel(e.label);
+          return n.includes('fabrica') || n.includes('materia');
+        });
+        if (materialFromSummary)
+          materialValue = toNum(materialFromSummary.value);
+      }
+
+      // Baseline para deltas
+      modalBaselineRef.current.set(targetId, {
+        bad: Number(badValue) || 0,
+        material: supportsMaterial ? Number(materialValue) || 0 : null,
+        supportsMaterial,
+      });
+
+      // Inputs iniciales
+      initialValues[`${key}_bad`] = String(Number(badValue) || 0);
+      if (supportsMaterial) {
+        initialValues[`${key}_material`] = String(Number(materialValue) || 0);
+      }
+
+      // Fila del modal
+      modalAreaSummaries.push({
+        id: targetId,
+        name: area.name,
+        malas: Number(badValue) || 0,
+        defectuoso: supportsMaterial
+          ? Number(materialValue) || 0
+          : Number(area.defectuoso ?? 0),
+        supportsMaterial,
+      });
     });
 
+    setModalAreas(modalAreaSummaries);
     setAreaBadQuantities(initialValues);
     setBadModalOwner(ownerArea);
+    setBadModalPartial(partial ?? null);
     setShowBadQuantity(true);
   };
 
@@ -2271,7 +2420,8 @@ const CerrarOrdenDeTrabajoAuxScreen: React.FC = () => {
                       const allowBadQuantityModal =
                         field === 'malas' &&
                         area.id >= 6 &&
-                        area.status === 'Completado';
+                        (area.status === 'Completado' ||
+                          area.status.includes('auditoria'));
 
                       const shouldRenderAggregateInput =
                         isEditableAggregateField && isLastPartial && rem <= 0;
@@ -2347,8 +2497,9 @@ const CerrarOrdenDeTrabajoAuxScreen: React.FC = () => {
                           remSum = getRemainderBySum(area, 'noprocess');
                           break;
                         case 'malas': {
-                          remValue = getRemTotal(area.id); // <- solo no liberados (REM) desde flow.badQuantityDetails
-                          remSum = totalBad; // puedes mantener tu total acumulado como Σ
+                          const { remBad, sumBad } = getRemTotal(area.id);
+                          remValue = remBad; // 👈 20 (solo REM)
+                          remSum = sumBad; // 👈 35 (suma total)
                           break;
                         }
                         default:
@@ -2358,7 +2509,8 @@ const CerrarOrdenDeTrabajoAuxScreen: React.FC = () => {
                       const allowBadQuantityModalRem =
                         field === 'malas' &&
                         area.id >= 6 &&
-                        area.status === 'Completado';
+                        (area.status === 'Completado' ||
+                          area.status.includes('auditoria'));
 
                       // --- Rem (columna 1)
                       const remainderPartialContent =

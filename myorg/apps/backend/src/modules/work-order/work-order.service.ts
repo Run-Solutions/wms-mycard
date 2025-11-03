@@ -2128,6 +2128,10 @@ export class WorkOrderService {
 
     const canPersistDetails =
       resolvedSourceFlowId !== null && resolvedSourceAreaId !== null;
+      if (!partialReleaseId || partialReleaseId === 0) {
+        console.log('⚠️ Forzando partialReleaseId a null (no hay liberación parcial)');
+        partialReleaseId = null;
+      }
 
     const areasResponses = await this.prisma.areasResponse.findMany({
       where: { work_order_id: workOrderId },
@@ -2204,7 +2208,7 @@ export class WorkOrderService {
                 partial_release_id: partialReleaseId,
                 block: detailBlock ?? undefined,
               },
-              select: { id: true, bad_quantity: true, material_quantity: true, values: true },
+              select: { id: true, bad_quantity: true, material_quantity: true, values: true, block: true },
             })) as any;
           } else {
             // FINAL: findFirst por (source_flow, target_area, partial_release=null)
@@ -2215,7 +2219,7 @@ export class WorkOrderService {
                 partial_release_id: null,
                 block: detailBlock ?? undefined,
               },
-              select: { id: true, bad_quantity: true, material_quantity: true, values: true },
+              select: { id: true, bad_quantity: true, material_quantity: true, values: true, block: true },
             })) as any;
           }
         }
@@ -2286,8 +2290,8 @@ export class WorkOrderService {
               const existing = await delegate.findUnique({ where: { id: blockId } });
               if (existing) {
                 const incomingNext = {
-                  bad_quantity: (coerceToNumber(existing?.bad_quantity) ?? 0) + (summaryDeltas.bad_quantity ?? 0),
-                  material_quantity: (coerceToNumber(existing?.material_quantity) ?? 0) + (summaryDeltas.material_quantity ?? 0),
+                  bad_quantity: aggregated.bad_quantity ?? summaryDeltas.bad_quantity ?? coerceToNumber(existing?.bad_quantity) ?? 0,
+ material_quantity: aggregated.material_quantity ?? summaryDeltas.material_quantity ?? coerceToNumber(existing?.material_quantity) ?? 0,
                 };
                 const { deltas, logs, nextValues } = buildNumericChangesCorte(
                   existing,
@@ -2346,10 +2350,17 @@ export class WorkOrderService {
           }
         }
 
+        console.log(
+          '🔎 [DEBUG corte]',
+          'handledByAreaResponse:', handledByAreaResponse,
+          '| partialReleaseId:', partialReleaseId,
+          '| area:', summary.areaName,
+        );
+
         // --------------------------
         // FALLBACK: partialRelease (si no se acumuló en bloque target)
         // --------------------------
-        if (!handledByAreaResponse) {
+        if (!handledByAreaResponse && partialReleaseId !== null && summary.areaName !== 'corte') {
           const partialList = partialReleaseByAreaId.get(summary.areaId);
           if (partialList && partialList.length > 0) {
             const targetPartial = partialList[partialList.length - 1];
@@ -2449,6 +2460,21 @@ export class WorkOrderService {
             incomingValues.length > 0
               ? mergeDetailValues(previousValues, incomingValues)
               : null;
+
+              if (partialReleaseId === null && (existingDetail as any)?.block === 'partialRelease') {
+                console.log('⚠️ Reiniciando registro parcial previo (se usará bloque corte)');
+                existingDetail = null;
+              }
+
+              if (partialReleaseId === null) {
+                console.log('🧾 Ajustando totales finales (sin partial) - antes:', normalizedTotals);
+              
+                // Forzar que se usen los valores enviados por el operador (no los acumulados)
+                normalizedTotals.bad_quantity = aggregated.bad_quantity ?? normalizedTotals.bad_quantity;
+                normalizedTotals.material_quantity = aggregated.material_quantity ?? normalizedTotals.material_quantity;
+              
+                console.log('✅ Ajustando totales finales (sin partial) - después:', normalizedTotals);
+              }
 
           if (existingDetail) {
             const updateData: Prisma.BadQuantityDetailUpdateInput = {

@@ -1,5 +1,11 @@
 import React, { useState, useCallback } from 'react';
-import { View, Text, StyleSheet, ActivityIndicator, Platform } from 'react-native';
+import {
+  View,
+  Text,
+  StyleSheet,
+  ActivityIndicator,
+  Platform,
+} from 'react-native';
 import { useFocusEffect } from '@react-navigation/native';
 import { getWorkOrdersWithInconformidadAuditory } from '../../../api/rechazos';
 import WorkOrderList from '../../../components/Rechazos/WorkOrderList';
@@ -37,41 +43,41 @@ const RechazosScreen: React.FC = () => {
 
   const fetchAllWorkOrders = async () => {
     try {
-      setLoading(true);
       const res = await getWorkOrdersWithInconformidadAuditory();
-      const flowsAuditory = Array.isArray(res?.pendingOrdersAuditory) ? res.pendingOrdersAuditory : [];
-      const flowsAuditoryPartial = Array.isArray(res?.pendingOrdersAuditoryPartial) ? res.pendingOrdersAuditoryPartial : [];
+      console.log(res, 'res');
 
-      // Une ambas fuentes
-      const allFlows = [...flowsAuditory, ...flowsAuditoryPartial];
+      // ✅ Adaptado al nuevo backend
+      const allFlows = Array.isArray(res?.pendingOrders)
+        ? res.pendingOrders
+        : [];
 
-      // Aplana a WorkOrder y filtra nulos
-      const allWorkOrders = allFlows.map((f: any) => f?.workOrder).filter(Boolean);
+      // ✅ Aplana a WorkOrder y filtra nulos
+      const allWorkOrders = allFlows
+        .map((f: any) => f?.workOrder)
+        .filter(Boolean);
 
-      // Desduplica por id
+      // ✅ Deduplica por id (por si acaso)
       const deduped = dedupeBy(allWorkOrders, (wo: WorkOrder) => wo.id);
 
       setWorkOrders(deduped);
     } catch (err) {
       console.error('Error en fetchAllWorkOrders', err);
-    } finally {
-      setLoading(false);
     }
   };
 
   // =================== utils ===================
-function dedupeBy<T>(arr: T[], keyFn: (x: T) => string | number): T[] {
-  const seen = new Set<string | number>();
-  const out: T[] = [];
-  for (const item of arr) {
-    const k = keyFn(item);
-    if (!seen.has(k)) {
-      seen.add(k);
-      out.push(item);
+  function dedupeBy<T>(arr: T[], keyFn: (x: T) => string | number): T[] {
+    const seen = new Set<string | number>();
+    const out: T[] = [];
+    for (const item of arr) {
+      const k = keyFn(item);
+      if (!seen.has(k)) {
+        seen.add(k);
+        out.push(item);
+      }
     }
+    return out;
   }
-  return out;
-}
 
   // ✅ recarga cada vez que se enfoca esta pantalla
   useFocusEffect(
@@ -112,7 +118,9 @@ function dedupeBy<T>(arr: T[], keyFn: (x: T) => string | number): T[] {
         </View>
       ) : workOrders.length === 0 ? (
         <View style={styles.emptyState}>
-          <Text style={styles.emptyText}>No hay órdenes disponibles para esta área.</Text>
+          <Text style={styles.emptyText}>
+            No hay órdenes disponibles para esta área.
+          </Text>
         </View>
       ) : (
         <View style={styles.listWrapper}>

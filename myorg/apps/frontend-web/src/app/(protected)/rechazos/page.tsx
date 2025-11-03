@@ -35,17 +35,19 @@ const RechazosPage: React.FC = () => {
     async function fetchAllWorkOrders() {
       try {
         const res = await getWorkOrdersWithInconformidadAuditory();
-        console.log(res, 'res')
-        const flowsAuditory = Array.isArray(res?.pendingOrdersAuditory) ? res.pendingOrdersAuditory : [];
-        const flowsAuditoryPartial = Array.isArray(res?.pendingOrdersAuditoryPartial) ? res.pendingOrdersAuditoryPartial : [];
+        console.log(res, 'res');
 
-        // Une ambas fuentes
-        const allFlows = [...flowsAuditory, ...flowsAuditoryPartial];
+        // ✅ Adaptado al nuevo backend
+        const allFlows = Array.isArray(res?.pendingOrders)
+          ? res.pendingOrders
+          : [];
 
-        // Aplana a WorkOrder y filtra nulos
-        const allWorkOrders = allFlows.map((f: any) => f?.workOrder).filter(Boolean);
+        // ✅ Aplana a WorkOrder y filtra nulos
+        const allWorkOrders = allFlows
+          .map((f: any) => f?.workOrder)
+          .filter(Boolean);
 
-        // Desduplica por id
+        // ✅ Deduplica por id (por si acaso)
         const deduped = dedupeBy(allWorkOrders, (wo: WorkOrder) => wo.id);
 
         setWorkOrders(deduped);
@@ -55,7 +57,6 @@ const RechazosPage: React.FC = () => {
     }
     fetchAllWorkOrders();
   }, []);
-
   return (
     <PageContainer>
       <TitleWrapper>

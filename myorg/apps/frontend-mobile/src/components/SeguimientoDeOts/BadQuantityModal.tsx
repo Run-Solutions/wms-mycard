@@ -25,12 +25,12 @@ export interface BadQuantityModalResult {
     areaName: string;
     values: Array<{ label: string; value: number }>;
   }>;
-  updatedAreas: AreaData[];
+  updatedAreas: AreaForBadQty[];
 }
 
 interface Props {
   visible: boolean;
-  areas: AreaData[];
+  areas: AreaForBadQty[];
   areaBadQuantities: { [key: string]: string };
   setAreaBadQuantities: React.Dispatch<
     React.SetStateAction<{ [key: string]: string }>

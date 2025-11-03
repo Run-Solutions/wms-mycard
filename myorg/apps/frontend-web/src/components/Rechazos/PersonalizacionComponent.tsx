@@ -202,7 +202,7 @@ export default function PersonalizacionComponent({
     if (
       allValidated &&
       Array.isArray(currentFlow?.badQuantityDetails) &&
-      currentFlow.areaResponse?.colorEdge
+      currentFlow.areaResponse?.personalizacion
     ) {
       const sinParcial = currentFlow.badQuantityDetails.filter(
         (d: any) => d.partial_release_id === null
@@ -328,7 +328,7 @@ export default function PersonalizacionComponent({
     if (
       allValidated &&
       Array.isArray(currentFlow?.badQuantityDetails) &&
-      currentFlow.areaResponse?.colorEdge
+      currentFlow.areaResponse?.personalizacion
     ) {
       console.log('Caso 1: todos validados → sumar los sin parcial');
       const sinParciales = currentFlow.badQuantityDetails.filter(

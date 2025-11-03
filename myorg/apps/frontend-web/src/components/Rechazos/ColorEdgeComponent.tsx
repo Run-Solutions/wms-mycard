@@ -306,7 +306,6 @@ export default function ColorEdgeComponent({ workOrder, currentFlow }: Props) {
     const partials = currentFlow?.partialReleases || [];
     const allValidated =
       partials.length > 0 && partials.every((p: any) => p.validated);
-    console.log(allValidated, 'allValidatedfff');
     const onlyOnePartial = partials.length === 1;
 
     // 🧠 identificar parcial activo (no validado, más reciente)
@@ -316,8 +315,6 @@ export default function ColorEdgeComponent({ workOrder, currentFlow }: Props) {
         (a: any, b: any) =>
           new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
       )[0];
-
-    console.log(currentPartial, 'currentparcial');
 
     // --- Caso 1: todos validados → sumar los sin parcial
     if (
@@ -331,7 +328,10 @@ export default function ColorEdgeComponent({ workOrder, currentFlow }: Props) {
       );
 
       return sinParciales.reduce(
-        (acc: number, d: any) => acc + (Number(d.bad_quantity) || 0),
+        (acc: number, d: any) =>
+          acc +
+          (Number(d.bad_quantity) || 0) +
+          (Number(d.material_quantity) || 0),
         0
       );
     }
@@ -347,7 +347,10 @@ export default function ColorEdgeComponent({ workOrder, currentFlow }: Props) {
       );
 
       return detallesDelParcial.reduce(
-        (acc: number, d: any) => acc + (Number(d.bad_quantity) || 0),
+        (acc: number, d: any) =>
+          acc +
+          (Number(d.bad_quantity) || 0) +
+          (Number(d.material_quantity) || 0),
         0
       );
     }

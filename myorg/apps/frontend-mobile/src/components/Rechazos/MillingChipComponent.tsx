@@ -201,7 +201,7 @@ const MillingChipComponent: React.FC<Props> = ({ workOrder, currentFlow }) => {
     if (
       allValidated &&
       Array.isArray(currentFlow?.badQuantityDetails) &&
-      currentFlow.areaResponse?.colorEdge
+      currentFlow.areaResponse?.millingChip
     ) {
       const sinParcial = currentFlow.badQuantityDetails.filter(
         (d: any) => d.partial_release_id === null
@@ -327,7 +327,7 @@ const MillingChipComponent: React.FC<Props> = ({ workOrder, currentFlow }) => {
     if (
       allValidated &&
       Array.isArray(currentFlow?.badQuantityDetails) &&
-      currentFlow.areaResponse?.colorEdge
+      currentFlow.areaResponse?.millingChip
     ) {
       console.log('Caso 1: todos validados → sumar los sin parcial');
       const sinParciales = currentFlow.badQuantityDetails.filter(
@@ -335,7 +335,10 @@ const MillingChipComponent: React.FC<Props> = ({ workOrder, currentFlow }) => {
       );
 
       return sinParciales.reduce(
-        (acc: number, d: any) => acc + (Number(d.bad_quantity) || 0),
+        (acc: number, d: any) =>
+          acc +
+          (Number(d.bad_quantity) || 0) +
+          (Number(d.material_quantity) || 0),
         0
       );
     }
@@ -351,7 +354,10 @@ const MillingChipComponent: React.FC<Props> = ({ workOrder, currentFlow }) => {
       );
 
       return detallesDelParcial.reduce(
-        (acc: number, d: any) => acc + (Number(d.bad_quantity) || 0),
+        (acc: number, d: any) =>
+          acc +
+          (Number(d.bad_quantity) || 0) +
+          (Number(d.material_quantity) || 0),
         0
       );
     }

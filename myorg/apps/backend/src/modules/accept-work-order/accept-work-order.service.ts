@@ -63,16 +63,15 @@ export class AcceptWorkOrderService {
   ) {
     console.log('Buscando órdenes pendientes...', statuses);
     console.log('Usuario', userId);
-
-
+  
     if (!areasOperatorIds && role_id === 2) {
       throw new Error('No se proporcionaron áreas válidas');
     }
+  
+    // === 1️⃣ Consultas separadas ===
     const pendingOrders = await this.prisma.workOrderFlow.findMany({
       where: {
-        status: {
-          in: statuses,
-        },
+        status: { in: statuses },
         area_id: areasOperatorIds,
         assigned_user: userId,
       },
@@ -84,28 +83,18 @@ export class AcceptWorkOrderService {
             flow: {
               include: {
                 area: true,
-                areaResponse: {
-                  include: {
-                    inconformities: true,
-                  },
-                },
+                areaResponse: { include: { inconformities: true } },
               },
             },
           },
         },
       },
     });
-
+  
     const pendingOrdersAuditory = await this.prisma.workOrderFlow.findMany({
       where: {
-        status: {
-          in: statuses,
-        },
-        formAuditory: {
-          some: {
-            OR: [{ reviewed_by_id: userId }],
-          },
-        },
+        status: { in: statuses },
+        formAuditory: { some: { reviewed_by_id: userId } },
       },
       include: {
         workOrder: {
@@ -115,27 +104,19 @@ export class AcceptWorkOrderService {
             flow: {
               include: {
                 area: true,
-                formAuditory: {
-                  include: {
-                    user: true,
-                  },
-                },
+                formAuditory: { include: { user: true } },
               },
             },
           },
         },
       },
     });
-
+  
     const pendingOrdersAuditoryPartial = await this.prisma.workOrderFlow.findMany({
       where: {
         status: { in: statuses },
         partialReleases: {
-          some: {
-            formAuditory: {
-              reviewed_by_id: userId,
-            },
-          },
+          some: { formAuditory: { reviewed_by_id: userId } },
         },
       },
       include: {
@@ -156,22 +137,31 @@ export class AcceptWorkOrderService {
         },
       },
     });
-    console.log(pendingOrdersAuditoryPartial, 'pendingOrdersAuditoryPartial')
-
-    if (
-      pendingOrders.length === 0 &&
-      pendingOrdersAuditory.length === 0 &&
-      pendingOrdersAuditoryPartial.length === 0
-    ) {
+    console.log('pendingOrders', pendingOrders)
+    console.log('pendingOrdersAuditory', pendingOrdersAuditory)
+    console.log('pendingOrdersAuditoryPartial', pendingOrdersAuditoryPartial)
+  
+    // === 2️⃣ Unificar y deduplicar ===
+    const allOrders = [
+      ...pendingOrders,
+      ...pendingOrdersAuditory,
+      ...pendingOrdersAuditoryPartial,
+    ];
+  
+    // Deduplicar por ID del flujo (workOrderFlow.id)
+    const uniqueOrders = Array.from(
+      new Map(allOrders.map(o => [o.id, o])).values(),
+    );
+  
+    if (uniqueOrders.length === 0) {
       return { message: 'No hay órdenes pendientes para esta área.' };
     }
-
-    console.log('Órdenes pendientes desde work-orders services', pendingOrders);
-
+  
+    console.log('Órdenes únicas encontradas:', uniqueOrders.length);
+  
+    // === 3️⃣ Retornar resultado unificado ===
     return {
-      pendingOrders,
-      pendingOrdersAuditory,
-      pendingOrdersAuditoryPartial
+      pendingOrders: uniqueOrders,
     };
   }
 

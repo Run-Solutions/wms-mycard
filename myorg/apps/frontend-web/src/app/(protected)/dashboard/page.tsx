@@ -124,18 +124,10 @@ const COUNT_RESOLVERS: Partial<Record<string, () => Promise<number>>> = {
   rechazos: async (): Promise<number> => {
     try {
       const res = await getWorkOrdersWithInconformidadAuditory();
-      const flowsAuditory = Array.isArray(res?.pendingOrdersAuditory)
-        ? res.pendingOrdersAuditory
-        : [];
-      const flowsAuditoryPartial = Array.isArray(
-        res?.pendingOrdersAuditoryPartial
-      )
-        ? res.pendingOrdersAuditoryPartial
-        : [];
-
       // Une ambas fuentes
-      const allFlows = [...flowsAuditory, ...flowsAuditoryPartial];
-
+      const allFlows = Array.isArray(res?.pendingOrders)
+      ? res.pendingOrders
+      : [];
       const count = getPendingCount(allFlows);
       return typeof count === 'number' ? count : 0; // siempre número
     } catch (err) {
