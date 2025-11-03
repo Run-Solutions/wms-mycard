@@ -165,7 +165,7 @@ model WorkOrder {
   isCollator            Boolean            @default(false) // Indica si la OT es de tipo Collator
   
   user                  User                @relation("UserWorkOrders", fields: [created_by], references: [id])
-  user_closed           User?               @relation("UserWorkOrdersClosed", fields: [closed_by], references: [id])
+  user_closed           User?               @relation("UserWorkOrdersClosed", fields: [closed_by], references: [id], map: "work_orders_closed_by_fkey", onUpdate: Cascade, onDelete: SetNull)
   files                 WorkOrderFiles[]    // Relacion con archivos
   flow                  WorkOrderFlow[]     // Relación con las áreas por las que ha pasado
   areasResponses        AreasResponse[]     @relation("WorkOrderOnResponse")
