@@ -421,7 +421,7 @@ export default function SerigrafiaComponent({ workOrder }: Props) {
                 Cancelar
               </CancelButton>
               <ConfirmButton onClick={handleSerigrafiaSubmit}>
-              {isSubmitting ? 'Liberando...' : 'Confirmar'}
+                {isSubmitting ? 'Liberando...' : 'Confirmar'}
               </ConfirmButton>
             </div>
           </ModalBox>
