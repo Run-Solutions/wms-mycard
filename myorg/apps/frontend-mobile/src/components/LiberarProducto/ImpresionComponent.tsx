@@ -44,6 +44,7 @@ const ImpresionComponent = ({ workOrder }: { workOrder: any }) => {
   const [checkedVueltaNG, setCheckedVueltaNG] = useState<number[]>([]);
 
   const isDisabled = workOrder.status === 'En proceso';
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
   console.log('El mismo workOrder (workOrder)', workOrder);
   const { user } = useAuth();
@@ -186,7 +187,7 @@ const ImpresionComponent = ({ workOrder }: { workOrder: any }) => {
     ? sampleQuantityNumber * 24
     : 0;
 
-  const enviarACQM = async () => {
+  const handleSubmit = async () => {
     const questions = workOrder.area.formQuestions.filter(
       (q: any) => q.role_id === null
     );
@@ -248,7 +249,8 @@ const ImpresionComponent = ({ workOrder }: { workOrder: any }) => {
       user_id: currentFlow.assigned_user,
       sample_quantity: Number(sampleQuantity),
     };
-
+    if (isSubmitting) return;
+    setIsSubmitting(true);
     try {
       await submitToCQMImpression(payload);
       Alert.alert('Formulario enviado a CQM');
@@ -256,15 +258,19 @@ const ImpresionComponent = ({ workOrder }: { workOrder: any }) => {
       setShowCqmModal(false);
     } catch (err) {
       Alert.alert('Error al Enviar a Calidad/CQM.');
+    } finally {
+      setIsSubmitting(false);
     }
   };
 
-  const liberarProducto = async () => {
+  const handleImpressSubmit = async () => {
     const numValue = Number(sampleQuantity);
     if (isNaN(numValue) || !Number.isInteger(numValue) || numValue <= 0) {
       Alert.alert('Cantidad de muestra inválida');
       return;
     }
+    if (isSubmitting) return; // evita doble clic
+    setIsSubmitting(true);
     const payload = {
       workOrderId: workOrder.workOrder.id,
       workOrderFlowId: currentFlow.id,
@@ -282,6 +288,8 @@ const ImpresionComponent = ({ workOrder }: { workOrder: any }) => {
       navigation.goBack();
     } catch (err) {
       Alert.alert('Error del servidor al liberar.');
+    } finally {
+      setIsSubmitting(false);
     }
   };
 
@@ -531,9 +539,11 @@ const ImpresionComponent = ({ workOrder }: { workOrder: any }) => {
               </TouchableOpacity>
               <TouchableOpacity
                 style={styles.confirmButton}
-                onPress={enviarACQM}
+                onPress={handleSubmit}
               >
-                <Text style={styles.modalButtonText}>Enviar Respuestas</Text>
+                <Text style={styles.modalButtonText}>
+                  {isSubmitting ? 'Enviando...' : 'Enviar Respuestas'}
+                </Text>
               </TouchableOpacity>
             </View>
           </ScrollView>
@@ -554,9 +564,11 @@ const ImpresionComponent = ({ workOrder }: { workOrder: any }) => {
               </TouchableOpacity>
               <TouchableOpacity
                 style={styles.confirmButton}
-                onPress={liberarProducto}
+                onPress={handleImpressSubmit}
               >
-                <Text style={styles.modalButtonText}>Confirmar</Text>
+                <Text style={styles.modalButtonText}>
+                  {isSubmitting ? 'Liberando...' : 'Confirmar'}
+                </Text>
               </TouchableOpacity>
             </View>
           </View>

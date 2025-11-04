@@ -198,6 +198,7 @@ const PersonalizacionComponent = ({ workOrder }: { workOrder: any }) => {
   const [flowListState, setFlowListState] = useState<any[]>(() => [
     ...(workOrder?.workOrder?.flow ?? []),
   ]);
+  const [isSubmitting, setIsSubmitting] = useState(false);
   const flowList: any[] = useMemo(() => flowListState, [flowListState]);
   const currentFlow = useMemo(
     () =>
@@ -441,7 +442,8 @@ const PersonalizacionComponent = ({ workOrder }: { workOrder: any }) => {
       ...basePayload,
       ...aditionalFields,
     };
-
+    if (isSubmitting) return;
+    setIsSubmitting(true);
     try {
       await submitToCQMPersonalizacion(payload);
       Alert.alert('Formulario enviado a CQM');
@@ -449,6 +451,8 @@ const PersonalizacionComponent = ({ workOrder }: { workOrder: any }) => {
       setShowCqmModal(false);
     } catch (err) {
       Alert.alert('Error al Enviar a Calidad/CQM.');
+    } finally {
+      setIsSubmitting(false);
     }
   };
 
@@ -620,6 +624,8 @@ const PersonalizacionComponent = ({ workOrder }: { workOrder: any }) => {
       Alert.alert('Cantidad de muestra inválida');
       return;
     }
+    if (isSubmitting) return; // evita doble clic
+    setIsSubmitting(true);
     const payload = {
       workOrderId: workOrder.workOrder.id,
       workOrderFlowId: currentFlow.id,
@@ -684,6 +690,8 @@ const PersonalizacionComponent = ({ workOrder }: { workOrder: any }) => {
       navigation.goBack();
     } catch (err) {
       Alert.alert('Error del servidor al liberar.');
+    } finally {
+      setIsSubmitting(false);
     }
   };
 
@@ -971,9 +979,7 @@ const PersonalizacionComponent = ({ workOrder }: { workOrder: any }) => {
                 bad_quantity: toInt(areaBadQuantities[badKey]),
               };
               if (supportsMaterial)
-                data.material_quantity = toInt(
-                  areaBadQuantities[materialKey]
-                );
+                data.material_quantity = toInt(areaBadQuantities[materialKey]);
               const inputsForArea = inputsMap.get(flow.area_id) ?? [];
               return {
                 areaId: flow.area_id,
@@ -1329,7 +1335,9 @@ const PersonalizacionComponent = ({ workOrder }: { workOrder: any }) => {
               style={styles.submitBtn}
               onPress={handleSubmitToCQM}
             >
-              <Text style={styles.submitText}>Enviar Respuestas</Text>
+              <Text style={styles.submitText}>
+                {isSubmitting ? 'Enviando...' : 'Enviar Respuestas'}
+              </Text>
             </TouchableOpacity>
           </View>
         </ScrollView>
@@ -1351,7 +1359,9 @@ const PersonalizacionComponent = ({ workOrder }: { workOrder: any }) => {
                 style={styles.confirmButton}
                 onPress={handlePersonalizacionSubmit}
               >
-                <Text style={styles.modalButtonText}>Confirmar</Text>
+                <Text style={styles.modalButtonText}>
+                  {isSubmitting ? 'Liberando...' : 'Confirmar'}
+                </Text>
               </TouchableOpacity>
             </View>
           </View>

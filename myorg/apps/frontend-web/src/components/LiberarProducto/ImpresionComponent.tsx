@@ -36,6 +36,7 @@ export default function ImpresionComponent({ workOrder }: Props) {
   const openModal = () => {
     setShowModal(true);
   };
+  const [isSubmitting, setIsSubmitting] = useState(false);
   const closeModal = () => {
     setShowModal(false);
   };
@@ -290,7 +291,7 @@ export default function ImpresionComponent({ workOrder }: Props) {
       return;
     }
 
-    // 1) Preguntas VISIBLES 
+    // 1) Preguntas VISIBLES
     const visibleQuestions = (workOrder.area.formQuestions ?? [])
       // .slice(ini, fin) // <-- si tu tabla usa slice, aplícalo aquí
       .filter((q: any) => q.role_id === null);
@@ -340,12 +341,15 @@ export default function ImpresionComponent({ workOrder }: Props) {
       user_id: currentFlow.assigned_user,
       sample_quantity: Number(sampleQuantity),
     };
-
+    if (isSubmitting) return;
+    setIsSubmitting(true);
     try {
       await submitToCQMImpression(payload);
       router.push('/liberarProducto');
     } catch (error) {
       console.log('Error al guardar la respuesta: ', error);
+    } finally {
+      setIsSubmitting(false);
     }
   };
 
@@ -376,6 +380,8 @@ export default function ImpresionComponent({ workOrder }: Props) {
     setShowConfirm(true); // Si pasa todas las validaciones, ahora sí abre el modal
   };
   const handleImpressSubmit = async () => {
+    if (isSubmitting) return; // evita doble clic
+    setIsSubmitting(true);
     const payload = {
       workOrderId: workOrder.workOrder.id,
       workOrderFlowId: currentFlow.id,
@@ -390,10 +396,10 @@ export default function ImpresionComponent({ workOrder }: Props) {
       router.push('/liberarProducto');
     } catch (error) {
       console.log('Error al enviar datos:', error);
+    } finally {
+      setIsSubmitting(false);
     }
   };
-
-
 
   return (
     <>
@@ -469,7 +475,7 @@ export default function ImpresionComponent({ workOrder }: Props) {
                 Cancelar
               </CancelButton>
               <ConfirmButton onClick={handleImpressSubmit}>
-                Confirmar
+                {isSubmitting ? 'Liberando...' : 'Confirmar'}
               </ConfirmButton>
             </div>
           </ModalBox>
@@ -492,7 +498,7 @@ export default function ImpresionComponent({ workOrder }: Props) {
               onToggle={handleToggleFrenteVuelta}
             />
             <InputGroup style={{ paddingTop: '30px' }}>
-              <Label style={{ color: '#374151'}}>Muestras:</Label>
+              <Label style={{ color: '#374151' }}>Muestras:</Label>
               <Input
                 type="number"
                 placeholder="Ej: 2"
@@ -528,7 +534,9 @@ export default function ImpresionComponent({ workOrder }: Props) {
                   onToggle={() => {}} // no hace nada
                   readOnly // <- nuevo prop para deshabilitar
                 />
-                <SectionTitle style={{ color: '#374151'}}>Tonos y/o Densidades Contra</SectionTitle>
+                <SectionTitle style={{ color: '#374151' }}>
+                  Tonos y/o Densidades Contra
+                </SectionTitle>
                 <RadioGroup>
                   <RadioLabel>
                     <Radio type="radio" name="prueba" value="color" disabled />
@@ -548,7 +556,7 @@ export default function ImpresionComponent({ workOrder }: Props) {
             <div style={{ display: 'flex', gap: '1rem' }}>
               <CloseButton onClick={closeModal}>Cerrar</CloseButton>
               <SubmitButton onClick={handleSubmit}>
-                Enviar Respuestas
+                {isSubmitting ? 'Enviando...' : 'Enviar Respuestas'}
               </SubmitButton>
             </div>
           </ModalContent>

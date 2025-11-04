@@ -175,7 +175,7 @@ export default function EmpalmeComponent({ workOrder }: Props) {
   >([]);
   const [sampleQuantity, setSampleQuantity] = useState<number>(0);
   // Para controlar qué preguntas están marcadas
-  const [checkedQuestions, setCheckedQuestions] = useState<number[]>([]);
+  const [isSubmitting, setIsSubmitting] = useState(false);
   // Función para manejar el cambio en el campo de muestras
   const handleSampleQuantityChange = (
     e: React.ChangeEvent<HTMLInputElement>
@@ -287,11 +287,15 @@ export default function EmpalmeComponent({ workOrder }: Props) {
       user_id: currentFlow.assigned_user,
       sample_quantity: Number(sampleQuantity),
     };
+    if (isSubmitting) return;
+    setIsSubmitting(true);
     try {
       await submitToCQMEmpalme(payload);
       router.push('/liberarProducto');
     } catch (error) {
       console.log('Error al guardar la respuesta: ', error);
+    } finally {
+      setIsSubmitting(false);
     }
   };
 
@@ -322,6 +326,8 @@ export default function EmpalmeComponent({ workOrder }: Props) {
     setShowConfirm(true); // Si pasa todas las validaciones, ahora sí abre el modal
   };
   const handleEmpalmeSubmit = async () => {
+    if (isSubmitting) return; // evita doble clic
+    setIsSubmitting(true);
     const payload = {
       workOrderId: workOrder.workOrder.id,
       workOrderFlowId: currentFlow.id,
@@ -336,13 +342,17 @@ export default function EmpalmeComponent({ workOrder }: Props) {
       router.push('/liberarProducto');
     } catch (error) {
       console.log('Error al enviar datos:', error);
+    } finally {
+      setIsSubmitting(false);
     }
   };
 
   return (
     <>
       <Container>
-        <Title>Área: Empalme {workOrder.workOrder.isCollator ? '(Collator)': ''}</Title>
+        <Title>
+          Área: Empalme {workOrder.workOrder.isCollator ? '(Collator)' : ''}
+        </Title>
 
         <WorkOrderHojasInfo
           workOrder={workOrder}
@@ -414,7 +424,7 @@ export default function EmpalmeComponent({ workOrder }: Props) {
                 Cancelar
               </CancelButton>
               <ConfirmButton onClick={handleEmpalmeSubmit}>
-                Confirmar
+                {isSubmitting ? 'Liberando...' : 'Confirmar'}
               </ConfirmButton>
             </div>
           </ModalBox>
@@ -436,8 +446,8 @@ export default function EmpalmeComponent({ workOrder }: Props) {
               onToggle={handleToggleRespuesta}
             />
             <InputGroup style={{ paddingTop: '30px' }}>
-            <Label style={{ color: '#374151'}}>Muestras:</Label>
-            <Input
+              <Label style={{ color: '#374151' }}>Muestras:</Label>
+              <Input
                 type="number"
                 placeholder="Ej: 2"
                 value={sampleQuantity}
@@ -508,7 +518,7 @@ export default function EmpalmeComponent({ workOrder }: Props) {
             <div style={{ display: 'flex', gap: '1rem' }}>
               <CloseButton onClick={closeModal}>Cerrar</CloseButton>
               <SubmitButton onClick={handleSubmit}>
-                Enviar Respuestas
+                {isSubmitting ? 'Enviando...' : 'Enviar Respuestas'}
               </SubmitButton>
             </div>
           </ModalContent>

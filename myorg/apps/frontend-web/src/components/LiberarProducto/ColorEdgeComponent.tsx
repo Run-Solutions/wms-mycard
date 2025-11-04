@@ -158,6 +158,8 @@ export default function ColorEdgeComponent({ workOrder }: Props) {
   const [flowListState, setFlowListState] = useState<any[]>(() => [
     ...(workOrder?.workOrder?.flow ?? []),
   ]);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+
   const flowList: any[] = useMemo(() => flowListState, [flowListState]);
   const currentFlow = useMemo(
     () =>
@@ -479,12 +481,15 @@ export default function ColorEdgeComponent({ workOrder }: Props) {
       sample_quantity: Number(sampleQuantity),
       color_edge: colorEdge,
     };
-
+    if (isSubmitting) return;
+    setIsSubmitting(true);
     try {
       await submitToCQMColorEdge(payload);
       router.push('/liberarProducto');
     } catch (error) {
       console.error('Error al guardar la respuesta:', error);
+    } finally {
+      setIsSubmitting(false);
     }
   };
 
@@ -582,6 +587,9 @@ export default function ColorEdgeComponent({ workOrder }: Props) {
   };
 
   const handleColorEdgeSubmit = async () => {
+    if (isSubmitting) return; // evita doble clic
+    setIsSubmitting(true);
+
     const payload = {
       workOrderId: workOrder?.workOrder?.id,
       workOrderFlowId: currentFlow?.id,
@@ -618,7 +626,7 @@ export default function ColorEdgeComponent({ workOrder }: Props) {
         !!stash &&
         Array.isArray(stash.badQuantitySummary) &&
         stash.badQuantitySummary.length > 0;
-        console.log('hasStash', stash);
+      console.log('hasStash', stash);
 
       if (isPartial && hasStash) {
         // ⬅️ PARCIAL: manda con partialReleaseId
@@ -644,6 +652,8 @@ export default function ColorEdgeComponent({ workOrder }: Props) {
       router.push('/liberarProducto');
     } catch (error) {
       console.error('Error al enviar datos:', error);
+    } finally {
+      setIsSubmitting(false);
     }
   };
 
@@ -960,7 +970,7 @@ export default function ColorEdgeComponent({ workOrder }: Props) {
                 Cancelar
               </CancelButton>
               <ConfirmButton onClick={handleColorEdgeSubmit}>
-                Confirmar
+                {isSubmitting ? 'Liberando...' : 'Confirmar'}
               </ConfirmButton>
             </div>
           </ModalBox>
@@ -1004,7 +1014,7 @@ export default function ColorEdgeComponent({ workOrder }: Props) {
             <div style={{ display: 'flex', gap: '1rem' }}>
               <CloseButton onClick={closeModal}>Cerrar</CloseButton>
               <SubmitButton onClick={handleSubmitToCQM}>
-                Enviar Respuestas
+                {isSubmitting ? 'Enviando...' : 'Enviar Respuestas'}
               </SubmitButton>
             </div>
           </ModalContent>

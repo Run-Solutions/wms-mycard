@@ -657,12 +657,19 @@ const CerrarOrdenDeTrabajoAuxScreen: React.FC = () => {
       const cqm = Number(firstAnswer?.sample_quantity ?? 0);
       const noprocess = Number(p?.noprocess_quantity ?? 0);
 
+      console.log(buenas, 'buenas')
+      console.log(malas, 'malas')
+      console.log(excedente, 'excedente')
+      console.log(defectuoso, 'defectuoso')
+      console.log(muestras, 'muestras')
+      console.log(cqm, 'cqm')
+      console.log(badToOthers, 'badToOthers')
+
       return (
         buenas +
-        malas +
         excedente +
-        badToOthers +
         defectuoso +
+        badToOthers +
         cqm +
         muestras +
         noprocess
@@ -681,7 +688,6 @@ const CerrarOrdenDeTrabajoAuxScreen: React.FC = () => {
       return (
         buenas +
         excedente +
-        badToOthers +
         defectuoso +
         cqm +
         muestras +

@@ -157,6 +157,7 @@ const MillingChipComponent = ({ workOrder }: { workOrder: any }) => {
   const [flowListState, setFlowListState] = useState<any[]>(() => [
     ...(workOrder?.workOrder?.flow ?? []),
   ]);
+  const [isSubmitting, setIsSubmitting] = useState(false);
   const flowList: any[] = useMemo(() => flowListState, [flowListState]);
   const currentFlow = useMemo(
     () =>
@@ -361,7 +362,8 @@ const MillingChipComponent = ({ workOrder }: { workOrder: any }) => {
       revisar_tecnologia: revisarTecnologia,
       validar_kvc: validarKVC,
     };
-
+    if (isSubmitting) return;
+    setIsSubmitting(true);
     try {
       await submitToCQMMillingChip(payload);
       Alert.alert('Formulario enviado a CQM');
@@ -369,6 +371,8 @@ const MillingChipComponent = ({ workOrder }: { workOrder: any }) => {
       setShowCqmModal(false);
     } catch (err) {
       Alert.alert('Error al Enviar a Calidad/CQM.');
+    } finally {
+      setIsSubmitting(false);
     }
   };
 
@@ -544,6 +548,8 @@ const MillingChipComponent = ({ workOrder }: { workOrder: any }) => {
       Alert.alert('Cantidad de muestra inválida');
       return;
     }
+    if (isSubmitting) return; // evita doble clic
+    setIsSubmitting(true);
     const payload = {
       workOrderId: workOrder.workOrder.id,
       workOrderFlowId: currentFlow.id,
@@ -606,6 +612,8 @@ const MillingChipComponent = ({ workOrder }: { workOrder: any }) => {
       navigation.goBack();
     } catch (err) {
       Alert.alert('Error del servidor al liberar.');
+    } finally {
+      setIsSubmitting(false);
     }
   };
 
@@ -1071,7 +1079,7 @@ const MillingChipComponent = ({ workOrder }: { workOrder: any }) => {
                 style={styles.confirmButton}
                 onPress={handleSubmitToCQM}
               >
-                <Text style={styles.modalButtonText}>Enviar Respuestas</Text>
+                <Text style={styles.modalButtonText}>{isSubmitting ? 'Enviando...' : 'Enviar Respuestas'}</Text>
               </TouchableOpacity>
             </View>
           </ScrollView>
@@ -1094,7 +1102,7 @@ const MillingChipComponent = ({ workOrder }: { workOrder: any }) => {
                 style={styles.confirmButton}
                 onPress={handleMillingChipSubmit}
               >
-                <Text style={styles.modalButtonText}>Confirmar</Text>
+                <Text style={styles.modalButtonText}>{isSubmitting ? 'Liberando...' : 'Confirmar'}{' '}</Text>
               </TouchableOpacity>
             </View>
           </View>

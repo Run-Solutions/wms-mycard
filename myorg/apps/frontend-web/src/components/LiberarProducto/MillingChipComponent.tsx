@@ -154,6 +154,8 @@ export default function MillingChipComponent({ workOrder }: Props) {
   const [flowListState, setFlowListState] = useState<any[]>(() => [
     ...(workOrder?.workOrder?.flow ?? []),
   ]);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+
   const flowList: any[] = useMemo(() => flowListState, [flowListState]);
 
   const currentFlow = useMemo(
@@ -477,12 +479,15 @@ export default function MillingChipComponent({ workOrder }: Props) {
       revisar_tecnologia: revisarTecnologia,
       validar_kvc: validarKVC,
     };
-
+    if (isSubmitting) return;
+    setIsSubmitting(true);
     try {
       await submitToCQMMillingChip(payload);
       router.push('/liberarProducto');
     } catch (error) {
       console.log('Error al guardar la respuesta: ', error);
+    } finally {
+      setIsSubmitting(false);
     }
   };
 
@@ -579,6 +584,9 @@ export default function MillingChipComponent({ workOrder }: Props) {
     setShowConfirm(true);
   };
   const handleMillingChipSubmit = async () => {
+    if (isSubmitting) return; // evita doble clic
+    setIsSubmitting(true);
+
     const payload = {
       workOrderId: workOrder.workOrder.id,
       workOrderFlowId: currentFlow.id,
@@ -596,10 +604,13 @@ export default function MillingChipComponent({ workOrder }: Props) {
 
     try {
       const otId = workOrder?.workOrder?.ot_id ?? '';
-      const res = (await releaseProductFromMillingChip(payload)) as ReleaseResponse;
+      const res = (await releaseProductFromMillingChip(
+        payload
+      )) as ReleaseResponse;
 
       // 2️⃣ Si es PARCIAL → mandar badQuantitySummary con partialReleaseId
-      const stash = pendingBadQty ?? loadPendingBadQty(otId, currentFlow?.id ?? null);
+      const stash =
+        pendingBadQty ?? loadPendingBadQty(otId, currentFlow?.id ?? null);
 
       const isPartial =
         !!res &&
@@ -640,6 +651,8 @@ export default function MillingChipComponent({ workOrder }: Props) {
       router.push('/liberarProducto');
     } catch (error) {
       console.log('Error al enviar datos:', error);
+    } finally {
+      setIsSubmitting(false);
     }
   };
 
@@ -948,7 +961,7 @@ export default function MillingChipComponent({ workOrder }: Props) {
                 Cancelar
               </CancelButton>
               <ConfirmButton onClick={handleMillingChipSubmit}>
-                Confirmar
+                {isSubmitting ? 'Liberando...' : 'Confirmar'}{' '}
               </ConfirmButton>
             </div>
           </ModalBox>
@@ -1002,7 +1015,7 @@ export default function MillingChipComponent({ workOrder }: Props) {
             <div style={{ display: 'flex', gap: '1rem' }}>
               <CloseButton onClick={closeModal}>Cerrar</CloseButton>
               <SubmitButton onClick={handleSubmitToCQM}>
-                Enviar Respuestas
+                {isSubmitting ? 'Enviando...' : 'Enviar Respuestas'}
               </SubmitButton>
             </div>
           </ModalContent>

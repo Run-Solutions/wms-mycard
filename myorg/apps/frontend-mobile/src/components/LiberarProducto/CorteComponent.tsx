@@ -156,6 +156,7 @@ const CorteComponent = ({ workOrder }: { workOrder: any }) => {
   const [flowListState, setFlowListState] = useState<any[]>(() => [
     ...(workOrder?.workOrder?.flow ?? []),
   ]);
+  const [isSubmitting, setIsSubmitting] = useState(false);
   const flowList: any[] = useMemo(() => flowListState, [flowListState]);
   const currentFlow = useMemo(
     () =>
@@ -362,7 +363,8 @@ const CorteComponent = ({ workOrder }: { workOrder: any }) => {
       user_id: currentFlow.assigned_user,
       sample_quantity: Number(sampleQuantity),
     };
-
+    if (isSubmitting) return;
+    setIsSubmitting(true);
     try {
       await submitToCQMCorte(payload);
       Alert.alert('Formulario enviado a CQM');
@@ -370,6 +372,8 @@ const CorteComponent = ({ workOrder }: { workOrder: any }) => {
       setShowCqmModal(false);
     } catch (err) {
       Alert.alert('Error al Enviar a Calidad/CQM.');
+    } finally {
+      setIsSubmitting(false);
     }
   };
 
@@ -485,6 +489,8 @@ const CorteComponent = ({ workOrder }: { workOrder: any }) => {
       Alert.alert('Cantidad de muestra inválida');
       return;
     }
+    if (isSubmitting) return; // evita doble clic
+    setIsSubmitting(true);
     const payload = {
       workOrderId: workOrder.workOrder.id,
       workOrderFlowId: currentFlow.id,
@@ -547,6 +553,8 @@ const CorteComponent = ({ workOrder }: { workOrder: any }) => {
       navigation.goBack();
     } catch (err) {
       Alert.alert('Error del servidor al liberar.');
+    } finally {
+      setIsSubmitting(false);
     }
   };
 
@@ -959,7 +967,9 @@ const CorteComponent = ({ workOrder }: { workOrder: any }) => {
                 style={styles.confirmButton}
                 onPress={handleSubmitToCQM}
               >
-                <Text style={styles.modalButtonText}>Enviar Respuestas</Text>
+                <Text style={styles.modalButtonText}>
+                  {isSubmitting ? 'Enviando...' : 'Enviar Respuestas'}
+                </Text>
               </TouchableOpacity>
             </View>
           </ScrollView>
@@ -982,7 +992,9 @@ const CorteComponent = ({ workOrder }: { workOrder: any }) => {
                 style={styles.confirmButton}
                 onPress={handleCorteSubmit}
               >
-                <Text style={styles.modalButtonText}>Confirmar</Text>
+                <Text style={styles.modalButtonText}>
+                  {isSubmitting ? 'Liberando...' : 'Confirmar'}
+                </Text>
               </TouchableOpacity>
             </View>
           </View>

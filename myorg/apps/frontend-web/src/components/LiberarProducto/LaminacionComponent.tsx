@@ -34,8 +34,9 @@ export default function LaminacionComponent({ workOrder }: Props) {
   };
   // Para bloquear liberacion hasta que sea aprobado por CQM
   const isDisabled = workOrder.status === 'En proceso';
+  const [isSubmitting, setIsSubmitting] = useState(false);
   const [showModal, setShowModal] = useState(false);
-    const openModal = () => {
+  const openModal = () => {
     setShowModal(true);
   };
   const closeModal = () => {
@@ -235,30 +236,30 @@ export default function LaminacionComponent({ workOrder }: Props) {
   const tarjetasporliberar = sampleQuantity * 24;
 
   // Preguntas visibles en la tabla (mismo filtro que pasas al child con roleId=null)
-    const visibleQuestions =
-      workOrder.area.formQuestions?.filter((q: any) => q.role_id === null) ?? [];
-    // Crea answersByQuestion en base a responses
-    const answersByQuestion = useMemo(() => {
-      const map: Record<number, boolean | undefined> = {};
-      for (const r of responses) map[r.questionId] = r.answer;
-      return map;
-    }, [responses]);
-    // Listas derivadas para el componente de tabla (no se guardan aparte)
-    const checkedRespuestaOK = useMemo(
-      () =>
-        visibleQuestions
-          .filter((q: any) => answersByQuestion[q.id] === true)
-          .map((q: any) => q.id),
-      [visibleQuestions, answersByQuestion]
-    );
-  
-    const checkedRespuestaNG = useMemo(
-      () =>
-        visibleQuestions
-          .filter((q: any) => answersByQuestion[q.id] === false)
-          .map((q: any) => q.id),
-      [visibleQuestions, answersByQuestion]
-    );
+  const visibleQuestions =
+    workOrder.area.formQuestions?.filter((q: any) => q.role_id === null) ?? [];
+  // Crea answersByQuestion en base a responses
+  const answersByQuestion = useMemo(() => {
+    const map: Record<number, boolean | undefined> = {};
+    for (const r of responses) map[r.questionId] = r.answer;
+    return map;
+  }, [responses]);
+  // Listas derivadas para el componente de tabla (no se guardan aparte)
+  const checkedRespuestaOK = useMemo(
+    () =>
+      visibleQuestions
+        .filter((q: any) => answersByQuestion[q.id] === true)
+        .map((q: any) => q.id),
+    [visibleQuestions, answersByQuestion]
+  );
+
+  const checkedRespuestaNG = useMemo(
+    () =>
+      visibleQuestions
+        .filter((q: any) => answersByQuestion[q.id] === false)
+        .map((q: any) => q.id),
+    [visibleQuestions, answersByQuestion]
+  );
 
   // Para mandar la OT a evaluacion por CQM
   const handleSubmit = async () => {
@@ -301,11 +302,15 @@ export default function LaminacionComponent({ workOrder }: Props) {
       finish_validation:
         selectedOption === 'otro' ? otherValue : selectedOption,
     };
+    if (isSubmitting) return;
+    setIsSubmitting(true);
     try {
       await submitToCQMLaminacion(payload);
       router.push('/liberarProducto');
     } catch (error) {
       console.log('Error al guardar la respuesta: ', error);
+    } finally {
+      setIsSubmitting(false);
     }
   };
 
@@ -335,7 +340,9 @@ export default function LaminacionComponent({ workOrder }: Props) {
 
     setShowConfirm(true); // Si pasa todas las validaciones, ahora sí abre el modal
   };
-  const handleImpressSubmit = async () => {
+  const handleLaminacionSubmit = async () => {
+    if (isSubmitting) return; // evita doble clic
+    setIsSubmitting(true);
     const payload = {
       workOrderId: workOrder.workOrder.id,
       workOrderFlowId: currentFlow.id,
@@ -350,6 +357,8 @@ export default function LaminacionComponent({ workOrder }: Props) {
       router.push('/liberarProducto');
     } catch (error) {
       console.log('Error al enviar datos:', error);
+    } finally {
+      setIsSubmitting(false);
     }
   };
 
@@ -426,8 +435,8 @@ export default function LaminacionComponent({ workOrder }: Props) {
               <CancelButton onClick={() => setShowConfirm(false)}>
                 Cancelar
               </CancelButton>
-              <ConfirmButton onClick={handleImpressSubmit}>
-                Confirmar
+              <ConfirmButton onClick={handleLaminacionSubmit}>
+                {isSubmitting ? 'Liberando...' : 'Confirmar'}
               </ConfirmButton>
             </div>
           </ModalBox>
@@ -449,7 +458,9 @@ export default function LaminacionComponent({ workOrder }: Props) {
               onToggle={handleToggleRespuesta}
             />
             <InputGroup style={{ paddingTop: '30px', width: '70%' }}>
-              <Label style={{ color: '#374151'}}>Validar Acabado Vs Orden De Trabajo:</Label>
+              <Label style={{ color: '#374151' }}>
+                Validar Acabado Vs Orden De Trabajo:
+              </Label>
               <RadioGroup>
                 <RadioLabel>
                   <Radio
@@ -513,7 +524,7 @@ export default function LaminacionComponent({ workOrder }: Props) {
               )}
             </InputGroup>
             <InputGroup style={{ paddingTop: '30px' }}>
-            <Label style={{ color: '#374151'}}>Muestras:</Label>
+              <Label style={{ color: '#374151' }}>Muestras:</Label>
               <Input
                 type="number"
                 placeholder="Ej: 2"
@@ -560,7 +571,7 @@ export default function LaminacionComponent({ workOrder }: Props) {
             <div style={{ display: 'flex', gap: '1rem' }}>
               <CloseButton onClick={closeModal}>Cerrar</CloseButton>
               <SubmitButton onClick={handleSubmit}>
-                Enviar Respuestas
+                {isSubmitting ? 'Enviando...' : 'Enviar Respuestas'}
               </SubmitButton>
             </div>
           </ModalContent>

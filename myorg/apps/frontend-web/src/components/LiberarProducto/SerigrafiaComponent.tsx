@@ -25,6 +25,7 @@ export default function SerigrafiaComponent({ workOrder }: Props) {
   const router = useRouter();
   // Para bloquear liberacion hasta que sea aprobado por CQM
   const isDisabled = workOrder.status === 'En proceso';
+  const [isSubmitting, setIsSubmitting] = useState(false);
   const [showModal, setShowModal] = useState(false);
   const openModal = () => {
     setShowModal(true);
@@ -286,11 +287,15 @@ export default function SerigrafiaComponent({ workOrder }: Props) {
       user_id: currentFlow.assigned_user,
       sample_quantity: Number(sampleQuantity),
     };
+    if (isSubmitting) return;
+    setIsSubmitting(true);
     try {
       await submitToCQMSerigrafia(payload);
       router.push('/liberarProducto');
     } catch (error) {
       console.log('Error al guardar la respuesta: ', error);
+    } finally {
+      setIsSubmitting(false);
     }
   };
 
@@ -320,7 +325,9 @@ export default function SerigrafiaComponent({ workOrder }: Props) {
 
     setShowConfirm(true); // Si pasa todas las validaciones, ahora sí abre el modal
   };
-  const handleImpressSubmit = async () => {
+  const handleSerigrafiaSubmit = async () => {
+    if (isSubmitting) return; // evita doble clic
+    setIsSubmitting(true);
     const payload = {
       workOrderId: workOrder.workOrder.id,
       workOrderFlowId: currentFlow.id,
@@ -335,6 +342,8 @@ export default function SerigrafiaComponent({ workOrder }: Props) {
       router.push('/liberarProducto');
     } catch (error) {
       console.log('Error al enviar datos:', error);
+    } finally {
+      setIsSubmitting(false);
     }
   };
 
@@ -411,8 +420,8 @@ export default function SerigrafiaComponent({ workOrder }: Props) {
               <CancelButton onClick={() => setShowConfirm(false)}>
                 Cancelar
               </CancelButton>
-              <ConfirmButton onClick={handleImpressSubmit}>
-                Confirmar
+              <ConfirmButton onClick={handleSerigrafiaSubmit}>
+              {isSubmitting ? 'Liberando...' : 'Confirmar'}
               </ConfirmButton>
             </div>
           </ModalBox>
@@ -434,7 +443,7 @@ export default function SerigrafiaComponent({ workOrder }: Props) {
               onToggle={handleToggleRespuesta}
             />
             <InputGroup style={{ paddingTop: '30px' }}>
-              <Label style={{ color: '#374151'}}>Muestras:</Label>
+              <Label style={{ color: '#374151' }}>Muestras:</Label>
               <Input
                 type="number"
                 placeholder="Ej: 2"
@@ -473,7 +482,7 @@ export default function SerigrafiaComponent({ workOrder }: Props) {
             <div style={{ display: 'flex', gap: '1rem' }}>
               <CloseButton onClick={closeModal}>Cerrar</CloseButton>
               <SubmitButton onClick={handleSubmit}>
-                Enviar Respuestas
+                {isSubmitting ? 'Enviando...' : 'Enviar Respuestas'}
               </SubmitButton>
             </div>
           </ModalContent>

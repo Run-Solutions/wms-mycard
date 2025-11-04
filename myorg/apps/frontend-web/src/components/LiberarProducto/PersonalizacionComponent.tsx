@@ -200,6 +200,7 @@ export default function PersonalizacionComponent({ workOrder }: Props) {
   const [flowListState, setFlowListState] = useState<any[]>(() => [
     ...(workOrder?.workOrder?.flow ?? []),
   ]);
+  const [isSubmitting, setIsSubmitting] = useState(false);
   const flowList: any[] = useMemo(() => flowListState, [flowListState]);
 
   const currentFlow = useMemo(
@@ -551,12 +552,15 @@ export default function PersonalizacionComponent({ workOrder }: Props) {
       ...basePayload,
       ...aditionalFields,
     };
-
+    if (isSubmitting) return;
+    setIsSubmitting(true);
     try {
       await submitToCQMPersonalizacion(payload);
       router.push('/liberarProducto');
     } catch (error) {
       console.log('Error al guardar la respuesta: ', error);
+    } finally {
+      setIsSubmitting(false);
     }
   };
 
@@ -661,6 +665,9 @@ export default function PersonalizacionComponent({ workOrder }: Props) {
   };
 
   const handlePersonalizacionSubmit = async () => {
+    if (isSubmitting) return; // evita doble clic
+    setIsSubmitting(true);
+
     const payload = {
       workOrderId: workOrder.workOrder.id,
       workOrderFlowId: currentFlow.id,
@@ -721,6 +728,8 @@ export default function PersonalizacionComponent({ workOrder }: Props) {
       router.push('/liberarProducto');
     } catch (error) {
       console.log('Error al enviar datos:', error);
+    } finally {
+      setIsSubmitting(false);
     }
   };
 
@@ -1029,7 +1038,7 @@ export default function PersonalizacionComponent({ workOrder }: Props) {
                 Cancelar
               </CancelButton>
               <ConfirmButton onClick={handlePersonalizacionSubmit}>
-                Confirmar
+                {isSubmitting ? 'Liberando...' : 'Confirmar'}
               </ConfirmButton>
             </div>
           </ModalBox>
@@ -1434,7 +1443,7 @@ export default function PersonalizacionComponent({ workOrder }: Props) {
             <div style={{ display: 'flex', gap: '1rem' }}>
               <CloseButton onClick={closeModal}>Cerrar</CloseButton>
               <SubmitButton onClick={handleSubmitToCQM}>
-                Enviar Respuestas
+                {isSubmitting ? 'Enviando...' : 'Enviar Respuestas'}
               </SubmitButton>
             </div>
           </ModalContent>

@@ -165,6 +165,7 @@ const HotStampingComponent = ({ workOrder }: { workOrder: any }) => {
   const [flowListState, setFlowListState] = useState<any[]>(() => [
     ...(workOrder?.workOrder?.flow ?? []),
   ]);
+  const [isSubmitting, setIsSubmitting] = useState(false);
   const flowList: any[] = useMemo(() => flowListState, [flowListState]);
   const currentFlow = useMemo(
     () =>
@@ -373,7 +374,8 @@ const HotStampingComponent = ({ workOrder }: { workOrder: any }) => {
       revisar_posicion: revisarPosicion,
       imagen_holograma: imagenHolograma,
     };
-
+    if (isSubmitting) return;
+    setIsSubmitting(true);
     try {
       await submitToCQMHotStamping(payload);
       Alert.alert('Formulario enviado a CQM');
@@ -381,6 +383,8 @@ const HotStampingComponent = ({ workOrder }: { workOrder: any }) => {
       setShowCqmModal(false);
     } catch (err) {
       Alert.alert('Error al Enviar a Calidad/CQM.');
+    } finally {
+      setIsSubmitting(false);
     }
   };
 
@@ -549,6 +553,8 @@ const HotStampingComponent = ({ workOrder }: { workOrder: any }) => {
   };
 
   const handleHotStampingSubmit = async () => {
+    if (isSubmitting) return; // evita doble clic
+    setIsSubmitting(true);
     const payload = {
       workOrderId: workOrder.workOrder.id,
       workOrderFlowId: currentFlow.id,
@@ -570,8 +576,8 @@ const HotStampingComponent = ({ workOrder }: { workOrder: any }) => {
       )) as ReleaseResponse;
       // 2) Si es PARCIAL → mandar badQuantitySummary con partialReleaseId
       const stash =
-      pendingBadQty ??
-      (await loadPendingBadQty(otId, currentFlow?.id ?? null));
+        pendingBadQty ??
+        (await loadPendingBadQty(otId, currentFlow?.id ?? null));
 
       const isPartial =
         !!res &&
@@ -612,6 +618,8 @@ const HotStampingComponent = ({ workOrder }: { workOrder: any }) => {
       navigation.goBack();
     } catch (err) {
       Alert.alert('Error del servidor al liberar.');
+    } finally {
+      setIsSubmitting(false);
     }
   };
 
@@ -932,9 +940,7 @@ const HotStampingComponent = ({ workOrder }: { workOrder: any }) => {
                 bad_quantity: toInt(areaBadQuantities[badKey]),
               };
               if (supportsMaterial)
-                data.material_quantity = toInt(
-                  areaBadQuantities[materialKey]
-                );
+                data.material_quantity = toInt(areaBadQuantities[materialKey]);
               const inputsForArea = inputsMap.get(flow.area_id) ?? [];
               return {
                 areaId: flow.area_id,
@@ -1115,7 +1121,9 @@ const HotStampingComponent = ({ workOrder }: { workOrder: any }) => {
                 style={styles.confirmButton}
                 onPress={handleSubmitToCQM}
               >
-                <Text style={styles.modalButtonText}>Enviar Respuestas</Text>
+                <Text style={styles.modalButtonText}>
+                  {isSubmitting ? 'Enviando...' : 'Enviar Respuestas'}
+                </Text>
               </TouchableOpacity>
             </View>
           </ScrollView>
@@ -1138,7 +1146,9 @@ const HotStampingComponent = ({ workOrder }: { workOrder: any }) => {
                 style={styles.confirmButton}
                 onPress={handleHotStampingSubmit}
               >
-                <Text style={styles.modalButtonText}>Confirmar</Text>
+                <Text style={styles.modalButtonText}>
+                  {isSubmitting ? 'Liberando...' : 'Confirmar'}
+                </Text>
               </TouchableOpacity>
             </View>
           </View>

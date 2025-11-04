@@ -40,6 +40,7 @@ const SerigrafiaComponent = ({ workOrder }: { workOrder: any }) => {
   const qualityQuestions =
     workOrder.area.formQuestions?.filter((q: any) => q.role_id === 3) || [];
   const isDisabled = workOrder.status === 'En proceso';
+  const [isSubmitting, setIsSubmitting] = useState(false);
   // Una sola fuente de verdad: por pregunta guarda true (OK), false (NG) o undefined (sin respuesta)
   const [answersByQuestion, setAnswersByQuestion] = useState<
     Record<number, boolean | undefined>
@@ -206,7 +207,7 @@ const SerigrafiaComponent = ({ workOrder }: { workOrder: any }) => {
     ? sampleQuantityNumber * 24
     : 0;
 
-  const enviarACQM = async () => {
+  const handleSubmit = async () => {
     const numValue = Number(sampleQuantity);
     if (isNaN(numValue) || !Number.isInteger(numValue) || numValue < 0) {
       Alert.alert('Cantidad de muestra inválida');
@@ -240,6 +241,8 @@ const SerigrafiaComponent = ({ workOrder }: { workOrder: any }) => {
       user_id: currentFlow.assigned_user,
       sample_quantity: numValue,
     };
+    if (isSubmitting) return;
+    setIsSubmitting(true);
     try {
       await submitToCQMSerigrafia(payload);
       Alert.alert('Formulario enviado a CQM');
@@ -247,15 +250,19 @@ const SerigrafiaComponent = ({ workOrder }: { workOrder: any }) => {
       setShowCqmModal(false);
     } catch (err) {
       Alert.alert('Error al Enviar a Calidad/CQM.');
+    } finally {
+      setIsSubmitting(false);
     }
   };
 
-  const liberarProducto = async () => {
+  const handleSerigrafiaSubmit = async () => {
     const numValue = Number(sampleQuantity);
     if (isNaN(numValue) || !Number.isInteger(numValue) || numValue <= 0) {
       Alert.alert('Cantidad de muestra inválida');
       return;
     }
+    if (isSubmitting) return; // evita doble clic
+    setIsSubmitting(true);
     const payload = {
       workOrderId: workOrder.workOrder.id,
       workOrderFlowId: currentFlow.id,
@@ -273,6 +280,8 @@ const SerigrafiaComponent = ({ workOrder }: { workOrder: any }) => {
       navigation.navigate('liberarProducto');
     } catch (err) {
       Alert.alert('Error del servidor al liberar.');
+    } finally {
+      setIsSubmitting(false);
     }
   };
 
@@ -481,9 +490,11 @@ const SerigrafiaComponent = ({ workOrder }: { workOrder: any }) => {
               </TouchableOpacity>
               <TouchableOpacity
                 style={styles.confirmButton}
-                onPress={enviarACQM}
+                onPress={handleSubmit}
               >
-                <Text style={styles.modalButtonText}>Enviar Respuestas</Text>
+                <Text style={styles.modalButtonText}>
+                  {isSubmitting ? 'Enviando...' : 'Enviar Respuestas'}
+                </Text>
               </TouchableOpacity>
             </View>
           </ScrollView>
@@ -504,9 +515,11 @@ const SerigrafiaComponent = ({ workOrder }: { workOrder: any }) => {
               </TouchableOpacity>
               <TouchableOpacity
                 style={styles.confirmButton}
-                onPress={liberarProducto}
+                onPress={handleSerigrafiaSubmit}
               >
-                <Text style={styles.modalButtonText}>Confirmar</Text>
+                <Text style={styles.modalButtonText}>
+                  {isSubmitting ? 'Liberando...' : 'Confirmar'}
+                </Text>
               </TouchableOpacity>
             </View>
           </View>

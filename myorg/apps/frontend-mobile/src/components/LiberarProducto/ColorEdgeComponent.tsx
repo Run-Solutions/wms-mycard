@@ -158,6 +158,7 @@ const ColorEdgeComponent = ({ workOrder }: { workOrder: any }) => {
   const [flowListState, setFlowListState] = useState<any[]>(() => [
     ...(workOrder?.workOrder?.flow ?? []),
   ]);
+  const [isSubmitting, setIsSubmitting] = useState(false);
   const flowList: any[] = useMemo(() => flowListState, [flowListState]);
   const currentFlow = useMemo(
     () =>
@@ -367,7 +368,8 @@ const ColorEdgeComponent = ({ workOrder }: { workOrder: any }) => {
       sample_quantity: Number(sampleQuantity),
       color_edge: colorEdge,
     };
-
+    if (isSubmitting) return;
+    setIsSubmitting(true);
     try {
       await submitToCQMColorEdge(payload);
       Alert.alert('Formulario enviado a CQM');
@@ -375,6 +377,8 @@ const ColorEdgeComponent = ({ workOrder }: { workOrder: any }) => {
       setShowCqmModal(false);
     } catch (err) {
       Alert.alert('Error al Enviar a Calidad/CQM.');
+    } finally {
+      setIsSubmitting(false);
     }
   };
 
@@ -548,6 +552,8 @@ const ColorEdgeComponent = ({ workOrder }: { workOrder: any }) => {
       Alert.alert('Cantidad de muestra inválida');
       return;
     }
+    if (isSubmitting) return; // evita doble clic
+    setIsSubmitting(true);
     const payload = {
       workOrderId: workOrder.workOrder.id,
       workOrderFlowId: currentFlow.id,
@@ -611,6 +617,8 @@ const ColorEdgeComponent = ({ workOrder }: { workOrder: any }) => {
       navigation.goBack();
     } catch (err) {
       Alert.alert('Error del servidor al liberar.');
+    } finally {
+      setIsSubmitting(false);
     }
   };
   const previousFlows = flowList
@@ -902,9 +910,7 @@ const ColorEdgeComponent = ({ workOrder }: { workOrder: any }) => {
                 bad_quantity: toInt(areaBadQuantities[badKey]),
               };
               if (supportsMaterial)
-                data.material_quantity = toInt(
-                  areaBadQuantities[materialKey]
-                );
+                data.material_quantity = toInt(areaBadQuantities[materialKey]);
               const inputsForArea = inputsMap.get(flow.area_id) ?? [];
               return {
                 areaId: flow.area_id,
@@ -1030,7 +1036,9 @@ const ColorEdgeComponent = ({ workOrder }: { workOrder: any }) => {
                 style={styles.confirmButton}
                 onPress={handleSubmitToCQM}
               >
-                <Text style={styles.modalButtonText}>Enviar Respuestas</Text>
+                <Text style={styles.modalButtonText}>
+                  {isSubmitting ? 'Enviando...' : 'Enviar Respuestas'}
+                </Text>
               </TouchableOpacity>
             </View>
           </ScrollView>
@@ -1053,7 +1061,9 @@ const ColorEdgeComponent = ({ workOrder }: { workOrder: any }) => {
                 style={styles.confirmButton}
                 onPress={handleColorEdgeSubmit}
               >
-                <Text style={styles.modalButtonText}>Confirmar</Text>
+                <Text style={styles.modalButtonText}>
+                  {isSubmitting ? 'Liberando...' : 'Confirmar'}
+                </Text>
               </TouchableOpacity>
             </View>
           </View>

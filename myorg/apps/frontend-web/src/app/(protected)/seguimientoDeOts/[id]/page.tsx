@@ -1270,12 +1270,19 @@ export default function SeguimientoDeOtsAuxPage({ params }: Props) {
       const cqm = Number(firstAnswer?.sample_quantity ?? 0);
       const noprocess = Number(p?.noprocess_quantity ?? 0);
 
+      console.log(buenas, 'buenas')
+      console.log(malas, 'malas')
+      console.log(excedente, 'excedente')
+      console.log(defectuoso, 'defectuoso')
+      console.log(muestras, 'muestras')
+      console.log(cqm, 'cqm')
+      console.log(badToOthers, 'badToOthers')
+
       return (
         buenas +
-        malas +
         excedente +
-        badToOthers +
         defectuoso +
+        badToOthers +
         cqm +
         muestras +
         noprocess
@@ -1294,28 +1301,6 @@ export default function SeguimientoDeOtsAuxPage({ params }: Props) {
       return (
         buenas +
         excedente +
-        badToOthers +
-        defectuoso +
-        cqm +
-        muestras +
-        noprocess
-      );
-    }
-
-    // Caso 3: Sin parciales (id >= 6 pero sin partials)
-    // Caso 2: Áreas con id < 6
-    if (area.id < 6) {
-      const buenas = Number(area.buenas ?? 0);
-      const excedente = Number(area.excedente ?? 0);
-      const defectuoso = Number(area.defectuoso ?? 0);
-      const cqm = Number(area.cqm ?? 0);
-      const muestras = Number(area.muestras ?? 0);
-      const noprocess = Number(area.noprocess ?? 0);
-
-      return (
-        buenas +
-        excedente +
-        badToOthers +
         defectuoso +
         cqm +
         muestras +

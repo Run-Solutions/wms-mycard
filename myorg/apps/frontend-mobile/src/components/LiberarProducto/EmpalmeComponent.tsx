@@ -32,6 +32,7 @@ const EmpalmeComponent = ({ workOrder }: { workOrder: any }) => {
   const navigation =
     useNavigation<NativeStackNavigationProp<RootStackParamList>>();
   const [sampleQuantity, setSampleQuantity] = useState<string>('0');
+  const [isSubmitting, setIsSubmitting] = useState(false);
   const [comments, setComments] = useState('');
   const [showCqmModal, setShowCqmModal] = useState(false);
   const [showConfirm, setShowConfirm] = useState(false);
@@ -203,7 +204,7 @@ const EmpalmeComponent = ({ workOrder }: { workOrder: any }) => {
     ? sampleQuantityNumber * 24
     : 0;
 
-  const enviarACQM = async () => {
+  const handleSubmit = async () => {
     const numValue = Number(sampleQuantity);
     if (isNaN(numValue) || !Number.isInteger(numValue) || numValue < 0) {
       Alert.alert('Cantidad de muestra inválida');
@@ -235,6 +236,8 @@ const EmpalmeComponent = ({ workOrder }: { workOrder: any }) => {
       user_id: currentFlow.assigned_user,
       sample_quantity: Number(sampleQuantity),
     };
+    if (isSubmitting) return;
+    setIsSubmitting(true);
     try {
       await submitToCQMEmpalme(payload);
       Alert.alert('Formulario enviado a CQM');
@@ -242,15 +245,19 @@ const EmpalmeComponent = ({ workOrder }: { workOrder: any }) => {
       setShowCqmModal(false);
     } catch (err) {
       Alert.alert('Error al Enviar a Calidad/CQM.');
+    } finally {
+      setIsSubmitting(false);
     }
   };
 
-  const liberarProducto = async () => {
+  const handleEmpalmeSubmit = async () => {
     const numValue = Number(sampleQuantity);
     if (isNaN(numValue) || !Number.isInteger(numValue) || numValue <= 0) {
       Alert.alert('Cantidad de muestra inválida');
       return;
     }
+    if (isSubmitting) return; // evita doble clic
+    setIsSubmitting(true);
     const payload = {
       workOrderId: workOrder.workOrder.id,
       workOrderFlowId: currentFlow.id,
@@ -267,52 +274,10 @@ const EmpalmeComponent = ({ workOrder }: { workOrder: any }) => {
       navigation.navigate('liberarProducto');
     } catch (err) {
       Alert.alert('Error del servidor al liberar.');
+    } finally {
+      setIsSubmitting(false);
     }
   };
-
-  const cantidadEntregadaLabel = lastCompletedOrPartial.areaResponse
-    ? 'Cantidad entregada (TARJETAS):'
-    : lastCompletedOrPartial.partialReleases?.some(
-        (r: PartialRelease) => r.validated
-      )
-    ? 'Cantidad entregada validada (TARJETAS):'
-    : 'Cantidad faltante por liberar (TARJETAS):';
-
-  const cantidadEntregadaLabelKits = lastCompletedOrPartial.areaResponse
-    ? 'Cantidad entregada (Hojas Frente / Hojas Vuelta):'
-    : lastCompletedOrPartial.partialReleases?.some(
-        (r: PartialRelease) => r.validated
-      )
-    ? 'Cantidad entregada validada (Hojas Frente / Hojas Vuelta):'
-    : 'Cantidad faltante por liberar (Hojas Frente / Hojas Vuelta):';
-
-  const cantidadEntregadaValue = lastCompletedOrPartial.areaResponse
-    ? // Mostrar cantidad según sub-área disponible
-      lastCompletedOrPartial.areaResponse.prepress?.plates ??
-      lastCompletedOrPartial.areaResponse.impression?.release_quantity ??
-      lastCompletedOrPartial.areaResponse.serigrafia?.release_quantity ??
-      lastCompletedOrPartial.areaResponse.empalme?.release_quantity ??
-      lastCompletedOrPartial.areaResponse.laminacion?.release_quantity ??
-      lastCompletedOrPartial.areaResponse.corte?.good_quantity ??
-      lastCompletedOrPartial.areaResponse.colorEdge?.good_quantity ??
-      lastCompletedOrPartial.areaResponse.hotStamping?.good_quantity ??
-      lastCompletedOrPartial.areaResponse.millingChip?.good_quantity ??
-      lastCompletedOrPartial.areaResponse.personalizacion?.good_quantity ??
-      'Sin cantidad'
-    : lastCompletedOrPartial.partialReleases?.some(
-        (r: PartialRelease) => r.validated
-      )
-    ? lastCompletedOrPartial.partialReleases
-        .filter((release: PartialRelease) => release.validated)
-        .reduce(
-          (sum: number, release: PartialRelease) => sum + release.quantity,
-          0
-        )
-    : (lastCompletedOrPartial.workOrder?.quantity ?? 0) -
-      (lastCompletedOrPartial.partialReleases?.reduce(
-        (sum: number, release: PartialRelease) => sum + release.quantity,
-        0
-      ) ?? 0);
 
   const handleToggleRespuesta = (
     questionId: number,
@@ -354,7 +319,9 @@ const EmpalmeComponent = ({ workOrder }: { workOrder: any }) => {
 
   return (
     <ScrollView style={styles.container}>
-      <Text style={styles.title}>Área: Empalme {workOrder.workOrder.isCollator ? '(Collator)': ''}</Text>
+      <Text style={styles.title}>
+        Área: Empalme {workOrder.workOrder.isCollator ? '(Collator)' : ''}
+      </Text>
 
       <WorkOrderHojasInfo
         workOrder={workOrder}
@@ -527,9 +494,11 @@ const EmpalmeComponent = ({ workOrder }: { workOrder: any }) => {
               </TouchableOpacity>
               <TouchableOpacity
                 style={styles.confirmButton}
-                onPress={enviarACQM}
+                onPress={handleSubmit}
               >
-                <Text style={styles.modalButtonText}>Enviar Respuestas</Text>
+                <Text style={styles.modalButtonText}>
+                  {isSubmitting ? 'Enviando...' : 'Enviar Respuestas'}
+                </Text>
               </TouchableOpacity>
             </View>
           </ScrollView>
@@ -550,9 +519,11 @@ const EmpalmeComponent = ({ workOrder }: { workOrder: any }) => {
               </TouchableOpacity>
               <TouchableOpacity
                 style={styles.confirmButton}
-                onPress={liberarProducto}
+                onPress={handleEmpalmeSubmit}
               >
-                <Text style={styles.modalButtonText}>Confirmar</Text>
+                <Text style={styles.modalButtonText}>
+                  {isSubmitting ? 'Liberando...' : 'Confirmar'}
+                </Text>
               </TouchableOpacity>
             </View>
           </View>

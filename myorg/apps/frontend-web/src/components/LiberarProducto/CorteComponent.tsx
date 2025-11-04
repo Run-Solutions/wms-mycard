@@ -153,6 +153,8 @@ export default function CorteComponent({ workOrder }: Props) {
   const [flowListState, setFlowListState] = useState<any[]>(() => [
     ...(workOrder?.workOrder?.flow ?? []),
   ]);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+
   const flowList: any[] = useMemo(() => flowListState, [flowListState]);
 
   const currentFlow = workOrder.workOrder.flow.find(
@@ -351,17 +353,17 @@ export default function CorteComponent({ workOrder }: Props) {
 
       const cachedSummary =
         !existingSummary.length &&
-          !detailSummary.length &&
-          workOrderKey &&
-          flowId
+        !detailSummary.length &&
+        workOrderKey &&
+        flowId
           ? loadBadQuantitySummary(workOrderKey, flowId) ?? []
           : [];
 
       const summary = existingSummary.length
         ? existingSummary
         : detailSummary.length
-          ? detailSummary
-          : cachedSummary;
+        ? detailSummary
+        : cachedSummary;
 
       return summary.length ? { ...flow, badQuantitySummary: summary } : flow;
     });
@@ -455,7 +457,6 @@ export default function CorteComponent({ workOrder }: Props) {
       alert('Completa todas las preguntas y cantidad de muestra.');
       return;
     }
-
     const payload = {
       question_id: responses.map((r) => r.questionId),
       work_order_flow_id: flowId,
@@ -466,12 +467,16 @@ export default function CorteComponent({ workOrder }: Props) {
       user_id: currentFlow.assigned_user,
       sample_quantity: Number(sampleQuantity),
     };
-
+    
+    if (isSubmitting) return;
+    setIsSubmitting(true);
     try {
       await submitToCQMCorte(payload);
       router.push('/liberarProducto');
     } catch (error) {
       console.log('Error al guardar la respuesta: ', error);
+    } finally {
+      setIsSubmitting(false);
     }
   };
 
@@ -492,7 +497,7 @@ export default function CorteComponent({ workOrder }: Props) {
 
     // Producción considerada para la validación
     const producedSoFar = goodQty + sumPartialQty;
-    console.log(producedSoFar, 'producedsofar')
+    console.log(producedSoFar, 'producedsofar');
     const partialsActual = currentFlow?.partialReleases ?? [];
     if (isNaN(numValue) || !Number.isInteger(numValue) || numValue <= 0) {
       alert('Por favor, ingresa una cantidad de muestra válida.');
@@ -500,9 +505,9 @@ export default function CorteComponent({ workOrder }: Props) {
     } else if (
       partialsActual.length > 0 &&
       Number(goodQuantity) +
-      Number(lastAreaBadQuantity) +
-      Number(excessQuantity) >
-      cantidadporliberar
+        Number(lastAreaBadQuantity) +
+        Number(excessQuantity) >
+        cantidadporliberar
     ) {
       alert(
         `La cantidad total a liberar es mayor a la entregada no procesada por la parcialidad anterior ${cantidadporliberar}.`
@@ -513,7 +518,13 @@ export default function CorteComponent({ workOrder }: Props) {
       noProc === 0 &&
       currentFlow?.areaResponse == null
     ) {
-      console.log("exce", producedSoFar, orderQty, noProc, currentFlow?.areaResponse);
+      console.log(
+        'exce',
+        producedSoFar,
+        orderQty,
+        noProc,
+        currentFlow?.areaResponse
+      );
       alert(
         `La cantidad de excedente ${Number(noProcessQuantity)} es invalida.`
       );
@@ -536,6 +547,9 @@ export default function CorteComponent({ workOrder }: Props) {
   };
 
   const handleCorteSubmit = async () => {
+    if (isSubmitting) return; // evita doble clic
+    setIsSubmitting(true);
+
     const payload = {
       workOrderId: workOrder.workOrder.id,
       workOrderFlowId: currentFlow.id,
@@ -556,7 +570,8 @@ export default function CorteComponent({ workOrder }: Props) {
       const res = (await releaseProductFromCorte(payload)) as ReleaseResponse;
 
       // 2) Si es PARCIAL → mandar badQuantitySummary con partialReleaseId
-      const stash = pendingBadQty ?? loadPendingBadQty(otId, currentFlow?.id ?? null);
+      const stash =
+        pendingBadQty ?? loadPendingBadQty(otId, currentFlow?.id ?? null);
 
       const isPartial =
         !!res &&
@@ -569,9 +584,8 @@ export default function CorteComponent({ workOrder }: Props) {
         !!stash &&
         Array.isArray(stash.badQuantitySummary) &&
         stash.badQuantitySummary.length > 0;
-      console.log("has", stash);
+      console.log('has', stash);
 
-      
       if (isPartial && hasStash) {
         // ⬅️ PARCIAL: manda con partialReleaseId
         await updateWorkOrderAreasLiberarCorte(otId, {
@@ -596,6 +610,8 @@ export default function CorteComponent({ workOrder }: Props) {
       router.push('/liberarProducto');
     } catch (error) {
       console.log('Error al enviar datos:', error);
+    } finally {
+      setIsSubmitting(false);
     }
   };
 
@@ -907,7 +923,7 @@ export default function CorteComponent({ workOrder }: Props) {
                 Cancelar
               </CancelButton>
               <ConfirmButton onClick={handleCorteSubmit}>
-                Confirmar
+                {isSubmitting ? 'Liberando...' : 'Confirmar'}
               </ConfirmButton>
             </div>
           </ModalBox>
@@ -968,7 +984,7 @@ export default function CorteComponent({ workOrder }: Props) {
             <div style={{ display: 'flex', gap: '1rem' }}>
               <CloseButton onClick={closeModal}>Cerrar</CloseButton>
               <SubmitButton onClick={handleSubmitToCQM}>
-                Enviar Respuestas
+                {isSubmitting ? 'Enviando...' : 'Enviar Respuestas'}
               </SubmitButton>
             </div>
           </ModalContent>
@@ -1111,15 +1127,15 @@ const CqmButton = styled.button<CqmButtonProps>`
 
   &:hover {
     background-color: ${({ $status, $cantidadporliberar, disabled }) => {
-    if ($status === 'Listo') return '#16a34a';
-    if (
-      ['Enviado a CQM', 'En Calidad'].includes($status) ||
-      Number($cantidadporliberar) === 0 ||
-      disabled
-    )
-      return '#9ca3af';
-    return '#1d4ed8';
-  }};
+      if ($status === 'Listo') return '#16a34a';
+      if (
+        ['Enviado a CQM', 'En Calidad'].includes($status) ||
+        Number($cantidadporliberar) === 0 ||
+        disabled
+      )
+        return '#9ca3af';
+      return '#1d4ed8';
+    }};
   }
 `;
 
