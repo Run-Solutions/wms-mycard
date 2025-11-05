@@ -1360,7 +1360,7 @@ export default function SeguimientoDeOtsAuxPage({ params }: Props) {
     const muestras2   = Number(area.muestras ?? 0);
     const noprocess2  = Number(area.noprocess ?? 0);
   
-    return buenas2 + excedente2 + badToOthers + defectuoso2 + cqm2 + muestras2 + noprocess2;
+    return buenas2 + excedente2 + badToOthers + defectuoso2 + cqm2 + muestras2 + noprocess2 + selfBad;
   };
 
   const cantidadHojasRaw = Number(workOrder?.quantity) / 24;

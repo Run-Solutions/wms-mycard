@@ -701,7 +701,7 @@ const CerrarOrdenDeTrabajoAuxScreen: React.FC = () => {
     const muestras2   = Number(area.muestras ?? 0);
     const noprocess2  = Number(area.noprocess ?? 0);
   
-    return buenas2 + excedente2 + badToOthers + defectuoso2 + cqm2 + muestras2 + noprocess2;
+    return buenas2 + excedente2 + badToOthers + defectuoso2 + cqm2 + muestras2 + noprocess2 + selfBad;
   };
 
   // Indexa totales de MALAS por P1..Pn y REM a nivel de cada flow (área)
