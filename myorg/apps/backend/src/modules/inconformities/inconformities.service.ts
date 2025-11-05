@@ -1,6 +1,15 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { PrismaService } from 'prisma/prisma.service';
 
+const EARLY_BLOCK_CONFIG = {
+  impression: { delegate: 'impressionResponse' },
+  serigrafia: { delegate: 'serigrafiaResponse' },
+  empalme: { delegate: 'empalmeResponse' },
+  laminacion: { delegate: 'laminacionResponse' },
+} as const;
+
+type EarlyBlockKey = keyof typeof EARLY_BLOCK_CONFIG;
+
 @Injectable()
 export class InconformitiesService {
   constructor(private prisma: PrismaService) {}
@@ -349,28 +358,112 @@ export class InconformitiesService {
     });
   }
 
-  async inconformityCorte(areaResponseId: number) {
+  async inconformityCorte(areaResponseFlowId: number) {
     return this.prisma.$transaction(async (tx) => {
       const flow = await tx.workOrderFlow.findUnique({
-        where: { id: Number(areaResponseId) },
+        where: { id: Number(areaResponseFlowId) },
+        select: { id: true, area_id: true, work_order_id: true },
       });
       if (!flow) throw new Error('Flujo no encontrado');
 
+      // Para escribir en bloques acumulables
+      const EARLY_AREA_TO_BLOCK: Record<number, EarlyBlockKey> = {
+        2: 'impression',
+        3: 'serigrafia',
+        4: 'empalme',
+        5: 'laminacion',
+      };
+      const EARLY_AREAS = Object.keys(EARLY_AREA_TO_BLOCK).map(Number);
+
+      // Helper: RESYNC absolutas en bloques 2..5 (impression/serigrafia/empalme/laminacion)
+      const resyncEarlyBlocks = async () => {
+        // Suma por target_area_id de lo que QUEDA en badQuantityDetail
+        const groups = await tx.badQuantityDetail.groupBy({
+          by: ['target_area_id'],
+          where: {
+            work_order_id: flow.work_order_id,
+            source_work_order_flow_id: flow.id,
+            source_area_id: flow.area_id,
+            target_area_id: { in: EARLY_AREAS },
+          },
+          _sum: { bad_quantity: true },
+        });
+
+        const totalsByArea = new Map<number, number>(
+          EARLY_AREAS.map((id) => [id, 0]),
+        );
+        for (const g of groups) {
+          totalsByArea.set(
+            Number(g.target_area_id),
+            Math.max(0, Number(g._sum.bad_quantity ?? 0)),
+          );
+        }
+
+        for (const [areaId, total] of totalsByArea.entries()) {
+          const blockKey = EARLY_AREA_TO_BLOCK[areaId];
+          if (!blockKey) continue;
+
+          // Último flow de ESA área en la OT
+          const targetFlow = await tx.workOrderFlow.findFirst({
+            where: { work_order_id: flow.work_order_id, area_id: areaId },
+            orderBy: { id: 'desc' },
+            select: { id: true },
+          });
+          if (!targetFlow) continue;
+
+          // Su areas_response
+          const areaResp = await tx.areasResponse.findFirst({
+            where: { work_order_flow_id: targetFlow.id, area_id: areaId },
+            select: { id: true },
+          });
+          if (!areaResp) continue;
+
+          const cfg = EARLY_BLOCK_CONFIG[blockKey];
+          const delegate = (tx as any)[cfg.delegate];
+
+          // Solo estos bloques (2..5) llevan bad_quantity, no material
+          const current = await delegate.findFirst({
+            where: { areas_response_id: areaResp.id },
+            select: { id: true, bad_quantity: true },
+          });
+          if (!current) continue;
+
+          const prev = Number(current.bad_quantity ?? 0);
+          if (prev !== total) {
+            await delegate.update({
+              where: { id: current.id },
+              data: { bad_quantity: total },
+            });
+            console.log('🔄 [RESYNC acumulables] ', {
+              target_area_id: areaId,
+              blockKey,
+              areas_response_id: areaResp.id,
+              prev,
+              total,
+            });
+          } else {
+            console.log('ℹ️ [RESYNC acumulables] ya coincide', {
+              target_area_id: areaId,
+              blockKey,
+              total,
+            });
+          }
+        }
+      };
+
+      // Datos de contexto para decidir qué borrar
       const areaResponse = await tx.areasResponse.findFirst({
         where: { work_order_flow_id: flow.id },
         include: { inconformities: true },
       });
-
       const flowParcial = await tx.partialRelease.findFirst({
-        where: {
-          work_order_flow_id: flow?.id,
-          validated: false,
-        },
+        where: { work_order_flow_id: flow.id, validated: false },
         select: { id: true },
       });
 
-      // CASO 1: No hay respuesta de área pero hay parciales inválidos
-      if ((!areaResponse && flowParcial) || (areaResponse && flowParcial)) {
+      // ── CASO 1: Hay parciales sin validar (reinicio de liberación parcial)
+      if (flowParcial) {
+        // Marcar inconformidades del parcial como revisadas
         await tx.inconformities.updateMany({
           where: {
             partial_release_id: flowParcial.id,
@@ -378,22 +471,36 @@ export class InconformitiesService {
           },
           data: { reviewed: true },
         });
+
+        // 🔥 BORRAR detalles del parcial
+        await tx.badQuantityDetail.deleteMany({
+          where: {
+            source_work_order_flow_id: flow.id,
+            partial_release_id: flowParcial.id,
+          },
+        });
+
+        // BORRAR el parcial y cualquier areas_response de ese flow
         await tx.partialRelease.deleteMany({
           where: { work_order_flow_id: flow.id, validated: false },
         });
-
         await tx.areasResponse.deleteMany({
           where: { work_order_flow_id: flow.id },
         });
+
+        // Poner el flow listo
         await tx.workOrderFlow.update({
           where: { id: flow.id },
           data: { status: 'Listo' },
         });
 
+        // 🧮 RESYNC absolutas en acumulables 2..5 tras la limpieza
+        await resyncEarlyBlocks();
+
         return { message: 'Liberación parcial reiniciada con éxito' };
       }
 
-      // CASO 2: Hay respuesta de área con inconformidad
+      // ── CASO 2: No hay parcial sin validar, pero sí areaResponse con inconformidad
       if (areaResponse) {
         // ✔️ Marcar inconformidades como revisadas
         await tx.inconformities.updateMany({
@@ -403,30 +510,47 @@ export class InconformitiesService {
           },
           data: { reviewed: true },
         });
+
+        // Borrar auditoría asociada a corte si existe
         const corteResponse = await tx.corteResponse.findUnique({
           where: { areas_response_id: areaResponse.id },
+          select: { id: true, form_auditory_id: true },
         });
         if (corteResponse?.form_auditory_id) {
           await tx.formAuditory.deleteMany({
             where: { id: corteResponse.form_auditory_id },
           });
         }
-        // ❌ Se elimina solo el corte, NO la inconformidad
+
+        // 🔥 Si el caso corresponde a remanente (partial_release_id = null), borra esos detalles
+        await tx.badQuantityDetail.deleteMany({
+          where: {
+            source_work_order_flow_id: flow.id,
+            partial_release_id: null,
+          },
+        });
+
+        // Limpia el corte + areaResponse del flow
         await tx.corteResponse.deleteMany({
           where: { areas_response_id: areaResponse.id },
         });
         await tx.areasResponse.deleteMany({
           where: { id: areaResponse.id },
         });
-        // ❌ No se elimina el áreaResponse (mantiene relación con la inconformidad)
+
         await tx.workOrderFlow.update({
           where: { id: flow.id },
           data: { status: 'Listo' },
         });
+
+        // 🧮 RESYNC absolutas en acumulables 2..5 tras la limpieza
+        await resyncEarlyBlocks();
+
         return {
           message: 'Corte limpiado y la inconformidad marcada como revisada',
         };
       }
+
       return { message: 'No se encontró información para procesar' };
     });
   }
@@ -551,11 +675,95 @@ export class InconformitiesService {
       });
       if (!flow) throw new Error('Flujo no encontrado');
 
+      // Para escribir en bloques acumulables
+      const EARLY_AREA_TO_BLOCK: Record<number, EarlyBlockKey> = {
+        2: 'impression',
+        3: 'serigrafia',
+        4: 'empalme',
+        5: 'laminacion',
+      };
+      const EARLY_AREAS = Object.keys(EARLY_AREA_TO_BLOCK).map(Number);
+
+      // Helper: RESYNC absolutas en bloques 2..5 (impression/serigrafia/empalme/laminacion)
+      const resyncEarlyBlocks = async () => {
+        // Suma por target_area_id de lo que QUEDA en badQuantityDetail
+        const groups = await tx.badQuantityDetail.groupBy({
+          by: ['target_area_id'],
+          where: {
+            work_order_id: flow.work_order_id,
+            source_work_order_flow_id: flow.id,
+            source_area_id: flow.area_id,
+            target_area_id: { in: EARLY_AREAS },
+          },
+          _sum: { bad_quantity: true },
+        });
+
+        const totalsByArea = new Map<number, number>(
+          EARLY_AREAS.map((id) => [id, 0]),
+        );
+        for (const g of groups) {
+          totalsByArea.set(
+            Number(g.target_area_id),
+            Math.max(0, Number(g._sum.bad_quantity ?? 0)),
+          );
+        }
+
+        for (const [areaId, total] of totalsByArea.entries()) {
+          const blockKey = EARLY_AREA_TO_BLOCK[areaId];
+          if (!blockKey) continue;
+
+          // Último flow de ESA área en la OT
+          const targetFlow = await tx.workOrderFlow.findFirst({
+            where: { work_order_id: flow.work_order_id, area_id: areaId },
+            orderBy: { id: 'desc' },
+            select: { id: true },
+          });
+          if (!targetFlow) continue;
+
+          // Su areas_response
+          const areaResp = await tx.areasResponse.findFirst({
+            where: { work_order_flow_id: targetFlow.id, area_id: areaId },
+            select: { id: true },
+          });
+          if (!areaResp) continue;
+
+          const cfg = EARLY_BLOCK_CONFIG[blockKey];
+          const delegate = (tx as any)[cfg.delegate];
+
+          // Solo estos bloques (2..5) llevan bad_quantity, no material
+          const current = await delegate.findFirst({
+            where: { areas_response_id: areaResp.id },
+            select: { id: true, bad_quantity: true },
+          });
+          if (!current) continue;
+
+          const prev = Number(current.bad_quantity ?? 0);
+          if (prev !== total) {
+            await delegate.update({
+              where: { id: current.id },
+              data: { bad_quantity: total },
+            });
+            console.log('🔄 [RESYNC acumulables] ', {
+              target_area_id: areaId,
+              blockKey,
+              areas_response_id: areaResp.id,
+              prev,
+              total,
+            });
+          } else {
+            console.log('ℹ️ [RESYNC acumulables] ya coincide', {
+              target_area_id: areaId,
+              blockKey,
+              total,
+            });
+          }
+        }
+      };
+
       const areaResponse = await tx.areasResponse.findFirst({
         where: { work_order_flow_id: flow.id },
         include: { inconformities: true },
       });
-
       const flowParcial = await tx.partialRelease.findFirst({
         where: {
           work_order_flow_id: flow?.id,
@@ -564,8 +772,9 @@ export class InconformitiesService {
         select: { id: true },
       });
 
-      // CASO 1: No hay respuesta de área pero hay parciales inválidos
-      if ((!areaResponse && flowParcial) || (areaResponse && flowParcial)) {
+      // ── CASO 1: Hay parciales sin validar (reinicio de liberación parcial)
+      if (flowParcial) {
+        // Marcar inconformidades del parcial como revisadas
         await tx.inconformities.updateMany({
           where: {
             partial_release_id: flowParcial.id,
@@ -573,21 +782,36 @@ export class InconformitiesService {
           },
           data: { reviewed: true },
         });
+
+        // 🔥 BORRAR detalles del parcial
+        await tx.badQuantityDetail.deleteMany({
+          where: {
+            source_work_order_flow_id: flow.id,
+            partial_release_id: flowParcial.id,
+          },
+        });
+
+        // BORRAR el parcial y cualquier areas_response de ese flow
         await tx.partialRelease.deleteMany({
-          where: { work_order_flow_id: flow?.id, validated: false },
+          where: { work_order_flow_id: flow.id, validated: false },
         });
-
         await tx.areasResponse.deleteMany({
-          where: { work_order_flow_id: flow?.id },
+          where: { work_order_flow_id: flow.id },
         });
 
+        // Poner el flow listo
         await tx.workOrderFlow.update({
-          where: { id: flow?.id },
+          where: { id: flow.id },
           data: { status: 'Listo' },
         });
+
+        // 🧮 RESYNC absolutas en acumulables 2..5 tras la limpieza
+        await resyncEarlyBlocks();
+
         return { message: 'Liberación parcial reiniciada con éxito' };
       }
 
+      // ── CASO 2: No hay parcial sin validar, pero sí areaResponse con inconformidad
       if (areaResponse) {
         // ✔️ Marcar inconformidades como revisadas
         await tx.inconformities.updateMany({
@@ -597,28 +821,44 @@ export class InconformitiesService {
           },
           data: { reviewed: true },
         });
+
+        // Borrar auditoría asociada a corte si existe
         const colorEdgeResponse = await tx.colorEdgeResponse.findUnique({
           where: { areas_response_id: areaResponse.id },
+          select: { id: true, form_auditory_id: true },
         });
         if (colorEdgeResponse?.form_auditory_id) {
           await tx.formAuditory.deleteMany({
             where: { id: colorEdgeResponse.form_auditory_id },
           });
         }
+
+        // 🔥 Si el caso corresponde a remanente (partial_release_id = null), borra esos detalles
+        await tx.badQuantityDetail.deleteMany({
+          where: {
+            source_work_order_flow_id: flow.id,
+            partial_release_id: null,
+          },
+        });
+
+        // Limpia el corte + areaResponse del flow
         await tx.colorEdgeResponse.deleteMany({
           where: { areas_response_id: areaResponse.id },
         });
         await tx.areasResponse.deleteMany({
-          where: {
-            id: areaResponse.id,
-          },
+          where: { id: areaResponse.id },
         });
+
         await tx.workOrderFlow.update({
-          where: { id: flow?.id },
+          where: { id: flow.id },
           data: { status: 'Listo' },
         });
+
+        // 🧮 RESYNC absolutas en acumulables 2..5 tras la limpieza
+        await resyncEarlyBlocks();
+
         return {
-          message: 'Corte limpiado y la inconformidad marcada como revisada',
+          message: 'colorEdgeResponse limpiado y la inconformidad marcada como revisada',
         };
       }
       return { message: 'Respuesta guardada con exito' };
@@ -746,6 +986,91 @@ export class InconformitiesService {
       });
       if (!flow) throw new Error('Flujo no encontrado');
 
+      // Para escribir en bloques acumulables
+      const EARLY_AREA_TO_BLOCK: Record<number, EarlyBlockKey> = {
+        2: 'impression',
+        3: 'serigrafia',
+        4: 'empalme',
+        5: 'laminacion',
+      };
+      const EARLY_AREAS = Object.keys(EARLY_AREA_TO_BLOCK).map(Number);
+
+      // Helper: RESYNC absolutas en bloques 2..5 (impression/serigrafia/empalme/laminacion)
+      const resyncEarlyBlocks = async () => {
+        // Suma por target_area_id de lo que QUEDA en badQuantityDetail
+        const groups = await tx.badQuantityDetail.groupBy({
+          by: ['target_area_id'],
+          where: {
+            work_order_id: flow.work_order_id,
+            source_work_order_flow_id: flow.id,
+            source_area_id: flow.area_id,
+            target_area_id: { in: EARLY_AREAS },
+          },
+          _sum: { bad_quantity: true },
+        });
+
+        const totalsByArea = new Map<number, number>(
+          EARLY_AREAS.map((id) => [id, 0]),
+        );
+        for (const g of groups) {
+          totalsByArea.set(
+            Number(g.target_area_id),
+            Math.max(0, Number(g._sum.bad_quantity ?? 0)),
+          );
+        }
+
+        for (const [areaId, total] of totalsByArea.entries()) {
+          const blockKey = EARLY_AREA_TO_BLOCK[areaId];
+          if (!blockKey) continue;
+
+          // Último flow de ESA área en la OT
+          const targetFlow = await tx.workOrderFlow.findFirst({
+            where: { work_order_id: flow.work_order_id, area_id: areaId },
+            orderBy: { id: 'desc' },
+            select: { id: true },
+          });
+          if (!targetFlow) continue;
+
+          // Su areas_response
+          const areaResp = await tx.areasResponse.findFirst({
+            where: { work_order_flow_id: targetFlow.id, area_id: areaId },
+            select: { id: true },
+          });
+          if (!areaResp) continue;
+
+          const cfg = EARLY_BLOCK_CONFIG[blockKey];
+          const delegate = (tx as any)[cfg.delegate];
+
+          // Solo estos bloques (2..5) llevan bad_quantity, no material
+          const current = await delegate.findFirst({
+            where: { areas_response_id: areaResp.id },
+            select: { id: true, bad_quantity: true },
+          });
+          if (!current) continue;
+
+          const prev = Number(current.bad_quantity ?? 0);
+          if (prev !== total) {
+            await delegate.update({
+              where: { id: current.id },
+              data: { bad_quantity: total },
+            });
+            console.log('🔄 [RESYNC acumulables] ', {
+              target_area_id: areaId,
+              blockKey,
+              areas_response_id: areaResp.id,
+              prev,
+              total,
+            });
+          } else {
+            console.log('ℹ️ [RESYNC acumulables] ya coincide', {
+              target_area_id: areaId,
+              blockKey,
+              total,
+            });
+          }
+        }
+      };
+
       const areaResponse = await tx.areasResponse.findFirst({
         where: { work_order_flow_id: flow.id },
         include: { inconformities: true },
@@ -759,7 +1084,9 @@ export class InconformitiesService {
         select: { id: true },
       });
 
-      if ((!areaResponse && flowParcial) || (areaResponse && flowParcial)) {
+      // ── CASO 1: Hay parciales sin validar (reinicio de liberación parcial)
+      if (flowParcial) {
+        // Marcar inconformidades del parcial como revisadas
         await tx.inconformities.updateMany({
           where: {
             partial_release_id: flowParcial.id,
@@ -767,21 +1094,36 @@ export class InconformitiesService {
           },
           data: { reviewed: true },
         });
+
+        // 🔥 BORRAR detalles del parcial
+        await tx.badQuantityDetail.deleteMany({
+          where: {
+            source_work_order_flow_id: flow.id,
+            partial_release_id: flowParcial.id,
+          },
+        });
+
+        // BORRAR el parcial y cualquier areas_response de ese flow
         await tx.partialRelease.deleteMany({
           where: { work_order_flow_id: flow.id, validated: false },
         });
-
         await tx.areasResponse.deleteMany({
           where: { work_order_flow_id: flow.id },
         });
+
+        // Poner el flow listo
         await tx.workOrderFlow.update({
           where: { id: flow.id },
           data: { status: 'Listo' },
         });
 
+        // 🧮 RESYNC absolutas en acumulables 2..5 tras la limpieza
+        await resyncEarlyBlocks();
+
         return { message: 'Liberación parcial reiniciada con éxito' };
       }
 
+      // ── CASO 2: No hay parcial sin validar, pero sí areaResponse con inconformidad
       if (areaResponse) {
         // ✔️ Marcar inconformidades como revisadas
         await tx.inconformities.updateMany({
@@ -791,29 +1133,44 @@ export class InconformitiesService {
           },
           data: { reviewed: true },
         });
+
+        // Borrar auditoría asociada a corte si existe
         const hotStampingResponse = await tx.hotStampingResponse.findUnique({
           where: { areas_response_id: areaResponse.id },
+          select: { id: true, form_auditory_id: true },
         });
-        // Si existe un form_auditory_id, eliminar el FormAuditory
         if (hotStampingResponse?.form_auditory_id) {
           await tx.formAuditory.deleteMany({
             where: { id: hotStampingResponse.form_auditory_id },
           });
         }
-        // Eliminar el registro empalme asociado a ese AreasResponse
+
+        // 🔥 Si el caso corresponde a remanente (partial_release_id = null), borra esos detalles
+        await tx.badQuantityDetail.deleteMany({
+          where: {
+            source_work_order_flow_id: flow.id,
+            partial_release_id: null,
+          },
+        });
+
+        // Limpia el hotStampingResponse + areaResponse del flow
         await tx.hotStampingResponse.deleteMany({
           where: { areas_response_id: areaResponse.id },
         });
         await tx.areasResponse.deleteMany({
           where: { id: areaResponse.id },
         });
+
         await tx.workOrderFlow.update({
           where: { id: flow.id },
           data: { status: 'Listo' },
         });
+
+        // 🧮 RESYNC absolutas en acumulables 2..5 tras la limpieza
+        await resyncEarlyBlocks();
+
         return {
-          message:
-            'Hot Stamping limpiado y la inconformidad marcada como revisada',
+          message: 'Corte limpiado y la inconformidad marcada como revisada',
         };
       }
       return { message: 'No se encontró información para procesar' };
@@ -941,6 +1298,91 @@ export class InconformitiesService {
       });
       if (!flow) throw new Error('Flujo no encontrado');
 
+      // Para escribir en bloques acumulables
+      const EARLY_AREA_TO_BLOCK: Record<number, EarlyBlockKey> = {
+        2: 'impression',
+        3: 'serigrafia',
+        4: 'empalme',
+        5: 'laminacion',
+      };
+      const EARLY_AREAS = Object.keys(EARLY_AREA_TO_BLOCK).map(Number);
+
+      // Helper: RESYNC absolutas en bloques 2..5 (impression/serigrafia/empalme/laminacion)
+      const resyncEarlyBlocks = async () => {
+        // Suma por target_area_id de lo que QUEDA en badQuantityDetail
+        const groups = await tx.badQuantityDetail.groupBy({
+          by: ['target_area_id'],
+          where: {
+            work_order_id: flow.work_order_id,
+            source_work_order_flow_id: flow.id,
+            source_area_id: flow.area_id,
+            target_area_id: { in: EARLY_AREAS },
+          },
+          _sum: { bad_quantity: true },
+        });
+
+        const totalsByArea = new Map<number, number>(
+          EARLY_AREAS.map((id) => [id, 0]),
+        );
+        for (const g of groups) {
+          totalsByArea.set(
+            Number(g.target_area_id),
+            Math.max(0, Number(g._sum.bad_quantity ?? 0)),
+          );
+        }
+
+        for (const [areaId, total] of totalsByArea.entries()) {
+          const blockKey = EARLY_AREA_TO_BLOCK[areaId];
+          if (!blockKey) continue;
+
+          // Último flow de ESA área en la OT
+          const targetFlow = await tx.workOrderFlow.findFirst({
+            where: { work_order_id: flow.work_order_id, area_id: areaId },
+            orderBy: { id: 'desc' },
+            select: { id: true },
+          });
+          if (!targetFlow) continue;
+
+          // Su areas_response
+          const areaResp = await tx.areasResponse.findFirst({
+            where: { work_order_flow_id: targetFlow.id, area_id: areaId },
+            select: { id: true },
+          });
+          if (!areaResp) continue;
+
+          const cfg = EARLY_BLOCK_CONFIG[blockKey];
+          const delegate = (tx as any)[cfg.delegate];
+
+          // Solo estos bloques (2..5) llevan bad_quantity, no material
+          const current = await delegate.findFirst({
+            where: { areas_response_id: areaResp.id },
+            select: { id: true, bad_quantity: true },
+          });
+          if (!current) continue;
+
+          const prev = Number(current.bad_quantity ?? 0);
+          if (prev !== total) {
+            await delegate.update({
+              where: { id: current.id },
+              data: { bad_quantity: total },
+            });
+            console.log('🔄 [RESYNC acumulables] ', {
+              target_area_id: areaId,
+              blockKey,
+              areas_response_id: areaResp.id,
+              prev,
+              total,
+            });
+          } else {
+            console.log('ℹ️ [RESYNC acumulables] ya coincide', {
+              target_area_id: areaId,
+              blockKey,
+              total,
+            });
+          }
+        }
+      };
+
       const areaResponse = await tx.areasResponse.findFirst({
         where: { work_order_flow_id: flow.id },
         include: { inconformities: true },
@@ -954,7 +1396,9 @@ export class InconformitiesService {
         select: { id: true },
       });
 
-      if ((!areaResponse && flowParcial) || (areaResponse && flowParcial)) {
+      // ── CASO 1: Hay parciales sin validar (reinicio de liberación parcial)
+      if (flowParcial) {
+        // Marcar inconformidades del parcial como revisadas
         await tx.inconformities.updateMany({
           where: {
             partial_release_id: flowParcial.id,
@@ -962,21 +1406,36 @@ export class InconformitiesService {
           },
           data: { reviewed: true },
         });
+
+        // 🔥 BORRAR detalles del parcial
+        await tx.badQuantityDetail.deleteMany({
+          where: {
+            source_work_order_flow_id: flow.id,
+            partial_release_id: flowParcial.id,
+          },
+        });
+
+        // BORRAR el parcial y cualquier areas_response de ese flow
         await tx.partialRelease.deleteMany({
           where: { work_order_flow_id: flow.id, validated: false },
         });
-
         await tx.areasResponse.deleteMany({
           where: { work_order_flow_id: flow.id },
         });
+
+        // Poner el flow listo
         await tx.workOrderFlow.update({
-          where: { id: flow?.id },
+          where: { id: flow.id },
           data: { status: 'Listo' },
         });
+
+        // 🧮 RESYNC absolutas en acumulables 2..5 tras la limpieza
+        await resyncEarlyBlocks();
 
         return { message: 'Liberación parcial reiniciada con éxito' };
       }
 
+      // ── CASO 2: No hay parcial sin validar, pero sí areaResponse con inconformidad
       if (areaResponse) {
         // ✔️ Marcar inconformidades como revisadas
         await tx.inconformities.updateMany({
@@ -986,28 +1445,47 @@ export class InconformitiesService {
           },
           data: { reviewed: true },
         });
+
+        // Borrar auditoría asociada a corte si existe
         const millingChipResponse = await tx.millingChipResponse.findUnique({
           where: { areas_response_id: areaResponse.id },
+          select: { id: true, form_auditory_id: true },
         });
         if (millingChipResponse?.form_auditory_id) {
           await tx.formAuditory.deleteMany({
             where: { id: millingChipResponse.form_auditory_id },
           });
         }
+
+        // 🔥 Si el caso corresponde a remanente (partial_release_id = null), borra esos detalles
+        await tx.badQuantityDetail.deleteMany({
+          where: {
+            source_work_order_flow_id: flow.id,
+            partial_release_id: null,
+          },
+        });
+
+        // Limpia el corte + areaResponse del flow
         await tx.millingChipResponse.deleteMany({
           where: { areas_response_id: areaResponse.id },
         });
         await tx.areasResponse.deleteMany({
           where: { id: areaResponse.id },
         });
+
         await tx.workOrderFlow.update({
           where: { id: flow.id },
           data: { status: 'Listo' },
         });
+
+        // 🧮 RESYNC absolutas en acumulables 2..5 tras la limpieza
+        await resyncEarlyBlocks();
+
         return {
           message: 'Corte limpiado y la inconformidad marcada como revisada',
         };
       }
+
       return { message: 'No se encontró información para procesar' };
     });
   }
@@ -1133,6 +1611,91 @@ export class InconformitiesService {
       });
       if (!flow) throw new Error('Flujo no encontrado');
 
+      // Para escribir en bloques acumulables
+      const EARLY_AREA_TO_BLOCK: Record<number, EarlyBlockKey> = {
+        2: 'impression',
+        3: 'serigrafia',
+        4: 'empalme',
+        5: 'laminacion',
+      };
+      const EARLY_AREAS = Object.keys(EARLY_AREA_TO_BLOCK).map(Number);
+
+      // Helper: RESYNC absolutas en bloques 2..5 (impression/serigrafia/empalme/laminacion)
+      const resyncEarlyBlocks = async () => {
+        // Suma por target_area_id de lo que QUEDA en badQuantityDetail
+        const groups = await tx.badQuantityDetail.groupBy({
+          by: ['target_area_id'],
+          where: {
+            work_order_id: flow.work_order_id,
+            source_work_order_flow_id: flow.id,
+            source_area_id: flow.area_id,
+            target_area_id: { in: EARLY_AREAS },
+          },
+          _sum: { bad_quantity: true },
+        });
+
+        const totalsByArea = new Map<number, number>(
+          EARLY_AREAS.map((id) => [id, 0]),
+        );
+        for (const g of groups) {
+          totalsByArea.set(
+            Number(g.target_area_id),
+            Math.max(0, Number(g._sum.bad_quantity ?? 0)),
+          );
+        }
+
+        for (const [areaId, total] of totalsByArea.entries()) {
+          const blockKey = EARLY_AREA_TO_BLOCK[areaId];
+          if (!blockKey) continue;
+
+          // Último flow de ESA área en la OT
+          const targetFlow = await tx.workOrderFlow.findFirst({
+            where: { work_order_id: flow.work_order_id, area_id: areaId },
+            orderBy: { id: 'desc' },
+            select: { id: true },
+          });
+          if (!targetFlow) continue;
+
+          // Su areas_response
+          const areaResp = await tx.areasResponse.findFirst({
+            where: { work_order_flow_id: targetFlow.id, area_id: areaId },
+            select: { id: true },
+          });
+          if (!areaResp) continue;
+
+          const cfg = EARLY_BLOCK_CONFIG[blockKey];
+          const delegate = (tx as any)[cfg.delegate];
+
+          // Solo estos bloques (2..5) llevan bad_quantity, no material
+          const current = await delegate.findFirst({
+            where: { areas_response_id: areaResp.id },
+            select: { id: true, bad_quantity: true },
+          });
+          if (!current) continue;
+
+          const prev = Number(current.bad_quantity ?? 0);
+          if (prev !== total) {
+            await delegate.update({
+              where: { id: current.id },
+              data: { bad_quantity: total },
+            });
+            console.log('🔄 [RESYNC acumulables] ', {
+              target_area_id: areaId,
+              blockKey,
+              areas_response_id: areaResp.id,
+              prev,
+              total,
+            });
+          } else {
+            console.log('ℹ️ [RESYNC acumulables] ya coincide', {
+              target_area_id: areaId,
+              blockKey,
+              total,
+            });
+          }
+        }
+      };
+
       const areaResponse = await tx.areasResponse.findFirst({
         where: { work_order_flow_id: flow.id },
         include: { inconformities: true },
@@ -1146,7 +1709,9 @@ export class InconformitiesService {
         select: { id: true },
       });
 
-      if ((!areaResponse && flowParcial) || (areaResponse && flowParcial)) {
+      // ── CASO 1: Hay parciales sin validar (reinicio de liberación parcial)
+      if (flowParcial) {
+        // Marcar inconformidades del parcial como revisadas
         await tx.inconformities.updateMany({
           where: {
             partial_release_id: flowParcial.id,
@@ -1154,22 +1719,38 @@ export class InconformitiesService {
           },
           data: { reviewed: true },
         });
-        await tx.partialRelease.deleteMany({
-          where: { work_order_flow_id: flow?.id, validated: false },
+
+        // 🔥 BORRAR detalles del parcial
+        await tx.badQuantityDetail.deleteMany({
+          where: {
+            source_work_order_flow_id: flow.id,
+            partial_release_id: flowParcial.id,
+          },
         });
 
+        // BORRAR el parcial y cualquier areas_response de ese flow
+        await tx.partialRelease.deleteMany({
+          where: { work_order_flow_id: flow.id, validated: false },
+        });
         await tx.areasResponse.deleteMany({
           where: { work_order_flow_id: flow.id },
         });
+
+        // Poner el flow listo
         await tx.workOrderFlow.update({
           where: { id: flow.id },
           data: { status: 'Listo' },
         });
 
-        return { message: 'Respuesta guardada con exito' };
+        // 🧮 RESYNC absolutas en acumulables 2..5 tras la limpieza
+        await resyncEarlyBlocks();
+
+        return { message: 'Liberación parcial reiniciada con éxito' };
       }
 
+      // ── CASO 2: No hay parcial sin validar, pero sí areaResponse con inconformidad
       if (areaResponse) {
+        // ✔️ Marcar inconformidades como revisadas
         await tx.inconformities.updateMany({
           where: {
             areas_response_id: areaResponse.id,
@@ -1177,31 +1758,47 @@ export class InconformitiesService {
           },
           data: { reviewed: true },
         });
-        const personalizacionResponse =
-          await tx.personalizacionResponse.findUnique({
-            where: { areas_response_id: areaResponse.id },
-          });
-        // Si existe un form_auditory_id, eliminar el FormAuditory
+
+        // Borrar auditoría asociada a corte si existe
+        const personalizacionResponse = await tx.personalizacionResponse.findUnique({
+          where: { areas_response_id: areaResponse.id },
+          select: { id: true, form_auditory_id: true },
+        });
         if (personalizacionResponse?.form_auditory_id) {
           await tx.formAuditory.deleteMany({
             where: { id: personalizacionResponse.form_auditory_id },
           });
         }
+
+        // 🔥 Si el caso corresponde a remanente (partial_release_id = null), borra esos detalles
+        await tx.badQuantityDetail.deleteMany({
+          where: {
+            source_work_order_flow_id: flow.id,
+            partial_release_id: null,
+          },
+        });
+
+        // Limpia el personalizacionResponse + areaResponse del flow
         await tx.personalizacionResponse.deleteMany({
           where: { areas_response_id: areaResponse.id },
         });
         await tx.areasResponse.deleteMany({
           where: { id: areaResponse.id },
         });
+
         await tx.workOrderFlow.update({
           where: { id: flow.id },
           data: { status: 'Listo' },
         });
+
+        // 🧮 RESYNC absolutas en acumulables 2..5 tras la limpieza
+        await resyncEarlyBlocks();
+
         return {
-          message:
-            'Hot Stamping limpiado y la inconformidad marcada como revisada',
+          message: 'Corte limpiado y la inconformidad marcada como revisada',
         };
       }
+
       return { message: 'No se encontró información para procesar' };
     });
   }
