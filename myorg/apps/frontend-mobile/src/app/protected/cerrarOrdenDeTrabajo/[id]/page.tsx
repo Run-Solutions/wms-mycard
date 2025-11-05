@@ -642,7 +642,8 @@ const CerrarOrdenDeTrabajoAuxScreen: React.FC = () => {
   const lastStatus = lastFlow?.status?.toLowerCase() ?? '';
   const needsEvidence = lastStatus === 'en auditoria';
   const getAreaSumaTotal = (area: AreaData) => {
-    const badToOthers = sumBadBySource(Number(area.id ?? 0), false);
+    const partialId = area.partials?.[0]?.id;
+    const badToOthers = sumBadBySource(Number(area.id ?? 0), false, partialId);
 
     // Caso 1: Áreas con parciales (y con id >= 6)
     if (area.partials?.length && area.id >= 6) {
@@ -657,13 +658,13 @@ const CerrarOrdenDeTrabajoAuxScreen: React.FC = () => {
       const cqm = Number(firstAnswer?.sample_quantity ?? 0);
       const noprocess = Number(p?.noprocess_quantity ?? 0);
 
-      console.log(buenas, 'buenas')
-      console.log(malas, 'malas')
-      console.log(excedente, 'excedente')
-      console.log(defectuoso, 'defectuoso')
-      console.log(muestras, 'muestras')
-      console.log(cqm, 'cqm')
-      console.log(badToOthers, 'badToOthers')
+      console.log(buenas, 'buenas');
+      console.log(malas, 'malas');
+      console.log(excedente, 'excedente');
+      console.log(defectuoso, 'defectuoso');
+      console.log(muestras, 'muestras');
+      console.log(cqm, 'cqm');
+      console.log(badToOthers, 'badToOthers');
 
       return (
         buenas +
@@ -685,14 +686,7 @@ const CerrarOrdenDeTrabajoAuxScreen: React.FC = () => {
       const muestras = Number(area.muestras ?? 0);
       const noprocess = Number(area.noprocess ?? 0);
 
-      return (
-        buenas +
-        excedente +
-        defectuoso +
-        cqm +
-        muestras +
-        noprocess
-      );
+      return buenas + excedente + defectuoso + cqm + muestras + noprocess;
     }
 
     // Caso 3: Sin parciales (id >= 6 pero sin partials)
@@ -1058,6 +1052,12 @@ const CerrarOrdenDeTrabajoAuxScreen: React.FC = () => {
       Map<number, { bad: number; mat: number }>
     >();
 
+    // NEW: source -> partial_release_id -> (target -> {bad, mat})
+    const perPartialBySourceTarget = new Map<
+      number,
+      Map<number, Map<number, { bad: number; mat: number }>>
+    >();
+
     const accumulate = (
       store: Map<number, Map<number, { bad: number; mat: number }>>,
       sourceId: number,
@@ -1065,63 +1065,98 @@ const CerrarOrdenDeTrabajoAuxScreen: React.FC = () => {
       bad: number,
       mat: number
     ) => {
-      if (!sourceId || !targetId) return;
-      if (!store.has(sourceId)) {
-        store.set(sourceId, new Map());
+      if (!store.has(sourceId)) store.set(sourceId, new Map());
+      const m = store.get(sourceId)!;
+      const prev = m.get(targetId) ?? { bad: 0, mat: 0 };
+      m.set(targetId, { bad: prev.bad + bad, mat: prev.mat + mat });
+    };
+
+    const accumulatePerPartial = (
+      sourceId: number,
+      partialId: number,
+      targetId: number,
+      bad: number,
+      mat: number
+    ) => {
+      if (!perPartialBySourceTarget.has(sourceId)) {
+        perPartialBySourceTarget.set(sourceId, new Map());
       }
-      const targetMap = store.get(sourceId)!;
+      const byPartial = perPartialBySourceTarget.get(sourceId)!;
+      if (!byPartial.has(partialId)) byPartial.set(partialId, new Map());
+      const targetMap = byPartial.get(partialId)!;
+
       const prev = targetMap.get(targetId) ?? { bad: 0, mat: 0 };
-      targetMap.set(targetId, {
-        bad: prev.bad + bad,
-        mat: prev.mat + mat,
-      });
+      targetMap.set(targetId, { bad: prev.bad + bad, mat: prev.mat + mat });
     };
 
     const flows = workOrder?.flow ?? [];
     flows.forEach((f: any) => {
       (f?.badQuantityDetails ?? []).forEach((d: any) => {
-        const s = Number(d?.source_area_id) || 0;
-        const t = Number(d?.target_area_id) || 0;
-        if (!s || !t) return;
+        const sourceId = Number(d?.source_area_id) || 0;
+        const targetId = Number(d?.target_area_id) || 0;
+        if (!sourceId || !targetId) return;
 
         const bad = toNum(d?.bad_quantity);
         const mat = toNum(d?.material_quantity);
-        const partialReleaseId = Number(d?.partial_release_id) || null;
+        const partialId = Number(d?.partial_release_id);
 
-        accumulate(allBySourceTarget, s, t, bad, mat);
+        // Total (todas las contribuciones)
+        accumulate(allBySourceTarget, sourceId, targetId, bad, mat);
 
-        if (partialReleaseId == null) {
-          accumulate(remainderBySourceTarget, s, t, bad, mat);
+        if (Number.isFinite(partialId) && partialId > 0) {
+          // Por parcial
+          accumulatePerPartial(sourceId, partialId, targetId, bad, mat);
+        } else {
+          // Remanente (sin parcial)
+          accumulate(remainderBySourceTarget, sourceId, targetId, bad, mat);
         }
       });
     });
 
-    return { allBySourceTarget, remainderBySourceTarget };
+    return {
+      allBySourceTarget,
+      remainderBySourceTarget,
+      perPartialBySourceTarget,
+    };
   }, [workOrder]);
 
-  const sumBadBySource = (sourceId: number, includeSelf: boolean) => {
-    const m = badAgg.allBySourceTarget.get(Number(sourceId));
+  const sumBadBySource = (
+    sourceId: number,
+    includeSelf: boolean,
+    partialId?: number
+  ) => {
+    let m: Map<number, { bad: number; mat: number }> | undefined;
+
+    if (partialId) {
+      const byPartial = badAgg.perPartialBySourceTarget.get(Number(sourceId));
+      m = byPartial?.get(Number(partialId));
+    } else {
+      m = badAgg.allBySourceTarget.get(Number(sourceId));
+    }
+
     if (!m) return 0;
+
     let total = 0;
     m.forEach((v, tId) => {
+      // si es el mismo área
+      if (Number(tId) === Number(sourceId)) {
+        // solo suma las malas, NO el material
+        total += toNum(v.bad);
+        return;
+      }
+
+      // si no se incluyen las malas del mismo área, se salta
       if (!includeSelf && Number(tId) === Number(sourceId)) return;
+
+      // en los demás casos, suma normalmente
       total += toNum(v.bad);
     });
+
     return total;
   };
 
   const getBlockKey = (areaId: number): BlockKey | undefined =>
     areaBlockMap[Number(areaId)];
-
-  const getSelfBadAndMat = (area: AreaData) => {
-    const block = getBlockKey(Number(area.id));
-    const bad = toNum(area?.response?.[block as BlockKey]?.bad_quantity ?? 0);
-    // si manejas material en response (p.ej. corte), úsalo; si no, 0.
-    const mat = toNum(
-      area?.response?.[block as BlockKey]?.material_quantity ?? 0
-    );
-    return { bad, mat };
-  };
 
   // ======================================================
   // Derived totals / helpers

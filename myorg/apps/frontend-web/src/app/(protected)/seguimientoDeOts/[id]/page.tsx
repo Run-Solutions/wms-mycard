@@ -768,22 +768,22 @@ export default function SeguimientoDeOtsAuxPage({ params }: Props) {
     const area = areas.find((a) => a.id === areaId);
     const blockKey = areaBlockMap[areaId];
     const selfBad = Number(area?.response?.[blockKey]?.bad_quantity ?? 0);
-  
+
     // 🔹 Busca los detalles de esa área en workOrder.flow
     const flow = workOrder?.flow?.find((f: any) => f.area_id === areaId);
     const details = flow?.badQuantityDetails ?? [];
-  
+
     // 🔹 Solo REM (sin parciales)
     const remBad = details
       .filter((d: any) => d.partial_release_id == null)
       .reduce((sum: number, d: any) => sum + (Number(d?.bad_quantity) || 0), 0);
-  
+
     // 🔹 Suma total (todas las malas)
     const sumBad = details.reduce(
       (sum: number, d: any) => sum + (Number(d?.bad_quantity) || 0),
       0
     );
-  
+
     // 🔹 Para áreas < 6: rem = total (porque no hay parciales)
     if (areaId < 6) {
       const totals = entry?.totals ?? {};
@@ -793,7 +793,7 @@ export default function SeguimientoDeOtsAuxPage({ params }: Props) {
       );
       return { remBad: totalSum, sumBad: totalSum };
     }
-  
+
     // 🔹 Para áreas >= 6
     return { remBad: remBad || selfBad, sumBad: sumBad || selfBad };
   };
@@ -1090,10 +1090,51 @@ export default function SeguimientoDeOtsAuxPage({ params }: Props) {
   };
 
   const badAgg = useMemo(() => {
-    const bySourceTarget = new Map<
+    const allBySourceTarget = new Map<
       number,
-      Map<number, { bad: number; mat: number; partial: boolean }>
+      Map<number, { bad: number; mat: number }>
     >();
+    const remainderBySourceTarget = new Map<
+      number,
+      Map<number, { bad: number; mat: number }>
+    >();
+
+    // NEW: source -> partial_release_id -> (target -> {bad, mat})
+    const perPartialBySourceTarget = new Map<
+      number,
+      Map<number, Map<number, { bad: number; mat: number }>>
+    >();
+
+    const accumulate = (
+      store: Map<number, Map<number, { bad: number; mat: number }>>,
+      sourceId: number,
+      targetId: number,
+      bad: number,
+      mat: number
+    ) => {
+      if (!store.has(sourceId)) store.set(sourceId, new Map());
+      const m = store.get(sourceId)!;
+      const prev = m.get(targetId) ?? { bad: 0, mat: 0 };
+      m.set(targetId, { bad: prev.bad + bad, mat: prev.mat + mat });
+    };
+
+    const accumulatePerPartial = (
+      sourceId: number,
+      partialId: number,
+      targetId: number,
+      bad: number,
+      mat: number
+    ) => {
+      if (!perPartialBySourceTarget.has(sourceId)) {
+        perPartialBySourceTarget.set(sourceId, new Map());
+      }
+      const byPartial = perPartialBySourceTarget.get(sourceId)!;
+      if (!byPartial.has(partialId)) byPartial.set(partialId, new Map());
+      const targetMap = byPartial.get(partialId)!;
+
+      const prev = targetMap.get(targetId) ?? { bad: 0, mat: 0 };
+      targetMap.set(targetId, { bad: prev.bad + bad, mat: prev.mat + mat });
+    };
 
     const flows = workOrder?.flow ?? [];
     flows.forEach((f: any) => {
@@ -1104,52 +1145,65 @@ export default function SeguimientoDeOtsAuxPage({ params }: Props) {
 
         const bad = toNum(d?.bad_quantity);
         const mat = toNum(d?.material_quantity);
-        const isPartial = Number(d?.partial_release_id) > 0;
+        const partialId = Number(d?.partial_release_id);
 
-        if (!bySourceTarget.has(sourceId)) {
-          bySourceTarget.set(sourceId, new Map());
+        // Total (todas las contribuciones)
+        accumulate(allBySourceTarget, sourceId, targetId, bad, mat);
+
+        if (Number.isFinite(partialId) && partialId > 0) {
+          // Por parcial
+          accumulatePerPartial(sourceId, partialId, targetId, bad, mat);
+        } else {
+          // Remanente (sin parcial)
+          accumulate(remainderBySourceTarget, sourceId, targetId, bad, mat);
         }
-        const targetMap = bySourceTarget.get(sourceId)!;
-        const prev = targetMap.get(targetId) ?? {
-          bad: 0,
-          mat: 0,
-          partial: false,
-        };
-
-        targetMap.set(targetId, {
-          bad: prev.bad + bad,
-          mat: prev.mat + mat,
-          partial: prev.partial || isPartial,
-        });
       });
     });
 
-    return { bySourceTarget };
+    return {
+      allBySourceTarget,
+      remainderBySourceTarget,
+      perPartialBySourceTarget,
+    };
   }, [workOrder]);
 
-  const sumBadBySource = (sourceId: number, includeSelf: boolean) => {
-    const m = badAgg.bySourceTarget.get(Number(sourceId));
+  const sumBadBySource = (
+    sourceId: number,
+    includeSelf: boolean,
+    partialId?: number
+  ) => {
+    let m: Map<number, { bad: number; mat: number }> | undefined;
+
+    if (partialId) {
+      const byPartial = badAgg.perPartialBySourceTarget.get(Number(sourceId));
+      m = byPartial?.get(Number(partialId));
+    } else {
+      m = badAgg.allBySourceTarget.get(Number(sourceId));
+    }
+
     if (!m) return 0;
+
     let total = 0;
     m.forEach((v, tId) => {
+      // si es el mismo área
+      if (Number(tId) === Number(sourceId)) {
+        // solo suma las malas, NO el material
+        total += toNum(v.bad);
+        return;
+      }
+
+      // si no se incluyen las malas del mismo área, se salta
       if (!includeSelf && Number(tId) === Number(sourceId)) return;
+
+      // en los demás casos, suma normalmente
       total += toNum(v.bad);
     });
+
     return total;
   };
 
   const getBlockKey = (areaId: number): BlockKey | undefined =>
     areaBlockMap[Number(areaId)];
-
-  const getSelfBadAndMat = (area: AreaData) => {
-    const block = getBlockKey(Number(area.id));
-    const bad = toNum(area?.response?.[block as BlockKey]?.bad_quantity ?? 0);
-    // si manejas material en response (p.ej. corte), úsalo; si no, 0.
-    const mat = toNum(
-      area?.response?.[block as BlockKey]?.material_quantity ?? 0
-    );
-    return { bad, mat };
-  };
 
   const handleOpenBadQuantityModal = (
     ownerArea: AreaData,
@@ -1255,7 +1309,8 @@ export default function SeguimientoDeOtsAuxPage({ params }: Props) {
   };
 
   const getAreaSumaTotal = (area: AreaData) => {
-    const badToOthers = sumBadBySource(Number(area.id ?? 0), false);
+    const partialId = area.partials?.[0]?.id;
+    const badToOthers = sumBadBySource(Number(area.id ?? 0), false, partialId);
 
     // Caso 1: Áreas con parciales (y con id >= 6)
     if (area.partials?.length && area.id >= 6) {
@@ -1270,13 +1325,13 @@ export default function SeguimientoDeOtsAuxPage({ params }: Props) {
       const cqm = Number(firstAnswer?.sample_quantity ?? 0);
       const noprocess = Number(p?.noprocess_quantity ?? 0);
 
-      console.log(buenas, 'buenas')
-      console.log(malas, 'malas')
-      console.log(excedente, 'excedente')
-      console.log(defectuoso, 'defectuoso')
-      console.log(muestras, 'muestras')
-      console.log(cqm, 'cqm')
-      console.log(badToOthers, 'badToOthers')
+      console.log(buenas, 'buenas');
+      console.log(malas, 'malas');
+      console.log(excedente, 'excedente');
+      console.log(defectuoso, 'defectuoso');
+      console.log(muestras, 'muestras');
+      console.log(cqm, 'cqm');
+      console.log(badToOthers, 'badToOthers');
 
       return (
         buenas +
@@ -1298,14 +1353,7 @@ export default function SeguimientoDeOtsAuxPage({ params }: Props) {
       const muestras = Number(area.muestras ?? 0);
       const noprocess = Number(area.noprocess ?? 0);
 
-      return (
-        buenas +
-        excedente +
-        defectuoso +
-        cqm +
-        muestras +
-        noprocess
-      );
+      return buenas + excedente + defectuoso + cqm + muestras + noprocess;
     }
 
     // Caso 3: Sin parciales (id >= 6 pero sin partials)
@@ -1614,7 +1662,8 @@ export default function SeguimientoDeOtsAuxPage({ params }: Props) {
       if (baseline.supportsMaterial) {
         const matEntry = values.find((v) => {
           const n = normalizeSummaryLabel(v.label);
-          return n.includes('fabrica') || n.includes('materia');
+          console.log(n, 'normalize');
+          return n.includes('malo de f') || n.includes('materia');
         });
         const nextMat = toInt(matEntry?.value);
         materialChanged = nextMat !== toInt(baseline.material ?? 0);
@@ -1836,71 +1885,72 @@ export default function SeguimientoDeOtsAuxPage({ params }: Props) {
           sourceWorkOrderFlowId,
           partialReleaseId,
         };
+        console.log('payload modal', payload);
         await updateWorkOrderAreas(workOrder.ot_id, payload);
 
-        // === BUMP opcional: subir counters del bloque para reflejo inmediato en UI ===
-        const deltas: Array<{
-          areaId: number;
-          deltaBad: number;
-          deltaMat: number;
-        }> = [];
-        for (const item of modalInputs) {
-          const areaId = Number(item.areaId);
-          const base = baselineMap.get(areaId);
-          if (!base) continue;
+        // // === BUMP opcional: subir counters del bloque para reflejo inmediato en UI ===
+        // const deltas: Array<{
+        //   areaId: number;
+        //   deltaBad: number;
+        //   deltaMat: number;
+        // }> = [];
+        // for (const item of modalInputs) {
+        //   const areaId = Number(item.areaId);
+        //   const base = baselineMap.get(areaId);
+        //   if (!base) continue;
 
-          const badEntry = (item.values ?? []).find(
-            (v) => normalizeSummaryLabel(v.label) === 'malas'
-          );
-          const nextBad = toInt(badEntry?.value);
-          const deltaBad = nextBad - toInt(base.bad);
+        //   const badEntry = (item.values ?? []).find(
+        //     (v) => normalizeSummaryLabel(v.label) === 'malas'
+        //   );
+        //   const nextBad = toInt(badEntry?.value);
+        //   const deltaBad = nextBad - toInt(base.bad);
 
-          let deltaMat = 0;
-          if (base.supportsMaterial) {
-            const matEntry = (item.values ?? []).find((v) => {
-              const n = normalizeSummaryLabel(v.label);
-              return n.includes('fabrica') || n.includes('materia');
-            });
-            deltaMat = toInt(matEntry?.value) - toInt(base.material ?? 0);
-          }
+        //   let deltaMat = 0;
+        //   if (base.supportsMaterial) {
+        //     const matEntry = (item.values ?? []).find((v) => {
+        //       const n = normalizeSummaryLabel(v.label);
+        //       return n.includes('fabrica') || n.includes('materia');
+        //     });
+        //     deltaMat = toInt(matEntry?.value) - toInt(base.material ?? 0);
+        //   }
 
-          if (deltaBad !== 0 || deltaMat !== 0) {
-            deltas.push({ areaId, deltaBad, deltaMat });
-          }
-        }
+        //   if (deltaBad !== 0 || deltaMat !== 0) {
+        //     deltas.push({ areaId, deltaBad, deltaMat });
+        //   }
+        // }
 
-        const bumps = deltas
-          .map(({ areaId, deltaBad, deltaMat }) => {
-            const block = areaBlockMap[areaId] as BlockKey | undefined;
-            if (!block) return null;
-            const flow = workOrder?.flow?.find(
-              (f: any) => Number(f.area_id) === areaId
-            );
-            const blockId = flow?.areaResponse?.[block]?.id;
-            if (!blockId) return null;
+        // const bumps = deltas
+        //   .map(({ areaId, deltaBad, deltaMat }) => {
+        //     const block = areaBlockMap[areaId] as BlockKey | undefined;
+        //     if (!block) return null;
+        //     const flow = workOrder?.flow?.find(
+        //       (f: any) => Number(f.area_id) === areaId
+        //     );
+        //     const blockId = flow?.areaResponse?.[block]?.id;
+        //     if (!blockId) return null;
 
-            const data: Record<string, number> = {};
-            if (deltaBad !== 0) {
-              const now = toInt(flow?.areaResponse?.[block]?.bad_quantity ?? 0);
-              data.bad_quantity = now + deltaBad;
-            }
-            if (deltaMat !== 0) {
-              const now = toInt(
-                flow?.areaResponse?.[block]?.material_quantity ?? 0
-              );
-              data.material_quantity = now + deltaMat;
-            }
-            if (Object.keys(data).length === 0) return null;
+        //     const data: Record<string, number> = {};
+        //     if (deltaBad !== 0) {
+        //       const now = toInt(flow?.areaResponse?.[block]?.bad_quantity ?? 0);
+        //       data.bad_quantity = now + deltaBad;
+        //     }
+        //     if (deltaMat !== 0) {
+        //       const now = toInt(
+        //         flow?.areaResponse?.[block]?.material_quantity ?? 0
+        //       );
+        //       data.material_quantity = now + deltaMat;
+        //     }
+        //     if (Object.keys(data).length === 0) return null;
 
-            return { areaId, block, blockId, data };
-          })
-          .filter(Boolean);
+        //     return { areaId, block, blockId, data };
+        //   })
+        //   .filter(Boolean);
 
-        if (bumps.length > 0) {
-          await updateAreaResponseData(workOrder.ot_id, {
-            areas: bumps as any,
-          });
-        }
+        // if (bumps.length > 0) {
+        //   await updateAreaResponseData(workOrder.ot_id, {
+        //     areas: bumps as any,
+        //   });
+        // }
 
         await loadData();
         alert('Cambios guardados correctamente');
@@ -2652,12 +2702,14 @@ export default function SeguimientoDeOtsAuxPage({ params }: Props) {
                                   );
                                   remSum = getRemainderBySum(area, 'noprocess');
                                   break;
-                                  case 'malas': {
-                                    const { remBad, sumBad } = getRemTotal(area.id);
-                                    remValue = remBad; // 👈 20 (solo REM)
-                                    remSum = sumBad;   // 👈 35 (suma total)
-                                    break;
-                                  }
+                                case 'malas': {
+                                  const { remBad, sumBad } = getRemTotal(
+                                    area.id
+                                  );
+                                  remValue = remBad; // 👈 20 (solo REM)
+                                  remSum = sumBad; // 👈 35 (suma total)
+                                  break;
+                                }
                                 default:
                                   remValue = 0;
                               }

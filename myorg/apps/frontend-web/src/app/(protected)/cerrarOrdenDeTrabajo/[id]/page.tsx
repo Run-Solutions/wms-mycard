@@ -1038,14 +1038,38 @@ export default function CloseWorkOrderAuxPage({ params }: Props) {
     };
   }, [workOrder]);
 
-  const sumBadBySource = (sourceId: number, includeSelf: boolean) => {
-    const m = badAgg.allBySourceTarget.get(Number(sourceId));
+  const sumBadBySource = (
+    sourceId: number,
+    includeSelf: boolean,
+    partialId?: number
+  ) => {
+    let m: Map<number, { bad: number; mat: number }> | undefined;
+
+    if (partialId) {
+      const byPartial = badAgg.perPartialBySourceTarget.get(Number(sourceId));
+      m = byPartial?.get(Number(partialId));
+    } else {
+      m = badAgg.allBySourceTarget.get(Number(sourceId));
+    }
+
     if (!m) return 0;
+
     let total = 0;
     m.forEach((v, tId) => {
+      // si es el mismo área
+      if (Number(tId) === Number(sourceId)) {
+        // solo suma las malas, NO el material
+        total += toNum(v.bad);
+        return;
+      }
+
+      // si no se incluyen las malas del mismo área, se salta
       if (!includeSelf && Number(tId) === Number(sourceId)) return;
+
+      // en los demás casos, suma normalmente
       total += toNum(v.bad);
     });
+
     return total;
   };
 
@@ -1166,7 +1190,8 @@ export default function CloseWorkOrderAuxPage({ params }: Props) {
   };
 
   const getAreaSumaTotal = (area: AreaData) => {
-    const badToOthers = sumBadBySource(Number(area.id ?? 0), false);
+    const partialId = area.partials?.[0]?.id;
+    const badToOthers = sumBadBySource(Number(area.id ?? 0), false, partialId);
 
     // Caso 1: Áreas con parciales (y con id >= 6)
     if (area.partials?.length && area.id >= 6) {
@@ -1181,13 +1206,13 @@ export default function CloseWorkOrderAuxPage({ params }: Props) {
       const cqm = Number(firstAnswer?.sample_quantity ?? 0);
       const noprocess = Number(p?.noprocess_quantity ?? 0);
 
-      console.log(buenas, 'buenas')
-      console.log(malas, 'malas')
-      console.log(excedente, 'excedente')
-      console.log(defectuoso, 'defectuoso')
-      console.log(muestras, 'muestras')
-      console.log(cqm, 'cqm')
-      console.log(badToOthers, 'badToOthers')
+      console.log(buenas, 'buenas');
+      console.log(malas, 'malas');
+      console.log(excedente, 'excedente');
+      console.log(defectuoso, 'defectuoso');
+      console.log(muestras, 'muestras');
+      console.log(cqm, 'cqm');
+      console.log(badToOthers, 'badToOthers');
 
       return (
         buenas +
@@ -1209,14 +1234,7 @@ export default function CloseWorkOrderAuxPage({ params }: Props) {
       const muestras = Number(area.muestras ?? 0);
       const noprocess = Number(area.noprocess ?? 0);
 
-      return (
-        buenas +
-        excedente +
-        defectuoso +
-        cqm +
-        muestras +
-        noprocess
-      );
+      return buenas + excedente + defectuoso + cqm + muestras + noprocess;
     }
 
     // Caso 3: Sin parciales (id >= 6 pero sin partials)
