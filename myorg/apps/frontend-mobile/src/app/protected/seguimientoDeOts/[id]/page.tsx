@@ -1232,72 +1232,66 @@ const WorkOrderDetailScreen: React.FC = () => {
   };
 
   const getAreaSumaTotal = (area: AreaData) => {
-    const partialId = area.partials?.[0]?.id;
-    const badToOthers = sumBadBySource(Number(area.id ?? 0), false, partialId);
-
-    // Caso 1: Áreas con parciales (y con id >= 6)
-    if (area.partials?.length && area.id >= 6) {
+    const sid = Number(area.id ?? 0);
+  
+    // normaliza partialId (usa ALL si no hay parcial válido)
+    const pidRaw = area.partials?.[0]?.id;
+    const pid = Number.isFinite(Number(pidRaw)) && Number(pidRaw) > 0 ? Number(pidRaw) : undefined;
+  
+    // selfBad: malas del área a sí misma (sid -> sid)
+    const mapForSelf =
+      pid
+        ? badAgg.perPartialBySourceTarget.get(sid)?.get(pid)
+        : badAgg.allBySourceTarget.get(sid);
+    const selfBad = toNum(mapForSelf?.get(sid)?.bad);
+  
+    // malas enviadas a otras áreas (excluye self)
+    const badToOthers = sumBadBySource(sid, false, pid);
+  
+    // Caso 1: Áreas con parciales (id >= 6)
+    if (area.partials?.length && sid >= 6) {
       const p = area.partials[0];
       const firstAnswer = area.answers?.[0];
-
-      const buenas = Number(p?.quantity ?? 0);
-      const malas = Number(p?.bad_quantity ?? 0);
-      const excedente = Number(p?.excess_quantity ?? 0);
+  
+      const buenas     = Number(p?.quantity ?? 0);
+      const excedente  = Number(p?.excess_quantity ?? 0);
       const defectuoso = Number(p?.material_quantity ?? 0);
-      const muestras = Number(p?.formAuditory?.sample_auditory ?? 0);
-      const cqm = Number(firstAnswer?.sample_quantity ?? 0);
-      const noprocess = Number(p?.noprocess_quantity ?? 0);
+      const muestras   = Number(p?.formAuditory?.sample_auditory ?? 0);
+      const cqm        = Number(firstAnswer?.sample_quantity ?? 0);
+      const noprocess  = Number(p?.noprocess_quantity ?? 0);
 
-      console.log(buenas, 'buenas');
-      console.log(malas, 'malas');
-      console.log(excedente, 'excedente');
-      console.log(defectuoso, 'defectuoso');
-      console.log(muestras, 'muestras');
-      console.log(cqm, 'cqm');
-      console.log(badToOthers, 'badToOthers');
-
-      return (
-        buenas +
-        excedente +
-        defectuoso +
-        badToOthers +
-        cqm +
-        muestras +
-        noprocess
-      );
+      console.log('selfBad', selfBad)
+      console.log('buenas', buenas)
+      console.log('excedente', excedente)
+      console.log('defectuoso', defectuoso)
+      console.log('defectuoso', defectuoso)
+      console.log('badToOthers', badToOthers)
+  
+      // ⬇️ incluimos selfBad (no uses p.bad_quantity para evitar doble conteo)
+      return buenas + selfBad + excedente + defectuoso + badToOthers + cqm + muestras + noprocess;
     }
-
-    // Caso 2: Áreas con id < 6
-    if (area.id < 6) {
-      const buenas = Number(area.buenas ?? 0);
-      const excedente = Number(area.excedente ?? 0);
+  
+    // Caso 2: Áreas con id < 6 (sin material / self explícito)
+    if (sid < 6) {
+      const buenas     = Number(area.buenas ?? 0);
+      const excedente  = Number(area.excedente ?? 0);
       const defectuoso = Number(area.defectuoso ?? 0);
-      const cqm = Number(area.cqm ?? 0);
-      const muestras = Number(area.muestras ?? 0);
-      const noprocess = Number(area.noprocess ?? 0);
-
+      const cqm        = Number(area.cqm ?? 0);
+      const muestras   = Number(area.muestras ?? 0);
+      const noprocess  = Number(area.noprocess ?? 0);
+  
       return buenas + excedente + defectuoso + cqm + muestras + noprocess;
     }
-
-    // Caso 3: Sin parciales (id >= 6 pero sin partials)
-    const buenas = Number(area.buenas ?? 0);
-    const malas = Number(area.malas ?? 0);
-    const excedente = Number(area.excedente ?? 0);
-    const defectuoso = Number(area.defectuoso ?? 0);
-    const cqm = Number(area.cqm ?? 0);
-    const muestras = Number(area.muestras ?? 0);
-    const noprocess = Number(area.noprocess ?? 0);
-
-    return (
-      buenas +
-      malas +
-      excedente +
-      badToOthers +
-      defectuoso +
-      cqm +
-      muestras +
-      noprocess
-    );
+  
+    // Caso 3: id >= 6 sin parciales -> usa selfBad + badToOthers
+    const buenas2     = Number(area.buenas ?? 0);
+    const excedente2  = Number(area.excedente ?? 0);
+    const defectuoso2 = Number(area.defectuoso ?? 0);
+    const cqm2        = Number(area.cqm ?? 0);
+    const muestras2   = Number(area.muestras ?? 0);
+    const noprocess2  = Number(area.noprocess ?? 0);
+  
+    return buenas2 + excedente2 + badToOthers + defectuoso2 + cqm2 + muestras2 + noprocess2;
   };
 
   useEffect(() => {
@@ -1388,35 +1382,28 @@ const WorkOrderDetailScreen: React.FC = () => {
     includeSelf: boolean,
     partialId?: number
   ) => {
+    const sid = Number(sourceId);
+  
+    // Selecciona el mapa correcto (por parcial > 0 o total)
     let m: Map<number, { bad: number; mat: number }> | undefined;
-
-    if (partialId) {
-      const byPartial = badAgg.perPartialBySourceTarget.get(Number(sourceId));
-      m = byPartial?.get(Number(partialId));
+    if (Number.isFinite(Number(partialId)) && Number(partialId) > 0) {
+      m = badAgg.perPartialBySourceTarget.get(sid)?.get(Number(partialId));
     } else {
-      m = badAgg.allBySourceTarget.get(Number(sourceId));
+      m = badAgg.allBySourceTarget.get(sid);
     }
-
     if (!m) return 0;
-
+  
+    // Suma evitando duplicar el self cuando includeSelf = false
     let total = 0;
     m.forEach((v, tId) => {
-      // si es el mismo área
-      if (Number(tId) === Number(sourceId)) {
-        // solo suma las malas, NO el material
-        total += toNum(v.bad);
-        return;
-      }
-
-      // si no se incluyen las malas del mismo área, se salta
-      if (!includeSelf && Number(tId) === Number(sourceId)) return;
-
-      // en los demás casos, suma normalmente
-      total += toNum(v.bad);
+      const tid = Number(tId);
+      if (!includeSelf && tid === sid) return; // chequea ANTES de sumar
+      total += toNum(v.bad); // nunca sumes v.mat aquí
     });
-
+  
     return total;
   };
+
 
   const getBlockKey = (areaId: number): BlockKey | undefined =>
     areaBlockMap[Number(areaId)];

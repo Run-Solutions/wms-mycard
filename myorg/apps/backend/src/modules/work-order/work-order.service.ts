@@ -1261,13 +1261,18 @@ export class WorkOrderService {
               typeof value?.label === 'string' ? value.label.trim() : '';
             if (!label) return null;
 
-            const numeric = Number(value?.value ?? 0);
+            const toNumberOrNull = (v: unknown) => {
+              if (v === null || v === undefined) return null;
+              if (typeof v === 'string' && v.trim() === '') return null;
+              const n = Number(v);
+              return Number.isFinite(n) ? Math.round(n) : null;
+            };
+            const numeric = toNumberOrNull(value?.value);
+            if (numeric === null) return null;
+            const rounded = Math.max(0, numeric);
             if (!Number.isFinite(numeric)) return null;
 
-            const rounded = Math.round(numeric);
-
             // ✅ Conserva 0 cuando la etiqueta es de MATERIAL (esto permite "bajar a 0")
-            if (rounded === 0 && !isMaterialLabel(label)) return null;
 
             return { label, value: rounded };
           })
